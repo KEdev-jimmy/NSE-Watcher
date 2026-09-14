@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package ke.co.nsewatcher
 
 import android.os.Bundle
@@ -52,7 +54,6 @@ class MarketViewModel(application: Application, private val repository: MarketRe
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable private fun Dashboard(state: AppState, open: (Quote) -> Unit) { val snapshot = state.snapshot ?: return; LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { item { StatusCard(snapshot) }; item { Text("Watchlist overview", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }; item { Summary(snapshot.quotes) }; item { Text("Tracked equities", style = MaterialTheme.typography.titleMedium) }; items(snapshot.quotes, key = { it.symbol }) { StockCard(it, { open(it) }) }; item { Text("Recent news", style = MaterialTheme.typography.titleMedium) }; items(state.news.take(2)) { NewsCard(it) } } }
 @Composable private fun StatusCard(s: MarketSnapshot) { val stamp = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault()).format(s.updatedAt); Card { Column(Modifier.padding(16.dp)) { AssistChip(onClick = {}, label = { Text("Market status: ${s.status}") }, leadingIcon = { Icon(Icons.Default.Info, null) }); Spacer(Modifier.height(8.dp)); Text("Last updated: $stamp (demo refresh)", style = MaterialTheme.typography.bodyMedium); Text("Sample values are illustrative and may be delayed or unavailable. They are not live NSE quotes.", style = MaterialTheme.typography.bodySmall) } } }
 @Composable private fun Summary(quotes: List<Quote>) { val best = quotes.maxByOrNull { it.dailyChange }; val worst = quotes.minByOrNull { it.dailyChange }; Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) { Metric("Positive", quotes.count { it.dailyChange > 0 }.toString(), Modifier.weight(1f)); Metric("Strongest", best?.symbol ?: "—", Modifier.weight(1f)); Metric("Weakest", worst?.symbol ?: "—", Modifier.weight(1f)) } }
