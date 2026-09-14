@@ -9,7 +9,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.BackHandler
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -124,7 +124,6 @@ fun NSEWatcherApp(vm: MarketViewModel, prefs: SharedPreferences) {
     fun savePrefs() { prefs.edit().putBoolean("dark_mode", darkMode).putString("username", username).putString("email", email).putString("password", password).putString("description", description).putString("avatar_uri", avatarUri).apply() }
     val internalBackEnabled = settings || account || appearance || selected != null || tab != 0 || searchOpen
     BackHandler(enabled = internalBackEnabled) { when { searchOpen -> searchOpen = false; account -> account = false; appearance -> appearance = false; settings -> settings = false; selected != null -> selected = null; tab != 0 -> tab = 0 } }
-
     MaterialTheme(colorScheme = if (darkMode) DarkAppColors else AppColors) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             when {
@@ -147,75 +146,28 @@ private fun MainShell(state: AppState, vm: MarketViewModel, tab: Int, setTab: (I
             val nav = listOf("Home" to Icons.Default.Home, "Watchlist" to Icons.Default.Star, "Portfolio" to Icons.Default.AccountBalanceWallet, "Alerts" to Icons.Default.Notifications, "News" to Icons.Default.Article)
             nav.forEachIndexed { index, item -> NavigationBarItem(selected = tab == index, onClick = { setTab(index) }, icon = { Icon(item.second, item.first, Modifier.size(24.dp)) }, label = { Text(item.first) }, colors = NavigationBarItemDefaults.colors(selectedIconColor = Green, selectedTextColor = Green, indicatorColor = LightGreen, unselectedIconColor = Muted, unselectedTextColor = Muted)) }
         }
-    }) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
-            when {
-                state.loading -> CircularProgressIndicator(Modifier.align(Alignment.Center), color = Green)
-                state.error != null && state.snapshot == null -> ErrorState(state.error, vm::refresh)
-                tab == 0 -> Dashboard(state, open, viewAllWatchlist)
-                tab == 1 -> Watchlist(state.snapshot?.quotes.orEmpty(), vm::add, vm::remove, open)
-                tab == 2 -> PortfolioScreen(holdings, setHoldings)
-                tab == 3 -> AlertsScreen(alerts, setAlerts)
-                else -> NewsScreen(state.news)
-            }
-        }
-    }
+    }) { padding -> Box(Modifier.fillMaxSize().padding(padding)) { when { state.loading -> CircularProgressIndicator(Modifier.align(Alignment.Center), color = Green); state.error != null && state.snapshot == null -> ErrorState(state.error, vm::refresh); tab == 0 -> Dashboard(state, open, viewAllWatchlist); tab == 1 -> Watchlist(state.snapshot?.quotes.orEmpty(), vm::add, vm::remove, open); tab == 2 -> PortfolioScreen(holdings, setHoldings); tab == 3 -> AlertsScreen(alerts, setAlerts); else -> NewsScreen(state.news) } } }
 }
 
 @Composable
-private fun TopBar(openSettings: () -> Unit, openSearch: () -> Unit) {
-    TopAppBar(colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface), title = {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Surface(Modifier.size(40.dp), RoundedCornerShape(11.dp), color = LightGreen) { Icon(Icons.Default.ShowChart, null, tint = Green, Modifier.padding(7.dp)) }
-            Spacer(Modifier.width(9.dp))
-            Column { Text("NSE Watcher", fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium); Text("Track • Analyze • Grow", style = MaterialTheme.typography.labelSmall, color = Muted) }
-        }
-    }, actions = {
-        IconButton(onClick = openSearch) { Icon(Icons.Default.Search, "Search", tint = Green, Modifier.size(27.dp)) }
-        IconButton(onClick = openSettings) { Icon(Icons.Default.Settings, "Settings", tint = Green, Modifier.size(28.dp)) }
-    })
-}
+private fun TopBar(openSettings: () -> Unit, openSearch: () -> Unit) { TopAppBar(colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface), title = { Row(verticalAlignment = Alignment.CenterVertically) { Surface(Modifier.size(40.dp), RoundedCornerShape(11.dp), color = LightGreen) { Icon(Icons.Default.ShowChart, null, tint = Green, Modifier.padding(7.dp)) }; Spacer(Modifier.width(9.dp)); Column { Text("NSE Watcher", fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleMedium); Text("Track • Analyze • Grow", style = MaterialTheme.typography.labelSmall, color = Muted) } } }, actions = { IconButton(onClick = openSearch) { Icon(Icons.Default.Search, "Search", tint = Green, Modifier.size(27.dp)) }; IconButton(onClick = openSettings) { Icon(Icons.Default.Settings, "Settings", tint = Green, Modifier.size(28.dp)) } }) }
 
 @Composable
-private fun Dashboard(state: AppState, open: (Quote) -> Unit, viewAll: () -> Unit) {
-    val quotes = state.snapshot?.quotes.orEmpty()
-    val gainers = quotes.sortedByDescending { it.dailyChange }
-    val losers = quotes.sortedBy { it.dailyChange }
-    LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        item { MarketHero(state.snapshot?.updatedAt?.toString()?.replace('T', ' ')?.take(16) ?: "—") }
-        item { MarketSummary(quotes) }
-        item { SectionTitle("Market Indices", "NSE benchmark snapshot") }
-        item { IndicesRow() }
-        item { SectionTitleWithAction("🔥 Market Movers", "Top gainers and losers", "View All") {} }
-        item { MarketMovers(gainers.take(4), losers.take(4), open) }
-        item { SectionTitleWithAction("⭐ Your Watchlist", "Your tracked stocks", "View All", viewAll) }
-        item { LazyRow(contentPadding = PaddingValues(horizontal = 1.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) { items(quotes.take(6), key = { it.symbol }) { quote -> HorizontalStockCard(quote) { open(quote) } } } }
-        item { SectionTitle("🧠 NSE Watcher Intelligence", "Explainable demo analysis") }
-        item { IntelligenceSummary(quotes) }
-        item { SectionTitleWithAction("📰 Latest News", "From your tracked stocks", "View All") {} }
-        items(state.news.take(3), key = { it.id }) { NewsCard(it) }
-        item { DemoBanner() }
-    }
-}
+private fun Dashboard(state: AppState, open: (Quote) -> Unit, viewAll: () -> Unit) { val quotes = state.snapshot?.quotes.orEmpty(); val gainers = quotes.sortedByDescending { it.dailyChange }; val losers = quotes.sortedBy { it.dailyChange }; LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) { item { MarketHero(state.snapshot?.updatedAt?.toString()?.replace('T', ' ')?.take(16) ?: "—") }; item { MarketSummary(quotes) }; item { SectionTitle("Market Indices", "NSE benchmark snapshot") }; item { IndicesRow() }; item { SectionTitleWithAction("🔥 Market Movers", "Top gainers and losers", "View All") {} }; item { MarketMovers(gainers.take(4), losers.take(4), open) }; item { SectionTitleWithAction("⭐ Your Watchlist", "Your tracked stocks", "View All", viewAll) }; item { LazyRow(contentPadding = PaddingValues(horizontal = 1.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) { items(quotes.take(6), key = { it.symbol }) { quote -> HorizontalStockCard(quote) { open(quote) } } } }; item { SectionTitle("🧠 NSE Watcher Intelligence", "Explainable demo analysis") }; item { IntelligenceSummary(quotes) }; item { SectionTitleWithAction("📰 Latest News", "From your tracked stocks", "View All") {} }; items(state.news.take(3), key = { it.id }) { NewsCard(it) }; item { DemoBanner() } } }
 
 @Composable private fun MarketHero(updated: String) { Card(Modifier.fillMaxWidth(), RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = LightGreen)) { Row(Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Row(verticalAlignment = Alignment.CenterVertically) { Box(Modifier.size(9.dp).clip(CircleShape).background(Green)); Spacer(Modifier.width(7.dp)); Text("MARKET SESSION", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge) }; Spacer(Modifier.height(3.dp)); Text("DEMO MARKET", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = Green); Text("Sample prices • not live data", style = MaterialTheme.typography.bodySmall, color = Muted); Text("Updated $updated", style = MaterialTheme.typography.labelSmall, color = Muted) }; Column(horizontalAlignment = Alignment.End) { Text("NSE", fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.titleLarge); Text("Nairobi Securities\nExchange", style = MaterialTheme.typography.labelSmall, color = Muted, textAlign = TextAlign.End) } } } }
-
 @Composable private fun MarketSummary(quotes: List<Quote>) { val gain = quotes.count { it.dailyChange > 0 }; val loss = quotes.count { it.dailyChange < 0 }; val flat = quotes.size - gain - loss; Card(Modifier.fillMaxWidth(), RoundedCornerShape(13.dp), border = BorderStroke(1.dp, BorderGreen)) { Row(Modifier.fillMaxWidth().padding(vertical = 9.dp), horizontalArrangement = Arrangement.SpaceEvenly) { SummaryStat("Stocks", quotes.size.toString(), Green, Modifier.weight(1f)); SummaryDivider(); SummaryStat("Gainers", gain.toString(), Green, Modifier.weight(1f)); SummaryDivider(); SummaryStat("Losers", loss.toString(), Red, Modifier.weight(1f)); SummaryDivider(); SummaryStat("Unchanged", flat.toString(), TextDark, Modifier.weight(1f)) } } }
 @Composable private fun SummaryDivider() { Box(Modifier.width(1.dp).height(34.dp).background(BorderGreen)) }
 @Composable private fun SummaryStat(label: String, value: String, tint: Color, modifier: Modifier) { Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) { Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold, color = tint); Text(label, style = MaterialTheme.typography.labelSmall, color = Muted) } }
 @Composable private fun SectionTitle(title: String, subtitle: String) { Column { Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold); Text(subtitle, color = Muted, style = MaterialTheme.typography.labelSmall) } }
 @Composable private fun SectionTitleWithAction(title: String, subtitle: String, action: String, onAction: () -> Unit = {}) { Row(Modifier.fillMaxWidth().padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold); Text(subtitle, color = Muted, style = MaterialTheme.typography.labelSmall) }; TextButton(onClick = onAction, contentPadding = PaddingValues(horizontal = 2.dp, vertical = 0.dp)) { Text(action, color = Green, fontWeight = FontWeight.Bold); Icon(Icons.Default.ChevronRight, null, tint = Green, Modifier.size(18.dp)) } } }
-
 @Composable private fun IndicesRow() { LazyRow(horizontalArrangement = Arrangement.spacedBy(9.dp)) { items(demoIndices) { index -> Card(Modifier.width(150.dp), RoundedCornerShape(14.dp), border = BorderStroke(1.dp, BorderGreen)) { Column(Modifier.padding(11.dp)) { Text(index.name, fontWeight = FontWeight.ExtraBold); Text(String.format(Locale.US, "%.2f", index.value), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold); Text(String.format(Locale.US, "%+.2f%%", index.change), color = if (index.change >= 0) Green else Red, fontWeight = FontWeight.Bold); Text(index.description, color = Muted, style = MaterialTheme.typography.labelSmall, maxLines = 1) } } } } }
 @Composable private fun MarketMovers(gainers: List<Quote>, losers: List<Quote>, open: (Quote) -> Unit) { Card(Modifier.fillMaxWidth(), RoundedCornerShape(17.dp), border = BorderStroke(1.dp, BorderGreen)) { Row(Modifier.fillMaxWidth().padding(vertical = 12.dp)) { MoverColumn("Top Gainers", gainers, true, Modifier.weight(1f), open); Box(Modifier.width(1.dp).height(170.dp).background(BorderGreen)); MoverColumn("Top Losers", losers, false, Modifier.weight(1f), open) } } }
 @Composable private fun MoverColumn(title: String, quotes: List<Quote>, positive: Boolean, modifier: Modifier, open: (Quote) -> Unit) { Column(modifier.padding(horizontal = 13.dp)) { Row(verticalAlignment = Alignment.CenterVertically) { Icon(if (positive) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward, null, tint = if (positive) Green else Red, Modifier.size(22.dp)); Spacer(Modifier.width(5.dp)); Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.ExtraBold, color = if (positive) Green else Red) }; Spacer(Modifier.height(8.dp)); quotes.forEach { quote -> MoverRow(quote, positive) { open(quote) } } } }
 @Composable private fun MoverRow(q: Quote, positive: Boolean, onClick: () -> Unit) { Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) { StockLogo(q.symbol, 30); Spacer(Modifier.width(7.dp)); Text(q.symbol.removeSuffix(".KE"), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f)); Text(String.format(Locale.US, "%+.1f%%", q.dailyChange), fontWeight = FontWeight.ExtraBold, color = if (positive) Green else Red, style = MaterialTheme.typography.bodyMedium) } }
 @Composable private fun StockLogo(symbol: String, size: Int) { val short = symbol.removeSuffix(".KE"); val background = when (short) { "SCOM" -> Color(0xFF0B8F4D); "KCB" -> Color(0xFF1B4D9B); "EQTY" -> Color(0xFF137A45); "ABSA" -> Color(0xFFC6283D); "COOP" -> Color(0xFF1769AA); "EABL" -> Color(0xFFB8A23A); "KPLC" -> Color(0xFF285C8C); "BAT" -> Color(0xFF243B75); else -> Green }; Surface(Modifier.size(size.dp), RoundedCornerShape((size / 3).dp), color = background) { Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(short.take(3), color = Color.White, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.labelSmall) } } }
-
 @Composable private fun HorizontalStockCard(q: Quote, open: () -> Unit) { val tint = if (q.dailyChange >= 0) Green else Red; Card(Modifier.width(188.dp).clickable(onClick = open), RoundedCornerShape(15.dp), border = BorderStroke(1.dp, BorderGreen)) { Column(Modifier.padding(11.dp)) { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { StockLogo(q.symbol, 30); Spacer(Modifier.width(7.dp)); Column(Modifier.weight(1f)) { Text(q.symbol.removeSuffix(".KE"), fontWeight = FontWeight.ExtraBold); Text(q.companyName, style = MaterialTheme.typography.labelSmall, color = Muted, maxLines = 1) }; Text(String.format(Locale.US, "%+.1f%%", q.dailyChange), color = tint, fontWeight = FontWeight.ExtraBold) }; Spacer(Modifier.height(7.dp)); Text(String.format(Locale.US, "KSh %.2f", q.price), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.ExtraBold); Spacer(Modifier.height(4.dp)); Sparkline(q.history, tint); Text(q.signal.name, color = tint, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold) } } }
-
 @Composable private fun Sparkline(values: List<Double>, tint: Color) { Canvas(Modifier.fillMaxWidth().height(35.dp)) { if (values.size < 2) return@Canvas; val min = values.minOrNull() ?: 0.0; val max = values.maxOrNull() ?: 1.0; val range = (max - min).takeIf { it > 0.0 } ?: 1.0; val path = Path(); values.forEachIndexed { index, value -> val x = size.width * index / (values.size - 1).toFloat(); val y = size.height - ((value - min) / range).toFloat() * size.height; if (index == 0) path.moveTo(x, y) else path.lineTo(x, y) }; drawPath(path, tint, strokeWidth = 4f) } }
-
 @Composable private fun IntelligenceSummary(quotes: List<Quote>) { val best = quotes.maxByOrNull { watcherScore(it) }; Card(Modifier.fillMaxWidth(), RoundedCornerShape(16.dp), border = BorderStroke(1.dp, BorderGreen)) { Column(Modifier.padding(14.dp)) { Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.AutoGraph, null, tint = Green, Modifier.size(23.dp)); Spacer(Modifier.width(8.dp)); Column(Modifier.weight(1f)) { Text("NSE Watcher Score", fontWeight = FontWeight.ExtraBold); Text("Rule-based demo score, not investment advice", style = MaterialTheme.typography.labelSmall, color = Muted) }; if (best != null) ScoreBadge(watcherScore(best)) }; Spacer(Modifier.height(9.dp)); Text(best?.let { "Highest demo score: ${it.symbol.removeSuffix(".KE")} — ${it.signalExplanation}" } ?: "Add stocks to begin analysis.", style = MaterialTheme.typography.bodySmall) } } }
 private fun watcherScore(q: Quote): Int { val momentum = (q.dailyChange * 3 + q.weeklyChange * 1.5 + q.monthlyChange).coerceIn(-20.0, 40.0); val volume = if (q.averageVolume > 0) ((q.volume.toDouble() / q.averageVolume) * 10).coerceIn(0.0, 15.0) else 0.0; return (45 + momentum + volume).coerceIn(0.0, 100.0).toInt() }
 @Composable private fun ScoreBadge(score: Int) { Surface(shape = RoundedCornerShape(10.dp), color = LightGreen) { Text("$score/100", color = Green, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp)) } }
@@ -258,13 +210,4 @@ private fun watcherScore(q: Quote): Int { val momentum = (q.dailyChange * 3 + q.
 @Composable private fun AppearanceScreen(darkMode: Boolean, close: () -> Unit, setDark: (Boolean) -> Unit) { LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) { item { SettingsHeader("Appearance", close) }; item { ThemeOption("Light", !darkMode) { setDark(false) } }; item { ThemeOption("Dark", darkMode) { setDark(true) } }; item { Text("Your theme choice is saved on this device.", color = Muted, style = MaterialTheme.typography.bodySmall) } } }
 @Composable private fun ThemeOption(title: String, selected: Boolean, onClick: () -> Unit) { Card(Modifier.fillMaxWidth().clickable(onClick = onClick), RoundedCornerShape(15.dp), border = BorderStroke(if (selected) 2.dp else 1.dp, if (selected) Green else BorderGreen)) { Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) { Icon(if (title == "Light") Icons.Default.LightMode else Icons.Default.DarkMode, null, tint = Green); Spacer(Modifier.width(10.dp)); Text(title, Modifier.weight(1f), fontWeight = FontWeight.ExtraBold); RadioButton(selected = selected, onClick = onClick) } } }
 
-@Composable private fun Avatar(uri: String?, size: Int) {
-    val context = LocalContext.current
-    val bitmap: ImageBitmap? = remember(uri) {
-        uri?.let { value -> runCatching { context.contentResolver.openInputStream(Uri.parse(value)).use { stream -> stream?.let { BitmapFactory.decodeStream(it)?.asImageBitmap() } } }.getOrNull() }
-    }
-    Surface(Modifier.size(size.dp), CircleShape, color = Green) {
-        if (bitmap != null) Image(bitmap, null, Modifier.fillMaxSize())
-        else Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Icon(Icons.Default.Person, null, tint = Color.White, Modifier.size((size * 0.55f).dp)) }
-    }
-}
+@Composable private fun Avatar(uri: String?, size: Int) { val context = LocalContext.current; val bitmap: ImageBitmap? = remember(uri) { uri?.let { value -> runCatching { context.contentResolver.openInputStream(Uri.parse(value)).use { stream -> stream?.let { BitmapFactory.decodeStream(it)?.asImageBitmap() } } }.getOrNull() } }; Surface(Modifier.size(size.dp), CircleShape, color = Green) { if (bitmap != null) Image(bitmap, null, Modifier.fillMaxSize()) else Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Icon(Icons.Default.Person, null, tint = Color.White, Modifier.size((size * 0.55f).dp)) } } }
