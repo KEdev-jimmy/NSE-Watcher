@@ -10,7 +10,7 @@ data class MarketIndexDemo(
     val description: String
 )
 
-data class FundamentalDemo(
+data class IntelligenceFundamentalDemo(
     val marketCap: String,
     val peRatio: String,
     val pbRatio: String,
@@ -47,13 +47,13 @@ object DemoIntelligenceData {
     )
 
     private val fundamentals = mapOf(
-        "SCOM.KE" to FundamentalDemo("KSh 740.0B", "12.8x", "2.1x", "1.46", "4.1%", "16.8%", "8.2%", "11.4%", "0.38x"),
-        "EQTY.KE" to FundamentalDemo("KSh 178.0B", "6.9x", "1.2x", "6.84", "7.0%", "17.5%", "9.1%", "12.6%", "0.62x"),
-        "KCB.KE" to FundamentalDemo("KSh 126.0B", "4.8x", "0.9x", "8.30", "8.4%", "19.1%", "7.4%", "10.8%", "0.74x"),
-        "ABSA.KE" to FundamentalDemo("KSh 71.0B", "5.7x", "0.8x", "2.35", "8.9%", "14.7%", "6.0%", "8.1%", "0.69x"),
-        "COOP.KE" to FundamentalDemo("KSh 96.0B", "5.2x", "1.0x", "3.04", "7.8%", "18.0%", "7.9%", "9.8%", "0.71x"),
-        "EABL.KE" to FundamentalDemo("KSh 305.0B", "18.4x", "4.2x", "2.10", "2.8%", "23.2%", "6.4%", "5.9%", "1.20x"),
-        "KPLC.KE" to FundamentalDemo("KSh 31.0B", "N/A", "N/A", "-0.42", "0.0%", "N/A", "3.1%", "-", "N/A")
+        "SCOM.KE" to IntelligenceFundamentalDemo("KSh 740.0B", "12.8x", "2.1x", "1.46", "4.1%", "16.8%", "8.2%", "11.4%", "0.38x"),
+        "EQTY.KE" to IntelligenceFundamentalDemo("KSh 178.0B", "6.9x", "1.2x", "6.84", "7.0%", "17.5%", "9.1%", "12.6%", "0.62x"),
+        "KCB.KE" to IntelligenceFundamentalDemo("KSh 126.0B", "4.8x", "0.9x", "8.30", "8.4%", "19.1%", "7.4%", "10.8%", "0.74x"),
+        "ABSA.KE" to IntelligenceFundamentalDemo("KSh 71.0B", "5.7x", "0.8x", "2.35", "8.9%", "14.7%", "6.0%", "8.1%", "0.69x"),
+        "COOP.KE" to IntelligenceFundamentalDemo("KSh 96.0B", "5.2x", "1.0x", "3.04", "7.8%", "18.0%", "7.9%", "9.8%", "0.71x"),
+        "EABL.KE" to IntelligenceFundamentalDemo("KSh 305.0B", "18.4x", "4.2x", "2.10", "2.8%", "23.2%", "6.4%", "5.9%", "1.20x"),
+        "KPLC.KE" to IntelligenceFundamentalDemo("KSh 31.0B", "N/A", "N/A", "-0.42", "0.0%", "N/A", "3.1%", "-", "N/A")
     )
 
     private val events = mapOf(
@@ -63,8 +63,8 @@ object DemoIntelligenceData {
         "EABL.KE" to listOf(CorporateEventDemo("Dividend", "Sample dividend event", "Demo date", "Corporate-action placeholder for the demo."))
     )
 
-    fun fundamentals(symbol: String): FundamentalDemo = fundamentals[symbol]
-        ?: FundamentalDemo("—", "—", "—", "—", "—", "—", "—", "—", "—")
+    fun fundamentals(symbol: String): IntelligenceFundamentalDemo = fundamentals[symbol]
+        ?: IntelligenceFundamentalDemo("—", "—", "—", "—", "—", "—", "—", "—", "—")
 
     fun events(symbol: String): List<CorporateEventDemo> = events[symbol].orEmpty()
 
@@ -73,7 +73,7 @@ object DemoIntelligenceData {
         val trend = ((((q.weeklyChange + q.monthlyChange).coerceIn(-15.0, 15.0) + 15.0) / 30.0) * 30).roundToInt()
         val volumeRatio = if (q.averageVolume > 0) q.volume.toDouble() / q.averageVolume else 1.0
         val volume = (volumeRatio.coerceIn(0.0, 2.0) / 2.0 * 20).roundToInt()
-        val liquidity = (if (q.volume >= 1_000_000) 20 else 12)
+        val liquidity = if (q.volume >= 1_000_000) 20 else 12
         val total = (momentum + trend + volume + liquidity).coerceIn(0, 100)
         val label = when {
             total >= 80 -> "Strong"
