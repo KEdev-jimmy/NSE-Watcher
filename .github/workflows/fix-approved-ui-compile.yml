@@ -1,0 +1,44 @@
+name: Fix Approved UI Compile
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'app/src/main/java/ke/co/nsewatcher/ApprovedMarketActivity.kt'
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Fix missing SettingRow callback
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('app/src/main/java/ke/co/nsewatcher/ApprovedMarketActivity.kt')
+          text = path.read_text()
+          old = 'SettingRow(Icons.Default.Security, "Privacy & security", "Your account and data", null) }'
+          new = 'SettingRow(Icons.Default.Security, "Privacy & security", "Your account and data", null) {} }'
+          if old not in text:
+              print('No missing callback found; source already fixed.')
+              raise SystemExit(0)
+          path.write_text(text.replace(old, new, 1))
+          print('Fixed missing SettingRow callback.')
+          PY
+
+      - name: Commit source fix
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/src/main/java/ke/co/nsewatcher/ApprovedMarketActivity.kt
+          if git diff --cached --quiet; then
+            echo 'Nothing to commit.'
+            exit 0
+          fi
+          git commit -m 'Fix missing settings callback [skip ci]'
+          git push
