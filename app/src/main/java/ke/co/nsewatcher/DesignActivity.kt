@@ -235,8 +235,7 @@ private fun Companies(open:(Stock)->Unit){
                 Box(Modifier.fillMaxWidth().height(270.dp).clip(RoundedCornerShape(bottomStart=26.dp,bottomEnd=26.dp))){
                     Image(painter=androidx.compose.ui.res.painterResource(id=ke.co.nsewatcher.R.drawable.companies_city_background),contentDescription=null,modifier=Modifier.fillMaxSize(),contentScale=androidx.compose.ui.layout.ContentScale.Crop)
                     Box(Modifier.fillMaxSize().background(Color(0x99052B24)))
-                    Column(Modifier.fillMaxSize().padding(10.dp,20.dp,10.dp,18.dp),verticalArrangement=Arrangement.Bottom){Text("Discover",color=Color.White,fontSize=25.sp,fontWeight=FontWeight.ExtraBold);Text("Great Companies",color=Color.White,fontSize=25.sp,fontWeight=FontWeight.ExtraBold);Spacer(Modifier.height(5.dp));Text("Research. Analyze. Invest.
-Find the right companies for your future.",color=Color.White,fontSize=11.sp)}
+                    Column(Modifier.fillMaxSize().padding(10.dp,20.dp,10.dp,18.dp),verticalArrangement=Arrangement.Bottom){Text("Discover",color=Color.White,fontSize=25.sp,fontWeight=FontWeight.ExtraBold);Text("Great Companies",color=Color.White,fontSize=25.sp,fontWeight=FontWeight.ExtraBold);Spacer(Modifier.height(5.dp));Text("Research. Analyze. Invest.\nFind the right companies for your future.",color=Color.White,fontSize=11.sp)}
                 }
             }
             item{OutlinedTextField(value=query,onValueChange={query=it},modifier=Modifier.fillMaxWidth(),singleLine=true,placeholder={Text("Search companies...",color=Muted)},leadingIcon={Icon(Icons.Default.Search,null,tint=Muted)},shape=RoundedCornerShape(24.dp),colors=OutlinedTextFieldDefaults.colors(unfocusedContainerColor=Color.White,focusedContainerColor=Color.White,unfocusedBorderColor=Color.Transparent,focusedBorderColor=Green,unfocusedTextColor=TextDark,focusedTextColor=TextDark))}
