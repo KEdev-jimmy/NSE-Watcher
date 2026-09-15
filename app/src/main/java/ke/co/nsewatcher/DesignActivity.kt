@@ -134,76 +134,7 @@ private fun App(pickAvatar:()->Unit) {
 @Composable private fun BottomNav(selected:Int,onSelect:(Int)->Unit){val items=listOf("Home" to Icons.Default.Home,"Market" to Icons.Default.CandlestickChart,"Companies" to Icons.Default.Business,"Paper Invest" to Icons.Default.AccountBalanceWallet,"More" to Icons.Default.AutoGraph);NavigationBar{items.forEachIndexed{i,x->NavigationBarItem(selected==i,{onSelect(i)},icon={Icon(x.second,x.first)},label={Text(x.first,fontSize=9.sp)},colors=NavigationBarItemDefaults.colors(selectedIconColor=Green,selectedTextColor=Green,indicatorColor=LightGreen,unselectedIconColor=Muted,unselectedTextColor=Muted))}}}
 @Composable private fun Header(title:String,sub:String?=null,back:(()->Unit)?=null){Row(Modifier.fillMaxWidth().padding(horizontal=8.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically){if(back!=null)IconButton(back){Icon(Icons.Default.ArrowBack,"Back")};Column{Text(title,fontSize=20.sp,fontWeight=FontWeight.ExtraBold);if(sub!=null)Text(sub,fontSize=10.sp,color=Muted)}}}
 
-@Composable
-private fun Home(open:(Stock)->Unit){
-    val gainers=stocks.filter{it.change>0}.sortedByDescending{it.change}.take(4)
-    val losers=stocks.filter{it.change<0}.sortedBy{it.change}.take(3)
-    val portfolioValue=1254830L
-    val totalInvested=920000L
-    val totalReturn=portfolioValue-totalInvested
-    LazyColumn(contentPadding=PaddingValues(16.dp,8.dp,16.dp,20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
-        item{
-            Card(Modifier.fillMaxWidth(),RoundedCornerShape(20.dp),colors=CardDefaults.cardColors(containerColor=DarkGreen)){
-                Row(Modifier.padding(18.dp),verticalAlignment=Alignment.CenterVertically){
-                    Column(Modifier.weight(1f)){
-                        Text("Good morning,",color=Color.White,fontSize=15.sp)
-                        Text("Investor ☀️",color=Color.White,fontSize=26.sp,fontWeight=FontWeight.ExtraBold)
-                        Text("Stay informed. Make better decisions.",color=Color(0xFFD5E9DF),fontSize=11.sp)
-                    }
-                    Surface(Modifier.size(62.dp),CircleShape,color=Color(0xFF0B6B46)){Icon(Icons.Default.Spa,"Growth",tint=Color(0xFF8BE0B3),modifier=Modifier.padding(14.dp))}
-                }
-            }
-        }
-        item{
-            Card(Modifier.fillMaxWidth(),RoundedCornerShape(17.dp),colors=CardDefaults.cardColors(containerColor=Color.White),border=BorderStroke(1.dp,Border)){
-                Column(Modifier.padding(16.dp)){
-                    Text("Portfolio Value (Paper Invest)",color=DarkGreen,fontSize=11.sp)
-                    Text(String.format(Locale.US,"KSh %,d",portfolioValue),fontSize=25.sp,fontWeight=FontWeight.ExtraBold,color=TextDark)
-                    Text("▲ 12.4%",color=Green,fontSize=12.sp,fontWeight=FontWeight.ExtraBold)
-                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End){Text("vs. last 30 days",color=Muted,fontSize=9.sp)}
-                }
-            }
-        }
-        item{
-            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(9.dp)){
-                Card(Modifier.weight(1f),RoundedCornerShape(15.dp),colors=CardDefaults.cardColors(containerColor=Color.White),border=BorderStroke(1.dp,Border)){
-                    Column(Modifier.padding(13.dp)){Text("Total Invested",color=Muted,fontSize=10.sp);Text(String.format(Locale.US,"KSh %,d",totalInvested),fontWeight=FontWeight.ExtraBold,fontSize=16.sp,color=TextDark)}
-                }
-                Card(Modifier.weight(1f),RoundedCornerShape(15.dp),colors=CardDefaults.cardColors(containerColor=Color.White),border=BorderStroke(1.dp,Border)){
-                    Column(Modifier.padding(13.dp)){Text("Total Return",color=Muted,fontSize=10.sp);Text(String.format(Locale.US,"KSh %,d",totalReturn),fontWeight=FontWeight.ExtraBold,fontSize=16.sp,color=TextDark);Text("▲ 36.4%",color=Green,fontSize=10.sp,fontWeight=FontWeight.Bold)}
-                }
-            }
-        }
-        item{
-            Card(Modifier.fillMaxWidth(),RoundedCornerShape(17.dp),colors=CardDefaults.cardColors(containerColor=Color.White),border=BorderStroke(1.dp,Border)){
-                Column(Modifier.padding(14.dp)){
-                    Row(verticalAlignment=Alignment.CenterVertically){Text("Market Pulse",fontWeight=FontWeight.ExtraBold,fontSize=17.sp);Spacer(Modifier.weight(1f));Text("15 MIN DELAYED",color=Green,fontSize=9.sp,fontWeight=FontWeight.Bold)}
-                    Spacer(Modifier.height(8.dp))
-                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(8.dp)){
-                        Column(Modifier.weight(1f)){Text("Top Gainer",color=Muted,fontSize=9.sp);gainers.firstOrNull()?.let{Text(it.symbol,fontWeight=FontWeight.ExtraBold,fontSize=14.sp);Text(String.format(Locale.US,"%+.2f%%",it.change),color=Green,fontWeight=FontWeight.Bold,fontSize=10.sp)}}
-                        Column(Modifier.weight(1f)){Text("Top Loser",color=Muted,fontSize=9.sp);losers.firstOrNull()?.let{Text(it.symbol,fontWeight=FontWeight.ExtraBold,fontSize=14.sp);Text(String.format(Locale.US,"%+.2f%%",it.change),color=Red,fontWeight=FontWeight.Bold,fontSize=10.sp)}}
-                    }
-                }
-            }
-        }
-        item{
-            Card(Modifier.fillMaxWidth(),RoundedCornerShape(17.dp),colors=CardDefaults.cardColors(containerColor=Color(0xFFFFF7E2)),border=BorderStroke(1.dp,Color(0xFFF1E3B8))){
-                Row(Modifier.padding(14.dp),verticalAlignment=Alignment.CenterVertically){Icon(Icons.Default.Lightbulb,null,tint=Color(0xFFFFB300),modifier=Modifier.size(28.dp));Spacer(Modifier.width(10.dp));Text("Small steps in learning lead to big results in investing.",fontSize=11.sp,color=TextDark,fontWeight=FontWeight.Medium)}
-            }
-        }
-        item{
-            Column{
-                Text("Recent Activity",fontWeight=FontWeight.ExtraBold,fontSize=17.sp)
-                Spacer(Modifier.height(7.dp))
-                Card(Modifier.fillMaxWidth(),RoundedCornerShape(15.dp),colors=CardDefaults.cardColors(containerColor=Color.White),border=BorderStroke(1.dp,Border)){
-                    Column(Modifier.padding(horizontal=13.dp)){
-                        gainers.take(3).forEachIndexed{index,s->Row(Modifier.fillMaxWidth().padding(vertical=10.dp),verticalAlignment=Alignment.CenterVertically){Logo(s.symbol,30);Spacer(Modifier.width(9.dp));Column(Modifier.weight(1f)){Text(s.name,fontWeight=FontWeight.Bold,fontSize=11.sp);Text("Market watch",color=Muted,fontSize=9.sp)};Text(String.format(Locale.US,"%+.2f%%",s.change),color=Green,fontWeight=FontWeight.Bold,fontSize=10.sp)}}
-                    }
-                }
-            }
-        }
-    }
-}
+@Composable private fun Home(open:(Stock)->Unit){val gainers=stocks.filter{it.change>0}.sortedByDescending{it.change};val losers=stocks.filter{it.change<0}.sortedBy{it.change};LazyColumn(contentPadding=PaddingValues(16.dp,5.dp,16.dp,20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){item{MarketStatusCard()};item{IndexRow()};item{TrendCard()};item{Section("Market Snapshot","A quick view before you invest")};item{SnapshotActions()};item{Movers(gainers.take(4),losers.take(4),open)};item{Section("Top Companies","Stocks moving the NSE today")};item{LazyRow(horizontalArrangement=Arrangement.spacedBy(9.dp)){items(gainers.take(4)){StockMini(it){open(it)}}}};item{Section("Latest News","Market events and company updates")};item{NewsPreview()};item{PaperBanner()}}}
 @Composable private fun MarketStatusCard(){Card(Modifier.fillMaxWidth(),RoundedCornerShape(18.dp),colors=CardDefaults.cardColors(containerColor=LightGreen)){Column(Modifier.padding(15.dp)){Row(verticalAlignment=Alignment.CenterVertically){Box(Modifier.size(9.dp).clip(CircleShape).background(Green));Spacer(Modifier.width(7.dp));Text("NSE MARKET",color=DarkGreen,fontWeight=FontWeight.ExtraBold,fontSize=12.sp);Spacer(Modifier.weight(1f));Text("DATA FEED",color=Muted,fontSize=10.sp)};Spacer(Modifier.height(10.dp));Row(verticalAlignment=Alignment.Bottom){Column(Modifier.weight(1f)){Text("Market overview",color=Muted,fontSize=11.sp);Text("Clear picture of the NSE",fontSize=19.sp,fontWeight=FontWeight.ExtraBold);Text("before you make an investment decision.",fontSize=11.sp,color=Muted)};Surface(shape=RoundedCornerShape(10.dp),color=Color.White){Text("15 MIN DELAYED",color=Green,fontWeight=FontWeight.ExtraBold,fontSize=11.sp,modifier=Modifier.padding(horizontal=10.dp,vertical=7.dp))}}}}}
 @Composable private fun IndexRow(){val x=listOf("NSE 20" to "1,843.56","NASI" to "112.48","NSE 25" to "3,642.17");LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)){items(x){(n,v)->Card(Modifier.width(145.dp),RoundedCornerShape(14.dp),border=BorderStroke(1.dp,Border)){Column(Modifier.padding(11.dp)){Text(n,fontSize=11.sp,fontWeight=FontWeight.Bold);Text(v,fontSize=17.sp,fontWeight=FontWeight.ExtraBold);Text("▲ +1.34%",color=Green,fontSize=10.sp,fontWeight=FontWeight.Bold)}}}}}
 @Composable private fun TrendCard(){var p by rememberSaveable{mutableStateOf("1D")};Card(Modifier.fillMaxWidth(),RoundedCornerShape(17.dp),border=BorderStroke(1.dp,Border)){Column(Modifier.padding(14.dp)){Row(verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text("NSE 20 — Market Trend",fontWeight=FontWeight.ExtraBold,fontSize=15.sp);Text("See how the market has been performing",color=Muted,fontSize=10.sp)};Text("+1.34%",color=Green,fontWeight=FontWeight.ExtraBold)};Spacer(Modifier.height(8.dp));Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(4.dp)){listOf("1D","1W","1M","3M","6M","1Y","5Y").forEach{x->FilterChip(selected=p==x,onClick={p=x},label={Text(x,fontSize=10.sp)})}};Spacer(Modifier.height(5.dp));Chart(listOf(28f,38f,34f,47f,44f,58f,52f,67f,61f,74f,69f,83f),Green);Text("Historical performance will use sourced NSE market data in live mode.",color=Muted,fontSize=9.sp)}}}
@@ -223,30 +154,7 @@ private fun Home(open:(Stock)->Unit){
 @Composable private fun BreadthCard(){Card(Modifier.fillMaxWidth(),RoundedCornerShape(17.dp),border=BorderStroke(1.dp,Border)){Column(Modifier.padding(14.dp)){Text("Market Breadth",fontWeight=FontWeight.ExtraBold);Text("Advancers vs decliners",color=Muted,fontSize=10.sp);Spacer(Modifier.height(10.dp));Row(Modifier.fillMaxWidth().height(12.dp).clip(RoundedCornerShape(8.dp))){Box(Modifier.weight(78f).fillMaxSize().background(Green));Box(Modifier.weight(42f).fillMaxSize().background(Red))};Row(Modifier.fillMaxWidth().padding(top=7.dp),horizontalArrangement=Arrangement.SpaceBetween){Text("78 Advancing",color=Green,fontSize=10.sp,fontWeight=FontWeight.Bold);Text("42 Declining",color=Red,fontSize=10.sp,fontWeight=FontWeight.Bold)}}}}
 @Composable private fun MarketSnapshotDetail(){Card(Modifier.fillMaxWidth(),RoundedCornerShape(17.dp),border=BorderStroke(1.dp,Border)){Column(Modifier.padding(14.dp)){Text("Market Snapshot",fontWeight=FontWeight.ExtraBold);Text("Breadth, activity and momentum",color=Muted,fontSize=10.sp);Spacer(Modifier.height(8.dp));listOf("Market volume" to "12.8M shares","Advancing value" to "KSh 418.6M","Declining value" to "KSh 176.2M","Market momentum" to "Positive").forEach{(a,b)->Row(Modifier.fillMaxWidth().padding(vertical=7.dp)){Text(a,Modifier.weight(1f),fontSize=11.sp);Text(b,fontSize=11.sp,fontWeight=FontWeight.Bold,color=if(a=="Market momentum")Green else TextDark)}}}}}
 
-@Composable
-private fun Companies(open:(Stock)->Unit){
-    var query by rememberSaveable{mutableStateOf("")}
-    val filtered=stocks.filter{it.name.contains(query,true)||it.symbol.contains(query,true)}
-    val featured=listOf("SCOM","KCB","EQTY").mapNotNull{s->stocks.firstOrNull{it.symbol==s}}
-    val gainers=stocks.filter{it.change>0}.sortedByDescending{it.change}.take(6)
-    Box(Modifier.fillMaxSize().background(Color(0xFF062A23))){
-        LazyColumn(contentPadding=PaddingValues(16.dp,0.dp,16.dp,20.dp),verticalArrangement=Arrangement.spacedBy(11.dp)){
-            item{
-                Box(Modifier.fillMaxWidth().height(270.dp).clip(RoundedCornerShape(bottomStart=26.dp,bottomEnd=26.dp))){
-                    Image(painter=androidx.compose.ui.res.painterResource(id=ke.co.nsewatcher.R.drawable.companies_city_background),contentDescription=null,modifier=Modifier.fillMaxSize(),contentScale=androidx.compose.ui.layout.ContentScale.Crop)
-                    Box(Modifier.fillMaxSize().background(Color(0x99052B24)))
-                    Column(Modifier.fillMaxSize().padding(10.dp,20.dp,10.dp,18.dp),verticalArrangement=Arrangement.Bottom){Text("Discover",color=Color.White,fontSize=25.sp,fontWeight=FontWeight.ExtraBold);Text("Great Companies",color=Color.White,fontSize=25.sp,fontWeight=FontWeight.ExtraBold);Spacer(Modifier.height(5.dp));Text("Research. Analyze. Invest.
-Find the right companies for your future.",color=Color.White,fontSize=11.sp)}
-                }
-            }
-            item{OutlinedTextField(value=query,onValueChange={query=it},modifier=Modifier.fillMaxWidth(),singleLine=true,placeholder={Text("Search companies...",color=Muted)},leadingIcon={Icon(Icons.Default.Search,null,tint=Muted)},shape=RoundedCornerShape(24.dp),colors=OutlinedTextFieldDefaults.colors(unfocusedContainerColor=Color.White,focusedContainerColor=Color.White,unfocusedBorderColor=Color.Transparent,focusedBorderColor=Green,unfocusedTextColor=TextDark,focusedTextColor=TextDark))}
-            item{Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text("Featured Companies",color=Color.White,fontWeight=FontWeight.ExtraBold,fontSize=17.sp);Spacer(Modifier.weight(1f));Text("View all",color=Color(0xFF55E0A0),fontSize=11.sp,fontWeight=FontWeight.Bold)}}
-            item{Card(Modifier.fillMaxWidth(),RoundedCornerShape(17.dp),colors=CardDefaults.cardColors(containerColor=Color.White)){Column(Modifier.padding(horizontal=12.dp)){featured.forEachIndexed{index,s->Row(Modifier.fillMaxWidth().clickable{open(s)}.padding(vertical=11.dp),verticalAlignment=Alignment.CenterVertically){Logo(s.symbol,40);Spacer(Modifier.width(10.dp));Column(Modifier.weight(1f)){Text(s.name,color=TextDark,fontWeight=FontWeight.ExtraBold,fontSize=12.sp);Text(s.symbol,color=Muted,fontSize=10.sp);Text(String.format(Locale.US,"KSh %.2f",s.price),color=Muted,fontSize=10.sp)};Column(horizontalAlignment=Alignment.End){Text(String.format(Locale.US,"KSh %.2f",s.price),color=TextDark,fontWeight=FontWeight.Bold,fontSize=11.sp);Text(String.format(Locale.US,"%+.1f%%",s.change),color=if(s.change>=0)Green else Red,fontWeight=FontWeight.Bold,fontSize=10.sp)}};if(index<featured.lastIndex)HorizontalDivider(color=Border)}}}}
-            item{Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text("Top Gainers",color=Color.White,fontWeight=FontWeight.ExtraBold,fontSize=17.sp);Spacer(Modifier.weight(1f));Text("View all",color=Color(0xFF55E0A0),fontSize=11.sp,fontWeight=FontWeight.Bold)}}
-            item{val list=if(query.isBlank())gainers else filtered.filter{it.change>0}.sortedByDescending{it.change}.take(6);Card(Modifier.fillMaxWidth(),RoundedCornerShape(17.dp),colors=CardDefaults.cardColors(containerColor=Color.White)){Column(Modifier.padding(horizontal=12.dp)){list.forEachIndexed{index,s->Row(Modifier.fillMaxWidth().clickable{open(s)}.padding(vertical=10.dp),verticalAlignment=Alignment.CenterVertically){Logo(s.symbol,40);Spacer(Modifier.width(10.dp));Column(Modifier.weight(1f)){Text(s.name,color=TextDark,fontWeight=FontWeight.ExtraBold,fontSize=12.sp);Text(s.symbol,color=Muted,fontSize=10.sp)};Column(horizontalAlignment=Alignment.End){Text(String.format(Locale.US,"KSh %.2f",s.price),color=TextDark,fontWeight=FontWeight.Bold,fontSize=11.sp);Text(String.format(Locale.US,"%+.1f%%",s.change),color=if(s.change>=0)Green else Red,fontWeight=FontWeight.Bold,fontSize=10.sp)}};if(index<list.lastIndex)HorizontalDivider(color=Border)}}}}
-        }
-    }
-}
+@Composable private fun Companies(open:(Stock)->Unit){LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(9.dp)){item{Section("Company Intelligence","Understand each company before you invest")};items(stocks){s->Card(Modifier.fillMaxWidth().clickable{open(s)},RoundedCornerShape(14.dp),border=BorderStroke(1.dp,Border)){Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically){Logo(s.symbol,40);Spacer(Modifier.width(10.dp));Column(Modifier.weight(1f)){Text(s.name,fontWeight=FontWeight.ExtraBold,fontSize=13.sp);Text(s.symbol,color=Muted,fontSize=10.sp);Text(String.format(Locale.US,"KSh %.2f",s.price),fontWeight=FontWeight.Bold,fontSize=12.sp)};Text(String.format(Locale.US,"%+.2f%%",s.change),color=if(s.change>=0)Green else Red,fontWeight=FontWeight.ExtraBold)}}}}}
 @Composable
 private fun Company(s: Stock, back: () -> Unit) {
     val periods = listOf("1D", "1W", "1M", "3M", "6M", "1Y", "5Y")
