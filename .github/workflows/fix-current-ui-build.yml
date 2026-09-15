@@ -14,41 +14,34 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Apply requested Home/Profile and JVM fixes
+      - name: Fix malformed multiline UI strings
         shell: python
         run: |
           from pathlib import Path
-
-          ui = Path('app/src/main/java/ke/co/nsewatcher/DesignActivity.kt')
-          text = ui.read_text()
+          path = Path('app/src/main/java/ke/co/nsewatcher/DesignActivity.kt')
+          text = path.read_text()
           replacements = {
-              '};IconButton({}){Icon(Icons.Default.Search,"Search",tint=Green)};Avatar(name){go(Page.PROFILE)};IconButton({go(Page.SETTINGS)}){Icon(Icons.Default.Settings,"Settings",tint=Green)}}}': '};Avatar(name){go(Page.PROFILE)}}}',
-              'Column(Modifier.padding(16.dp)){\n                    Text("Portfolio Value (Paper Invest)"': 'Column(Modifier.padding(12.dp)){\n                    Text("Portfolio Value (Paper Invest)"',
-              'Column(Modifier.padding(13.dp)){Text("Total Invested"': 'Column(Modifier.padding(10.dp)){Text("Total Invested"',
-              'Column(Modifier.padding(13.dp)){Text("Total Return"': 'Column(Modifier.padding(10.dp)){Text("Total Return"',
-              'item{RowItem(Icons.Default.PhotoCamera,"Profile Picture","Change your profile photo",pick)};item{RowItem(Icons.Default.Lock,"Account Security"': 'item{RowItem(Icons.Default.PhotoCamera,"Profile Picture","Change your profile photo",pick)};item{RowItem(Icons.Default.Settings,"Settings","Customize your NSE Watcher settings"){go(Page.SETTINGS)}};item{RowItem(Icons.Default.Lock,"Account Security"',
+              'Text("“Small steps in learning\nlead to big results in investing.”"': 'Text("“Small steps in learning\\nlead to big results in investing.”"',
+              'Text("Research. Analyze. Invest.\nFind the right companies for your future."': 'Text("Research. Analyze. Invest.\\nFind the right companies for your future."',
           }
+          changed = False
           for old, new in replacements.items():
               if old in text:
-                  text = text.replace(old, new, 1)
-          ui.write_text(text)
-
-          gradle = Path('app/build.gradle.kts')
-          g = gradle.read_text()
-          if 'java {\n    toolchain {\n        languageVersion = JavaLanguageVersion.of(17)\n    }\n}' not in g:
-              marker = '\nkotlin {\n    jvmToolchain(17)\n}'
-              if marker not in g:
-                  raise SystemExit('Gradle toolchain insertion point not found; refusing to modify build config.')
-              g = g.replace(marker, '\njava {\n    toolchain {\n        languageVersion = JavaLanguageVersion.of(17)\n    }\n}\n' + marker, 1)
-              gradle.write_text(g)
-      - name: Commit source fixes
+                  text = text.replace(old, new)
+                  changed = True
+          if not changed:
+              print('No malformed multiline strings found.')
+          else:
+              path.write_text(text)
+              print('Fixed malformed multiline strings.')
+      - name: Commit source fix
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add app/src/main/java/ke/co/nsewatcher/DesignActivity.kt app/build.gradle.kts
+          git add app/src/main/java/ke/co/nsewatcher/DesignActivity.kt
           if git diff --cached --quiet; then
             echo 'Nothing to commit.'
             exit 0
           fi
-          git commit -m 'Fix Home Profile UI and align JVM target'
+          git commit -m 'Fix Home and Companies UI compile strings [skip ci]'
           git push
