@@ -6,7 +6,6 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -15,18 +14,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -34,313 +22,155 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountBalanceWallet
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.AutoGraph
-import androidx.compose.material.icons.filled.Business
-import androidx.compose.material.icons.filled.CandlestickChart
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.HelpOutline
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Logout
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.NotificationsNone
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PhotoCamera
-import androidx.compose.material.icons.filled.PrivacyTip
-import androidx.compose.material.icons.filled.ReportProblem
-import androidx.compose.material.icons.filled.RestartAlt
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.ShowChart
-import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.Web
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Divider
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.*
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
 
-private val NSEGreen = Color(0xFF00A859)
-private val NSELight = Color(0xFFE9F8F0)
-private val NSEDark = Color(0xFF083C27)
-private val NSEText = Color(0xFF12231B)
-private val NSEMuted = Color(0xFF6C7A72)
-private val NSEBorder = Color(0xFFE1EAE5)
-private val NSERed = Color(0xFFE04444)
+private val Green = Color(0xFF00A859)
+private val LightGreen = Color(0xFFE9F8F0)
+private val DarkGreen = Color(0xFF083C27)
+private val TextDark = Color(0xFF12231B)
+private val Muted = Color(0xFF6C7A72)
+private val Border = Color(0xFFE1EAE5)
+private val Red = Color(0xFFE04444)
+private const val PREFS = "nse_watcher_preferences"
 
-private data class DesignStock(val symbol: String, val name: String, val price: Double, val change: Double, val history: List<Double>)
-
-private val designStocks = listOf(
-    DesignStock("SCOM", "Safaricom", 18.50, 5.24, listOf(15.2, 15.5, 15.3, 16.1, 16.8, 16.5, 17.2, 17.9, 18.5)),
-    DesignStock("KCB", "KCB Group", 42.30, 3.26, listOf(38.0, 38.8, 39.2, 40.1, 39.7, 40.8, 41.5, 41.9, 42.3)),
-    DesignStock("EQTY", "Equity Group", 46.75, 2.98, listOf(43.2, 43.8, 44.0, 44.9, 44.5, 45.1, 45.8, 46.1, 46.75)),
-    DesignStock("COOP", "Co-operative Bank", 21.10, 2.41, listOf(19.5, 19.7, 20.0, 19.9, 20.3, 20.5, 20.8, 20.9, 21.1)),
-    DesignStock("ABSA", "Absa Bank Kenya", 14.30, -2.17, listOf(15.5, 15.2, 15.0, 14.8, 14.9, 14.6, 14.7, 14.5, 14.3)),
-    DesignStock("EABL", "East African Breweries", 155.00, -1.81, listOf(161.0, 160.5, 159.8, 158.7, 159.2, 157.8, 157.0, 156.2, 155.0)),
-    DesignStock("KPLC", "Kenya Power", 4.82, -1.22, listOf(5.2, 5.1, 5.0, 5.05, 4.9, 4.95, 4.88, 4.86, 4.82))
+private data class Stock(val symbol:String,val name:String,val price:Double,val change:Double)
+private val stocks = listOf(
+    Stock("SCOM","Safaricom",18.50,5.24), Stock("KCB","KCB Group",42.30,3.26),
+    Stock("EQTY","Equity Group",46.75,2.98), Stock("COOP","Co-operative Bank",21.10,2.41),
+    Stock("ABSA","Absa Bank Kenya",14.30,-2.17), Stock("EABL","East African Breweries",155.00,-1.81),
+    Stock("KPLC","Kenya Power",4.82,-1.22)
 )
 
-private enum class Page { HOME, MARKET, COMPANIES, PAPER, MORE, COMPANY, PROFILE, SETTINGS, THEME, NOTIFICATIONS, LIVE_DATA, CHARTS, ALERTS, LANGUAGE, SECURITY, HELP, ABOUT }
+private enum class Page { HOME, MARKET, COMPANIES, PAPER, MORE, COMPANY, PROFILE, SETTINGS, THEME, NOTIFICATIONS, LIVE_DATA, CHARTS, ALERTS, LANGUAGE, SECURITY, LINKED, PRIVACY, DISPLAY, HELP, ABOUT }
 
 class DesignActivity : ComponentActivity() {
-    private val picker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-        if (uri != null) {
-            try { contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) { }
-            getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString("avatar_uri", uri.toString()).apply()
-        }
+    private val imagePicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        uri ?: return@registerForActivityResult
+        try { contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) { }
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString("avatar_uri", uri.toString()).apply()
     }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { DesignApp(onPickAvatar = { picker.launch(arrayOf("image/*")) }) }
+        setContent { NSEWatcherApp { imagePicker.launch(arrayOf("image/*")) } }
     }
 }
 
-private const val PREFS = "nse_watcher_preferences"
-
 @Composable
-private fun DesignApp(onPickAvatar: () -> Unit) {
+private fun NSEWatcherApp(pickAvatar:()->Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-    var page by rememberSaveable { mutableStateOf(Page.HOME) }
-    var previousPage by rememberSaveable { mutableStateOf(Page.HOME) }
+    var page by remember { mutableStateOf(Page.HOME) }
+    var history by remember { mutableStateOf(emptyList<Page>()) }
     var tab by rememberSaveable { mutableIntStateOf(0) }
-    var selected by rememberSaveable { mutableStateOf("SCOM") }
-    var profileName by rememberSaveable { mutableStateOf(prefs.getString("profile_name", "James Waweru") ?: "James Waweru") }
-    var username by rememberSaveable { mutableStateOf(prefs.getString("username", "jameswaweru") ?: "jameswaweru") }
-    var email by rememberSaveable { mutableStateOf(prefs.getString("email", "jameswaweru@gmail.com") ?: "jameswaweru@gmail.com") }
-    var description by rememberSaveable { mutableStateOf(prefs.getString("description", "IT Graduate | Investor | Learner") ?: "IT Graduate | Investor | Learner") }
-    var dark by rememberSaveable { mutableStateOf(prefs.getBoolean("dark_mode", false)) }
-    var marketAlerts by rememberSaveable { mutableStateOf(prefs.getBoolean("market_alerts", true)) }
-    var priceAlerts by rememberSaveable { mutableStateOf(prefs.getBoolean("price_alerts", true)) }
-    var newsAlerts by rememberSaveable { mutableStateOf(prefs.getBoolean("news_alerts", true)) }
-    var appAlerts by rememberSaveable { mutableStateOf(prefs.getBoolean("app_alerts", true)) }
-    var showVolume by rememberSaveable { mutableStateOf(prefs.getBoolean("show_volume", true)) }
-    var showChanges by rememberSaveable { mutableStateOf(prefs.getBoolean("show_changes", true)) }
-    var autoRefresh by rememberSaveable { mutableStateOf(prefs.getBoolean("auto_refresh", true)) }
-
-    fun save(key: String, value: Any) {
-        val edit = prefs.edit()
-        when (value) { is Boolean -> edit.putBoolean(key, value); is String -> edit.putString(key, value) }
-        edit.apply()
-    }
-    fun go(to: Page) { previousPage = page; page = to }
-    fun back() { page = if (page == Page.COMPANY || page == Page.PROFILE || page == Page.SETTINGS || page == Page.THEME || page == Page.NOTIFICATIONS || page == Page.LIVE_DATA || page == Page.CHARTS || page == Page.ALERTS || page == Page.LANGUAGE || page == Page.SECURITY || page == Page.HELP || page == Page.ABOUT) previousPage else Page.HOME }
-
+    var selected by remember { mutableStateOf(stocks.first()) }
+    var name by rememberSaveable { mutableStateOf(prefs.getString("profile_name","James Waweru") ?: "James Waweru") }
+    var username by rememberSaveable { mutableStateOf(prefs.getString("username","jameswaweru") ?: "jameswaweru") }
+    var email by rememberSaveable { mutableStateOf(prefs.getString("email","jameswaweru@gmail.com") ?: "jameswaweru@gmail.com") }
+    var description by rememberSaveable { mutableStateOf(prefs.getString("description","IT Graduate | Investor | Learner") ?: "IT Graduate | Investor | Learner") }
+    var dark by rememberSaveable { mutableStateOf(prefs.getBoolean("dark_mode",false)) }
+    var marketAlerts by rememberSaveable { mutableStateOf(prefs.getBoolean("market_alerts",true)) }
+    var priceAlerts by rememberSaveable { mutableStateOf(prefs.getBoolean("price_alerts",true)) }
+    var newsAlerts by rememberSaveable { mutableStateOf(prefs.getBoolean("news_alerts",true)) }
+    var appAlerts by rememberSaveable { mutableStateOf(prefs.getBoolean("app_alerts",true)) }
+    var autoRefresh by rememberSaveable { mutableStateOf(prefs.getBoolean("auto_refresh",true)) }
+    var showVolume by rememberSaveable { mutableStateOf(prefs.getBoolean("show_volume",true)) }
+    var showChanges by rememberSaveable { mutableStateOf(prefs.getBoolean("show_changes",true)) }
+    fun save(key:String,value:Boolean) { prefs.edit().putBoolean(key,value).apply() }
+    fun save(key:String,value:String) { prefs.edit().putString(key,value).apply() }
+    fun go(to:Page) { if (to != page) { history = history + page; page = to } }
+    fun back() { if (history.isNotEmpty()) { page = history.last(); history = history.dropLast(1) } else page = Page.HOME }
     androidx.activity.compose.BackHandler(enabled = page != Page.HOME) { back() }
 
-    val scheme = if (dark) androidx.compose.material3.darkColorScheme(primary = Color(0xFF32D486), background = Color(0xFF0D1712), surface = Color(0xFF132019), onBackground = Color.White, onSurface = Color.White, onSurfaceVariant = Color(0xFFB7C7BE)) else androidx.compose.material3.lightColorScheme(primary = NSEGreen, background = Color.White, surface = Color.White, onBackground = NSEText, onSurface = NSEText, onSurfaceVariant = NSEMuted)
-    MaterialTheme(colorScheme = scheme) {
-        Surface(Modifier.fillMaxSize(), color = scheme.background) {
-            when (page) {
-                Page.HOME, Page.MARKET, Page.COMPANIES, Page.PAPER, Page.MORE -> Scaffold(
-                    topBar = { MainTopBar(profileName, go, onSearch = {}) },
-                    bottomBar = { DesignNavigation(tab) { tab = it; page = when (it) { 0 -> Page.HOME; 1 -> Page.MARKET; 2 -> Page.COMPANIES; 3 -> Page.PAPER; else -> Page.MORE } } }
-                ) { padding -> Box(Modifier.fillMaxSize().padding(padding)) {
-                    when (page) { Page.HOME -> HomeScreen { selected = it; go(Page.COMPANY) }; Page.MARKET -> MarketScreen(); Page.COMPANIES -> CompaniesScreen { selected = it; go(Page.COMPANY) }; Page.PAPER -> PaperInvestScreen(); else -> MoreScreen(go) }
-                } }
-                Page.COMPANY -> CompanyScreen(designStocks.first { it.symbol == selected }, ::back)
-                Page.PROFILE -> ProfileScreen(profileName, username, email, description, prefs.getString("avatar_uri", null), onName = { profileName = it; save("profile_name", it) }, onUsername = { username = it; save("username", it) }, onEmail = { email = it; save("email", it) }, onDescription = { description = it; save("description", it) }, onPickAvatar = onPickAvatar, goBack = ::back, go = ::go)
-                Page.SETTINGS -> SettingsScreen(dark, marketAlerts, priceAlerts, newsAlerts, appAlerts, showVolume, showChanges, autoRefresh, onDark = { dark = it; save("dark_mode", it) }, onMarket = { marketAlerts = it; save("market_alerts", it) }, onPrice = { priceAlerts = it; save("price_alerts", it) }, onNews = { newsAlerts = it; save("news_alerts", it) }, onApp = { appAlerts = it; save("app_alerts", it) }, onVolume = { showVolume = it; save("show_volume", it) }, onChanges = { showChanges = it; save("show_changes", it) }, onRefresh = { autoRefresh = it; save("auto_refresh", it) }, goBack = ::back, go = ::go)
-                Page.THEME -> ThemeScreen(dark, { dark = it; save("dark_mode", it) }, ::back)
-                Page.NOTIFICATIONS -> NotificationsScreen(marketAlerts, priceAlerts, newsAlerts, appAlerts, { marketAlerts = it; save("market_alerts", it) }, { priceAlerts = it; save("price_alerts", it) }, { newsAlerts = it; save("news_alerts", it) }, { appAlerts = it; save("app_alerts", it) }, ::back)
-                Page.LIVE_DATA -> LiveDataScreen(autoRefresh, showVolume, showChanges, { autoRefresh = it; save("auto_refresh", it) }, { showVolume = it; save("show_volume", it) }, { showChanges = it; save("show_changes", it) }, ::back)
-                Page.CHARTS -> SimpleSettingsScreen("Chart Settings", Icons.Default.ShowChart, listOf("Default timeframe" to "1D", "Chart style" to "Line", "Show grid" to "On", "Show indicators" to "On"), ::back)
-                Page.ALERTS -> SimpleSettingsScreen("Price Alerts", Icons.Default.Notifications, listOf("Price alerts" to if (priceAlerts) "Enabled" else "Disabled", "Daily gain/loss" to "Enabled", "High volume" to "Enabled", "Corporate actions" to "Enabled"), ::back)
-                Page.LANGUAGE -> SimpleSettingsScreen("Language", Icons.Default.Language, listOf("App language" to "English", "Market currency" to "KSh (Kenyan Shillings)", "Region" to "Kenya"), ::back)
-                Page.SECURITY -> SimpleSettingsScreen("Account Security", Icons.Default.Lock, listOf("Password" to "••••••••", "Biometric unlock" to "Off", "Active sessions" to "This device", "Data permissions" to "Review"), ::back)
-                Page.HELP -> HelpScreen(::back)
-                Page.ABOUT -> AboutScreen(::back)
+    val colors = if (dark) darkColorScheme(primary=Color(0xFF32D486),background=Color(0xFF0D1712),surface=Color(0xFF132019),onSurface=Color.White,onBackground=Color.White,onSurfaceVariant=Color(0xFFB7C7BE)) else lightColorScheme(primary=Green,background=Color.White,surface=Color.White,onSurface=TextDark,onBackground=TextDark,onSurfaceVariant=Muted)
+    MaterialTheme(colorScheme=colors) {
+        Surface(Modifier.fillMaxSize(), color=colors.background) {
+            when(page) {
+                Page.HOME,Page.MARKET,Page.COMPANIES,Page.PAPER,Page.MORE -> Scaffold(
+                    topBar={ TopBar(name,go) },
+                    bottomBar={ BottomNav(tab) { tab=it; history=emptyList(); page=when(it){0->Page.HOME;1->Page.MARKET;2->Page.COMPANIES;3->Page.PAPER;else->Page.MORE} } }
+                ) { pad -> Box(Modifier.fillMaxSize().padding(pad)) { when(page) {
+                    Page.HOME -> Home { selected=it; go(Page.COMPANY) }
+                    Page.MARKET -> Market()
+                    Page.COMPANIES -> Companies { selected=it; go(Page.COMPANY) }
+                    Page.PAPER -> PaperInvest()
+                    else -> More(go)
+                } } }
+                Page.COMPANY -> Company(selected,::back)
+                Page.PROFILE -> Profile(name,username,email,description,pickAvatar,{name=it;save("profile_name",it)},{username=it;save("username",it)},{email=it;save("email",it)},{description=it;save("description",it)},pickAvatar,::back,go)
+                Page.SETTINGS -> Settings(dark,marketAlerts,priceAlerts,newsAlerts,appAlerts,autoRefresh,showVolume,showChanges,{dark=it;save("dark_mode",it)}, {marketAlerts=it;save("market_alerts",it)}, {priceAlerts=it;save("price_alerts",it)}, {newsAlerts=it;save("news_alerts",it)}, {appAlerts=it;save("app_alerts",it)}, {autoRefresh=it;save("auto_refresh",it)}, {showVolume=it;save("show_volume",it)}, {showChanges=it;save("show_changes",it)},::back,go)
+                Page.THEME -> ThemePage(dark,{dark=it;save("dark_mode",it)},::back)
+                Page.NOTIFICATIONS -> NotificationsPage(marketAlerts,priceAlerts,newsAlerts,appAlerts,{marketAlerts=it;save("market_alerts",it)},{priceAlerts=it;save("price_alerts",it)},{newsAlerts=it;save("news_alerts",it)},{appAlerts=it;save("app_alerts",it)},::back)
+                Page.LIVE_DATA -> LiveData(autoRefresh,showVolume,showChanges,{autoRefresh=it;save("auto_refresh",it)},{showVolume=it;save("show_volume",it)},{showChanges=it;save("show_changes",it)},::back)
+                Page.CHARTS -> SimplePage("Chart Settings",Icons.Default.ShowChart,listOf("Default timeframe" to "1D","Chart style" to "Line","Show grid" to "On","Indicators" to "On"),::back)
+                Page.ALERTS -> SimplePage("Price Alerts",Icons.Default.Notifications,listOf("Price alerts" to if(priceAlerts)"Enabled" else "Disabled","Daily gain / loss" to "Enabled","High volume" to "Enabled","Corporate actions" to "Enabled"),::back)
+                Page.LANGUAGE -> SimplePage("Language",Icons.Default.Language,listOf("App language" to "English","Currency" to "KSh (Kenyan Shillings)","Region" to "Kenya"),::back)
+                Page.SECURITY -> SimplePage("Account Security",Icons.Default.Lock,listOf("Password" to "••••••••","Biometric unlock" to "Off","Active sessions" to "This device","Data permissions" to "Review"),::back)
+                Page.LINKED -> SimplePage("Linked Accounts",Icons.Default.Link,listOf("Google" to "Not connected","Broker account" to "Not connected"),::back)
+                Page.PRIVACY -> SimplePage("Privacy",Icons.Default.PrivacyTip,listOf("Personalisation" to "On device","Analytics" to "Optional","Data sharing" to "Not shared for trading"),::back)
+                Page.DISPLAY -> SimplePage("Font & Display",Icons.Default.Visibility,listOf("Font size" to "Medium","Compact cards" to "On","Animations" to "Standard"),::back)
+                Page.HELP -> HelpPage(::back)
+                Page.ABOUT -> AboutPage(::back)
             }
         }
     }
 }
 
-@Composable
-private fun MainTopBar(name: String, go: (Page) -> Unit, onSearch: () -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Surface(Modifier.size(42.dp), RoundedCornerShape(12.dp), NSELight) { Icon(Icons.Default.ShowChart, null, Modifier.padding(7.dp), NSEGreen) }
-        Spacer(Modifier.width(9.dp))
-        Column(Modifier.weight(1f)) { Text("NSE Watcher", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold); Text("Analyse • Understand • Invest Smarter", 10.sp, color = NSEMuted) }
-        IconButton(onClick = onSearch) { Icon(Icons.Default.Search, "Search", tint = NSEGreen) }
-        ProfileAvatar(name, null) { go(Page.PROFILE) }
-        IconButton(onClick = { go(Page.SETTINGS) }) { Icon(Icons.Default.Settings, "Settings", tint = NSEGreen) }
-    }
-}
+@Composable private fun TopBar(name:String,go:(Page)->Unit) { Row(Modifier.fillMaxWidth().padding(horizontal=15.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically) { Surface(Modifier.size(42.dp),RoundedCornerShape(12.dp),LightGreen){Icon(Icons.Default.ShowChart,null,Modifier.padding(7.dp),Green)}; Spacer(Modifier.width(9.dp)); Column(Modifier.weight(1f)){Text("NSE Watcher",fontSize=18.sp,fontWeight=FontWeight.ExtraBold);Text("Analyse • Understand • Invest Smarter",fontSize=10.sp,color=Muted)}; IconButton({}){Icon(Icons.Default.Search,"Search",tint=Green)}; Avatar(name){go(Page.PROFILE)}; IconButton({go(Page.SETTINGS)}){Icon(Icons.Default.Settings,"Settings",tint=Green)} } }
 
-@Composable
-private fun ProfileAvatar(name: String, uri: String?, onClick: () -> Unit) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val savedUri = uri ?: context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("avatar_uri", null)
-    val bitmap by produceState<Bitmap?>(initialValue = null, savedUri) {
-        value = try { savedUri?.let { context.contentResolver.openInputStream(Uri.parse(it))?.use(BitmapFactory::decodeStream) } } catch (_: Exception) { null }
-    }
-    Surface(Modifier.size(38.dp).clip(CircleShape).clickable(onClick = onClick), CircleShape, Color(0xFFDDEFE6)) {
-        if (bitmap != null) Image(bitmap!!.asImageBitmap(), contentDescription = "Profile", modifier = Modifier.fillMaxSize()) else Box(Modifier.fillMaxSize(), Alignment.Center) { Text(name.take(1).uppercase(Locale.getDefault()), color = NSEGreen, fontWeight = FontWeight.ExtraBold) }
-    }
-}
+@Composable private fun Avatar(name:String,onClick:()->Unit){val c=androidx.compose.ui.platform.LocalContext.current;val u=c.getSharedPreferences(PREFS,0).getString("avatar_uri",null);val b by produceState<Bitmap?>(null,u){value=try{u?.let{c.contentResolver.openInputStream(Uri.parse(it))?.use{stream->BitmapFactory.decodeStream(stream)}}}catch(_:Exception){null}};Surface(Modifier.size(38.dp).clip(CircleShape).clickable(onClick=onClick),CircleShape,Color(0xFFDDEFE6)){if(b!=null)Image(b!!.asImageBitmap(),"Profile",Modifier.fillMaxSize())else Box(Modifier.fillMaxSize(),Alignment.Center){Text(name.take(1).uppercase(),color=Green,fontWeight=FontWeight.Bold)}}}
 
-@Composable
-private fun DesignNavigation(selected: Int, onSelect: (Int) -> Unit) {
-    val items = listOf("Home" to Icons.Default.Home, "Market" to Icons.Default.CandlestickChart, "Companies" to Icons.Default.Business, "Paper Invest" to Icons.Default.AccountBalanceWallet, "More" to Icons.Default.AutoGraph)
-    NavigationBar(containerColor = MaterialTheme.colorScheme.surface) { items.forEachIndexed { index, item -> NavigationBarItem(selected == index, { onSelect(index) }, icon = { Icon(item.second, item.first, Modifier.size(22.dp)) }, label = { Text(item.first, fontSize = 9.sp) }, colors = NavigationBarItemDefaults.colors(selectedIconColor = NSEGreen, selectedTextColor = NSEGreen, indicatorColor = NSELight, unselectedIconColor = NSEMuted, unselectedTextColor = NSEMuted)) } }
-}
+@Composable private fun BottomNav(selected:Int,onSelect:(Int)->Unit){val items=listOf("Home" to Icons.Default.Home,"Market" to Icons.Default.CandlestickChart,"Companies" to Icons.Default.Business,"Paper Invest" to Icons.Default.AccountBalanceWallet,"More" to Icons.Default.AutoGraph);NavigationBar{items.forEachIndexed{i,x->NavigationBarItem(selected==i,{onSelect(i)},icon={Icon(x.second,x.first)},label={Text(x.first,fontSize=9.sp)},colors=NavigationBarItemDefaults.colors(selectedIconColor=Green,selectedTextColor=Green,indicatorColor=LightGreen,unselectedIconColor=Muted,unselectedTextColor=Muted))}}}
 
-@Composable
-private fun ProfileScreen(name: String, username: String, email: String, description: String, avatar: String?, onName: (String) -> Unit, onUsername: (String) -> Unit, onEmail: (String) -> Unit, onDescription: (String) -> Unit, onPickAvatar: () -> Unit, goBack: () -> Unit, go: (Page) -> Unit) {
-    var edit by rememberSaveable { mutableStateOf(false) }
-    var n by rememberSaveable(name) { mutableStateOf(name) }; var u by rememberSaveable(username) { mutableStateOf(username) }; var e by rememberSaveable(email) { mutableStateOf(email) }; var d by rememberSaveable(description) { mutableStateOf(description) }
-    Column(Modifier.fillMaxSize()) {
-        PageHeader("Profile", goBack)
-        LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            item { ProfileHero(name, avatar, onPickAvatar) }
-            item { Card(Modifier.fillMaxWidth(), RoundedCornerShape(17.dp), border = BorderStroke(1.dp, NSEBorder)) { Column(Modifier.padding(14.dp)) {
-                if (edit) {
-                    ProfileField("Full name", n, { n = it }, Icons.Default.Person); ProfileField("Username", u, { u = it }, Icons.Default.AccountCircle); ProfileField("Email", e, { e = it }, Icons.Default.Email); ProfileField("Description", d, { d = it }, Icons.Default.Info)
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { TextButton({ edit = false }) { Text("Cancel") }; TextButton({ onName(n); onUsername(u); onEmail(e); onDescription(d); edit = false }) { Text("Save", color = NSEGreen, fontWeight = FontWeight.Bold) } }
-                } else {
-                    InfoLine(Icons.Default.AccountCircle, "Username", "@$username"); InfoLine(Icons.Default.Email, "Email", email); InfoLine(Icons.Default.Person, "Profile", description)
-                    SettingsRow(Icons.Default.Tune, "Edit Profile", "Update your personal information") { edit = true }
-                }
-            } } }
-            item { SettingsRow(Icons.Default.PhotoCamera, "Change Profile Picture", "Choose a new photo from your phone", onPickAvatar) }
-            item { SettingsRow(Icons.Default.Lock, "Account Security", "Password, sessions and account protection") { go(Page.SECURITY) } }
-            item { SettingsRow(Icons.Default.Link, "Linked Accounts", "Manage connected services") { SimpleSettingsScreen("Linked Accounts", Icons.Default.Link, listOf("Google" to "Not connected", "Broker account" to "Not connected"), goBack) } }
-            item { Card(Modifier.fillMaxWidth(), RoundedCornerShape(15.dp), colors = CardDefaults.cardColors(containerColor = NSELight)) { Text("NSE Watcher helps you understand market information. It does not execute trades or guarantee investment returns.", Modifier.padding(14.dp), color = NSEDark, fontSize = 11.sp) } }
-        }
-    }
-}
+@Composable private fun PageHeader(title:String,back:()->Unit){Row(Modifier.fillMaxWidth().padding(8.dp),verticalAlignment=Alignment.CenterVertically){IconButton(back){Icon(Icons.Default.ArrowBack,"Back")};Text(title,fontSize=19.sp,fontWeight=FontWeight.ExtraBold)}}
 
-@Composable
-private fun ProfileHero(name: String, avatar: String?, onPickAvatar: () -> Unit) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val uri = avatar ?: context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("avatar_uri", null)
-    val bitmap by produceState<Bitmap?>(initialValue = null, uri) { value = try { uri?.let { context.contentResolver.openInputStream(Uri.parse(it))?.use(BitmapFactory::decodeStream) } } catch (_: Exception) { null } }
-    Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = NSELight)) { Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth().padding(18.dp)) {
-        Box(Modifier.size(88.dp)) { Surface(Modifier.fillMaxSize().clip(CircleShape), CircleShape, Color.White) { if (bitmap != null) Image(bitmap!!.asImageBitmap(), "Profile picture", Modifier.fillMaxSize()) else Box(Modifier.fillMaxSize(), Alignment.Center) { Icon(Icons.Default.Person, null, Modifier.size(45.dp), NSEGreen) } }; Surface(Modifier.size(30.dp).align(Alignment.BottomEnd).clip(CircleShape).clickable(onClick = onPickAvatar), CircleShape, NSEGreen) { Icon(Icons.Default.PhotoCamera, "Change profile picture", Modifier.padding(7.dp), Color.White) } }
-        Spacer(Modifier.height(10.dp)); Text(name, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold); Text("IT Graduate | Investor | Learner", fontSize = 11.sp, color = NSEMuted)
-    } }
-}
+@Composable private fun Profile(name:String,username:String,email:String,description:String,unusedPick:()->Unit,onName:(String)->Unit,onUsername:(String)->Unit,onEmail:(String)->Unit,onDescription:(String)->Unit,pick:()->Unit,back:()->Unit,go:(Page)->Unit){var edit by rememberSaveable{mutableStateOf(false)};var n by rememberSaveable(name){mutableStateOf(name)};var u by rememberSaveable(username){mutableStateOf(username)};var e by rememberSaveable(email){mutableStateOf(email)};var d by rememberSaveable(description){mutableStateOf(description)};Column{PageHeader("Profile",back);LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){item{ProfileHero(name,pick)};item{Card(Modifier.fillMaxWidth(),RoundedCornerShape(17.dp),border=BorderStroke(1.dp,Border)){Column(Modifier.padding(14.dp)){if(edit){Field("Full name",n,{n=it},Icons.Default.Person);Field("Username",u,{u=it},Icons.Default.AccountCircle);Field("Email",e,{e=it},Icons.Default.Email);Field("Description",d,{d=it},Icons.Default.Info);Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End){TextButton({edit=false}){Text("Cancel")};TextButton({onName(n);onUsername(u);onEmail(e);onDescription(d);edit=false}){Text("Save",color=Green,fontWeight=FontWeight.Bold)}}}else{Info(Icons.Default.AccountCircle,"Username","@$username");Info(Icons.Default.Email,"Email",email);Info(Icons.Default.Person,"Description",description);Row(Modifier.fillMaxWidth().clickable{edit=true}.padding(vertical=10.dp),verticalAlignment=Alignment.CenterVertically){Icon(Icons.Default.Tune,null,tint=Green);Spacer(Modifier.width(10.dp));Column(Modifier.weight(1f)){Text("Edit Profile",fontWeight=FontWeight.Bold);Text("Update your personal information",fontSize=10.sp,color=Muted)};Icon(Icons.Default.ChevronRight,null,tint=Muted)}}}}};item{SettingsRow(Icons.Default.PhotoCamera,"Change Profile Picture","Choose a new photo from your phone",pick)};item{SettingsRow(Icons.Default.Lock,"Account Security","Password, sessions and protection"){go(Page.SECURITY)}};item{SettingsRow(Icons.Default.Link,"Linked Accounts","Manage connected services"){go(Page.LINKED)}};item{Card(Modifier.fillMaxWidth(),RoundedCornerShape(15.dp),colors=CardDefaults.cardColors(containerColor=LightGreen)){Text("NSE Watcher is an information and analysis product. It does not execute trades or guarantee returns.",Modifier.padding(14.dp),color=DarkGreen,fontSize=11.sp)}}}}}
 
-@Composable
-private fun ProfileField(label: String, value: String, onValue: (String) -> Unit, icon: androidx.compose.ui.graphics.vector.ImageVector) {
-    TextField(value, onValue, Modifier.fillMaxWidth().padding(bottom = 7.dp), label = { Text(label) }, leadingIcon = { Icon(icon, null, tint = NSEGreen) }, singleLine = label != "Description", colors = TextFieldDefaults.colors(focusedIndicatorColor = NSEGreen, focusedLabelColor = NSEGreen))
-}
+@Composable private fun ProfileHero(name:String,pick:()->Unit){val c=androidx.compose.ui.platform.LocalContext.current;val u=c.getSharedPreferences(PREFS,0).getString("avatar_uri",null);val b by produceState<Bitmap?>(null,u){value=try{u?.let{c.contentResolver.openInputStream(Uri.parse(it))?.use{stream->BitmapFactory.decodeStream(stream)}}}catch(_:Exception){null}};Card(Modifier.fillMaxWidth(),RoundedCornerShape(18.dp),colors=CardDefaults.cardColors(containerColor=LightGreen)){Column(Modifier.fillMaxWidth().padding(18.dp),horizontalAlignment=Alignment.CenterHorizontally){Box(Modifier.size(92.dp)){Surface(Modifier.fillMaxSize(),CircleShape,Color.White){if(b!=null)Image(b!!.asImageBitmap(),"Profile picture",Modifier.fillMaxSize())else Box(Modifier.fillMaxSize(),Alignment.Center){Icon(Icons.Default.Person,null,Modifier.size(46.dp),Green)}};Surface(Modifier.size(30.dp).align(Alignment.BottomEnd).clickable(onClick=pick),CircleShape,Green){Icon(Icons.Default.PhotoCamera,"Change profile picture",Modifier.padding(7.dp),Color.White)}};Spacer(Modifier.height(9.dp));Text(name,fontSize=20.sp,fontWeight=FontWeight.ExtraBold);Text("IT Graduate | Investor | Learner",fontSize=11.sp,color=Muted)}}}
 
-@Composable
-private fun SettingsScreen(dark: Boolean, market: Boolean, price: Boolean, news: Boolean, app: Boolean, volume: Boolean, changes: Boolean, refresh: Boolean, onDark: (Boolean) -> Unit, onMarket: (Boolean) -> Unit, onPrice: (Boolean) -> Unit, onNews: (Boolean) -> Unit, onApp: (Boolean) -> Unit, onVolume: (Boolean) -> Unit, onChanges: (Boolean) -> Unit, onRefresh: (Boolean) -> Unit, goBack: () -> Unit, go: (Page) -> Unit) {
-    Column(Modifier.fillMaxSize()) { PageHeader("Settings", goBack); LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        item { SettingsSection("Appearance") { SettingsRow(Icons.Default.LightMode, "Theme", if (dark) "Dark" else "Light") { go(Page.THEME) }; SettingsRow(Icons.Default.Language, "Language", "English") { go(Page.LANGUAGE) }; SettingsRow(Icons.Default.Visibility, "Font & Display", "Comfortable reading") {} } }
-        item { SettingsSection("Notifications") { SettingsRow(Icons.Default.Notifications, "Notifications", "Market alerts, news and updates") { go(Page.NOTIFICATIONS) }; SwitchRow("Market alerts", "Important market movements and trends", market, onMarket); SwitchRow("Price alerts", "Custom price notifications", price, onPrice); SwitchRow("News notifications", "Latest NSE news and company updates", news, onNews); SwitchRow("App notifications", "General updates and reminders", app, onApp) } }
-        item { SettingsSection("Data & Display") { SettingsRow(Icons.Default.Storage, "Live Data", "NSE data source and refresh") { go(Page.LIVE_DATA) }; SettingsRow(Icons.Default.ShowChart, "Chart Settings", "Timeframes, indicators and style") { go(Page.CHARTS) }; SwitchRow("Show trading volume", "Display volume where available", volume, onVolume); SwitchRow("Show price changes", "Display daily percentage changes", changes, onChanges) } }
-        item { SettingsSection("Market Preferences") { SettingsRow(Icons.Default.NotificationsNone, "Price Alerts", "Configure your favourite-stock alerts") { go(Page.ALERTS) }; SettingsRow(Icons.Default.Tune, "Watchlist & Market Preferences", "Default market views and symbols") {} } }
-        item { SettingsSection("Privacy & Security") { SettingsRow(Icons.Default.Lock, "Account Security", "Password and account protection") { go(Page.SECURITY) }; SettingsRow(Icons.Default.PrivacyTip, "Privacy", "How NSE Watcher handles your data") {} } }
-        item { SettingsSection("Support") { SettingsRow(Icons.Default.HelpOutline, "Help & Support", "FAQs, contact support and report an issue") { go(Page.HELP) }; SettingsRow(Icons.Default.Info, "About NSE Watcher", "Version, terms and product information") { go(Page.ABOUT) } } }
-        item { Card(Modifier.fillMaxWidth(), RoundedCornerShape(15.dp), border = BorderStroke(1.dp, NSEBorder)) { Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Logout, null, tint = NSERed); Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text("Log out", fontWeight = FontWeight.Bold); Text("End this session on the device", color = NSEMuted, fontSize = 10.sp) }; Text("›", color = NSERed, fontSize = 22.sp) } } }
-    } }
-}
+@Composable private fun Field(label:String,value:String,onValue:(String)->Unit,icon:ImageVector){TextField(value,onValue,Modifier.fillMaxWidth().padding(bottom=7.dp),label={Text(label)},leadingIcon={Icon(icon,null,tint=Green)},singleLine=label!="Description",colors=TextFieldDefaults.colors(focusedIndicatorColor=Green,focusedLabelColor=Green))}
+@Composable private fun Info(icon:ImageVector,title:String,value:String){Row(Modifier.fillMaxWidth().padding(vertical=7.dp),verticalAlignment=Alignment.CenterVertically){Surface(Modifier.size(36.dp),CircleShape,LightGreen){Icon(icon,null,Modifier.padding(8.dp),Green)};Spacer(Modifier.width(10.dp));Column{Text(title,fontSize=10.sp,color=Muted);Text(value,fontSize=13.sp,fontWeight=FontWeight.Bold)}}}
 
-@Composable
-private fun SettingsSection(title: String, content: @Composable ColumnScope.() -> Unit) { Column { Text(title, Modifier.padding(bottom = 6.dp), fontWeight = FontWeight.ExtraBold, fontSize = 13.sp, color = NSEMuted); Card(Modifier.fillMaxWidth(), RoundedCornerShape(16.dp), border = BorderStroke(1.dp, NSEBorder)) { Column(content = content) } } }
+@Composable private fun Settings(dark:Boolean,market:Boolean,price:Boolean,news:Boolean,app:Boolean,refresh:Boolean,volume:Boolean,changes:Boolean,onDark:(Boolean)->Unit,onMarket:(Boolean)->Unit,onPrice:(Boolean)->Unit,onNews:(Boolean)->Unit,onApp:(Boolean)->Unit,onRefresh:(Boolean)->Unit,onVolume:(Boolean)->Unit,onChanges:(Boolean)->Unit,back:()->Unit,go:(Page)->Unit){Column{PageHeader("Settings",back);LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){item{Section("Appearance"){SettingsRow(Icons.Default.LightMode,"Theme",if(dark)"Dark" else "Light"){go(Page.THEME)};SettingsRow(Icons.Default.Language,"Language","English"){go(Page.LANGUAGE)};SettingsRow(Icons.Default.Visibility,"Font & Display","Comfortable reading"){go(Page.DISPLAY)}}};item{Section("Notifications"){SettingsRow(Icons.Default.Notifications,"Notifications","Market alerts, news and updates"){go(Page.NOTIFICATIONS)};SwitchRow("Market alerts","Important market movements and trends",market,onMarket);SwitchRow("Price alerts","Custom price notifications",price,onPrice);SwitchRow("News notifications","Latest NSE news and company updates",news,onNews);SwitchRow("App notifications","General updates and reminders",app,onApp)}};item{Section("Data & Display"){SettingsRow(Icons.Default.Storage,"Live Data","NSE data source and refresh"){go(Page.LIVE_DATA)};SettingsRow(Icons.Default.ShowChart,"Chart Settings","Timeframes, indicators and style"){go(Page.CHARTS)};SwitchRow("Show trading volume","Display volume where available",volume,onVolume);SwitchRow("Show price changes","Display daily percentage changes",changes,onChanges)}};item{Section("Market Preferences"){SettingsRow(Icons.Default.NotificationsNone,"Price Alerts","Configure stock alerts"){go(Page.ALERTS)};SettingsRow(Icons.Default.Tune,"Watchlist & Market Preferences","Default market views and symbols") {}}};item{Section("Privacy & Security"){SettingsRow(Icons.Default.Lock,"Account Security","Password and account protection"){go(Page.SECURITY)};SettingsRow(Icons.Default.PrivacyTip,"Privacy","How NSE Watcher handles your data"){go(Page.PRIVACY)}}};item{Section("Support"){SettingsRow(Icons.Default.HelpOutline,"Help & Support","FAQs, contact and report issues"){go(Page.HELP)};SettingsRow(Icons.Default.Info,"About NSE Watcher","Version and product information"){go(Page.ABOUT)}}}}}}
 
-@Composable
-private fun SwitchRow(title: String, subtitle: String, checked: Boolean, onChecked: (Boolean) -> Unit) { Row(Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text(title, fontWeight = FontWeight.Bold, fontSize = 13.sp); Text(subtitle, color = NSEMuted, fontSize = 10.sp) }; Switch(checked, onChecked) } }
+@Composable private fun Section(title:String,content:@Composable ColumnScope.()->Unit){Column{Text(title,Modifier.padding(bottom=6.dp),fontSize=13.sp,fontWeight=FontWeight.ExtraBold,color=Muted);Card(Modifier.fillMaxWidth(),RoundedCornerShape(16.dp),border=BorderStroke(1.dp,Border)){Column(content=content)}}}
+@Composable private fun SwitchRow(title:String,subtitle:String,checked:Boolean,onChecked:(Boolean)->Unit){Row(Modifier.fillMaxWidth().padding(13.dp,10.dp),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(title,fontWeight=FontWeight.Bold,fontSize=13.sp);Text(subtitle,fontSize=10.sp,color=Muted)};Switch(checked,onChecked)}}
+@Composable private fun ThemePage(dark:Boolean,onDark:(Boolean)->Unit,back:()->Unit){Column{PageHeader("Theme",back);LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){item{ThemeChoice("Light","Clean white NSE Watcher experience",Icons.Default.LightMode,!dark){onDark(false)}};item{ThemeChoice("Dark","Low-light interface for night use",Icons.Default.DarkMode,dark){onDark(true)}};item{ThemeChoice("System Default","Follow your phone display setting",Icons.Default.RestartAlt,false){}};item{Note("Theme changes apply immediately and are saved on this device.")}}}}
+@Composable private fun ThemeChoice(title:String,subtitle:String,icon:ImageVector,selected:Boolean,onClick:()->Unit){Card(Modifier.fillMaxWidth().clickable(onClick=onClick),RoundedCornerShape(15.dp),border=BorderStroke(1.dp,if(selected)Green else Border)){Row(Modifier.padding(14.dp),verticalAlignment=Alignment.CenterVertically){Surface(Modifier.size(40.dp),CircleShape,LightGreen){Icon(icon,null,Modifier.padding(9.dp),Green)};Spacer(Modifier.width(11.dp));Column(Modifier.weight(1f)){Text(title,fontWeight=FontWeight.Bold);Text(subtitle,fontSize=10.sp,color=Muted)};if(selected)Icon(Icons.Default.CheckCircle,null,tint=Green)}}}
+@Composable private fun NotificationsPage(market:Boolean,price:Boolean,news:Boolean,app:Boolean,onMarket:(Boolean)->Unit,onPrice:(Boolean)->Unit,onNews:(Boolean)->Unit,onApp:(Boolean)->Unit,back:()->Unit){Column{PageHeader("Notifications",back);LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){item{SwitchCard("Market Alerts","Important market movements, trends and events",market,onMarket)};item{SwitchCard("Price Alerts","Custom alerts for stocks you follow",price,onPrice)};item{SwitchCard("News Notifications","Latest NSE news and company updates",news,onNews)};item{SwitchCard("App Notifications","General updates and reminders",app,onApp)};item{SettingsRow(Icons.Default.Notifications,"Notification Sound","Default") {}};item{SettingsRow(Icons.Default.Visibility,"Do Not Disturb","Off") {}}}}}
+@Composable private fun SwitchCard(title:String,subtitle:String,checked:Boolean,onChecked:(Boolean)->Unit){Card(Modifier.fillMaxWidth(),RoundedCornerShape(15.dp),border=BorderStroke(1.dp,Border)){SwitchRow(title,subtitle,checked,onChecked)}}
+@Composable private fun LiveData(refresh:Boolean,volume:Boolean,changes:Boolean,onRefresh:(Boolean)->Unit,onVolume:(Boolean)->Unit,onChanges:(Boolean)->Unit,back:()->Unit){Column{PageHeader("Live Data",back);LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){item{Card(Modifier.fillMaxWidth(),RoundedCornerShape(15.dp),colors=CardDefaults.cardColors(containerColor=LightGreen)){Row(Modifier.padding(14.dp),verticalAlignment=Alignment.CenterVertically){Icon(Icons.Default.CheckCircle,null,tint=Green,modifier=Modifier.size(30.dp));Spacer(Modifier.width(10.dp));Column{Text("NSE market data",fontWeight=FontWeight.ExtraBold);Text("Live or delayed data will show its source and timestamp when connected.",fontSize=10.sp,color=Muted)}}}};item{SettingsRow(Icons.Default.Web,"Data Source","NSE / licensed market-data provider") {}};item{SwitchRow("Auto refresh","Refresh market information when available",refresh,onRefresh)};item{SwitchRow("Show trading volume","Display volume where available",volume,onVolume)};item{SwitchRow("Show price changes","Display daily percentage changes",changes,onChanges)};item{SettingsRow(Icons.Default.Storage,"Data Display","KSh (Kenyan Shillings)") {}};item{Text("Real-time market data may be delayed depending on the source and licensing arrangement.",Modifier.padding(8.dp),fontSize=10.sp,color=Muted)}}}}
+@Composable private fun SimplePage(title:String,icon:ImageVector,rows:List<Pair<String,String>>,back:()->Unit){Column{PageHeader(title,back);LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(9.dp)){items(rows){SettingsRow(icon,it.first,it.second){}}}}}
+@Composable private fun HelpPage(back:()->Unit){Column{PageHeader("Help & Support",back);LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(9.dp)){item{SettingsRow(Icons.Default.HelpOutline,"FAQs","Find answers to common questions") {}};item{SettingsRow(Icons.Default.Email,"Contact Support","Get in touch with our team") {}};item{SettingsRow(Icons.Default.ReportProblem,"Report an Issue","Help us improve the app") {}};item{SettingsRow(Icons.Default.Info,"User Guide","Learn how to use NSE Watcher") {}};item{SettingsRow(Icons.Default.Web,"Terms & Conditions","Read our terms of service") {}};item{SettingsRow(Icons.Default.PrivacyTip,"Privacy Policy","How we handle your data") {}};item{Note("Need help? Contact support@nsewatcher.co.ke")}}}}
+@Composable private fun AboutPage(back:()->Unit){Column{PageHeader("About NSE Watcher",back);LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){item{Card(Modifier.fillMaxWidth(),RoundedCornerShape(18.dp),colors=CardDefaults.cardColors(containerColor=LightGreen)){Column(Modifier.fillMaxWidth().padding(20.dp),horizontalAlignment=Alignment.CenterHorizontally){Icon(Icons.Default.ShowChart,null,Modifier.size(55.dp),Green);Text("NSE Watcher",fontSize=22.sp,fontWeight=FontWeight.ExtraBold);Text("Market Intelligence • Analyse • Understand",fontSize=11.sp,color=Muted);Text("Version 1.0",color=Green,fontWeight=FontWeight.Bold)}}};item{SettingsRow(Icons.Default.Info,"What NSE Watcher does","Understand NSE market information before deciding") {}};item{SettingsRow(Icons.Default.Web,"Terms & Conditions","Review terms of service") {}};item{SettingsRow(Icons.Default.PrivacyTip,"Privacy Policy","Review privacy information") {}};item{Note("NSE Watcher is an information and analysis product, not a broker. Paper Investing uses virtual money and does not place real trades." )}}}}
+@Composable private fun SettingsRow(icon:ImageVector,title:String,subtitle:String,onClick:()->Unit){Row(Modifier.fillMaxWidth().clickable(onClick=onClick).padding(horizontal=13.dp,vertical=11.dp),verticalAlignment=Alignment.CenterVertically){Surface(Modifier.size(38.dp),CircleShape,LightGreen){Icon(icon,null,Modifier.padding(8.dp),Green)};Spacer(Modifier.width(11.dp));Column(Modifier.weight(1f)){Text(title,fontWeight=FontWeight.Bold,fontSize=13.sp);if(subtitle.isNotBlank())Text(subtitle,fontSize=10.sp,color=Muted)};Icon(Icons.Default.ChevronRight,null,tint=Muted,modifier=Modifier.size(19.dp))}}
+@Composable private fun Note(text:String){Card(Modifier.fillMaxWidth(),RoundedCornerShape(15.dp),colors=CardDefaults.cardColors(containerColor=LightGreen)){Text(text,Modifier.padding(14.dp),fontSize=10.sp,color=DarkGreen)}}
 
-@Composable
-private fun ThemeScreen(dark: Boolean, onDark: (Boolean) -> Unit, back: () -> Unit) { Column(Modifier.fillMaxSize()) { PageHeader("Theme", back); LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) { item { ThemeOption("Light", "Clean white NSE Watcher experience", Icons.Default.LightMode, !dark) { onDark(false) } }; item { ThemeOption("Dark", "Low-light interface for night use", Icons.Default.DarkMode, dark) { onDark(true) } }; item { ThemeOption("System Default", "Follow your phone display setting", Icons.Default.RestartAlt, false) {} }; item { Card(Modifier.fillMaxWidth(), RoundedCornerShape(15.dp), colors = CardDefaults.cardColors(containerColor = NSELight)) { Text("Theme changes apply immediately and are saved on this device.", Modifier.padding(14.dp), color = NSEDark, fontSize = 11.sp) } } } } }
-
-@Composable
-private fun ThemeOption(title: String, subtitle: String, icon: androidx.compose.ui.graphics.vector.ImageVector, selected: Boolean, onClick: () -> Unit) { Card(Modifier.fillMaxWidth().clickable(onClick = onClick), RoundedCornerShape(15.dp), border = BorderStroke(1.dp, if (selected) NSEGreen else NSEBorder)) { Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) { Surface(Modifier.size(40.dp), CircleShape, NSELight) { Icon(icon, null, Modifier.padding(9.dp), NSEGreen) }; Spacer(Modifier.width(11.dp)); Column(Modifier.weight(1f)) { Text(title, fontWeight = FontWeight.Bold); Text(subtitle, color = NSEMuted, fontSize = 10.sp) }; Icon(if (selected) Icons.Default.CheckCircle else Icons.Default.Visibility, null, tint = if (selected) NSEGreen else NSEMuted) } } }
-
-@Composable
-private fun NotificationsScreen(market: Boolean, price: Boolean, news: Boolean, app: Boolean, onMarket: (Boolean) -> Unit, onPrice: (Boolean) -> Unit, onNews: (Boolean) -> Unit, onApp: (Boolean) -> Unit, back: () -> Unit) { Column(Modifier.fillMaxSize()) { PageHeader("Notifications", back); LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) { item { SwitchCard("Market Alerts", "Get notified about important market movements, trends and events", market, onMarket) }; item { SwitchCard("Price Alerts", "Receive custom alerts for stocks you follow", price, onPrice) }; item { SwitchCard("News Notifications", "Receive the latest NSE news and company updates", news, onNews) }; item { SwitchCard("App Notifications", "General app updates and reminders", app, onApp) }; item { SettingsRow(Icons.Default.Notifications, "Notification Sound", "Default") {}; item { SettingsRow(Icons.Default.Visibility, "Do Not Disturb", "Off") {} } } } }
-
-@Composable
-private fun SwitchCard(title: String, subtitle: String, checked: Boolean, onChecked: (Boolean) -> Unit) { Card(Modifier.fillMaxWidth(), RoundedCornerShape(15.dp), border = BorderStroke(1.dp, NSEBorder)) { SwitchRow(title, subtitle, checked, onChecked) } }
-
-@Composable
-private fun LiveDataScreen(refresh: Boolean, volume: Boolean, changes: Boolean, onRefresh: (Boolean) -> Unit, onVolume: (Boolean) -> Unit, onChanges: (Boolean) -> Unit, back: () -> Unit) { Column(Modifier.fillMaxSize()) { PageHeader("Live Data", back); LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) { item { Card(Modifier.fillMaxWidth(), RoundedCornerShape(15.dp), colors = CardDefaults.cardColors(containerColor = NSELight)) { Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.CheckCircle, null, tint = NSEGreen, modifier = Modifier.size(30.dp)); Spacer(Modifier.width(10.dp)); Column { Text("NSE market data", fontWeight = FontWeight.ExtraBold); Text("Live or delayed data will be shown with its source and timestamp when connected.", color = NSEMuted, fontSize = 10.sp) } } } }; item { SettingsRow(Icons.Default.Web, "Data Source", "NSE / licensed market-data provider") {} }; item { SwitchRow("Auto refresh", "Refresh market information when new data is available", refresh, onRefresh) }; item { SwitchRow("Show trading volume", "Display volume where available", volume, onVolume) }; item { SwitchRow("Show price changes", "Display daily percentage changes", changes, onChanges) }; item { SettingsRow(Icons.Default.Storage, "Data Display", "KSh (Kenyan Shillings)") {} }; item { Text("Note: Real-time market data may be delayed depending on the source and licensing arrangement.", Modifier.padding(8.dp), color = NSEMuted, fontSize = 10.sp) } } } }
-
-@Composable
-private fun SimpleSettingsScreen(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, rows: List<Pair<String, String>>, back: () -> Unit) { Column(Modifier.fillMaxSize()) { PageHeader(title, back); LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) { items(rows) { (a, b) -> SettingsRow(icon, a, b) {} } } } }
-
-@Composable
-private fun HelpScreen(back: () -> Unit) { Column(Modifier.fillMaxSize()) { PageHeader("Help & Support", back); LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) { item { SettingsRow(Icons.Default.HelpOutline, "FAQs", "Find answers to common questions") {} }; item { SettingsRow(Icons.Default.Email, "Contact Support", "Get in touch with our team") {} }; item { SettingsRow(Icons.Default.ReportProblem, "Report an Issue", "Help us improve the app") {} }; item { SettingsRow(Icons.Default.Info, "User Guide", "Learn how to use NSE Watcher") {} }; item { SettingsRow(Icons.Default.Web, "Terms & Conditions", "Read our terms of service") {} }; item { SettingsRow(Icons.Default.PrivacyTip, "Privacy Policy", "How we handle your data") {} }; item { Card(Modifier.fillMaxWidth(), RoundedCornerShape(15.dp), colors = CardDefaults.cardColors(containerColor = NSELight)) { Column(Modifier.padding(15.dp)) { Text("Need immediate help?", fontWeight = FontWeight.ExtraBold); Text("Email: support@nsewatcher.co.ke", color = NSEMuted, fontSize = 11.sp); Text("We’re here to help.", color = NSEDark, fontSize = 11.sp) } } } } } }
-
-@Composable
-private fun AboutScreen(back: () -> Unit) { Column(Modifier.fillMaxSize()) { PageHeader("About NSE Watcher", back); LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) { item { Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = NSELight)) { Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) { Icon(Icons.Default.ShowChart, null, Modifier.size(55.dp), NSEGreen); Text("NSE Watcher", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold); Text("Market Intelligence • Analyse • Understand", color = NSEMuted, fontSize = 11.sp); Text("Version 1.0", color = NSEGreen, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 6.dp)) } } }; item { SettingsRow(Icons.Default.Info, "What NSE Watcher does", "Helps you understand NSE market information before making your own decision") {} }; item { SettingsRow(Icons.Default.Web, "Terms & Conditions", "Review terms of service") {} }; item { SettingsRow(Icons.Default.PrivacyTip, "Privacy Policy", "Review privacy information") {} }; item { Text("NSE Watcher is an information and analysis product, not a broker. Paper Investing uses virtual money and does not place real trades. Nothing in the app is a guarantee of future returns.", Modifier.padding(8.dp), color = NSEMuted, fontSize = 10.sp) } } } }
-
-@Composable
-private fun PageHeader(title: String, back: () -> Unit) { Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) { IconButton(onClick = back) { Icon(Icons.Default.ArrowBack, "Back") }; Text(title, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold) } }
-
-@Composable
-private fun SettingsRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, subtitle: String, onClick: () -> Unit) { Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 13.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) { Surface(Modifier.size(38.dp), CircleShape, NSELight) { Icon(icon, null, Modifier.padding(8.dp), NSEGreen) }; Spacer(Modifier.width(11.dp)); Column(Modifier.weight(1f)) { Text(title, fontWeight = FontWeight.Bold, fontSize = 13.sp); if (subtitle.isNotBlank()) Text(subtitle, color = NSEMuted, fontSize = 10.sp) }; Icon(Icons.Default.ChevronRight, null, tint = NSEMuted, modifier = Modifier.size(19.dp)) } }
-
-@Composable
-private fun InfoLine(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, value: String) { Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) { Surface(Modifier.size(36.dp), CircleShape, NSELight) { Icon(icon, null, Modifier.padding(8.dp), NSEGreen) }; Spacer(Modifier.width(10.dp)); Column { Text(title, color = NSEMuted, fontSize = 10.sp); Text(value, fontWeight = FontWeight.Bold, fontSize = 13.sp) } } }
-
-@Composable
-private fun HomeScreen(open: (DesignStock) -> Unit) { val gainers = designStocks.filter { it.change > 0 }.sortedByDescending { it.change }; val losers = designStocks.filter { it.change < 0 }.sortedBy { it.change }; LazyColumn(contentPadding = PaddingValues(16.dp, 5.dp, 16.dp, 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { item { MarketStatusCard() }; item { IndexMiniRow() }; item { TrendCard() }; item { SectionHeader("Market Snapshot", "A quick view before you invest") }; item { SnapshotActions() }; item { MoversCard(gainers.take(4), losers.take(3), open) }; item { SectionHeader("Top Companies", "Stocks moving the NSE today") }; item { LazyRow(horizontalArrangement = Arrangement.spacedBy(9.dp)) { items(gainers.take(4)) { StockMiniCard(it, open) } } }; item { SectionHeader("Latest News", "Market events and company updates") }; item { NewsPreview() }; item { PaperBanner() } } }
-
-@Composable private fun MarketStatusCard() { Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = NSELight)) { Column(Modifier.padding(15.dp)) { Row(verticalAlignment = Alignment.CenterVertically) { Box(Modifier.size(9.dp).clip(CircleShape).background(NSEGreen)); Spacer(Modifier.width(7.dp)); Text("NSE MARKET OPEN", color = NSEDark, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp); Spacer(Modifier.weight(1f)); Text("10:24 AM EAT", color = NSEMuted, fontSize = 10.sp) }; Spacer(Modifier.height(10.dp)); Text("Market overview", color = NSEMuted, fontSize = 11.sp); Text("Clear picture of the NSE", fontSize = 19.sp, fontWeight = FontWeight.ExtraBold); Text("before you make an investment decision.", fontSize = 11.sp, color = NSEMuted) } } }
-@Composable private fun IndexMiniRow() { LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) { items(listOf("NSE 20" to "1,843.56", "NASI" to "112.48", "NSE 25" to "3,642.17")) { (n, v) -> Card(Modifier.width(145.dp), RoundedCornerShape(14.dp), border = BorderStroke(1.dp, NSEBorder)) { Column(Modifier.padding(11.dp)) { Text(n, fontSize = 11.sp, fontWeight = FontWeight.Bold); Text(v, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold); Text("▲ +1.34%", color = NSEGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold) } } } } }
-@Composable private fun TrendCard() { var period by rememberSaveable { mutableStateOf("1D") }; Card(Modifier.fillMaxWidth(), RoundedCornerShape(17.dp), border = BorderStroke(1.dp, NSEBorder)) { Column(Modifier.padding(14.dp)) { Row(verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text("NSE 20 — Market Trend", fontWeight = FontWeight.ExtraBold, fontSize = 15.sp); Text("See how the market has been performing", color = NSEMuted, fontSize = 10.sp) }; Text("+1.34%", color = NSEGreen, fontWeight = FontWeight.ExtraBold) }; Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) { listOf("1D", "1W", "1M", "3M", "6M", "1Y", "5Y").forEach { FilterChip(period == it, { period = it }, label = { Text(it, fontSize = 10.sp) }) } }; TrendChart(); Text("Historical performance will use sourced NSE market data in live mode.", color = NSEMuted, fontSize = 9.sp) } } }
-@Composable private fun TrendChart() { Canvas(Modifier.fillMaxWidth().height(95.dp).padding(vertical = 8.dp)) { val values = listOf(28f, 38f, 34f, 47f, 44f, 58f, 52f, 67f, 61f, 74f, 69f, 83f); val path = Path(); values.forEachIndexed { i, v -> val x = size.width * i / (values.size - 1); val y = size.height - v / 100f * size.height; if (i == 0) path.moveTo(x, y) else path.lineTo(x, y) }; drawPath(path, NSEGreen, style = Stroke(4f, cap = StrokeCap.Round)) } }
-@Composable private fun SectionHeader(title: String, subtitle: String) { Column { Text(title, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp); Text(subtitle, color = NSEMuted, fontSize = 10.sp) } }
-@Composable private fun SnapshotActions() { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) { ActionTile(Icons.Default.AutoGraph, "Sectors", "Performance", Modifier.weight(1f)); ActionTile(Icons.Default.ShowChart, "Top Movers", "Gainers & Losers", Modifier.weight(1f)); ActionTile(Icons.Default.Business, "Market Analysis", "Trends & Outlook", Modifier.weight(1f)); ActionTile(Icons.Default.NotificationsNone, "News & Events", "Latest Updates", Modifier.weight(1f)) } }
-@Composable private fun ActionTile(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, subtitle: String, modifier: Modifier) { Card(modifier, RoundedCornerShape(13.dp), border = BorderStroke(1.dp, NSEBorder)) { Column(Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) { Icon(icon, null, tint = NSEGreen, modifier = Modifier.size(22.dp)); Spacer(Modifier.height(4.dp)); Text(title, fontWeight = FontWeight.Bold, fontSize = 10.sp, textAlign = TextAlign.Center); Text(subtitle, color = NSEMuted, fontSize = 7.sp, textAlign = TextAlign.Center) } } }
-@Composable private fun MoversCard(gainers: List<DesignStock>, losers: List<DesignStock>, open: (DesignStock) -> Unit) { Card(Modifier.fillMaxWidth(), RoundedCornerShape(17.dp), border = BorderStroke(1.dp, NSEBorder)) { Row(Modifier.padding(vertical = 12.dp)) { MoverList("Top Gainers", gainers, NSEGreen, open, Modifier.weight(1f)); Box(Modifier.width(1.dp).height(150.dp).background(NSEBorder)); MoverList("Top Losers", losers, NSERed, open, Modifier.weight(1f)) } } }
-@Composable private fun MoverList(title: String, stocks: List<DesignStock>, tint: Color, open: (DesignStock) -> Unit, modifier: Modifier) { Column(modifier.padding(horizontal = 11.dp)) { Text(title, color = tint, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp); stocks.forEach { s -> Row(Modifier.fillMaxWidth().clickable { open(s) }.padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text(s.symbol, fontWeight = FontWeight.Bold, fontSize = 11.sp); Text(String.format(Locale.US, "KSh %.2f", s.price), color = NSEMuted, fontSize = 9.sp) }; Text(String.format(Locale.US, "%+.2f%%", s.change), color = tint, fontWeight = FontWeight.Bold, fontSize = 10.sp) } } } }
-@Composable private fun StockMiniCard(stock: DesignStock, open: (DesignStock) -> Unit) { Card(Modifier.width(175.dp).clickable { open(stock) }, RoundedCornerShape(15.dp), border = BorderStroke(1.dp, NSEBorder)) { Column(Modifier.padding(12.dp)) { Text(stock.symbol, fontWeight = FontWeight.ExtraBold); Text(stock.name, color = NSEMuted, fontSize = 9.sp); Text(String.format(Locale.US, "KSh %.2f", stock.price), fontSize = 17.sp, fontWeight = FontWeight.ExtraBold); Text(String.format(Locale.US, "%+.2f%%", stock.change), color = if (stock.change >= 0) NSEGreen else NSERed, fontSize = 10.sp, fontWeight = FontWeight.Bold) } } }
-@Composable private fun NewsPreview() { Card(Modifier.fillMaxWidth(), RoundedCornerShape(15.dp), border = BorderStroke(1.dp, NSEBorder)) { Column(Modifier.padding(13.dp)) { Text("Safaricom posts strong Q1 results", fontWeight = FontWeight.Bold); Text("Net profit and operating trends from the company update…", color = NSEMuted, fontSize = 10.sp); Divider(Modifier.padding(vertical = 8.dp), color = NSEBorder); Text("Market breadth improves as banking stocks lead", fontWeight = FontWeight.Bold); Text("2h ago • Market Update", color = NSEMuted, fontSize = 9.sp) } } }
-@Composable private fun PaperBanner() { Card(Modifier.fillMaxWidth(), RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = NSEDark)) { Row(Modifier.padding(15.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.AccountBalanceWallet, null, tint = Color.White, modifier = Modifier.size(32.dp)); Spacer(Modifier.width(10.dp)); Column { Text("PAPER INVESTING", color = Color.White, fontWeight = FontWeight.ExtraBold); Text("Practice with virtual money using real NSE prices when available.", color = Color.White, fontSize = 10.sp) } } } }
-
-@Composable private fun MarketScreen() { LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { item { SectionHeader("Market Analysis", "Understand the broader NSE") }; item { TrendCard() }; item { SettingsRow(Icons.Default.AutoGraph, "Sector Performance", "Banking, telecom, manufacturing, energy") {} }; item { SettingsRow(Icons.Default.ShowChart, "Market Breadth", "Advancers, decliners and unchanged") {} }; item { SettingsRow(Icons.Default.NotificationsNone, "Corporate Actions", "Dividends, results and announcements") {} } } }
-@Composable private fun CompaniesScreen(open: (DesignStock) -> Unit) { LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { item { SectionHeader("NSE Companies", "Explore company intelligence") }; items(designStocks) { s -> SettingsRow(Icons.Default.Business, s.name, "${s.symbol} • KSh ${String.format(Locale.US, "%.2f", s.price)} • ${String.format(Locale.US, "%+.2f%%", s.change)}") { open(s) } } } }
-@Composable private fun CompanyScreen(stock: DesignStock, back: () -> Unit) { Column(Modifier.fillMaxSize()) { PageHeader(stock.name, back); LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) { item { Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = NSELight)) { Column(Modifier.padding(16.dp)) { Text(stock.symbol, color = NSEDark, fontWeight = FontWeight.Bold); Text(String.format(Locale.US, "KSh %.2f", stock.price), fontSize = 29.sp, fontWeight = FontWeight.ExtraBold); Text(String.format(Locale.US, "%+.2f%% today", stock.change), color = if (stock.change >= 0) NSEGreen else NSERed, fontWeight = FontWeight.Bold) } } }; item { Card(Modifier.fillMaxWidth(), RoundedCornerShape(17.dp), border = BorderStroke(1.dp, NSEBorder)) { Column(Modifier.padding(14.dp)) { Text("Price History", fontWeight = FontWeight.ExtraBold); TrendChart() } } }; item { SettingsSection("NSE Watcher Intelligence") { SettingsRow(Icons.Default.AutoGraph, "Watcher Score", "Illustrative score • explainable factors") {}; SettingsRow(Icons.Default.Business, "Fundamentals", "Valuation, profitability, leverage and growth") {}; SettingsRow(Icons.Default.NotificationsNone, "Corporate Actions", "Dividends, results and announcements") {} } }; item { Text("This screen is currently illustrative. Live NSE data and licensed sources will replace demo values.", color = NSEMuted, fontSize = 10.sp, modifier = Modifier.padding(6.dp)) } } } }
-@Composable private fun PaperInvestScreen() { LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { item { Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = NSEDark)) { Column(Modifier.padding(17.dp)) { Text("PAPER PORTFOLIO", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp); Text("KSh 100,000", color = Color.White, fontSize = 29.sp, fontWeight = FontWeight.ExtraBold); Text("Virtual balance • No real money", color = Color.White, fontSize = 10.sp) } } }; item { SectionHeader("Holdings", "Hypothetical investments follow market movement") }; item { SettingsRow(Icons.Default.Business, "SCOM", "100 shares • KSh 1,850 value") {}; item { SettingsRow(Icons.Default.Business, "KCB", "50 shares • KSh 2,115 value") {}; item { Text("Paper Investing is educational and does not place trades with a broker.", color = NSEMuted, fontSize = 10.sp, modifier = Modifier.padding(6.dp)) } } }
-@Composable private fun MoreScreen(go: (Page) -> Unit) { LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) { item { SectionHeader("More", "Your NSE Watcher tools") }; item { SettingsRow(Icons.Default.AccountCircle, "Profile", "Personal information and profile picture") { go(Page.PROFILE) } }; item { SettingsRow(Icons.Default.Settings, "Settings", "Theme, notifications, data and privacy") { go(Page.SETTINGS) } }; item { SettingsRow(Icons.Default.HelpOutline, "Help & Support", "FAQs, contact and report issues") { go(Page.HELP) } }; item { SettingsRow(Icons.Default.Info, "About NSE Watcher", "Version and product information") { go(Page.ABOUT) } } }
+@Composable private fun Home(open:(Stock)->Unit){val g=stocks.filter{it.change>0};val l=stocks.filter{it.change<0};LazyColumn(contentPadding=PaddingValues(16.dp,5.dp,16.dp,20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){item{MarketStatus()};item{Indexes()};item{Trend()};item{Header("Market Snapshot","A quick view before you invest")};item{Snapshot()};item{Movers(g,l,open)};item{Header("Top Companies","Stocks moving the NSE today")};item{LazyRow(horizontalArrangement=Arrangement.spacedBy(9.dp)){items(g){StockCard(it,open)}}};item{Header("Latest News","Market events and company updates")};item{News()};item{PaperBanner()}}}
+@Composable private fun MarketStatus(){Card(Modifier.fillMaxWidth(),RoundedCornerShape(18.dp),colors=CardDefaults.cardColors(containerColor=LightGreen)){Column(Modifier.padding(15.dp)){Row(verticalAlignment=Alignment.CenterVertically){Box(Modifier.size(9.dp).clip(CircleShape).background(Green));Spacer(Modifier.width(7.dp));Text("NSE MARKET OPEN",fontWeight=FontWeight.ExtraBold,fontSize=12.sp,color=DarkGreen);Spacer(Modifier.weight(1f));Text("10:24 AM EAT",fontSize=10.sp,color=Muted)};Spacer(Modifier.height(10.dp));Text("Market overview",fontSize=11.sp,color=Muted);Text("Clear picture of the NSE",fontSize=19.sp,fontWeight=FontWeight.ExtraBold);Text("before you make an investment decision.",fontSize=11.sp,color=Muted)}}}
+@Composable private fun Indexes(){LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)){items(listOf("NSE 20" to "1,843.56","NASI" to "112.48","NSE 25" to "3,642.17")){Card(Modifier.width(145.dp),RoundedCornerShape(14.dp),border=BorderStroke(1.dp,Border)){Column(Modifier.padding(11.dp)){Text(it.first,fontSize=11.sp,fontWeight=FontWeight.Bold);Text(it.second,fontSize=17.sp,fontWeight=FontWeight.ExtraBold);Text("▲ +1.34%",fontSize=10.sp,color=Green,fontWeight=FontWeight.Bold)}}}}}
+@Composable private fun Trend(){var period by rememberSaveable{mutableStateOf("1D")};Card(Modifier.fillMaxWidth(),RoundedCornerShape(17.dp),border=BorderStroke(1.dp,Border)){Column(Modifier.padding(14.dp)){Row(verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text("NSE 20 — Market Trend",fontSize=15.sp,fontWeight=FontWeight.ExtraBold);Text("See how the market has been performing",fontSize=10.sp,color=Muted)};Text("+1.34%",fontWeight=FontWeight.ExtraBold,color=Green)};Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(4.dp)){listOf("1D","1W","1M","3M","6M","1Y","5Y").forEach{FilterChip(period==it,{period=it},label={Text(it,fontSize=10.sp)})}};Chart();Text("Historical performance will use sourced NSE market data in live mode.",fontSize=9.sp,color=Muted)}}}
+@Composable private fun Chart(){Canvas(Modifier.fillMaxWidth().height(90.dp).padding(vertical=8.dp)){val v=listOf(28f,38f,34f,47f,44f,58f,52f,67f,61f,74f,69f,83f);val p=Path();v.forEachIndexed{i,x->val xx=size.width*i/(v.size-1);val y=size.height-x/100f*size.height;if(i==0)p.moveTo(xx,y)else p.lineTo(xx,y)};drawPath(p,Green,style=Stroke(4f,cap=StrokeCap.Round))}}
+@Composable private fun Header(title:String,subtitle:String){Column{Text(title,fontSize=16.sp,fontWeight=FontWeight.ExtraBold);Text(subtitle,fontSize=10.sp,color=Muted)}}
+@Composable private fun Snapshot(){Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(7.dp)){Action(Icons.Default.AutoGraph,"Sectors","Performance");Action(Icons.Default.ShowChart,"Top Movers","Gainers & Losers");Action(Icons.Default.Business,"Market Analysis","Trends & Outlook");Action(Icons.Default.NotificationsNone,"News & Events","Latest Updates")}}
+@Composable private fun Action(icon:ImageVector,title:String,subtitle:String){Card(Modifier.weight(1f),RoundedCornerShape(13.dp),border=BorderStroke(1.dp,Border)){Column(Modifier.padding(8.dp),horizontalAlignment=Alignment.CenterHorizontally){Icon(icon,null,Modifier.size(22.dp),Green);Spacer(Modifier.height(4.dp));Text(title,fontSize=10.sp,fontWeight=FontWeight.Bold,textAlign=TextAlign.Center);Text(subtitle,fontSize=7.sp,color=Muted,textAlign=TextAlign.Center)}}}
+@Composable private fun Movers(g:List<Stock>,l:List<Stock>,open:(Stock)->Unit){Card(Modifier.fillMaxWidth(),RoundedCornerShape(17.dp),border=BorderStroke(1.dp,Border)){Row(Modifier.padding(vertical=12.dp)){MoverList("Top Gainers",g,Green,open,Modifier.weight(1f));Box(Modifier.width(1.dp).height(145.dp).background(Border));MoverList("Top Losers",l,Red,open,Modifier.weight(1f))}}}
+@Composable private fun MoverList(title:String,s:List<Stock>,tint:Color,open:(Stock)->Unit,mod:Modifier){Column(mod.padding(horizontal=11.dp)){Text(title,color=tint,fontWeight=FontWeight.ExtraBold,fontSize=12.sp);s.take(4).forEach{Row(Modifier.fillMaxWidth().clickable{open(it)}.padding(vertical=5.dp)){Column(Modifier.weight(1f)){Text(it.symbol,fontWeight=FontWeight.Bold,fontSize=11.sp);Text("KSh ${String.format(Locale.US,"%.2f",it.price)}",fontSize=9.sp,color=Muted)};Text(String.format(Locale.US,"%+.2f%%",it.change),color=tint,fontWeight=FontWeight.Bold,fontSize=10.sp)}}}}
+@Composable private fun StockCard(s:Stock,open:(Stock)->Unit){Card(Modifier.width(175.dp).clickable{open(s)},RoundedCornerShape(15.dp),border=BorderStroke(1.dp,Border)){Column(Modifier.padding(12.dp)){Text(s.symbol,fontWeight=FontWeight.ExtraBold);Text(s.name,fontSize=9.sp,color=Muted);Text("KSh ${String.format(Locale.US,"%.2f",s.price)}",fontSize=17.sp,fontWeight=FontWeight.ExtraBold);Text(String.format(Locale.US,"%+.2f%%",s.change),color=if(s.change>=0)Green else Red,fontSize=10.sp,fontWeight=FontWeight.Bold)}}}
+@Composable private fun News(){Card(Modifier.fillMaxWidth(),RoundedCornerShape(15.dp),border=BorderStroke(1.dp,Border)){Column(Modifier.padding(13.dp)){Text("Safaricom posts strong Q1 results",fontWeight=FontWeight.Bold);Text("Net profit and operating trends from the company update…",fontSize=10.sp,color=Muted);Box(Modifier.fillMaxWidth().padding(vertical=8.dp).height(1.dp).background(Border));Text("Market breadth improves as banking stocks lead",fontWeight=FontWeight.Bold);Text("2h ago • Market Update",fontSize=9.sp,color=Muted)}}}
+@Composable private fun PaperBanner(){Card(Modifier.fillMaxWidth(),RoundedCornerShape(16.dp),colors=CardDefaults.cardColors(containerColor=DarkGreen)){Row(Modifier.padding(15.dp),verticalAlignment=Alignment.CenterVertically){Icon(Icons.Default.AccountBalanceWallet,null,Modifier.size(32.dp),Color.White);Spacer(Modifier.width(10.dp));Column{Text("PAPER INVESTING",color=Color.White,fontWeight=FontWeight.ExtraBold);Text("Virtual money using real NSE prices when available.",color=Color.White,fontSize=10.sp)}}}}
+@Composable private fun Market(){LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){item{Header("Market Analysis","Understand the broader NSE")};item{Trend()};item{SettingsRow(Icons.Default.AutoGraph,"Sector Performance","Banking, telecom, manufacturing and energy") {}};item{SettingsRow(Icons.Default.ShowChart,"Market Breadth","Advancers, decliners and unchanged") {}};item{SettingsRow(Icons.Default.NotificationsNone,"Corporate Actions","Dividends, results and announcements") {}}}}
+@Composable private fun Companies(open:(Stock)->Unit){LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){item{Header("NSE Companies","Explore company intelligence")};items(stocks){s->SettingsRow(Icons.Default.Business,s.name,"${s.symbol} • KSh ${String.format(Locale.US,"%.2f",s.price)} • ${String.format(Locale.US,"%+.2f%%",s.change)}"){open(s)}}}}
+@Composable private fun Company(s:Stock,back:()->Unit){Column{PageHeader(s.name,back);LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(11.dp)){item{Card(Modifier.fillMaxWidth(),RoundedCornerShape(18.dp),colors=CardDefaults.cardColors(containerColor=LightGreen)){Column(Modifier.padding(16.dp)){Text(s.symbol,color=DarkGreen,fontWeight=FontWeight.Bold);Text("KSh ${String.format(Locale.US,"%.2f",s.price)}",fontSize=29.sp,fontWeight=FontWeight.ExtraBold);Text(String.format(Locale.US,"%+.2f%% today",s.change),color=if(s.change>=0)Green else Red,fontWeight=FontWeight.Bold)}}};item{Card(Modifier.fillMaxWidth(),RoundedCornerShape(17.dp),border=BorderStroke(1.dp,Border)){Column(Modifier.padding(14.dp)){Text("Price History",fontWeight=FontWeight.ExtraBold);Chart()}}};item{Section("NSE Watcher Intelligence"){SettingsRow(Icons.Default.AutoGraph,"Watcher Score","Illustrative, explainable factors"){};SettingsRow(Icons.Default.Business,"Fundamentals","Valuation, profitability, leverage and growth"){};SettingsRow(Icons.Default.NotificationsNone,"Corporate Actions","Dividends, results and announcements"){} }};item{Text("This screen is illustrative until live NSE data and licensed sources are connected.",fontSize=10.sp,color=Muted)}}}}
+@Composable private fun PaperInvest(){LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(11.dp)){item{Card(Modifier.fillMaxWidth(),RoundedCornerShape(18.dp),colors=CardDefaults.cardColors(containerColor=DarkGreen)){Column(Modifier.padding(17.dp)){Text("PAPER PORTFOLIO",color=Color.White,fontWeight=FontWeight.Bold);Text("KSh 100,000",color=Color.White,fontSize=29.sp,fontWeight=FontWeight.ExtraBold);Text("Virtual balance • No real money",color=Color.White,fontSize=10.sp)}}};item{Header("Holdings","Hypothetical investments follow market movement")};item{SettingsRow(Icons.Default.Business,"SCOM","100 shares • KSh 1,850 value") {}};item{SettingsRow(Icons.Default.Business,"KCB","50 shares • KSh 2,115 value") {}};item{Note("Paper Investing is educational and does not place trades with a broker.")}}}
+@Composable private fun More(go:(Page)->Unit){LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(9.dp)){item{Header("More","Your NSE Watcher tools")};item{SettingsRow(Icons.Default.AccountCircle,"Profile","Personal information and profile picture"){go(Page.PROFILE)}};item{SettingsRow(Icons.Default.Settings,"Settings","Theme, notifications, data and privacy"){go(Page.SETTINGS)}};item{SettingsRow(Icons.Default.HelpOutline,"Help & Support","FAQs, contact and report issues"){go(Page.HELP)}};item{SettingsRow(Icons.Default.Info,"About NSE Watcher","Version and product information"){go(Page.ABOUT)}}}}
