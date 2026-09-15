@@ -1,0 +1,74 @@
+name: Build Android APK Clean
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'app/**'
+      - 'gradle/**'
+      - 'gradle.properties'
+      - 'settings.gradle.kts'
+      - 'build.gradle.kts'
+      - '.github/workflows/build-apk-clean.yml'
+
+permissions:
+  contents: read
+
+env:
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+
+jobs:
+  debug-apk:
+    name: Build debug APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+      - name: Configure Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+      - name: Verify current UI source
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('app/src/main/java/ke/co/nsewatcher/DesignActivity.kt')
+          if not path.is_file():
+              raise SystemExit('DesignActivity.kt was not found')
+          text = path.read_text(encoding='utf-8')
+          for required in ('private fun Home', 'private fun Companies'):
+              if required not in text:
+                  raise SystemExit(f'Missing required composable: {required}')
+          if 'ApprovedMarketActivity' in text:
+              raise SystemExit('Obsolete ApprovedMarketActivity reference found')
+          print('Current UI source verified successfully.')
+          PY
+      - name: Verify obsolete activity is absent
+        run: |
+          if find app/src -name 'ApprovedMarketActivity.kt' -print -quit | grep -q .; then
+            echo 'Obsolete ApprovedMarketActivity.kt is present.'
+            exit 1
+          fi
+          echo 'ApprovedMarketActivity.kt is absent, as expected.'
+      - name: Install Gradle 8.14.4
+        run: |
+          curl -fsSL https://services.gradle.org/distributions/gradle-8.14.4-bin.zip -o gradle.zip
+          unzip -q gradle.zip
+          echo "$GITHUB_WORKSPACE/gradle-8.14.4/bin" >> "$GITHUB_PATH"
+      - name: Build debug APK
+        run: gradle --no-daemon assembleDebug
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: nse-watcher-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
