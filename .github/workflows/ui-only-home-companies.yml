@@ -2,6 +2,9 @@ name: Apply Home and Companies UI Only
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/ui-only-home-companies.yml'
 
 permissions:
   contents: write
@@ -73,10 +76,11 @@ jobs:
           REPLACE_CITY_BASE64
           CITY_IMAGE
 
-      - name: Commit
+      - name: Commit UI-only changes
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add app/src/main/java/ke/co/nsewatcher/DesignActivity.kt app/src/main/res/drawable/companies_city_background.jpg
+          if git diff --cached --quiet; then echo 'No UI changes needed.'; exit 0; fi
           git commit -m 'Update Home and Companies UI only'
           git push
