@@ -22,8 +22,11 @@ jobs:
           cache: gradle
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-      - name: Install Android platform
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+        with:
+          packages: ""
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
       - name: Install Gradle
         run: |
           curl -fsSL https://services.gradle.org/distributions/gradle-8.14.4-bin.zip -o gradle.zip
