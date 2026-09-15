@@ -137,10 +137,7 @@ private fun ApprovedApp() {
 
 @Composable
 private fun ApprovedTopBar(onProfile: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         Surface(Modifier.size(42.dp), RoundedCornerShape(12.dp), color = ALightGreen) {
             Icon(Icons.Default.ShowChart, null, Modifier.padding(8.dp), AGreen)
         }
@@ -150,42 +147,18 @@ private fun ApprovedTopBar(onProfile: () -> Unit) {
             Text("Analyse • Understand • Invest Smarter", fontSize = 10.sp, color = AMuted)
         }
         IconButton(onClick = {}) { Icon(Icons.Default.Search, "Search", tint = AGreen) }
-        Surface(
-            modifier = Modifier.size(40.dp).clip(CircleShape).clickable(onClick = onProfile),
-            shape = CircleShape,
-            color = ALightGreen
-        ) {
-            Box(Modifier.fillMaxSize(), Alignment.Center) {
-                Text("J", color = AGreen, fontWeight = FontWeight.Bold)
-            }
+        Surface(Modifier.size(40.dp).clip(CircleShape).clickable(onClick = onProfile), CircleShape, ALightGreen) {
+            Box(Modifier.fillMaxSize(), Alignment.Center) { Text("J", color = AGreen, fontWeight = FontWeight.Bold) }
         }
     }
 }
 
 @Composable
 private fun ApprovedBottomNav(selected: Int, onSelect: (Int) -> Unit) {
-    val items = listOf(
-        "Home" to Icons.Default.Home,
-        "Market" to Icons.Default.CandlestickChart,
-        "Companies" to Icons.Default.Business,
-        "Paper Invest" to Icons.Default.AccountBalanceWallet,
-        "More" to Icons.Default.AutoGraph
-    )
+    val items = listOf("Home" to Icons.Default.Home, "Market" to Icons.Default.CandlestickChart, "Companies" to Icons.Default.Business, "Paper Invest" to Icons.Default.AccountBalanceWallet, "More" to Icons.Default.AutoGraph)
     NavigationBar(containerColor = Color(0xFFF9F2FC)) {
         items.forEachIndexed { index, item ->
-            NavigationBarItem(
-                selected = selected == index,
-                onClick = { onSelect(index) },
-                icon = { Icon(item.second, item.first) },
-                label = { Text(item.first, fontSize = 9.sp) },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = AGreen,
-                    selectedTextColor = AGreen,
-                    indicatorColor = ALightGreen,
-                    unselectedIconColor = AMuted,
-                    unselectedTextColor = AMuted
-                )
-            )
+            NavigationBarItem(selected = selected == index, onClick = { onSelect(index) }, icon = { Icon(item.second, item.first) }, label = { Text(item.first, fontSize = 9.sp) }, colors = NavigationBarItemDefaults.colors(selectedIconColor = AGreen, selectedTextColor = AGreen, indicatorColor = ALightGreen, unselectedIconColor = AMuted, unselectedTextColor = AMuted))
         }
     }
 }
@@ -194,10 +167,7 @@ private fun ApprovedBottomNav(selected: Int, onSelect: (Int) -> Unit) {
 private fun ApprovedHome(stocks: List<Stock>, open: (Stock) -> Unit) {
     val gainers = stocks.filter { it.change > 0 }.sortedByDescending { it.change }
     val losers = stocks.filter { it.change < 0 }.sortedBy { it.change }
-    LazyColumn(
-        contentPadding = PaddingValues(20.dp, 4.dp, 20.dp, 24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
+    LazyColumn(contentPadding = PaddingValues(20.dp, 4.dp, 20.dp, 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { MarketStatusCard() }
         item { IndexCards() }
         item { MarketPulse(gainers, losers) }
@@ -211,11 +181,9 @@ private fun MarketStatusCard() {
     Card(Modifier.fillMaxWidth(), RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(ALightGreen)) {
         Column(Modifier.padding(18.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(9.dp).clip(CircleShape).background(AGreen))
-                Spacer(Modifier.width(8.dp))
+                Box(Modifier.size(9.dp).clip(CircleShape).background(AGreen)); Spacer(Modifier.width(8.dp))
                 Text("NSE MARKET", color = ADarkGreen, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
-                Spacer(Modifier.weight(1f))
-                Text("DATA FEED", color = AMuted, fontSize = 10.sp)
+                Spacer(Modifier.weight(1f)); Text("DATA FEED", color = AMuted, fontSize = 10.sp)
             }
             Spacer(Modifier.height(14.dp))
             Row(verticalAlignment = Alignment.Bottom) {
@@ -224,9 +192,7 @@ private fun MarketStatusCard() {
                     Text("Clear picture of the NSE", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
                     Text("before you make an investment decision.", color = AMuted, fontSize = 12.sp)
                 }
-                Surface(shape = RoundedCornerShape(11.dp), color = Color.White) {
-                    Text("15 MIN DELAYED", color = AGreen, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 11.dp, vertical = 8.dp))
-                }
+                Surface(RoundedCornerShape(11.dp), color = Color.White) { Text("15 MIN DELAYED", color = AGreen, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 11.dp, vertical = 8.dp)) }
             }
         }
     }
@@ -234,440 +200,69 @@ private fun MarketStatusCard() {
 
 @Composable
 private fun IndexCards() {
-    val values = listOf(
-        Triple("NSE 20", "1,843.56", "+1.34%"),
-        Triple("NASI", "112.48", "+1.34%"),
-        Triple("NSE 25", "3,642.17", "+1.34%")
-    )
+    val values = listOf(Triple("NSE 20", "1,843.56", "+1.34%"), Triple("NASI", "112.48", "+1.34%"), Triple("NSE 25", "3,642.17", "+1.34%"))
     LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        items(values) { (name, value, change) ->
-            Card(Modifier.width(154.dp), RoundedCornerShape(16.dp), border = BorderStroke(1.dp, ABorder)) {
-                Column(Modifier.padding(13.dp)) {
-                    Text(name, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    Text(value, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("▲ $change", color = AGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
+        items(values) { (name, value, change) -> Card(Modifier.width(154.dp), RoundedCornerShape(16.dp), border = BorderStroke(1.dp, ABorder)) { Column(Modifier.padding(13.dp)) { Text(name, fontSize = 11.sp, fontWeight = FontWeight.Bold); Text(value, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold); Text("▲ $change", color = AGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold) } } }
     }
 }
 
 @Composable
 private fun MarketPulse(gainers: List<Stock>, losers: List<Stock>) {
-    val advancers = gainers.size
-    val decliners = losers.size
+    val advancers = gainers.size; val decliners = losers.size
     Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), border = BorderStroke(1.dp, ABorder)) {
         Column(Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.MonitorHeart, null, tint = AGreen)
-                Spacer(Modifier.width(8.dp))
-                Column {
-                    Text("Market Pulse", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("Quick view of market activity and sentiment.", color = AMuted, fontSize = 11.sp)
-                }
-            }
+            Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.MonitorHeart, null, tint = AGreen); Spacer(Modifier.width(8.dp)); Column { Text("Market Pulse", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold); Text("Quick view of market activity and sentiment.", color = AMuted, fontSize = 11.sp) } }
             Spacer(Modifier.height(14.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 PulseBox(Modifier.weight(1f), "Advancers vs Decliners", "$advancers / $decliners", "${if (advancers + decliners == 0) 0 else (advancers * 100 / (advancers + decliners))}% Advancers", true)
                 PulseBox(Modifier.weight(1f), "Strongest Sector", "Banking", "+2.48%", true)
             }
             Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                MoverText("Top Gainer", gainers.firstOrNull()?.symbol ?: "—", gainers.firstOrNull()?.change ?: 0.0, true, Modifier.weight(1f))
-                MoverText("Top Loser", losers.firstOrNull()?.symbol ?: "—", losers.firstOrNull()?.change ?: 0.0, false, Modifier.weight(1f))
-            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) { MoverText("Top Gainer", gainers.firstOrNull()?.symbol ?: "—", gainers.firstOrNull()?.change ?: 0.0, true, Modifier.weight(1f)); MoverText("Top Loser", losers.firstOrNull()?.symbol ?: "—", losers.firstOrNull()?.change ?: 0.0, false, Modifier.weight(1f)) }
         }
     }
 }
 
-@Composable
-private fun PulseBox(modifier: Modifier, title: String, value: String, sub: String, positive: Boolean) {
-    Surface(modifier, RoundedCornerShape(12.dp), color = Color(0xFFF8FBF9)) {
-        Column(Modifier.padding(11.dp)) {
-            Text(title, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-            Text(value, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
-            Text(sub, color = if (positive) AGreen else ARed, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-        }
-    }
-}
+@Composable private fun PulseBox(modifier: Modifier, title: String, value: String, sub: String, positive: Boolean) { Surface(modifier, RoundedCornerShape(12.dp), color = Color(0xFFF8FBF9)) { Column(Modifier.padding(11.dp)) { Text(title, fontSize = 10.sp, fontWeight = FontWeight.Bold); Text(value, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold); Text(sub, color = if (positive) AGreen else ARed, fontSize = 10.sp, fontWeight = FontWeight.Bold) } } }
+@Composable private fun MoverText(title: String, symbol: String, change: Double, positive: Boolean, modifier: Modifier) { Column(modifier) { Text(title, fontSize = 10.sp, color = AMuted); Text(symbol, fontSize = 14.sp, fontWeight = FontWeight.Bold); Text(String.format("%+.2f%%", change), color = if (positive) AGreen else ARed, fontSize = 11.sp, fontWeight = FontWeight.Bold) } }
 
-@Composable
-private fun MoverText(title: String, symbol: String, change: Double, positive: Boolean, modifier: Modifier) {
-    Column(modifier) {
-        Text(title, fontSize = 10.sp, color = AMuted)
-        Text(symbol, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-        Text(String.format("%+.2f%%", change), color = if (positive) AGreen else ARed, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-    }
-}
+@Composable private fun NewsCard() { Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), border = BorderStroke(1.dp, ABorder)) { Column(Modifier.padding(16.dp)) { Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Article, null, tint = AGreen); Spacer(Modifier.width(8.dp)); Column { Text("What's moving the market?", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold); Text("News and events will feed this intelligence layer.", color = AMuted, fontSize = 11.sp) } }; Spacer(Modifier.height(12.dp)); Surface(RoundedCornerShape(12.dp), color = ALightGreen) { Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Insights, null, tint = AGreen); Spacer(Modifier.width(10.dp)); Column { Text("Market intelligence", fontWeight = FontWeight.Bold, fontSize = 12.sp); Text("Company news, announcements and market events will be combined here.", color = AMuted, fontSize = 10.sp) } } } } } }
+@Composable private fun PaperInvestBanner() { Card(Modifier.fillMaxWidth(), RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(ALightGreen)) { Row(Modifier.fillMaxWidth().padding(15.dp), verticalAlignment = Alignment.CenterVertically) { Surface(Modifier.size(38.dp), CircleShape, color = Color.White) { Icon(Icons.Default.AccountBalanceWallet, null, Modifier.padding(8.dp), AGreen) }; Spacer(Modifier.width(11.dp)); Column(Modifier.weight(1f)) { Text("Paper Invest", fontWeight = FontWeight.ExtraBold, fontSize = 14.sp); Text("Practice investing with virtual funds", color = AMuted, fontSize = 10.sp) }; Icon(Icons.Default.ChevronRight, null, tint = AGreen) } } }
 
-@Composable
-private fun NewsCard() {
-    Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), border = BorderStroke(1.dp, ABorder)) {
-        Column(Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Article, null, tint = AGreen)
-                Spacer(Modifier.width(8.dp))
-                Column {
-                    Text("What's moving the market?", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("News and events will feed this intelligence layer.", color = AMuted, fontSize = 11.sp)
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-            Surface(shape = RoundedCornerShape(12.dp), color = ALightGreen) {
-                Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Insights, null, tint = AGreen)
-                    Spacer(Modifier.width(10.dp))
-                    Column {
-                        Text("Market intelligence", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        Text("Company news, announcements and market events will be combined here.", color = AMuted, fontSize = 10.sp)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PaperInvestBanner() {
-    Card(Modifier.fillMaxWidth(), RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(ALightGreen)) {
-        Row(Modifier.fillMaxWidth().padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
-            Surface(Modifier.size(38.dp), CircleShape, color = Color.White) { Icon(Icons.Default.AccountBalanceWallet, null, Modifier.padding(8.dp), AGreen) }
-            Spacer(Modifier.width(11.dp))
-            Column(Modifier.weight(1f)) {
-                Text("Paper Invest", fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
-                Text("Practice investing with virtual funds", color = AMuted, fontSize = 10.sp)
-            }
-            Icon(Icons.Default.ChevronRight, null, tint = AGreen)
-        }
-    }
-}
-
-@Composable
-private fun ApprovedMarket(stocks: List<Stock>) {
+@Composable private fun ApprovedMarket(stocks: List<Stock>) {
     var period by rememberSaveable { mutableStateOf("1M") }
     val gainers = stocks.filter { it.change > 0 }.sortedByDescending { it.change }
     val losers = stocks.filter { it.change < 0 }.sortedBy { it.change }
     val chart = remember(period) { marketTrend(period) }
     LazyColumn(contentPadding = PaddingValues(20.dp, 4.dp, 20.dp, 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { MarketHeader() }
-        item {
-            Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), border = BorderStroke(1.dp, ABorder)) {
-                Column(Modifier.padding(15.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text("NSE 20 — Market Trend", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
-                            Text("See how the market has been performing.", color = AMuted, fontSize = 11.sp)
-                        }
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text("+1.34%", color = AGreen, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
-                            Text("1,843.56", fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                    Spacer(Modifier.height(10.dp))
-                    MarketLineChart(chart)
-                    Spacer(Modifier.height(8.dp))
-                    PeriodSelector(period) { period = it }
-                    Text("Historical data from NSE (15 min delayed) • ${chart.size} points", color = AMuted, fontSize = 9.sp, modifier = Modifier.padding(top = 7.dp))
-                }
-            }
-        }
+        item { Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), border = BorderStroke(1.dp, ABorder)) { Column(Modifier.padding(15.dp)) { Row(verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text("NSE 20 — Market Trend", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold); Text("See how the market has been performing.", color = AMuted, fontSize = 11.sp) }; Column(horizontalAlignment = Alignment.End) { Text("+1.34%", color = AGreen, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold); Text("1,843.56", fontSize = 10.sp, fontWeight = FontWeight.Bold) } }; Spacer(Modifier.height(10.dp)); MarketLineChart(chart); Spacer(Modifier.height(8.dp)); PeriodSelector(period) { period = it }; Text("Historical data from NSE (15 min delayed) • ${chart.size} points", color = AMuted, fontSize = 9.sp, modifier = Modifier.padding(top = 7.dp)) } } }
         item { BreadthCard(gainers.size, losers.size) }
         item { SectorCard() }
         item { MoversCard(gainers, losers) }
     }
 }
 
-@Composable
-private fun MarketHeader() {
-    Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(ALightGreen)) {
-        Row(Modifier.padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(9.dp).clip(CircleShape).background(AGreen))
-            Spacer(Modifier.width(7.dp))
-            Column(Modifier.weight(1f)) {
-                Text("NSE MARKET", color = ADarkGreen, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp)
-                Text("Market Analysis", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
-                Text("In-depth analysis and market trends.", color = AMuted, fontSize = 11.sp)
-            }
-            Text("15 MIN DELAYED", color = AGreen, fontWeight = FontWeight.ExtraBold, fontSize = 10.sp)
-        }
-    }
-}
+@Composable private fun MarketHeader() { Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(ALightGreen)) { Row(Modifier.padding(15.dp), verticalAlignment = Alignment.CenterVertically) { Box(Modifier.size(9.dp).clip(CircleShape).background(AGreen)); Spacer(Modifier.width(7.dp)); Column(Modifier.weight(1f)) { Text("NSE MARKET", color = ADarkGreen, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp); Text("Market Analysis", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold); Text("In-depth analysis and market trends.", color = AMuted, fontSize = 11.sp) }; Text("15 MIN DELAYED", color = AGreen, fontWeight = FontWeight.ExtraBold, fontSize = 10.sp) } } }
 
-@Composable
-private fun PeriodSelector(selected: String, onSelect: (String) -> Unit) {
-    val periods = listOf("1D", "1W", "1M", "3M", "6M", "1Y", "5Y")
-    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-        periods.forEach { period ->
-            Surface(
-                modifier = Modifier.width(57.dp).height(34.dp).clickable { onSelect(period) },
-                shape = RoundedCornerShape(10.dp),
-                color = if (period == selected) AGreen else Color.Transparent,
-                border = if (period == selected) null else BorderStroke(1.dp, Color(0xFF7D7D7D))
-            ) {
-                Box(Modifier.fillMaxSize(), Alignment.Center) {
-                    Text(period, color = if (period == selected) Color.White else AText, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-    }
-}
+@Composable private fun PeriodSelector(selected: String, onSelect: (String) -> Unit) { val periods = listOf("1D", "1W", "1M", "3M", "6M", "1Y", "5Y"); Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) { periods.forEach { period -> Surface(Modifier.width(57.dp).height(34.dp).clickable { onSelect(period) }, RoundedCornerShape(10.dp), color = if (period == selected) AGreen else Color.Transparent, border = if (period == selected) null else BorderStroke(1.dp, Color(0xFF7D7D7D))) { Box(Modifier.fillMaxSize(), Alignment.Center) { Text(period, color = if (period == selected) Color.White else AText, fontSize = 10.sp, fontWeight = FontWeight.Bold) } } } } }
 
-@Composable
-private fun MarketLineChart(values: List<Float>) {
-    Canvas(Modifier.fillMaxWidth().height(180.dp).padding(horizontal = 4.dp)) {
-        if (values.size < 2) return@Canvas
-        repeat(4) { i ->
-            val y = size.height * i / 3f
-            drawLine(Color(0xFFE8EFEB), Offset(0f, y), Offset(size.width, y), strokeWidth = 1f)
-        }
-        val min = values.minOrNull() ?: 0f
-        val max = values.maxOrNull() ?: 1f
-        val range = (max - min).takeIf { it > 0f } ?: 1f
-        val path = Path()
-        values.forEachIndexed { index, value ->
-            val x = index * size.width / (values.lastIndex.coerceAtLeast(1))
-            val y = size.height - ((value - min) / range) * (size.height - 16.dp.toPx()) - 8.dp.toPx()
-            if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
-        }
-        drawPath(path, AGreen, style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round))
-        val last = values.lastIndex
-        val lx = last * size.width / (values.lastIndex.coerceAtLeast(1))
-        val ly = size.height - ((values.last() - min) / range) * (size.height - 16.dp.toPx()) - 8.dp.toPx()
-        drawCircle(AGreen, 5.dp.toPx(), Offset(lx, ly))
-    }
-}
+@Composable private fun MarketLineChart(values: List<Float>) { Canvas(Modifier.fillMaxWidth().height(180.dp).padding(horizontal = 4.dp)) { if (values.size < 2) return@Canvas; repeat(4) { i -> val y = size.height * i / 3f; drawLine(Color(0xFFE8EFEB), Offset(0f, y), Offset(size.width, y), strokeWidth = 1f) }; val min = values.minOrNull() ?: 0f; val max = values.maxOrNull() ?: 1f; val range = (max - min).takeIf { it > 0f } ?: 1f; val path = Path(); values.forEachIndexed { index, value -> val x = index * size.width / (values.lastIndex.coerceAtLeast(1)); val y = size.height - ((value - min) / range) * (size.height - 16.dp.toPx()) - 8.dp.toPx(); if (index == 0) path.moveTo(x, y) else path.lineTo(x, y) }; drawPath(path, AGreen, style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)); val last = values.lastIndex; val lx = last * size.width / (values.lastIndex.coerceAtLeast(1)); val ly = size.height - ((values.last() - min) / range) * (size.height - 16.dp.toPx()) - 8.dp.toPx(); drawCircle(AGreen, 5.dp.toPx(), Offset(lx, ly)) } }
+private fun marketTrend(period: String): List<Float> { val base = listOf(1710f, 1725f, 1718f, 1740f, 1734f, 1752f, 1768f, 1775f, 1758f, 1770f, 1784f, 1790f, 1802f, 1794f, 1812f, 1807f, 1820f, 1814f, 1828f, 1843f); return when (period) { "1D" -> base.takeLast(8); "1W" -> base.takeLast(10); "1M" -> base; "3M" -> base.mapIndexed { i, v -> v - 90f + i * 4.7f }; "6M" -> base.mapIndexed { i, v -> v - 150f + i * 7.5f }; "1Y" -> base.mapIndexed { i, v -> v - 260f + i * 13.5f }; else -> base.mapIndexed { i, v -> v - 500f + i * 31f } } }
 
-private fun marketTrend(period: String): List<Float> {
-    val base = listOf(1710f, 1725f, 1718f, 1740f, 1734f, 1752f, 1768f, 1775f, 1758f, 1770f, 1784f, 1790f, 1802f, 1794f, 1812f, 1807f, 1820f, 1814f, 1828f, 1843f)
-    return when (period) {
-        "1D" -> base.takeLast(8)
-        "1W" -> base.takeLast(10)
-        "1M" -> base
-        "3M" -> base.mapIndexed { i, v -> v - 90f + i * 4.7f }
-        "6M" -> base.mapIndexed { i, v -> v - 150f + i * 7.5f }
-        "1Y" -> base.mapIndexed { i, v -> v - 260f + i * 13.5f }
-        else -> base.mapIndexed { i, v -> v - 500f + i * 31f }
-    }
-}
+@Composable private fun BreadthCard(advancers: Int, decliners: Int) { Card(Modifier.fillMaxWidth(), RoundedCornerShape(16.dp), border = BorderStroke(1.dp, ABorder)) { Column(Modifier.padding(15.dp)) { Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.BarChart, null, tint = AGreen); Spacer(Modifier.width(8.dp)); Column { Text("Market Breadth", fontWeight = FontWeight.ExtraBold, fontSize = 15.sp); Text("Advancers vs Decliners", color = AMuted, fontSize = 10.sp) } }; Spacer(Modifier.height(13.dp)); Row(Modifier.fillMaxWidth().height(9.dp).clip(RoundedCornerShape(10.dp))) { val total = (advancers + decliners).coerceAtLeast(1); Box(Modifier.weight(advancers.coerceAtLeast(1).toFloat()).fillMaxHeight().background(AGreen)); Box(Modifier.weight(decliners.coerceAtLeast(1).toFloat()).fillMaxHeight().background(ARed)) }; Spacer(Modifier.height(10.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("●  $advancers Advancers", color = AGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold); Text("●  $decliners Decliners", color = ARed, fontSize = 10.sp, fontWeight = FontWeight.Bold) } } } }
 
-@Composable
-private fun BreadthCard(advancers: Int, decliners: Int) {
-    Card(Modifier.fillMaxWidth(), RoundedCornerShape(16.dp), border = BorderStroke(1.dp, ABorder)) {
-        Column(Modifier.padding(15.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.BarChart, null, tint = AGreen)
-                Spacer(Modifier.width(8.dp))
-                Column {
-                    Text("Market Breadth", fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
-                    Text("Advancers vs Decliners", color = AMuted, fontSize = 10.sp)
-                }
-            }
-            Spacer(Modifier.height(13.dp))
-            Row(Modifier.fillMaxWidth().height(9.dp).clip(RoundedCornerShape(10.dp))) {
-                Box(Modifier.weight(advancers.coerceAtLeast(1).toFloat()).fillMaxHeight().background(AGreen))
-                Box(Modifier.weight(decliners.coerceAtLeast(1).toFloat()).fillMaxHeight().background(ARed))
-            }
-            Spacer(Modifier.height(10.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("●  $advancers Advancers", color = AGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                Text("●  $decliners Decliners", color = ARed, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-    }
-}
+@Composable private fun SectorCard() { val sectors = listOf("Banking" to 2.48, "Telecom" to 1.87, "Manufacturing" to 0.67, "Energy" to -1.21, "Retail" to 0.34); Card(Modifier.fillMaxWidth(), RoundedCornerShape(16.dp), border = BorderStroke(1.dp, ABorder)) { Column(Modifier.padding(15.dp)) { Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.PieChart, null, tint = AGreen); Spacer(Modifier.width(8.dp)); Column { Text("Sector Performance", fontWeight = FontWeight.ExtraBold, fontSize = 15.sp); Text("Top sectors by daily change", color = AMuted, fontSize = 10.sp) } }; Spacer(Modifier.height(11.dp)); sectors.forEach { (name, change) -> Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) { Text(name, Modifier.width(92.dp), fontSize = 10.sp); Box(Modifier.weight(1f).height(7.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFFEAF1ED))) { Box(Modifier.fillMaxHeight().fillMaxWidth((kotlin.math.abs(change) / 2.5).coerceIn(0.05, 1.0).toFloat()).background(if (change >= 0) AGreen else ARed)) }; Text(String.format("%+.2f%%", change), Modifier.width(55.dp), color = if (change >= 0) AGreen else ARed, fontSize = 10.sp, fontWeight = FontWeight.Bold) } } } } }
 
-@Composable
-private fun SectorCard() {
-    val sectors = listOf("Banking" to 2.48, "Telecom" to 1.87, "Manufacturing" to 0.67, "Energy" to -1.21, "Retail" to 0.34)
-    Card(Modifier.fillMaxWidth(), RoundedCornerShape(16.dp), border = BorderStroke(1.dp, ABorder)) {
-        Column(Modifier.padding(15.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.PieChart, null, tint = AGreen)
-                Spacer(Modifier.width(8.dp))
-                Column {
-                    Text("Sector Performance", fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
-                    Text("Top sectors by daily change", color = AMuted, fontSize = 10.sp)
-                }
-            }
-            Spacer(Modifier.height(11.dp))
-            sectors.forEach { (name, change) ->
-                Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(name, Modifier.width(92.dp), fontSize = 10.sp)
-                    Box(Modifier.weight(1f).height(7.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFFEAF1ED))) {
-                        Box(Modifier.fillMaxHeight().fillMaxWidth((kotlin.math.abs(change) / 2.5).coerceIn(0.05, 1.0).toFloat()).background(if (change >= 0) AGreen else ARed))
-                    }
-                    Text(String.format("%+.2f%%", change), Modifier.width(55.dp), color = if (change >= 0) AGreen else ARed, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-    }
-}
+@Composable private fun MoversCard(gainers: List<Stock>, losers: List<Stock>) { Card(Modifier.fillMaxWidth(), RoundedCornerShape(16.dp), border = BorderStroke(1.dp, ABorder)) { Column(Modifier.padding(15.dp)) { Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.SwapVert, null, tint = AGreen); Spacer(Modifier.width(8.dp)); Text("Top Movers", fontWeight = FontWeight.ExtraBold, fontSize = 15.sp) }; Spacer(Modifier.height(10.dp)); Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) { Column(Modifier.weight(1f)) { Text("↑ Top Gainers", color = AGreen, fontWeight = FontWeight.Bold, fontSize = 10.sp); gainers.take(5).forEach { MoverRow(it, true) } }; Column(Modifier.weight(1f)) { Text("↓ Top Losers", color = ARed, fontWeight = FontWeight.Bold, fontSize = 10.sp); losers.take(5).forEach { MoverRow(it, false) } } } } } }
+@Composable private fun MoverRow(stock: Stock, positive: Boolean) { Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) { Text(stock.symbol, fontSize = 10.sp, fontWeight = FontWeight.Bold); Text(String.format("%+.2f%%", stock.change), color = if (positive) AGreen else ARed, fontSize = 10.sp) } }
 
-@Composable
-private fun MoversCard(gainers: List<Stock>, losers: List<Stock>) {
-    Card(Modifier.fillMaxWidth(), RoundedCornerShape(16.dp), border = BorderStroke(1.dp, ABorder)) {
-        Column(Modifier.padding(15.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.SwapVert, null, tint = AGreen)
-                Spacer(Modifier.width(8.dp))
-                Text("Top Movers", fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
-            }
-            Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Column(Modifier.weight(1f)) {
-                    Text("↑ Top Gainers", color = AGreen, fontWeight = FontWeight.Bold, fontSize = 10.sp)
-                    gainers.take(5).forEach { MoverRow(it, true) }
-                }
-                Column(Modifier.weight(1f)) {
-                    Text("↓ Top Losers", color = ARed, fontWeight = FontWeight.Bold, fontSize = 10.sp)
-                    losers.take(5).forEach { MoverRow(it, false) }
-                }
-            }
-        }
-    }
-}
+@Composable private fun ApprovedCompanies(stocks: List<Stock>, open: (Stock) -> Unit) { LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) { item { Text("Companies", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold) }; item { Text("Understand individual NSE companies.", color = AMuted, fontSize = 12.sp) }; items(stocks) { stock -> Card(Modifier.fillMaxWidth().clickable { open(stock) }, RoundedCornerShape(15.dp), border = BorderStroke(1.dp, ABorder)) { Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text(stock.name, fontWeight = FontWeight.Bold); Text("${stock.symbol} • NSE", color = AMuted, fontSize = 10.sp) }; Column(horizontalAlignment = Alignment.End) { Text(String.format("KSh %.2f", stock.price), fontWeight = FontWeight.Bold); Text(String.format("%+.2f%%", stock.change), color = if (stock.change >= 0) AGreen else ARed, fontSize = 10.sp) } } } } } }
 
-@Composable
-private fun MoverRow(stock: Stock, positive: Boolean) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(stock.symbol, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-        Text(String.format("%+.2f%%", stock.change), color = if (positive) AGreen else ARed, fontSize = 10.sp)
-    }
-}
+@Composable private fun ApprovedCompany(stock: Stock?, onBack: () -> Unit) { var period by rememberSaveable { mutableStateOf("1Y") }; var history by remember(stock?.symbol) { mutableStateOf(stock?.history ?: emptyList()) }; LaunchedEffect(stock?.symbol, period) { stock?.symbol?.let { loaded -> MyStocksCache.loadHistory(loaded, period).takeIf { it.size >= 2 }?.let { history = it } } }; LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { item { Row(verticalAlignment = Alignment.CenterVertically) { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back") }; Column { Text(stock?.name ?: "Company", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold); Text("${stock?.symbol ?: "—"} • NSE", color = AMuted, fontSize = 10.sp) } } }; item { Text("NSE DATA • 15 MIN DELAYED", color = AGreen, fontWeight = FontWeight.Bold, fontSize = 10.sp) }; item { Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), border = BorderStroke(1.dp, ABorder)) { Column(Modifier.padding(15.dp)) { Text("Price History", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp); Spacer(Modifier.height(8.dp)); MarketLineChart(history.map { it.toFloat() }); PeriodSelector(period) { period = it } } } }; item { Card(Modifier.fillMaxWidth(), RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(ALightGreen)) { Column(Modifier.padding(15.dp)) { Text("NSE Watcher Score", fontWeight = FontWeight.ExtraBold); Text("Analysis factors will combine price, fundamentals, news, events and market conditions.", color = AMuted, fontSize = 11.sp) } } } } }
 
-@Composable
-private fun ApprovedCompanies(stocks: List<Stock>, open: (Stock) -> Unit) {
-    LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        item { Text("Companies", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold) }
-        item { Text("Understand individual NSE companies.", color = AMuted, fontSize = 12.sp) }
-        items(stocks) { stock ->
-            Card(Modifier.fillMaxWidth().clickable { open(stock) }, RoundedCornerShape(15.dp), border = BorderStroke(1.dp, ABorder)) {
-                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(stock.name, fontWeight = FontWeight.Bold)
-                        Text("${stock.symbol} • NSE", color = AMuted, fontSize = 10.sp)
-                    }
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(String.format("KSh %.2f", stock.price), fontWeight = FontWeight.Bold)
-                        Text(String.format("%+.2f%%", stock.change), color = if (stock.change >= 0) AGreen else ARed, fontSize = 10.sp)
-                    }
-                }
-            }
-        }
-    }
-}
+@Composable private fun ApprovedProfile(onBack: () -> Unit, onSettings: () -> Unit) { LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { item { Row(verticalAlignment = Alignment.CenterVertically) { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back") }; Text("Profile", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold) } }; item { Card(Modifier.fillMaxWidth(), RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(ALightGreen)) { Column(Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) { Surface(Modifier.size(70.dp), CircleShape, color = Color.White) { Box(Modifier.fillMaxSize(), Alignment.Center) { Text("J", fontSize = 28.sp, color = AGreen, fontWeight = FontWeight.Bold) } }; Spacer(Modifier.height(10.dp)); Text("James Waweru", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold); Text("IT Graduate | Investor | Learner", color = AMuted, fontSize = 11.sp) } } }; item { Card(Modifier.fillMaxWidth().clickable(onClick = onSettings), RoundedCornerShape(16.dp), border = BorderStroke(1.dp, ABorder)) { Row(Modifier.padding(15.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Settings, null, tint = AGreen); Spacer(Modifier.width(12.dp)); Column(Modifier.weight(1f)) { Text("Settings", fontWeight = FontWeight.Bold); Text("App, alerts, charts, privacy and display", color = AMuted, fontSize = 10.sp) }; Icon(Icons.Default.ChevronRight, null, tint = AMuted) } } } } }
 
-@Composable
-private fun ApprovedCompany(stock: Stock?, onBack: () -> Unit) {
-    var period by rememberSaveable { mutableStateOf("1Y") }
-    var history by remember(stock?.symbol) { mutableStateOf(stock?.history ?: emptyList()) }
-    LaunchedEffect(stock?.symbol, period) {
-        stock?.symbol?.let { loaded ->
-            MyStocksCache.loadHistory(loaded, period).takeIf { it.size >= 2 }?.let { history = it }
-        }
-    }
-    LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back") }
-                Column {
-                    Text(stock?.name ?: "Company", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("${stock?.symbol ?: "—"} • NSE", color = AMuted, fontSize = 10.sp)
-                }
-            }
-        }
-        item { Text("NSE DATA • 15 MIN DELAYED", color = AGreen, fontWeight = FontWeight.Bold, fontSize = 10.sp) }
-        item {
-            Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), border = BorderStroke(1.dp, ABorder)) {
-                Column(Modifier.padding(15.dp)) {
-                    Text("Price History", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
-                    Spacer(Modifier.height(8.dp))
-                    MarketLineChart(history.map { it.toFloat() })
-                    PeriodSelector(period) { period = it }
-                }
-            }
-        }
-        item {
-            Card(Modifier.fillMaxWidth(), RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(ALightGreen)) {
-                Column(Modifier.padding(15.dp)) {
-                    Text("NSE Watcher Score", fontWeight = FontWeight.ExtraBold)
-                    Text("Analysis factors will combine price, fundamentals, news, events and market conditions.", color = AMuted, fontSize = 11.sp)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ApprovedProfile(onBack: () -> Unit, onSettings: () -> Unit) {
-    LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back") }
-                Text("Profile", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
-            }
-        }
-        item {
-            Card(Modifier.fillMaxWidth(), RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(ALightGreen)) {
-                Column(Modifier.fillMaxWidth().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Surface(Modifier.size(70.dp), CircleShape, color = Color.White) { Box(Modifier.fillMaxSize(), Alignment.Center) { Text("J", fontSize = 28.sp, color = AGreen, fontWeight = FontWeight.Bold) } }
-                    Spacer(Modifier.height(10.dp))
-                    Text("James Waweru", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("IT Graduate | Investor | Learner", color = AMuted, fontSize = 11.sp)
-                }
-            }
-        }
-        item {
-            Card(Modifier.fillMaxWidth().clickable(onClick = onSettings), RoundedCornerShape(16.dp), border = BorderStroke(1.dp, ABorder)) {
-                Row(Modifier.padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Settings, null, tint = AGreen)
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text("Settings", fontWeight = FontWeight.Bold)
-                        Text("App, alerts, charts, privacy and display", color = AMuted, fontSize = 10.sp)
-                    }
-                    Icon(Icons.Default.ChevronRight, null, tint = AMuted)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ApprovedSettings(dark: Boolean, onDarkChange: (Boolean) -> Unit, onBack: () -> Unit) {
-    LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back") }
-                Text("Settings", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
-            }
-        }
-        item { SettingRow(Icons.Default.DarkMode, "Dark mode", "Appearance", dark) { onDarkChange(it) } }
-        item { SettingRow(Icons.Default.Notifications, "Notifications", "Market, price and news alerts", null) {} }
-        item { SettingRow(Icons.Default.ShowChart, "Chart settings", "Timeframes and chart display", null) {} }
-        item { SettingRow(Icons.Default.Security, "Privacy & security", "Your account and data", null) {} }
-    }
-}
-
-@Composable
-private fun SettingRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, subtitle: String, checked: Boolean?, onChecked: (Boolean) -> Unit) {
-    Card(Modifier.fillMaxWidth(), RoundedCornerShape(15.dp), border = BorderStroke(1.dp, ABorder)) {
-        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, null, tint = AGreen)
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) { Text(title, fontWeight = FontWeight.Bold); Text(subtitle, color = AMuted, fontSize = 10.sp) }
-            if (checked != null) Switch(checked, onCheckedChange = onChecked)
-            else Icon(Icons.Default.ChevronRight, null, tint = AMuted)
-        }
-    }
-}
-
-@Composable
-private fun ApprovedSimplePage(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, message: String) {
-    Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-        Surface(Modifier.size(64.dp), CircleShape, ALightGreen) { Icon(icon, null, Modifier.padding(16.dp), AGreen) }
-        Spacer(Modifier.height(14.dp))
-        Text(title, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
-        Text(message, color = AMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 5.dp))
-    }
-}
+@Composable private fun ApprovedSettings(dark: Boolean, onDarkChange: (Boolean) -> Unit, onBack: () -> Unit) { LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) { item { Row(verticalAlignment = Alignment.CenterVertically) { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back") }; Text("Settings", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold) } }; item { SettingRow(Icons.Default.DarkMode, "Dark mode", "Appearance", dark) { onDarkChange(it) } }; item { SettingRow(Icons.Default.Notifications, "Notifications", "Market, price and news alerts", null) {} }; item { SettingRow(Icons.Default.ShowChart, "Chart settings", "Timeframes and chart display", null) {} }; item { SettingRow(Icons.Default.Security, "Privacy & security", "Your account and data", null) {} } } }
+@Composable private fun SettingRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, subtitle: String, checked: Boolean?, onChecked: (Boolean) -> Unit) { Card(Modifier.fillMaxWidth(), RoundedCornerShape(15.dp), border = BorderStroke(1.dp, ABorder)) { Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) { Icon(icon, null, tint = AGreen); Spacer(Modifier.width(12.dp)); Column(Modifier.weight(1f)) { Text(title, fontWeight = FontWeight.Bold); Text(subtitle, color = AMuted, fontSize = 10.sp) }; if (checked != null) Switch(checked, onCheckedChange = onChecked) else Icon(Icons.Default.ChevronRight, null, tint = AMuted) } } }
+@Composable private fun ApprovedSimplePage(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, message: String) { Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) { Surface(Modifier.size(64.dp), CircleShape, ALightGreen) { Icon(icon, null, Modifier.padding(16.dp), AGreen) }; Spacer(Modifier.height(14.dp)); Text(title, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold); Text(message, color = AMuted, fontSize = 12.sp, modifier = Modifier.padding(top = 5.dp)) } }
