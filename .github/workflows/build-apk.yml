@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   GRADLE_OPTS: "-Dorg.gradle.daemon=false"
@@ -16,6 +16,81 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+
+      - name: Integrate company history chart
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('app/src/main/java/ke/co/nsewatcher/DesignActivity.kt')
+          s = p.read_text()
+
+          if 'PriceHistoryChart(history)' in s and 'MyStocksCache.loadHistory(selected.symbol,period)' in s:
+              print('Company history chart is already integrated.')
+              raise SystemExit(0)
+
+          marker = 'Page.COMPANY->Company(selected,::back)'
+          if marker not in s:
+              raise SystemExit('Company page call not found; stopping safely.')
+
+          m = re.search(r'@Composable\s+private fun Company\b', s)
+          if not m:
+              raise SystemExit('Company composable not found; stopping safely.')
+
+          start = m.start()
+          brace = s.find('{', m.start())
+          depth = 0
+          end = None
+          for i in range(brace, len(s)):
+              if s[i] == '{':
+                  depth += 1
+              elif s[i] == '}':
+                  depth -= 1
+                  if depth == 0:
+                      end = i + 1
+                      break
+          if end is None:
+              raise SystemExit('Could not find Company composable end; stopping safely.')
+
+          replacement = r'''@Composable private fun Company(selected:Stock,back:()->Unit){
+    val periods = listOf("1D","1W","1M","3M","6M","1Y","5Y")
+    var period by rememberSaveable(selected.symbol){ mutableStateOf("1Y") }
+    var history by remember(selected.symbol){ mutableStateOf(selected.history) }
+    var loading by remember(selected.symbol){ mutableStateOf(false) }
+    LaunchedEffect(selected.symbol,period){
+        loading=true
+        val loaded=MyStocksCache.loadHistory(selected.symbol,period)
+        if(loaded.size>=2) history=loaded
+        loading=false
+    }
+    LazyColumn(contentPadding=PaddingValues(16.dp,8.dp,16.dp,24.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){
+        item{Row(verticalAlignment=Alignment.CenterVertically){IconButton(back){Icon(Icons.Default.ArrowBack,"Back")};Column{Text(selected.name,fontSize=24.sp,fontWeight=FontWeight.ExtraBold);Text("${selected.symbol} • NSE",fontSize=13.sp,color=Muted)}}}
+        item{Card(Modifier.fillMaxWidth(),RoundedCornerShape(22.dp),colors=CardDefaults.cardColors(containerColor=LightGreen)){Column(Modifier.padding(18.dp)){Text("NSE DATA • 15 MIN DELAYED",fontSize=12.sp,color=Muted,fontWeight=FontWeight.Bold);Spacer(Modifier.height(8.dp));Text("KSh ${String.format(Locale.US,"%.2f",selected.price)}",fontSize=32.sp,fontWeight=FontWeight.ExtraBold);Text(String.format(Locale.US,"%+.2f%% today",selected.change),fontSize=18.sp,fontWeight=FontWeight.Bold,color=if(selected.change>=0)Green else Red);Spacer(Modifier.height(10.dp));Text("Exchange-supplied NSE data • analysis only • no real trading",fontSize=12.sp,color=Muted)}}}
+        item{Card(Modifier.fillMaxWidth(),RoundedCornerShape(20.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){Column(Modifier.padding(16.dp)){Text("Price History",fontSize=20.sp,fontWeight=FontWeight.ExtraBold);Spacer(Modifier.height(10.dp));LazyRow(horizontalArrangement=Arrangement.spacedBy(7.dp)){items(periods){p->FilterChip(selected=period==p,onClick={period=p},label={Text(p,fontSize=11.sp)},shape=RoundedCornerShape(10.dp))}};Spacer(Modifier.height(12.dp));if(loading && history.size<2){Box(Modifier.fillMaxWidth().height(190.dp),Alignment.Center){CircularProgressIndicator(color=Green,strokeWidth=2.dp)}}else if(history.size>=2){PriceHistoryChart(history)}else{Box(Modifier.fillMaxWidth().height(190.dp),Alignment.Center){Text("Historical data unavailable",color=Muted)}};Spacer(Modifier.height(6.dp));Text(if(history.size>=2) "${history.size} historical points • $period" else "Waiting for historical NSE data",fontSize=11.sp,color=Muted)}}}
+        item{Card(Modifier.fillMaxWidth(),RoundedCornerShape(20.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){Column(Modifier.padding(16.dp)){Text("NSE Watcher Score",fontSize=20.sp,fontWeight=FontWeight.ExtraBold);Text("78 / 100",fontSize=38.sp,fontWeight=FontWeight.ExtraBold,color=Green);Text("Illustrative score based on momentum, activity and company factors.",fontSize=12.sp,color=Muted)}}}
+        item{Card(Modifier.fillMaxWidth(),RoundedCornerShape(20.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surfaceVariant)){Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(15.dp)){Text("Fundamentals",fontSize=20.sp,fontWeight=FontWeight.ExtraBold);FundamentalRow(Icons.Default.BarChart,"P/E","Illustrative");FundamentalRow(Icons.Default.AccountBalance,"P/B","Illustrative");FundamentalRow(Icons.Default.TrendingUp,"Dividend","Illustrative");FundamentalRow(Icons.Default.Warning,"Debt / Equity","Illustrative")}}}
+        item{Text("Prices use MyStocks exchange-supplied delayed NSE data. Fundamental figures remain illustrative until connected to sourced company data.",fontSize=11.sp,color=Muted)}
+    }
+}
+@Composable private fun FundamentalRow(icon:ImageVector,label:String,value:String){Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Icon(icon,null,tint=Green,modifier=Modifier.size(25.dp));Spacer(Modifier.width(14.dp));Text(label,fontSize=14.sp,modifier=Modifier.weight(1f));Text(value,fontSize=14.sp,fontWeight=FontWeight.Bold)}}
+@Composable private fun PriceHistoryChart(values:List<Double>){val min=values.minOrNull()?:0.0;val max=values.maxOrNull()?:1.0;val range=(max-min).takeIf{it>0.0}?:1.0;Canvas(Modifier.fillMaxWidth().height(190.dp)){val left=4f;val top=12f;val width=(size.width-8f).coerceAtLeast(1f);val height=(size.height-24f).coerceAtLeast(1f);val path=Path();values.forEachIndexed{index,value->val x=left+width*(if(values.size==1)0f else index.toFloat()/(values.size-1).toFloat());val y=top+height*(1f-((value-min)/range).toFloat());if(index==0)path.moveTo(x,y)else path.lineTo(x,y)};drawPath(path,color=Green,style=Stroke(width=5f,cap=StrokeCap.Round))}}
+'''
+
+          p.write_text(s[:start] + replacement + s[end:])
+          PY
+
+      - name: Commit chart integration to GitHub
+        run: |
+          if git diff --quiet; then
+            echo "No chart source changes needed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java/ke/co/nsewatcher/DesignActivity.kt
+          git commit -m "Company history chart integration"
+          git push
 
       - name: Set up Java
         uses: actions/setup-java@v4
