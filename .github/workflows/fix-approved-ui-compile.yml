@@ -5,6 +5,7 @@ on:
   push:
     paths:
       - 'app/src/main/java/ke/co/nsewatcher/ApprovedMarketActivity.kt'
+      - '.github/workflows/fix-approved-ui-compile.yml'
 
 permissions:
   contents: write
