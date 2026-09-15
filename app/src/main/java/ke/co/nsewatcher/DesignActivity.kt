@@ -99,7 +99,7 @@ private fun App(pickAvatar:()->Unit) {
     fun back(){if(history.isNotEmpty()){page=history.last();history=history.dropLast(1)}else page=Page.HOME}
     BackHandler(enabled=page!=Page.HOME){back()}
     val scheme=if(dark) darkColorScheme(primary=Color(0xFF32D486),background=Color(0xFF0D1712),surface=Color(0xFF132019),onSurface=Color.White,onBackground=Color.White,onSurfaceVariant=Color(0xFFB7C7BE)) else lightColorScheme(primary=Green,background=Color.White,surface=Color.White,onSurface=TextDark,onBackground=TextDark,onSurfaceVariant=Muted)
-    MaterialTheme(colorScheme=scheme){Surface(Modifier.fillMaxSize(),color=scheme.background){
+    MaterialTheme(colorScheme=scheme){Surface(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing),color=scheme.background){
         when(page){
             Page.HOME,Page.MARKET,Page.COMPANIES,Page.PAPER,Page.MORE -> Scaffold(topBar={TopBar(name,::go)},bottomBar={BottomNav(tab){tab=it;history=emptyList();page=when(it){0->Page.HOME;1->Page.MARKET;2->Page.COMPANIES;3->Page.PAPER;else->Page.MORE}}}){pad->Box(Modifier.fillMaxSize().padding(pad)){when(page){Page.HOME->Home{selected=it;go(Page.COMPANY)};Page.MARKET->Market();Page.COMPANIES->Companies{selected=it;go(Page.COMPANY)};Page.PAPER->Paper();else->More(::go)}}}
             Page.COMPANY->Company(selected,::back)
