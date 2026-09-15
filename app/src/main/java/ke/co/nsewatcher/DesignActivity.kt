@@ -156,7 +156,7 @@ private fun Home(open:(Stock)->Unit){
         }
         item{
             Card(Modifier.fillMaxWidth(),RoundedCornerShape(17.dp),colors=CardDefaults.cardColors(containerColor=Color.White),border=BorderStroke(1.dp,Border)){
-                Column(Modifier.padding(16.dp)){
+                Column(Modifier.padding(12.dp)){
                     Text("Portfolio Value (Paper Invest)",color=DarkGreen,fontSize=11.sp)
                     Text(String.format(Locale.US,"KSh %,d",portfolioValue),fontSize=25.sp,fontWeight=FontWeight.ExtraBold,color=TextDark)
                     Text("▲ 12.4%",color=Green,fontSize=12.sp,fontWeight=FontWeight.ExtraBold)
@@ -167,10 +167,10 @@ private fun Home(open:(Stock)->Unit){
         item{
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(9.dp)){
                 Card(Modifier.weight(1f),RoundedCornerShape(15.dp),colors=CardDefaults.cardColors(containerColor=Color.White),border=BorderStroke(1.dp,Border)){
-                    Column(Modifier.padding(13.dp)){Text("Total Invested",color=Muted,fontSize=10.sp);Text(String.format(Locale.US,"KSh %,d",totalInvested),fontWeight=FontWeight.ExtraBold,fontSize=16.sp,color=TextDark)}
+                    Column(Modifier.padding(10.dp)){Text("Total Invested",color=Muted,fontSize=10.sp);Text(String.format(Locale.US,"KSh %,d",totalInvested),fontWeight=FontWeight.ExtraBold,fontSize=16.sp,color=TextDark)}
                 }
                 Card(Modifier.weight(1f),RoundedCornerShape(15.dp),colors=CardDefaults.cardColors(containerColor=Color.White),border=BorderStroke(1.dp,Border)){
-                    Column(Modifier.padding(13.dp)){Text("Total Return",color=Muted,fontSize=10.sp);Text(String.format(Locale.US,"KSh %,d",totalReturn),fontWeight=FontWeight.ExtraBold,fontSize=16.sp,color=TextDark);Text("▲ 36.4%",color=Green,fontSize=10.sp,fontWeight=FontWeight.Bold)}
+                    Column(Modifier.padding(10.dp)){Text("Total Return",color=Muted,fontSize=10.sp);Text(String.format(Locale.US,"KSh %,d",totalReturn),fontWeight=FontWeight.ExtraBold,fontSize=16.sp,color=TextDark);Text("▲ 36.4%",color=Green,fontSize=10.sp,fontWeight=FontWeight.Bold)}
                 }
             }
         }
