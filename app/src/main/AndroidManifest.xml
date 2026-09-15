@@ -9,6 +9,5 @@
         <category android:name="android.intent.category.LAUNCHER" />
       </intent-filter>
     </activity>
-    <activity android:name=".ApprovedMarketActivity" android:exported="false" />
   </application>
 </manifest>
