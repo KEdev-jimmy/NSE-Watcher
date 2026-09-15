@@ -34,5 +34,12 @@ jobs:
           echo "$GITHUB_WORKSPACE/gradle-8.14.4/bin" >> "$GITHUB_PATH"
       - name: Build with Gradle
         run: gradle --no-daemon build
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: NSE-Watcher-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
 
       # Clean-foundation verification after removing obsolete experimental UI and manifest entry.
