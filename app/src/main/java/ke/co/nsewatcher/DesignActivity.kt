@@ -155,7 +155,165 @@ private fun App(pickAvatar:()->Unit) {
 @Composable private fun MarketSnapshotDetail(){Card(Modifier.fillMaxWidth(),RoundedCornerShape(17.dp),border=BorderStroke(1.dp,Border)){Column(Modifier.padding(14.dp)){Text("Market Snapshot",fontWeight=FontWeight.ExtraBold);Text("Breadth, activity and momentum",color=Muted,fontSize=10.sp);Spacer(Modifier.height(8.dp));listOf("Market volume" to "12.8M shares","Advancing value" to "KSh 418.6M","Declining value" to "KSh 176.2M","Market momentum" to "Positive").forEach{(a,b)->Row(Modifier.fillMaxWidth().padding(vertical=7.dp)){Text(a,Modifier.weight(1f),fontSize=11.sp);Text(b,fontSize=11.sp,fontWeight=FontWeight.Bold,color=if(a=="Market momentum")Green else TextDark)}}}}}
 
 @Composable private fun Companies(open:(Stock)->Unit){LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(9.dp)){item{Section("Company Intelligence","Understand each company before you invest")};items(stocks){s->Card(Modifier.fillMaxWidth().clickable{open(s)},RoundedCornerShape(14.dp),border=BorderStroke(1.dp,Border)){Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically){Logo(s.symbol,40);Spacer(Modifier.width(10.dp));Column(Modifier.weight(1f)){Text(s.name,fontWeight=FontWeight.ExtraBold,fontSize=13.sp);Text(s.symbol,color=Muted,fontSize=10.sp);Text(String.format(Locale.US,"KSh %.2f",s.price),fontWeight=FontWeight.Bold,fontSize=12.sp)};Text(String.format(Locale.US,"%+.2f%%",s.change),color=if(s.change>=0)Green else Red,fontWeight=FontWeight.ExtraBold)}}}}}
-@Composable private fun Company(s:Stock,back:()->Unit){LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){item{Header(s.name,"${s.symbol} • NSE",back)};item{Card(Modifier.fillMaxWidth(),RoundedCornerShape(17.dp),colors=CardDefaults.cardColors(containerColor=LightGreen)){Column(Modifier.padding(16.dp)){Text("NSE DATA • 15 MIN DELAYED",color=Muted,fontSize=10.sp,fontWeight=FontWeight.Bold);Text(String.format(Locale.US,"KSh %.2f",s.price),fontSize=29.sp,fontWeight=FontWeight.ExtraBold);Text(String.format(Locale.US,"%+.2f%% today",s.change),color=if(s.change>=0)Green else Red,fontWeight=FontWeight.ExtraBold);Text("Exchange-supplied NSE data • analysis only • no real trading",color=Muted,fontSize=9.sp)}}};item{Card(Modifier.fillMaxWidth(),RoundedCornerShape(17.dp),border=BorderStroke(1.dp,Border)){Column(Modifier.padding(14.dp)){Text("Price History",fontWeight=FontWeight.ExtraBold);Chart(s.history.map{it.toFloat()},if(s.change>=0)Green else Red)}}};item{Card(Modifier.fillMaxWidth(),RoundedCornerShape(17.dp),border=BorderStroke(1.dp,Border)){Column(Modifier.padding(14.dp)){Text("NSE Watcher Score",fontWeight=FontWeight.ExtraBold,fontSize=16.sp);Text("78 / 100",fontSize=27.sp,fontWeight=FontWeight.ExtraBold,color=Green);Text("Illustrative score based on momentum, activity and company factors.",color=Muted,fontSize=10.sp)}}};item{Card(Modifier.fillMaxWidth(),RoundedCornerShape(17.dp),border=BorderStroke(1.dp,Border)){Column(Modifier.padding(14.dp)){Text("Fundamentals",fontWeight=FontWeight.ExtraBold);InfoRow(Icons.Default.Assessment,"P/E","Illustrative");InfoRow(Icons.Default.AccountBalance,"P/B","Illustrative");InfoRow(Icons.Default.TrendingUp,"Dividend","Illustrative");InfoRow(Icons.Default.Warning,"Debt / Equity","Illustrative")}}};item{Text("Prices use MyStocks exchange-supplied delayed NSE data. Fundamental figures remain illustrative until connected to sourced company data.",color=Muted,fontSize=9.sp)}}}
+@Composable
+private fun Company(s: Stock, back: () -> Unit) {
+    val periods = listOf("1D", "1W", "1M", "3M", "6M", "1Y", "5Y")
+    var period by rememberSaveable(s.symbol) { mutableStateOf("1Y") }
+    var history by remember(s.symbol) { mutableStateOf(s.history) }
+    var loading by remember(s.symbol) { mutableStateOf(false) }
+
+    LaunchedEffect(s.symbol, period) {
+        loading = true
+        val live = MyStocksCache.loadHistory(s.symbol, period)
+        if (live.size >= 2) history = live
+        loading = false
+    }
+
+    LazyColumn(
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item { Header(s.name, "${s.symbol} • NSE", back) }
+
+        item {
+            Card(
+                Modifier.fillMaxWidth(),
+                RoundedCornerShape(17.dp),
+                colors = CardDefaults.cardColors(containerColor = LightGreen)
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("NSE DATA • 15 MIN DELAYED", color = Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Text(String.format(Locale.US, "KSh %.2f", s.price), fontSize = 29.sp, fontWeight = FontWeight.ExtraBold)
+                    Text(
+                        String.format(Locale.US, "%+.2f%% today", s.change),
+                        color = if (s.change >= 0) Green else Red,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    Text("Exchange-supplied NSE data • analysis only • no real trading", color = Muted, fontSize = 9.sp)
+                }
+            }
+        }
+
+        item {
+            Card(
+                Modifier.fillMaxWidth(),
+                RoundedCornerShape(17.dp),
+                border = BorderStroke(1.dp, Border)
+            ) {
+                Column(Modifier.padding(14.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Price History", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
+                            Text("Historical closing prices", color = Muted, fontSize = 10.sp)
+                        }
+                        if (loading) {
+                            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Green)
+                        }
+                    }
+
+                    Spacer(Modifier.height(9.dp))
+
+                    Row(
+                        Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        periods.forEach { value ->
+                            FilterChip(
+                                selected = period == value,
+                                onClick = { period = value },
+                                label = { Text(value, fontSize = 10.sp) }
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    if (history.size >= 2) {
+                        CompanyHistoryChart(
+                            values = history,
+                            tint = if (s.change >= 0) Green else Red
+                        )
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("${history.size} data points", color = Muted, fontSize = 9.sp)
+                            Text("$period", color = Green, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                        }
+                    } else {
+                        Box(
+                            Modifier.fillMaxWidth().height(130.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("Historical data unavailable", color = Muted, fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            Card(Modifier.fillMaxWidth(), RoundedCornerShape(17.dp), border = BorderStroke(1.dp, Border)) {
+                Column(Modifier.padding(14.dp)) {
+                    Text("NSE Watcher Score", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
+                    Text("78 / 100", fontSize = 27.sp, fontWeight = FontWeight.ExtraBold, color = Green)
+                    Text("Illustrative score based on momentum, activity and company factors.", color = Muted, fontSize = 10.sp)
+                }
+            }
+        }
+
+        item {
+            Card(Modifier.fillMaxWidth(), RoundedCornerShape(17.dp), border = BorderStroke(1.dp, Border)) {
+                Column(Modifier.padding(14.dp)) {
+                    Text("Fundamentals", fontWeight = FontWeight.ExtraBold)
+                    InfoRow(Icons.Default.Assessment, "P/E", "Illustrative")
+                    InfoRow(Icons.Default.AccountBalance, "P/B", "Illustrative")
+                    InfoRow(Icons.Default.TrendingUp, "Dividend", "Illustrative")
+                    InfoRow(Icons.Default.Warning, "Debt / Equity", "Illustrative")
+                }
+            }
+        }
+
+        item {
+            Text(
+                "Prices use MyStocks exchange-supplied delayed NSE data. Fundamental figures remain illustrative until connected to sourced company data.",
+                color = Muted,
+                fontSize = 9.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun CompanyHistoryChart(values: List<Double>, tint: Color) {
+    val valid = values.filter { it.isFinite() && it > 0.0 }
+    if (valid.size < 2) return
+
+    Canvas(
+        Modifier
+            .fillMaxWidth()
+            .height(150.dp)
+            .padding(vertical = 8.dp)
+    ) {
+        val min = valid.minOrNull() ?: return@Canvas
+        val max = valid.maxOrNull() ?: return@Canvas
+        val range = (max - min).takeIf { it > 0.0 } ?: 1.0
+        val path = Path()
+
+        valid.forEachIndexed { index, value ->
+            val x = size.width * index / (valid.lastIndex.coerceAtLeast(1))
+            val y = size.height - (((value - min) / range).toFloat() * size.height)
+            if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
+
+        drawPath(
+            path = path,
+            color = tint,
+            style = Stroke(width = 4f, cap = StrokeCap.Round)
+        )
+    }
+}
+
 @Composable private fun InfoRow(i:ImageVector,a:String,b:String){Row(Modifier.fillMaxWidth().padding(vertical=7.dp),verticalAlignment=Alignment.CenterVertically){Icon(i,null,tint=Green,modifier=Modifier.size(20.dp));Spacer(Modifier.width(10.dp));Text(a,Modifier.weight(1f),fontSize=11.sp);Text(b,fontSize=11.sp,fontWeight=FontWeight.Bold)}}
 @Composable private fun Paper(){LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(11.dp)){item{Card(Modifier.fillMaxWidth(),RoundedCornerShape(18.dp),colors=CardDefaults.cardColors(containerColor=DarkGreen)){Column(Modifier.padding(17.dp)){Text("PAPER PORTFOLIO",color=Color.White,fontWeight=FontWeight.Bold);Text("KSh 100,000",color=Color.White,fontSize=29.sp,fontWeight=FontWeight.ExtraBold);Text("Virtual balance • No real money",color=Color.White,fontSize=10.sp)}}};item{Section("Holdings","Hypothetical investments follow market movement")};item{RowItem(Icons.Default.Business,"SCOM","100 shares • KSh 1,850 value")};item{RowItem(Icons.Default.Business,"KCB","50 shares • KSh 2,115 value")};item{Note("Paper Investing is educational and does not place trades with a broker.")}}}
 @Composable private fun More(go:(Page)->Unit){LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(9.dp)){item{Section("More","Your NSE Watcher tools")};item{RowItem(Icons.Default.AccountCircle,"Profile","Personal information and profile picture"){go(Page.PROFILE)}};item{RowItem(Icons.Default.Settings,"Settings","Theme, notifications, data and privacy"){go(Page.SETTINGS)}};item{RowItem(Icons.Default.HelpOutline,"Help & Support","FAQs, contact and report issues"){go(Page.HELP)}};item{RowItem(Icons.Default.Info,"About NSE Watcher","Version and product information"){go(Page.ABOUT)}}}}
