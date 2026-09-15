@@ -1,0 +1,63 @@
+name: Apply approved Home and Companies UI
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/apply-modern-ui.yml"
+      - "app/src/main/java/ke/co/nsewatcher/DesignActivity.kt"
+      - "app/src/main/java/ke/co/nsewatcher/ModernHomeCompanies.kt"
+
+permissions:
+  contents: write
+
+jobs:
+  patch-ui:
+    if: ${{ !contains(github.event.head_commit.message, '[ui-modernized]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Switch only Home and Companies to the new UI
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('app/src/main/java/ke/co/nsewatcher/DesignActivity.kt')
+          text = path.read_text()
+
+          old_home = 'Page.HOME->Home{selected=it;go(Page.COMPANY)}'
+          new_home = 'Page.HOME->ModernHome(stocks){selected=it;go(Page.COMPANY)}'
+          old_companies = 'Page.COMPANIES->Companies{selected=it;go(Page.COMPANY)}'
+          new_companies = 'Page.COMPANIES->ModernCompanies(stocks){selected=it;go(Page.COMPANY)}'
+
+          home_count = text.count(old_home)
+          companies_count = text.count(old_companies)
+
+          if home_count != 1:
+              raise SystemExit(f'Expected exactly one Home route, found {home_count}')
+          if companies_count != 1:
+              raise SystemExit(f'Expected exactly one Companies route, found {companies_count}')
+
+          text = text.replace(old_home, new_home, 1)
+          text = text.replace(old_companies, new_companies, 1)
+          path.write_text(text)
+          print('Home and Companies routes updated. No other screen routes were changed.')
+          PY
+
+      - name: Verify patch scope
+        run: |
+          grep -q 'Page.HOME->ModernHome(stocks)' app/src/main/java/ke/co/nsewatcher/DesignActivity.kt
+          grep -q 'Page.COMPANIES->ModernCompanies(stocks)' app/src/main/java/ke/co/nsewatcher/DesignActivity.kt
+          grep -q 'Page.MARKET->Market()' app/src/main/java/ke/co/nsewatcher/DesignActivity.kt
+          grep -q 'Page.PAPER->Paper()' app/src/main/java/ke/co/nsewatcher/DesignActivity.kt
+          grep -q 'else->More(::go)' app/src/main/java/ke/co/nsewatcher/DesignActivity.kt
+          echo 'Scope verification passed: Home and Companies only.'
+
+      - name: Commit UI switch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java/ke/co/nsewatcher/DesignActivity.kt
+          git diff --cached --quiet && exit 0
+          git commit -m "Use approved Home and Companies UI [ui-modernized]"
+          git push
