@@ -3,7 +3,8 @@
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
   <application android:allowBackup="true" android:icon="@drawable/ic_nse_watcher" android:label="NSE Watcher" android:theme="@style/Theme.NSEWatcher" android:usesCleartextTraffic="false">
     <activity android:name=".MainActivity" android:exported="false" />
-    <activity android:name=".DesignActivity" android:exported="true">
+    <activity android:name=".DesignActivity" android:exported="false" />
+    <activity android:name=".ApprovedMarketActivity" android:exported="true">
       <intent-filter>
         <action android:name="android.intent.action.MAIN" />
         <category android:name="android.intent.category.LAUNCHER" />
