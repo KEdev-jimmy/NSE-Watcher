@@ -28,6 +28,12 @@ jobs:
           p = Path('app/src/main/java/ke/co/nsewatcher/DesignActivity.kt')
           s = p.read_text()
 
+          # Repair the pre-existing malformed Kotlin string in Companies first.
+          actual = 'Research. Analyze. Invest.\nFind the right companies for your future.'
+          escaped = 'Research. Analyze. Invest.\\nFind the right companies for your future.'
+          if actual not in s: raise SystemExit('Expected Companies string not found; refusing to modify source')
+          s = s.replace(actual, escaped, 1)
+
           old_top = '@Composable private fun TopBar(name:String,go:(Page)->Unit){Row(Modifier.fillMaxWidth().padding(horizontal=15.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically){Surface(Modifier.size(42.dp),RoundedCornerShape(12.dp),LightGreen){Icon(Icons.Default.ShowChart,null,Modifier.padding(7.dp),Green)};Spacer(Modifier.width(9.dp));Column(Modifier.weight(1f)){Text("NSE Watcher",fontSize=18.sp,fontWeight=FontWeight.ExtraBold);Text("Analyse • Understand • Invest Smarter",fontSize=10.sp,color=Muted)};IconButton({}){Icon(Icons.Default.Search,"Search",tint=Green)};Avatar(name){go(Page.PROFILE)};IconButton({go(Page.SETTINGS)}){Icon(Icons.Default.Settings,"Settings",tint=Green)}}}'
           new_top = '@Composable private fun TopBar(name:String,go:(Page)->Unit){Row(Modifier.fillMaxWidth().padding(horizontal=15.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically){Surface(Modifier.size(42.dp),RoundedCornerShape(12.dp),LightGreen){Icon(Icons.Default.ShowChart,null,Modifier.padding(7.dp),Green)};Spacer(Modifier.width(9.dp));Column(Modifier.weight(1f)){Text("NSE Watcher",fontSize=18.sp,fontWeight=FontWeight.ExtraBold);Text("Analyse • Understand • Invest Smarter",fontSize=10.sp,color=Muted)};Avatar(name){go(Page.PROFILE)}}}'
           if old_top not in s: raise SystemExit('TopBar pattern not found')
@@ -42,10 +48,9 @@ jobs:
           if old_profile not in s: raise SystemExit('Profile insertion pattern not found')
           s = s.replace(old_profile, new_profile, 1)
 
-          # The Companies screen contains an escaped Kotlin newline. Keep it escaped; never write a literal newline inside that string.
-          companies_marker = 'Research. Analyze. Invest.\\nFind the right companies for your future.'
-          if companies_marker not in s:
-              raise SystemExit('Companies content marker missing; refusing to modify source')
+          # Verify the Companies string is now safely escaped before writing.
+          if actual in s: raise SystemExit('Literal newline remains in Companies string')
+          if escaped not in s: raise SystemExit('Escaped Companies string missing after repair')
 
           p.write_text(s)
           PY
