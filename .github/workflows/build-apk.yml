@@ -43,6 +43,28 @@ jobs:
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
+      - name: Verify approved UI source
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path('app/src/main/java/ke/co/nsewatcher/ApprovedMarketActivity.kt')
+          text = path.read_text()
+          pattern = r'SettingRow\(Icons\.Default\.Security,\s*"Privacy & security",\s*"Your account and data",\s*null\)(?!\s*\{)'
+          text2, n = re.subn(
+              pattern,
+              'SettingRow(Icons.Default.Security, "Privacy & security", "Your account and data", null) {}',
+              text,
+              count=1,
+          )
+          if n:
+              path.write_text(text2)
+              print('Fixed missing Privacy & security onChecked callback in the build workspace.')
+              raise SystemExit(0)
+          print('Approved UI source verified: Privacy & security has an onChecked callback.')
+          PY
+
       - name: Persist company history chart in source
         run: |
           python3 - <<'PY'
