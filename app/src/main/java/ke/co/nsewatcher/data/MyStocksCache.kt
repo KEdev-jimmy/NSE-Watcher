@@ -15,6 +15,7 @@ import java.net.URL
  * Replace this bridge with the real NSE Watcher backend before production.
  */
 object MyStocksCache {
+    // MyStocks African equity prices are exchange-supplied and 15-minute delayed.
     private const val STOCKS_URL =
         "https://raw.githubusercontent.com/KEdev-jimmy/NSE-Watcher/main/data/mystocks/stocks.json"
 
