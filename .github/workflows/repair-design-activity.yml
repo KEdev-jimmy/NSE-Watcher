@@ -42,6 +42,11 @@ jobs:
           if old_profile not in s: raise SystemExit('Profile insertion pattern not found')
           s = s.replace(old_profile, new_profile, 1)
 
+          # The Companies screen contains an escaped Kotlin newline. Keep it escaped; never write a literal newline inside that string.
+          companies_marker = 'Research. Analyze. Invest.\\nFind the right companies for your future.'
+          if companies_marker not in s:
+              raise SystemExit('Companies content marker missing; refusing to modify source')
+
           p.write_text(s)
           PY
 
