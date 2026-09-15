@@ -42,6 +42,7 @@ object MyStocksCache {
                         val name = item.optString("name", symbol)
                         val price = item.optDouble("price", Double.NaN)
                         if (!price.isFinite()) continue
+                        val previousClose = item.optDouble("previousClose", price)
                         val changePct = item.optDouble("changePct", 0.0) * 100.0
                         add(
                             Stock(
@@ -49,7 +50,7 @@ object MyStocksCache {
                                 name = name,
                                 price = price,
                                 change = changePct,
-                                history = listOf(price)
+                                history = listOf(previousClose, price)
                             )
                         )
                     }
