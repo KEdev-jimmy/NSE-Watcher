@@ -5,6 +5,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -29,6 +30,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -149,9 +151,9 @@ private fun ApprovedTopBar(onProfile: () -> Unit) {
         }
         IconButton(onClick = {}) { Icon(Icons.Default.Search, "Search", tint = AGreen) }
         Surface(
-            Modifier.size(40.dp).clip(CircleShape).clickable(onClick = onProfile),
-            CircleShape,
-            ALightGreen
+            modifier = Modifier.size(40.dp).clip(CircleShape).clickable(onClick = onProfile),
+            shape = CircleShape,
+            color = ALightGreen
         ) {
             Box(Modifier.fillMaxSize(), Alignment.Center) {
                 Text("J", color = AGreen, fontWeight = FontWeight.Bold)
@@ -222,7 +224,7 @@ private fun MarketStatusCard() {
                     Text("Clear picture of the NSE", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
                     Text("before you make an investment decision.", color = AMuted, fontSize = 12.sp)
                 }
-                Surface(RoundedCornerShape(11.dp), color = Color.White) {
+                Surface(shape = RoundedCornerShape(11.dp), color = Color.White) {
                     Text("15 MIN DELAYED", color = AGreen, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 11.dp, vertical = 8.dp))
                 }
             }
@@ -311,7 +313,7 @@ private fun NewsCard() {
                 }
             }
             Spacer(Modifier.height(12.dp))
-            Surface(RoundedCornerShape(12.dp), color = ALightGreen) {
+            Surface(shape = RoundedCornerShape(12.dp), color = ALightGreen) {
                 Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Insights, null, tint = AGreen)
                     Spacer(Modifier.width(10.dp))
@@ -377,18 +379,16 @@ private fun ApprovedMarket(stocks: List<Stock>) {
 
 @Composable
 private fun MarketHeader() {
-    Column(Modifier.fillMaxWidth()) {
-        Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(ALightGreen)) {
-            Row(Modifier.padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(9.dp).clip(CircleShape).background(AGreen))
-                Spacer(Modifier.width(7.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("NSE MARKET", color = ADarkGreen, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp)
-                    Text("Market Analysis", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("In-depth analysis and market trends.", color = AMuted, fontSize = 11.sp)
-                }
-                Text("15 MIN DELAYED", color = AGreen, fontWeight = FontWeight.ExtraBold, fontSize = 10.sp)
+    Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(ALightGreen)) {
+        Row(Modifier.padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(9.dp).clip(CircleShape).background(AGreen))
+            Spacer(Modifier.width(7.dp))
+            Column(Modifier.weight(1f)) {
+                Text("NSE MARKET", color = ADarkGreen, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp)
+                Text("Market Analysis", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+                Text("In-depth analysis and market trends.", color = AMuted, fontSize = 11.sp)
             }
+            Text("15 MIN DELAYED", color = AGreen, fontWeight = FontWeight.ExtraBold, fontSize = 10.sp)
         }
     }
 }
@@ -399,8 +399,8 @@ private fun PeriodSelector(selected: String, onSelect: (String) -> Unit) {
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
         periods.forEach { period ->
             Surface(
-                Modifier.width(57.dp).height(34.dp).clickable { onSelect(period) },
-                RoundedCornerShape(10.dp),
+                modifier = Modifier.width(57.dp).height(34.dp).clickable { onSelect(period) },
+                shape = RoundedCornerShape(10.dp),
                 color = if (period == selected) AGreen else Color.Transparent,
                 border = if (period == selected) null else BorderStroke(1.dp, Color(0xFF7D7D7D))
             ) {
@@ -464,7 +464,6 @@ private fun BreadthCard(advancers: Int, decliners: Int) {
             }
             Spacer(Modifier.height(13.dp))
             Row(Modifier.fillMaxWidth().height(9.dp).clip(RoundedCornerShape(10.dp))) {
-                val total = (advancers + decliners).coerceAtLeast(1)
                 Box(Modifier.weight(advancers.coerceAtLeast(1).toFloat()).fillMaxHeight().background(AGreen))
                 Box(Modifier.weight(decliners.coerceAtLeast(1).toFloat()).fillMaxHeight().background(ARed))
             }
@@ -643,9 +642,7 @@ private fun ApprovedSettings(dark: Boolean, onDarkChange: (Boolean) -> Unit, onB
                 Text("Settings", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
             }
         }
-        item {
-            SettingRow(Icons.Default.DarkMode, "Dark mode", "Appearance", dark) { onDarkChange(it) }
-        }
+        item { SettingRow(Icons.Default.DarkMode, "Dark mode", "Appearance", dark) { onDarkChange(it) } }
         item { SettingRow(Icons.Default.Notifications, "Notifications", "Market, price and news alerts", null) {} }
         item { SettingRow(Icons.Default.ShowChart, "Chart settings", "Timeframes and chart display", null) {} }
         item { SettingRow(Icons.Default.Security, "Privacy & security", "Your account and data", null) {} }
