@@ -24,6 +24,50 @@ async function mystocks(path) {
   return data;
 }
 
+function periodConfig(period) {
+  const end = new Date();
+  const start = new Date(end);
+  let interval = '1d';
+  switch (String(period || '1y').toLowerCase()) {
+    case '1d':
+      start.setDate(start.getDate() - 1);
+      interval = '15m';
+      break;
+    case '1w':
+      start.setDate(start.getDate() - 7);
+      interval = '1d';
+      break;
+    case '1m':
+      start.setMonth(start.getMonth() - 1);
+      interval = '1d';
+      break;
+    case '3m':
+      start.setMonth(start.getMonth() - 3);
+      interval = '1d';
+      break;
+    case '6m':
+      start.setMonth(start.getMonth() - 6);
+      interval = '1d';
+      break;
+    case '1y':
+      start.setFullYear(start.getFullYear() - 1);
+      interval = '1w';
+      break;
+    case '5y':
+      start.setFullYear(start.getFullYear() - 5);
+      interval = '1mo';
+      break;
+    default:
+      start.setFullYear(start.getFullYear() - 1);
+      interval = '1w';
+  }
+  return {
+    interval,
+    from: start.toISOString().slice(0, 10),
+    to: end.toISOString().slice(0, 10),
+  };
+}
+
 module.exports = async (req, res) => {
   if (req.method !== 'GET') return json(res, 405, { error: 'GET only' });
   const action = String(req.query.action || 'snapshot');
@@ -40,6 +84,22 @@ module.exports = async (req, res) => {
       const gainers = await mystocks('/market/movers?exchange=NSE&direction=gainers&limit=10');
       const losers = await mystocks('/market/movers?exchange=NSE&direction=losers&limit=10');
       return json(res, 200, { source: 'MyStocks Africa', delayMinutes: 15, fetchedAt: new Date().toISOString(), gainers, losers });
+    }
+    if (action === 'chart') {
+      const symbol = String(req.query.symbol || '').trim();
+      if (!symbol) return json(res, 400, { error: 'symbol is required' });
+      const period = String(req.query.period || '1y').toLowerCase();
+      const cfg = periodConfig(period);
+      const data = await mystocks(`/stocks/${encodeURIComponent(symbol)}/candles?interval=${encodeURIComponent(cfg.interval)}&from=${cfg.from}&to=${cfg.to}`);
+      return json(res, 200, {
+        source: 'MyStocks Africa',
+        delayMinutes: 15,
+        fetchedAt: new Date().toISOString(),
+        symbol,
+        period,
+        interval: cfg.interval,
+        data,
+      });
     }
     const symbols = String(req.query.symbols || '').trim();
     const path = symbols
