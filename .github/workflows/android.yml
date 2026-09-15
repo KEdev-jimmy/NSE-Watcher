@@ -30,6 +30,8 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: ""
 
       - name: Install Android SDK packages
         run: |
@@ -46,6 +48,8 @@ jobs:
         run: |
           test -f app/src/main/java/ke/co/nsewatcher/DesignActivity.kt
           test ! -f app/src/main/java/ke/co/nsewatcher/ApprovedMarketActivity.kt
+          test ! -f app/src/main/java/ke/co/nsewatcher/MainActivity.kt
+          test ! -f app/src/main/java/ke/co/nsewatcher/UiBuildTrigger.kt
           grep -q 'private fun Home' app/src/main/java/ke/co/nsewatcher/DesignActivity.kt
           grep -q 'private fun Companies' app/src/main/java/ke/co/nsewatcher/DesignActivity.kt
           ! grep -R -q 'ApprovedMarketActivity' app/src/main/java || exit 1
