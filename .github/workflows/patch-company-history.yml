@@ -6,12 +6,15 @@ permissions:
   contents: write
 jobs:
   patch:
-    if: "!contains(github.event.head_commit.message, 'Company history chart integration')"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Patch company screen
         run: |
+          if git log -1 --pretty=%B | grep -q "Company history chart integration"; then
+            echo "Patch already applied."
+            exit 0
+          fi
           python3 - <<'PY'
           from pathlib import Path
           import re
@@ -19,8 +22,7 @@ jobs:
           s = p.read_text()
           if 'Page.COMPANY->Company(selected,::back)' not in s:
               raise SystemExit('Company page call not found; stopping safely.')
-          pattern = re.compile(r'@Composable\s+private fun Company\b')
-          m = pattern.search(s)
+          m = re.search(r'@Composable\s+private fun Company\b', s)
           if not m:
               raise SystemExit('Company composable not found; stopping safely.')
           start = m.start()
