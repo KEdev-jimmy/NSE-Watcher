@@ -14,15 +14,59 @@ import java.net.URL
  * the backend and keeps the GitHub cache as a development fallback.
  */
 object MyStocksCache {
-    private const val BACKEND_URL =
+    private const val BACKEND_STOCKS_URL =
         "https://nse-watcher.vercel.app/api/market?action=stocks"
+    private const val BACKEND_CHART_URL =
+        "https://nse-watcher.vercel.app/api/market?action=chart"
     private const val FALLBACK_URL =
         "https://raw.githubusercontent.com/KEdev-jimmy/NSE-Watcher/main/data/mystocks/stocks.json"
 
+    private val chartSymbols = setOf("SCOM", "KCB", "EQTY", "ABSA", "COOP", "EABL", "KPLC")
+
     suspend fun loadStocks(): List<Stock> = withContext(Dispatchers.IO) {
-        loadFromUrl(BACKEND_URL).takeIf { it.isNotEmpty() }
+        val base = loadFromUrl(BACKEND_STOCKS_URL).takeIf { it.isNotEmpty() }
             ?: loadFromUrl(FALLBACK_URL)
+        if (base.isEmpty()) return@withContext emptyList()
+
+        // Keep the first live slice deliberately small: the dashboard/company
+        // experience gets real historical data without firing dozens of API calls.
+        // The same chart endpoint will be used for lazy per-company loading next.
+        base.map { stock ->
+            if (stock.symbol in chartSymbols) {
+                val history = loadHistory(stock.symbol, "1y")
+                if (history.size >= 2) stock.copy(history = history) else stock
+            } else stock
+        }
     }
+
+    suspend fun loadHistory(symbol: String, period: String = "1y"): List<Double> = withContext(Dispatchers.IO) {
+        val qualified = if (symbol.contains('.')) symbol else "$symbol.KE"
+        loadHistoryFromUrl("$BACKEND_CHART_URL&symbol=$qualified&period=$period")
+    }
+
+    private fun loadHistoryFromUrl(url: String): List<Double> = runCatching {
+        val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            connectTimeout = 10_000
+            readTimeout = 10_000
+            setRequestProperty("Accept", "application/json")
+        }
+        try {
+            if (connection.responseCode !in 200..299) return@runCatching emptyList()
+            val root = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
+            val data = root.optJSONObject("data") ?: return@runCatching emptyList()
+            val candles = data.optJSONArray("candles") ?: return@runCatching emptyList()
+            buildList {
+                for (i in 0 until candles.length()) {
+                    val candle = candles.optJSONObject(i) ?: continue
+                    val close = candle.optDouble("close", Double.NaN)
+                    if (close.isFinite() && close > 0.0) add(close)
+                }
+            }
+        } finally {
+            connection.disconnect()
+        }
+    }.getOrDefault(emptyList())
 
     private fun loadFromUrl(url: String): List<Stock> = runCatching {
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
