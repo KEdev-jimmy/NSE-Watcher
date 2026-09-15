@@ -1,0 +1,58 @@
+name: Repair DesignActivity safely
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/repair-design-activity.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Restore known-good DesignActivity and apply only requested changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git checkout 3f8ff24bc766fe56792391dcbb02ef8abafcc437 -- app/src/main/java/ke/co/nsewatcher/DesignActivity.kt
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/ke/co/nsewatcher/DesignActivity.kt')
+          s = p.read_text()
+
+          old_top = '@Composable private fun TopBar(name:String,go:(Page)->Unit){Row(Modifier.fillMaxWidth().padding(horizontal=15.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically){Surface(Modifier.size(42.dp),RoundedCornerShape(12.dp),LightGreen){Icon(Icons.Default.ShowChart,null,Modifier.padding(7.dp),Green)};Spacer(Modifier.width(9.dp));Column(Modifier.weight(1f)){Text("NSE Watcher",fontSize=18.sp,fontWeight=FontWeight.ExtraBold);Text("Analyse • Understand • Invest Smarter",fontSize=10.sp,color=Muted)};IconButton({}){Icon(Icons.Default.Search,"Search",tint=Green)};Avatar(name){go(Page.PROFILE)};IconButton({go(Page.SETTINGS)}){Icon(Icons.Default.Settings,"Settings",tint=Green)}}}'
+          new_top = '@Composable private fun TopBar(name:String,go:(Page)->Unit){Row(Modifier.fillMaxWidth().padding(horizontal=15.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically){Surface(Modifier.size(42.dp),RoundedCornerShape(12.dp),LightGreen){Icon(Icons.Default.ShowChart,null,Modifier.padding(7.dp),Green)};Spacer(Modifier.width(9.dp));Column(Modifier.weight(1f)){Text("NSE Watcher",fontSize=18.sp,fontWeight=FontWeight.ExtraBold);Text("Analyse • Understand • Invest Smarter",fontSize=10.sp,color=Muted)};Avatar(name){go(Page.PROFILE)}}}'
+          if old_top not in s: raise SystemExit('TopBar pattern not found')
+          s = s.replace(old_top, new_top, 1)
+
+          s = s.replace('Column(Modifier.padding(16.dp)){\n                    Text("Portfolio Value (Paper Invest)"', 'Column(Modifier.padding(12.dp)){\n                    Text("Portfolio Value (Paper Invest)"', 1)
+          s = s.replace('Column(Modifier.padding(13.dp)){Text("Total Invested"', 'Column(Modifier.padding(10.dp)){Text("Total Invested"', 1)
+          s = s.replace('Column(Modifier.padding(13.dp)){Text("Total Return"', 'Column(Modifier.padding(10.dp)){Text("Total Return"', 1)
+
+          old_profile = 'item{RowItem(Icons.Default.PhotoCamera,"Profile Picture","Change your profile photo",pick)};item{RowItem(Icons.Default.Lock,"Account Security","Password and device protection"){go(Page.SECURITY)}}'
+          new_profile = 'item{RowItem(Icons.Default.PhotoCamera,"Profile Picture","Change your profile photo",pick)};item{RowItem(Icons.Default.Settings,"Settings","Theme, notifications, data and privacy"){go(Page.SETTINGS)}};item{RowItem(Icons.Default.Lock,"Account Security","Password and device protection"){go(Page.SECURITY)}}'
+          if old_profile not in s: raise SystemExit('Profile insertion pattern not found')
+          s = s.replace(old_profile, new_profile, 1)
+
+          p.write_text(s)
+          PY
+
+      - name: Commit only DesignActivity
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/src/main/java/ke/co/nsewatcher/DesignActivity.kt
+          git diff --cached --check
+          git diff --cached -- app/src/main/java/ke/co/nsewatcher/DesignActivity.kt
+          git commit -m 'Fix Home Profile UI safely'
+          git push origin HEAD:main
