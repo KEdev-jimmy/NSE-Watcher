@@ -35,4 +35,4 @@ jobs:
       - name: Build with Gradle
         run: gradle --no-daemon build
 
-      # Verification trigger after restoring the known-valid UI source.
+      # Clean-foundation verification after removing obsolete experimental UI.
