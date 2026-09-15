@@ -35,4 +35,4 @@ jobs:
       - name: Build with Gradle
         run: gradle --no-daemon build
 
-      # Clean-foundation verification after removing obsolete experimental UI.
+      # Clean-foundation verification after removing obsolete experimental UI and manifest entry.
