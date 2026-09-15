@@ -8,57 +8,68 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Temporary read-only bridge to the GitHub-published MyStocks cache.
+ * Read-only market-data bridge.
  *
- * The MyStocks credential never enters the Android app. GitHub Actions refreshes
- * the cache with the repository secret, and the app only reads the public cache.
- * Replace this bridge with the real NSE Watcher backend before production.
+ * The MyStocks credential stays on the Vercel backend. The Android app calls
+ * the backend and keeps the GitHub cache as a development fallback.
  */
 object MyStocksCache {
-    // MyStocks African equity prices are exchange-supplied and 15-minute delayed.
-    private const val STOCKS_URL =
+    private const val BACKEND_URL =
+        "https://nse-watcher.vercel.app/api/market?action=stocks"
+    private const val FALLBACK_URL =
         "https://raw.githubusercontent.com/KEdev-jimmy/NSE-Watcher/main/data/mystocks/stocks.json"
 
     suspend fun loadStocks(): List<Stock> = withContext(Dispatchers.IO) {
-        runCatching {
-            val connection = (URL(STOCKS_URL).openConnection() as HttpURLConnection).apply {
-                requestMethod = "GET"
-                connectTimeout = 8_000
-                readTimeout = 8_000
-                setRequestProperty("Accept", "application/json")
-            }
-            try {
-                if (connection.responseCode !in 200..299) return@runCatching emptyList()
-                val outer = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
-                val rawContent = outer.optString("content")
-                val payload = JSONObject(if (rawContent.isNotBlank()) rawContent else outer.toString())
-                val array = payload.optJSONArray("stocks") ?: return@runCatching emptyList()
-
-                buildList {
-                    for (i in 0 until array.length()) {
-                        val item = array.optJSONObject(i) ?: continue
-                        val qualified = item.optString("symbol")
-                        if (qualified.isBlank()) continue
-                        val symbol = qualified.substringBefore('.')
-                        val name = item.optString("name", symbol)
-                        val price = item.optDouble("price", Double.NaN)
-                        if (!price.isFinite()) continue
-                        val previousClose = item.optDouble("previousClose", price)
-                        val changePct = item.optDouble("changePct", 0.0) * 100.0
-                        add(
-                            Stock(
-                                symbol = symbol,
-                                name = name,
-                                price = price,
-                                change = changePct,
-                                history = listOf(previousClose, price)
-                            )
-                        )
-                    }
-                }
-            } finally {
-                connection.disconnect()
-            }
-        }.getOrDefault(emptyList())
+        loadFromUrl(BACKEND_URL).takeIf { it.isNotEmpty() }
+            ?: loadFromUrl(FALLBACK_URL)
     }
+
+    private fun loadFromUrl(url: String): List<Stock> = runCatching {
+        val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            connectTimeout = 8_000
+            readTimeout = 8_000
+            setRequestProperty("Accept", "application/json")
+        }
+        try {
+            if (connection.responseCode !in 200..299) return@runCatching emptyList()
+            val root = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
+
+            // Backend response: { data: { stocks: [...] } }.
+            // GitHub fallback response: { content: "{ stocks: [...] }" }.
+            val dataObject = root.optJSONObject("data")
+            val rawContent = root.optString("content")
+            val payload = when {
+                dataObject != null -> dataObject
+                rawContent.isNotBlank() -> JSONObject(rawContent)
+                else -> root
+            }
+            val array = payload.optJSONArray("stocks") ?: return@runCatching emptyList()
+
+            buildList {
+                for (i in 0 until array.length()) {
+                    val item = array.optJSONObject(i) ?: continue
+                    val qualified = item.optString("symbol")
+                    if (qualified.isBlank()) continue
+                    val symbol = qualified.substringBefore('.')
+                    val name = item.optString("name", symbol)
+                    val price = item.optDouble("price", Double.NaN)
+                    if (!price.isFinite()) continue
+                    val previousClose = item.optDouble("previousClose", price)
+                    val changePct = item.optDouble("changePct", 0.0) * 100.0
+                    add(
+                        Stock(
+                            symbol = symbol,
+                            name = name,
+                            price = price,
+                            change = changePct,
+                            history = listOf(previousClose, price)
+                        )
+                    )
+                }
+            }
+        } finally {
+            connection.disconnect()
+        }
+    }.getOrDefault(emptyList())
 }
