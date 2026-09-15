@@ -1,11 +1,6 @@
 name: Restore Valid UI Source
 
 on:
-  push:
-    branches: [ "main" ]
-    paths:
-      - '.github/workflows/restore-valid-ui.yml'
-      - 'app/src/main/java/ke/co/nsewatcher/DesignActivity.kt'
   workflow_dispatch:
 
 permissions:
@@ -27,10 +22,8 @@ jobs:
           git show 5c462d605b69247fb35a29e0a975e9b5cdd7e3fb:"$TARGET" > "$TARGET"
           python3 - <<'PY'
           from pathlib import Path
-          import re
           p = Path('app/src/main/java/ke/co/nsewatcher/DesignActivity.kt')
           text = p.read_text()
-          # The approved Home design does not include Quick Actions.
           start = text.find('                  item{Column{Row(verticalAlignment=Alignment.CenterVertically){Text("Quick Actions"')
           if start >= 0:
               end = text.find('                  item{Card(Modifier.fillMaxWidth(),RoundedCornerShape(15.dp)', start)
