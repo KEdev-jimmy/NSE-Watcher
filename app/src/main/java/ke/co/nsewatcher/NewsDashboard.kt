@@ -39,13 +39,20 @@ private data class NewsMeta(val symbol:String, val company:String, val logo:Stri
 
 private fun dashboardNewsMeta(item:NewsItem):NewsMeta {
     val symbol = item.symbol.trim().uppercase(Locale.US).removeSuffix(".KE")
-    val stock = stocks.firstOrNull { it.symbol.equals(symbol, true) }
-    val company = item.companyName.trim().ifBlank { stock?.name.orEmpty() }
-    val finalSymbol = stock?.symbol ?: symbol
-    val logo = stock?.logoUrl?.takeIf { it.isNotBlank() }
-        ?: finalSymbol.takeIf { it.isNotBlank() }?.let { "https://mystocks.africa/logos/${it.lowercase(Locale.US)}-ke.svg" }.orEmpty()
-    val label = finalSymbol.ifBlank { item.source.ifBlank { "NSE" } }
-    return NewsMeta(finalSymbol, company, logo, label)
+    val company = item.companyName.trim()
+    val logo = symbol.takeIf { it.isNotBlank() }?.let { "https://mystocks.africa/logos/${it.lowercase(Locale.US)}-ke.svg" }.orEmpty()
+    val label = symbol.ifBlank { item.source.ifBlank { "NSE" } }
+    return NewsMeta(symbol, company, logo, label)
+}
+
+@Composable
+private fun NewsDashboardHeader(title:String, sub:String?=null) {
+    Row(Modifier.fillMaxWidth().padding(horizontal=8.dp, vertical=8.dp), verticalAlignment=Alignment.CenterVertically) {
+        Column {
+            Text(title, fontSize=20.sp, fontWeight=FontWeight.ExtraBold)
+            if (sub != null) Text(sub, fontSize=10.sp, color=NewsMuted)
+        }
+    }
 }
 
 @Composable
@@ -73,7 +80,7 @@ fun NewsDashboard(open:(NewsItem)->Unit) {
         contentPadding = PaddingValues(start = 14.dp, top = 4.dp, end = 14.dp, bottom = 22.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        item { Header("News", "NSE companies, dividends & market intelligence") }
+        item { NewsDashboardHeader("News", "NSE companies, dividends & market intelligence") }
         item {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 categories.forEach { c ->
@@ -205,7 +212,7 @@ private fun NewsLatestCard(item:NewsItem, open:(NewsItem)->Unit) {
             }
             Spacer(Modifier.width(9.dp))
             Column(Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(verticalAlignment=Alignment.CenterVertically) {
                     Text(if (meta.company.isNotBlank()) meta.company else meta.label, color=NewsText, fontSize=9.sp, fontWeight=FontWeight.ExtraBold, maxLines=1, modifier=Modifier.weight(1f))
                     if (meta.symbol.isNotBlank()) DashboardSymbol(meta.symbol)
                 }
