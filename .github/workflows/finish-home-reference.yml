@@ -1,0 +1,100 @@
+name: Finish approved Home reference
+
+on:
+  push:
+    paths:
+      - '.github/workflows/finish-home-reference.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+
+jobs:
+  finish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compact approved hero
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          hp = Path('app/src/main/java/ke/co/nsewatcher/HomeDashboard.kt')
+          s = hp.read_text()
+          s = s.replace('.height(366.dp)', '.height(300.dp)', 1)
+          s = s.replace('Modifier.padding(start = 24.dp, end = 20.dp, top = 20.dp)', 'Modifier.padding(start = 22.dp, end = 18.dp, top = 14.dp)', 1)
+          s = s.replace('Modifier.size(58.dp).clip(RoundedCornerShape(17.dp))', 'Modifier.size(48.dp).clip(RoundedCornerShape(15.dp))', 1)
+          s = s.replace('modifier = Modifier.padding(10.dp).fillMaxSize()', 'modifier = Modifier.padding(8.dp).fillMaxSize()', 1)
+          s = s.replace('fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)', 'fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)', 1)
+          s = s.replace('fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)', 'fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)', 1)
+          s = s.replace('fontSize = 11.sp)', 'fontSize = 10.sp)', 1)
+          s = s.replace('Box(Modifier.size(42.dp), contentAlignment = Alignment.Center)', 'Box(Modifier.size(36.dp), contentAlignment = Alignment.Center)', 1)
+          s = s.replace('modifier = Modifier.size(29.dp)', 'modifier = Modifier.size(25.dp)', 1)
+          s = s.replace('Modifier.padding(start = 30.dp, top = 20.dp, end = 24.dp)', 'Modifier.padding(start = 26.dp, top = 10.dp, end = 22.dp)', 1)
+          s = s.replace('fontSize = 12.sp)', 'fontSize = 11.sp)', 1)
+          s = s.replace('Spacer(Modifier.weight(1f))\n            MarketIndexCard', 'Spacer(Modifier.height(8.dp))\n            MarketIndexCard', 1)
+          s = s.replace('Modifier.fillMaxWidth().padding(horizontal = 14.dp),\n        RoundedCornerShape(20.dp)', 'Modifier.fillMaxWidth().padding(horizontal = 12.dp),\n        RoundedCornerShape(18.dp)', 1)
+          s = s.replace('Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically)', 'Row(Modifier.padding(horizontal = 11.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically)', 1)
+          s = s.replace('Column(Modifier.weight(1.22f))', 'Column(Modifier.weight(1.28f))', 1)
+          s = s.replace('Modifier.size(35.dp).clip(RoundedCornerShape(10.dp))', 'Modifier.size(31.dp).clip(RoundedCornerShape(9.dp))', 1)
+          s = s.replace('modifier = Modifier.padding(7.dp)', 'modifier = Modifier.padding(6.dp)', 1)
+          s = s.replace('VerticalDivider(color = Color.White.copy(alpha = .25f), modifier = Modifier.height(118.dp))', 'VerticalDivider(color = Color.White.copy(alpha = .25f), modifier = Modifier.height(96.dp))', 1)
+          s = s.replace('Spacer(Modifier.height(7.dp))\n                Row(horizontalArrangement = Arrangement.spacedBy(12.dp))', 'Spacer(Modifier.height(5.dp))\n                Row(horizontalArrangement = Arrangement.spacedBy(9.dp))', 1)
+
+          # Replace the unavailable placeholder + decorative mini chart with the requested compact reference value.
+          pattern = re.compile(r'Spacer\(Modifier\.height\(12\.dp\)\)\s*Row\(verticalAlignment = Alignment\.Bottom\).*?MiniIndexChart\(\)', re.S)
+          replacement = 'Spacer(Modifier.height(7.dp))\n                Row(verticalAlignment = Alignment.CenterVertically) { Text("181.74", color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.ExtraBold); Spacer(Modifier.width(7.dp)); Text("▲ +0.84%", color = Color(0xFF58E8A8), fontSize = 11.sp, fontWeight = FontWeight.Bold) }\n                Text("Reference snapshot • live index feed pending", color = Color(0xFFA8E7C8), fontSize = 7.sp)'
+          s, n = pattern.subn(replacement, s, count=1)
+          if n != 1:
+              raise SystemExit('Could not find the index placeholder/chart block')
+          hp.write_text(s)
+
+          dp = Path('app/src/main/java/ke/co/nsewatcher/DesignActivity.kt')
+          d = dp.read_text()
+          old = 'Scaffold(topBar={TopBar(name,::go)},bottomBar={BottomNav(tab){tab=it;history=emptyList();page=when(it){0->Page.HOME;1->Page.MARKET;2->Page.NEWS;3->Page.COMPANIES;else->Page.MORE}}})'
+          new = 'Scaffold(topBar={if(page!=Page.HOME) TopBar(name,::go)},bottomBar={BottomNav(tab){tab=it;history=emptyList();page=when(it){0->Page.HOME;1->Page.MARKET;2->Page.NEWS;3->Page.COMPANIES;else->Page.MORE}}})'
+          if old in d: d = d.replace(old, new, 1)
+          dp.write_text(d)
+          PY
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: ""
+
+      - name: Install Android SDK packages
+        run: sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Install Gradle
+        run: |
+          curl -fsSL https://services.gradle.org/distributions/gradle-8.14.4-bin.zip -o gradle.zip
+          unzip -q gradle.zip
+          echo "$GITHUB_WORKSPACE/gradle-8.14.4/bin" >> "$GITHUB_PATH"
+
+      - name: Build
+        run: gradle --no-daemon build
+
+      - name: Commit and clean workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java/ke/co/nsewatcher/HomeDashboard.kt app/src/main/java/ke/co/nsewatcher/DesignActivity.kt
+          git commit -m "Match Home hero to approved reference" || true
+          git rm .github/workflows/finish-home-reference.yml .github/workflows/restore-compact-home.yml 2>/dev/null || true
+          git commit -m "Remove temporary Home design workflows" || true
+          git push origin HEAD:main
