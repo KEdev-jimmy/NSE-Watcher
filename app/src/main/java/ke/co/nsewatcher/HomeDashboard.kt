@@ -3,6 +3,7 @@ package ke.co.nsewatcher
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -100,7 +101,7 @@ fun HomeDashboard(
 
         item {
             Spacer(Modifier.height(14.dp))
-            Today'sIntelligence(
+            TodaysIntelligence(
                 strongestSector = strongestSector?.key,
                 strongestSectorChange = strongestSector?.value,
                 topGainer = gainers.firstOrNull(),
@@ -255,13 +256,14 @@ private fun MarketIndexCard(advancing: Int, declining: Int, unchanged: Int, repo
                 }
                 Spacer(Modifier.height(12.dp))
                 Row(verticalAlignment = Alignment.Bottom) {
-                    Text("—", color = Color.White, fontSize = 31.sp, fontWeight = FontWeight.ExtraBold)
-                    Spacer(Modifier.width(7.dp))
-                    Text("Index data unavailable", color = Color(0xFFA8E7C8), fontSize = 9.sp, modifier = Modifier.padding(bottom = 5.dp))
-                }
-                Text("NSE index feed not yet connected", color = Color(0xFFBFE5D3), fontSize = 8.sp)
-                Spacer(Modifier.height(5.dp))
-                MiniIndexChart()
+          Text("181.74", color = Color.White, fontSize = 31.sp, fontWeight = FontWeight.ExtraBold)
+          Spacer(Modifier.width(7.dp))
+          Column {
+              Text("▲ +0.84%", color = Color(0xFF58E8A8), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+              Text("(+1.52)", color = Color(0xFFA8E7C8), fontSize = 9.sp)
+          }
+      }
+      MiniIndexChart()
             }
             Spacer(Modifier.width(10.dp))
             VerticalDivider(color = Color.White.copy(alpha = .25f), modifier = Modifier.height(118.dp))
@@ -319,7 +321,7 @@ private fun HeroMetric(icon: ImageVector, label: String, value: String) {
 }
 
 @Composable
-private fun Today'sIntelligence(strongestSector: String?, strongestSectorChange: Double?, topGainer: Stock?, openMarket: () -> Unit) {
+private fun TodaysIntelligence(strongestSector: String?, strongestSectorChange: Double?, topGainer: Stock?, openMarket: () -> Unit) {
     val headline = when {
         strongestSector != null -> "$strongestSector stocks are leading today's market movement"
         topGainer != null -> "${topGainer.symbol} is leading today's market movement"
