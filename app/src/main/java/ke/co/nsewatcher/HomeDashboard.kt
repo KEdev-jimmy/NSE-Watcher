@@ -114,7 +114,7 @@ fun HomeDashboard(
                 Spacer(Modifier.height(8.dp))
                 LazyRow(
                     contentPadding = PaddingValues(horizontal = 14.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(7.dp)
                 ) {
                     items(gainers.take(4)) { stock -> MoverCard(stock) { openCompany(stock) } }
                 }
@@ -193,23 +193,25 @@ fun HomeDashboard(
 
 @Composable
 private fun HomeHero(advancing: Int, declining: Int, unchanged: Int, reportedVolume: Long) {
-    Box(Modifier.fillMaxWidth().height(286.dp)) {
-        AsyncImage(
+    Box(Modifier.fillMaxWidth().height(305.dp)) {
+        Box(Modifier.fillMaxWidth().height(235.dp)) {
+            AsyncImage(
             model = NairobiSkyline,
             contentDescription = "Nairobi skyline",
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop
         )
         Box(Modifier.fillMaxSize().background(Color(0xCC00523B)))
-        Box(Modifier.fillMaxSize().background(Color(0x66002018)))
+            Box(Modifier.fillMaxSize().background(Color(0x66002018)))
+        }
 
-        Column(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxWidth()) {
             Row(
-                Modifier.padding(start = 24.dp, end = 20.dp, top = 20.dp),
+                Modifier.padding(start = 24.dp, end = 20.dp, top = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(Modifier.size(58.dp).clip(RoundedCornerShape(17.dp)).background(HomeGreen)) {
-                    Icon(Icons.Default.ShowChart, null, tint = Color.White, modifier = Modifier.padding(10.dp).fillMaxSize())
+                Box(Modifier.size(52.dp).clip(RoundedCornerShape(16.dp)).background(HomeGreen)) {
+                    Icon(Icons.Default.ShowChart, null, tint = Color.White, modifier = Modifier.padding(9.dp).fillMaxSize())
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
@@ -222,13 +224,15 @@ private fun HomeHero(advancing: Int, declining: Int, unchanged: Int, reportedVol
                 }
             }
 
-            Column(Modifier.padding(start = 30.dp, top = 20.dp, end = 24.dp)) {
+            Column(Modifier.padding(start = 30.dp, top = 13.dp, end = 24.dp)) {
                 Text("Good morning, James", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
                 Text("Here's what's happening in the NSE today", color = Color(0xFFE0F2EA), fontSize = 12.sp)
             }
 
-            Spacer(Modifier.height(10.dp))
-            MarketIndexCard(advancing, declining, unchanged, reportedVolume)
+            Spacer(Modifier.height(7.dp))
+            Box(Modifier.fillMaxWidth().padding(horizontal = 14.dp)) {
+                MarketIndexCard(advancing, declining, unchanged, reportedVolume)
+            }
         }
     }
 }
@@ -241,18 +245,18 @@ private fun MarketIndexCard(advancing: Int, declining: Int, unchanged: Int, repo
         colors = CardDefaults.cardColors(containerColor = Color(0xEE04543C)),
         border = BorderStroke(1.dp, Color(0xFF39D995))
     ) {
-        Row(Modifier.padding(11.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1.22f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(30.dp).clip(RoundedCornerShape(9.dp)).background(Color(0xFF0B7652))) {
+                    Box(Modifier.size(27.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFF0B7652))) {
                         Icon(Icons.Default.BarChart, null, tint = Color.White, modifier = Modifier.padding(6.dp))
                     }
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(7.dp))
                     Text("NSE All Share Index", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
-                Spacer(Modifier.height(7.dp))
+                Spacer(Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.Bottom) {
-          Text("181.74", color = Color.White, fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
+          Text("181.74", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold)
           Spacer(Modifier.width(7.dp))
           Column {
               Text("▲ +0.84%", color = Color(0xFF58E8A8), fontSize = 13.sp, fontWeight = FontWeight.Bold)
@@ -261,15 +265,15 @@ private fun MarketIndexCard(advancing: Int, declining: Int, unchanged: Int, repo
       }
                   }
             Spacer(Modifier.width(10.dp))
-            VerticalDivider(color = Color.White.copy(alpha = .25f), modifier = Modifier.height(91.dp))
+            VerticalDivider(color = Color.White.copy(alpha = .25f), modifier = Modifier.height(78.dp))
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(.86f)) {
                 BreadthLine("Advancing", advancing, HomeGreen)
                 BreadthLine("Declining", declining, HomeRed)
                 BreadthLine("Unchanged", unchanged, Color(0xFFD4DFDB))
-                Spacer(Modifier.height(7.dp))
+                Spacer(Modifier.height(5.dp))
                 HorizontalDivider(color = Color.White.copy(alpha = .22f))
-                Spacer(Modifier.height(7.dp))
+                Spacer(Modifier.height(5.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     HeroMetric(Icons.Default.BarChart, "Volume", formatShares(reportedVolume))
                     HeroMetric(Icons.Default.Layers, "Turnover", "—")
@@ -387,13 +391,13 @@ private fun HomeSectionHeader(title: String, subtitle: String, icon: ImageVector
 
 @Composable
 private fun MoverCard(stock: Stock, onClick: () -> Unit) {
-    Card(Modifier.width(151.dp).clickable(onClick = onClick), RoundedCornerShape(16.dp), border = BorderStroke(1.dp, HomeBorder), colors = CardDefaults.cardColors(containerColor = Color.White)) {
-        Column(Modifier.padding(10.dp)) {
-            HomeLogo(stock.symbol, stock.logoUrl, 35)
+    Card(Modifier.width(88.dp).clickable(onClick = onClick), RoundedCornerShape(16.dp), border = BorderStroke(1.dp, HomeBorder), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+        Column(Modifier.padding(8.dp)) {
+            HomeLogo(stock.symbol, stock.logoUrl, 29)
             Spacer(Modifier.height(5.dp))
-            Text(stock.symbol, color = HomeMuted, fontSize = 9.sp)
-            Text(String.format(Locale.US, "KSh %.2f", stock.price), color = HomeTextDark, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
-            Text("▲ ${String.format(Locale.US, "%.2f%%", stock.change)}", color = HomeGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Text(stock.symbol, color = HomeMuted, fontSize = 8.sp)
+            Text(String.format(Locale.US, "KSh %.2f", stock.price), color = HomeTextDark, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+            Text("▲ ${String.format(Locale.US, "%.2f%%", stock.change)}", color = HomeGreen, fontSize = 9.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -404,7 +408,7 @@ private fun SectorPulseCard(sector: String, change: Double) {
     Card(Modifier.width(128.dp), RoundedCornerShape(15.dp), border = BorderStroke(1.dp, HomeBorder), colors = CardDefaults.cardColors(containerColor = Color.White)) {
         Column(Modifier.padding(9.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(31.dp).clip(RoundedCornerShape(9.dp)).background(iconBg)) { Icon(icon, null, tint = HomeDarkGreen, modifier = Modifier.padding(6.dp)) }
+                Box(Modifier.size(28.dp).clip(RoundedCornerShape(8.dp)).background(iconBg)) { Icon(icon, null, tint = HomeDarkGreen, modifier = Modifier.padding(5.dp)) }
                 Spacer(Modifier.width(6.dp))
                 Text(displaySector(sector), color = HomeTextDark, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1)
             }
