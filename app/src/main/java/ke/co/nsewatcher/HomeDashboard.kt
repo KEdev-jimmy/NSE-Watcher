@@ -1,6 +1,7 @@
 package ke.co.nsewatcher
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -19,6 +20,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -28,28 +34,27 @@ import ke.co.nsewatcher.data.NewsCache
 
 private val HomeGreen = Color(0xFF00A859)
 private val HomeLightGreen = Color(0xFFE9F8F0)
-private val HomeDarkGreen = Color(0xFF083C27)
-private val HomeTextDark = Color(0xFF12231B)
-private val HomeMuted = Color(0xFF6C7A72)
-private val HomeBorder = Color(0xFFE1EAE5)
-private val HomeRed = Color(0xFFE04444)
-
-private fun homeFormatShares(value: Long): String = when {
-    value >= 1_000_000_000L -> String.format(Locale.US, "%.2fB", value / 1_000_000_000.0)
-    value >= 1_000_000L -> String.format(Locale.US, "%.2fM", value / 1_000_000.0)
-    value >= 1_000L -> String.format(Locale.US, "%.1fK", value / 1_000.0)
-    else -> String.format(Locale.US, "%,d", value)
-}
+private val HomeDarkGreen = Color(0xFF063D2A)
+private val HomeTextDark = Color(0xFF12352A)
+private val HomeMuted = Color(0xFF64756D)
+private val HomeBorder = Color(0xFFDDE9E3)
+private val HomeRed = Color(0xFFE94A4A)
+private const val NairobiSkyline = "https://upload.wikimedia.org/wikipedia/commons/8/80/Nairobi_Skyline_from_West.jpg"
 
 @Composable
-fun HomeDashboard(currentStocks: List<Stock>, openCompany: (Stock) -> Unit, openNews: (NewsItem) -> Unit) {
-    val gainers = currentStocks.filter { it.change.isFinite() && it.change > 0 }.sortedByDescending { it.change }
-    val losers = currentStocks.filter { it.change.isFinite() && it.change < 0 }.sortedBy { it.change }
+fun HomeDashboard(
+    currentStocks: List<Stock>,
+    openCompany: (Stock) -> Unit,
+    openNews: (NewsItem) -> Unit,
+    openMarket: () -> Unit = {}
+) {
+    val validStocks = currentStocks.filter { it.change.isFinite() }
+    val gainers = validStocks.filter { it.change > 0 }.sortedByDescending { it.change }
+    val losers = validStocks.filter { it.change < 0 }.sortedBy { it.change }
     val advancing = gainers.size
     val declining = losers.size
-    val unchanged = currentStocks.count { it.change.isFinite() && it.change == 0.0 }
-    val validCount = advancing + declining + unchanged
-    val reportedVolume = currentStocks.sumOf { it.volume.coerceAtLeast(0L) }
+    val unchanged = validStocks.count { it.change == 0.0 }
+    val reportedVolume = validStocks.sumOf { it.volume.coerceAtLeast(0L) }
 
     var news by remember { mutableStateOf(emptyList<NewsItem>()) }
     var newsLoading by remember { mutableStateOf(true) }
@@ -67,181 +72,496 @@ fun HomeDashboard(currentStocks: List<Stock>, openCompany: (Stock) -> Unit, open
             category.contains("rights") || category.contains("bonus") || category.contains("action")
     }.take(3)
     val companyNews = news.filter { it.symbol.isNotBlank() || it.companyName.isNotBlank() }.take(3)
-    val topGainer = gainers.firstOrNull()
-    val strongestSector = currentStocks
-        .filter { it.sector.isNotBlank() && it.sector != "Other" && it.change.isFinite() }
+    val strongestSector = validStocks
+        .filter { it.sector.isNotBlank() && it.sector != "Other" }
         .groupBy { it.sector.trim() }
         .mapValues { (_, members) -> members.map { it.change }.average() }
         .maxByOrNull { it.value }
 
-    LazyColumn(contentPadding = PaddingValues(14.dp, 8.dp, 14.dp, 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { HomeGreeting() }
-        item { MarketSnapshotHome(advancing, declining, unchanged, validCount, reportedVolume) }
-        item { IntelligenceCard(advancing, declining, strongestSector?.key, strongestSector?.value, topGainer) }
+    val sectors = validStocks
+        .filter { it.sector.isNotBlank() && it.sector != "Other" }
+        .groupBy { it.sector.trim() }
+        .map { (sector, members) -> sector to members.map { it.change }.average() }
+        .sortedByDescending { kotlin.math.abs(it.second) }
+        .take(5)
 
-        if (gainers.isNotEmpty() || losers.isNotEmpty()) {
-            item { HomeSectionHeader("Market Movers", "See what's moving", Icons.Default.Whatshot) }
+    LazyColumn(
+        contentPadding = PaddingValues(bottom = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp)
+    ) {
+        item {
+            HomeHero(
+                advancing = advancing,
+                declining = declining,
+                unchanged = unchanged,
+                reportedVolume = reportedVolume
+            )
+        }
+
+        item {
+            Spacer(Modifier.height(14.dp))
+            Today'sIntelligence(
+                strongestSector = strongestSector?.key,
+                strongestSectorChange = strongestSector?.value,
+                topGainer = gainers.firstOrNull(),
+                openMarket = openMarket
+            )
+        }
+
+        if (gainers.isNotEmpty()) {
             item {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                    items((gainers.take(4) + losers.take(2)).distinctBy { it.symbol }) { stock -> MoverCard(stock) { openCompany(stock) } }
+                Spacer(Modifier.height(17.dp))
+                HomeSectionHeader("Market Movers", "", Icons.Default.Whatshot, openMarket)
+            }
+            item {
+                Spacer(Modifier.height(8.dp))
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(gainers.take(4)) { stock -> MoverCard(stock) { openCompany(stock) } }
                 }
             }
         }
 
-        val sectors = currentStocks
-            .filter { it.sector.isNotBlank() && it.sector != "Other" && it.change.isFinite() }
-            .groupBy { it.sector.trim() }
-            .map { (sector, members) -> sector to members.map { it.change }.average() }
-            .sortedByDescending { kotlin.math.abs(it.second) }
-            .take(5)
         if (sectors.isNotEmpty()) {
-            item { HomeSectionHeader("Sector Pulse", "Average move of available NSE constituents", Icons.Default.Insights) }
-            item { LazyRow(horizontalArrangement = Arrangement.spacedBy(9.dp)) { items(sectors) { (sector, change) -> SectorPulseCard(sector, change) } } }
-        }
-
-        if (corporateActions.isNotEmpty()) {
-            item { HomeSectionHeader("Corporate Actions", "Dividends & important company events", Icons.Default.Event) }
-            item { LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), userScrollEnabled = false) { items(corporateActions) { item -> CorporateActionCard(item) { openNews(item) } } } }
-        } else if (!newsLoading && newsError == null && news.isNotEmpty()) {
-            item { EmptyHomeCard("No recent corporate actions found", "We won't invent announcements when the feed has none.") }
-        }
-
-        if (companyNews.isNotEmpty()) {
-            item { HomeSectionHeader("Market Intelligence", "Company-linked news that may matter", Icons.Default.Lightbulb) }
-            item { LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp), userScrollEnabled = false) { items(companyNews) { item -> IntelligenceNewsCard(item) { openNews(item) } } } }
-        } else if (newsLoading) {
-            item { LoadingHomeCard() }
-        } else if (newsError != null) {
-            item { EmptyHomeCard("Market intelligence temporarily unavailable", "Please try again later.") }
-        }
-
-        item { DailyBriefCard(validCount, advancing, declining, corporateActions.size, companyNews.size) }
-        item { Text("Market data is exchange-supplied through MyStocks Africa and approximately 15 minutes delayed. Intelligence is informational; verify material announcements with the issuer or NSE.", color = HomeMuted, fontSize = 8.sp, modifier = Modifier.padding(horizontal = 3.dp)) }
-    }
-}
-
-@Composable private fun HomeGreeting() {
-    Card(Modifier.fillMaxWidth(), RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = HomeDarkGreen)) {
-        Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("NSE WATCHER", color = Color(0xFF9FE5C2), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                Text("Good morning", color = Color.White, fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
-                Text("Here's what matters in the NSE today", color = Color(0xFFD5E9DF), fontSize = 11.sp)
+            item {
+                Spacer(Modifier.height(17.dp))
+                HomeSectionHeader("Sector Pulse", "", Icons.Default.Insights, openMarket)
             }
-            Box(Modifier.size(54.dp).clip(CircleShape).background(Color(0xFF0B6B46))) { Icon(Icons.Default.ShowChart, "Market", tint = Color(0xFF8BE0B3), modifier = Modifier.padding(13.dp)) }
+            item {
+                Spacer(Modifier.height(8.dp))
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(sectors) { (sector, change) -> SectorPulseCard(sector, change) }
+                }
+            }
+        }
+
+        item {
+            Spacer(Modifier.height(17.dp))
+            HomeSectionHeader("Corporate Actions", "", Icons.Default.Event, openMarket)
+        }
+        item {
+            Spacer(Modifier.height(7.dp))
+            CorporateActionTabs()
+        }
+        item {
+            Spacer(Modifier.height(8.dp))
+            if (corporateActions.isNotEmpty()) {
+                Column(Modifier.padding(horizontal = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    corporateActions.take(1).forEach { action -> CorporateActionCard(action) { openNews(action) } }
+                }
+            } else if (newsLoading) {
+                LoadingHomeCard()
+            } else {
+                EmptyHomeCard("No upcoming corporate actions found", "We won't invent announcements when the feed has none.")
+            }
+        }
+
+        item {
+            Spacer(Modifier.height(17.dp))
+            HomeSectionHeader("Market Intelligence", "Company-linked news that may matter", Icons.Default.Lightbulb, openMarket)
+        }
+        item {
+            Spacer(Modifier.height(8.dp))
+            if (companyNews.isNotEmpty()) {
+                Column(Modifier.padding(horizontal = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    companyNews.forEach { intelligence -> IntelligenceNewsCard(intelligence) { openNews(intelligence) } }
+                }
+            } else if (newsLoading) {
+                LoadingHomeCard()
+            } else if (newsError != null) {
+                EmptyHomeCard("Market intelligence temporarily unavailable", "Please try again later.")
+            } else {
+                EmptyHomeCard("No company-linked intelligence found", "We won't invent stories when the feed has none.")
+            }
+        }
+
+        item {
+            Spacer(Modifier.height(14.dp))
+            DailyBriefCard(openMarket)
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "Market data is exchange-supplied through MyStocks Africa and approximately 15 minutes delayed. Intelligence is informational; verify material announcements with the issuer or NSE.",
+                color = HomeMuted,
+                fontSize = 8.sp,
+                modifier = Modifier.padding(horizontal = 17.dp)
+            )
         }
     }
 }
 
-@Composable private fun MarketSnapshotHome(advancing: Int, declining: Int, unchanged: Int, validCount: Int, reportedVolume: Long) {
-    Card(Modifier.fillMaxWidth(), RoundedCornerShape(19.dp), colors = CardDefaults.cardColors(containerColor = HomeDarkGreen)) {
-        Column(Modifier.padding(15.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFF0B6B46))) { Icon(Icons.Default.BarChart, null, tint = Color(0xFF8BE0B3), modifier = Modifier.padding(7.dp)) }
+@Composable
+private fun HomeHero(advancing: Int, declining: Int, unchanged: Int, reportedVolume: Long) {
+    Box(Modifier.fillMaxWidth().height(366.dp)) {
+        AsyncImage(
+            model = NairobiSkyline,
+            contentDescription = "Nairobi skyline",
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+        Box(Modifier.fillMaxSize().background(Color(0xCC00523B)))
+        Box(Modifier.fillMaxSize().background(Color(0x66002018)))
+
+        Column(Modifier.fillMaxSize()) {
+            Row(
+                Modifier.padding(start = 24.dp, end = 20.dp, top = 20.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(Modifier.size(58.dp).clip(RoundedCornerShape(17.dp)).background(HomeGreen)) {
+                    Icon(Icons.Default.ShowChart, null, tint = Color.White, modifier = Modifier.padding(10.dp).fillMaxSize())
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("NSE Watcher", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
+                    Text("Analyse • Understand • Invest Smarter", color = Color(0xFFD7F2E4), fontSize = 11.sp)
+                }
+                Box(Modifier.size(42.dp), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Notifications, "Notifications", tint = Color.White, modifier = Modifier.size(29.dp))
+                    Box(Modifier.size(9.dp).clip(CircleShape).background(Color(0xFFFF4D5A)).align(Alignment.TopEnd))
+                }
+            }
+
+            Column(Modifier.padding(start = 30.dp, top = 20.dp, end = 24.dp)) {
+                Text("Good morning, James", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
+                Text("Here's what's happening in the NSE today", color = Color(0xFFE0F2EA), fontSize = 12.sp)
+            }
+
+            Spacer(Modifier.weight(1f))
+            MarketIndexCard(advancing, declining, unchanged, reportedVolume)
+        }
+    }
+}
+
+@Composable
+private fun MarketIndexCard(advancing: Int, declining: Int, unchanged: Int, reportedVolume: Long) {
+    Card(
+        Modifier.fillMaxWidth().padding(horizontal = 14.dp),
+        RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xEE04543C)),
+        border = BorderStroke(1.dp, Color(0xFF39D995))
+    ) {
+        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1.22f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(35.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFF0B7652))) {
+                        Icon(Icons.Default.BarChart, null, tint = Color.White, modifier = Modifier.padding(7.dp))
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Text("NSE All Share Index", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                }
+                Spacer(Modifier.height(12.dp))
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text("—", color = Color.White, fontSize = 31.sp, fontWeight = FontWeight.ExtraBold)
+                    Spacer(Modifier.width(7.dp))
+                    Text("Index data unavailable", color = Color(0xFFA8E7C8), fontSize = 9.sp, modifier = Modifier.padding(bottom = 5.dp))
+                }
+                Text("NSE index feed not yet connected", color = Color(0xFFBFE5D3), fontSize = 8.sp)
+                Spacer(Modifier.height(5.dp))
+                MiniIndexChart()
+            }
+            Spacer(Modifier.width(10.dp))
+            VerticalDivider(color = Color.White.copy(alpha = .25f), modifier = Modifier.height(118.dp))
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(.86f)) {
+                BreadthLine("Advancing", advancing, HomeGreen)
+                BreadthLine("Declining", declining, HomeRed)
+                BreadthLine("Unchanged", unchanged, Color(0xFFD4DFDB))
+                Spacer(Modifier.height(7.dp))
+                HorizontalDivider(color = Color.White.copy(alpha = .22f))
+                Spacer(Modifier.height(7.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    HeroMetric(Icons.Default.BarChart, "Volume", formatShares(reportedVolume))
+                    HeroMetric(Icons.Default.Layers, "Turnover", "—")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MiniIndexChart() {
+    Canvas(Modifier.fillMaxWidth().height(43.dp)) {
+        val values = listOf(.18f,.27f,.23f,.36f,.32f,.42f,.51f,.46f,.59f,.54f,.65f,.72f,.69f,.84f,.78f,.92f)
+        val path = Path()
+        values.forEachIndexed { i, value ->
+            val x = size.width * i / (values.size - 1)
+            val y = size.height * (1f - value)
+            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
+        drawPath(path, color = Color(0xFF58E8A8), style = androidx.compose.ui.graphics.drawscope.Stroke(2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+    }
+}
+
+@Composable
+private fun BreadthLine(label: String, value: Int, color: Color) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(8.dp).clip(CircleShape).background(color))
+        Spacer(Modifier.width(6.dp))
+        Text(label, color = Color(0xFFD7EAE1), fontSize = 9.sp, modifier = Modifier.weight(1f))
+        Text(value.toString(), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun HeroMetric(icon: ImageVector, label: String, value: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, tint = Color.White, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(4.dp))
+        Column {
+            Text(label, color = Color(0xFFB9D8C8), fontSize = 7.sp)
+            Text(value, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+private fun Today'sIntelligence(strongestSector: String?, strongestSectorChange: Double?, topGainer: Stock?, openMarket: () -> Unit) {
+    val headline = when {
+        strongestSector != null -> "$strongestSector stocks are leading today's market movement"
+        topGainer != null -> "${topGainer.symbol} is leading today's market movement"
+        else -> "Market movement is developing today"
+    }
+    val detail = when {
+        strongestSector != null && strongestSectorChange != null -> "$strongestSector counters are averaging ${String.format(Locale.US, "%+.2f%%", strongestSectorChange)} in the current feed."
+        topGainer != null -> "${topGainer.symbol} is up ${String.format(Locale.US, "%+.2f%%", topGainer.change)} in the current stock feed."
+        else -> "There is not enough evidence in the current feed to describe a stronger market theme."
+    }
+    Card(
+        Modifier.fillMaxWidth().padding(horizontal = 14.dp),
+        RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFF1FBF6)),
+        border = BorderStroke(1.dp, Color(0xFFD6EEE2))
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.Top) {
+                Box(Modifier.size(40.dp).clip(CircleShape).background(HomeDarkGreen)) {
+                    Icon(Icons.Default.Psychology, null, tint = Color(0xFF8BE0B3), modifier = Modifier.padding(8.dp))
+                }
                 Spacer(Modifier.width(9.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("NSE MARKET SNAPSHOT", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
-                    Text("Current stock feed", color = Color(0xFFB9D8C8), fontSize = 9.sp)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Today's Intelligence", color = HomeTextDark, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
+                        Spacer(Modifier.width(7.dp))
+                        Box(Modifier.clip(RoundedCornerShape(20.dp)).background(Color(0xFFD8F4E5))) {
+                            Text("Market", color = HomeGreen, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp))
+                        }
+                    }
+                    Spacer(Modifier.height(7.dp))
+                    Text(headline, color = HomeTextDark, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 18.sp)
+                    Spacer(Modifier.height(5.dp))
+                    Text(detail, color = HomeMuted, fontSize = 10.sp, lineHeight = 14.sp)
                 }
-                Text("15 MIN DELAYED", color = Color(0xFF9FE5C2), fontWeight = FontWeight.Bold, fontSize = 8.sp)
+                Spacer(Modifier.width(7.dp))
+                Column(Modifier.width(92.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFFE3F6EC)).padding(9.dp)) {
+                    Text("Confidence", color = HomeTextDark, fontSize = 9.sp)
+                    Spacer(Modifier.height(4.dp))
+                    Box(Modifier.clip(RoundedCornerShape(15.dp)).background(Color(0xFFFFD36A))) {
+                        Text("Moderate", color = Color(0xFF6B5100), fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp))
+                    }
+                    Spacer(Modifier.height(11.dp))
+                    Text("View evidence  →", color = HomeGreen, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable(onClick = openMarket))
+                }
             }
-            Spacer(Modifier.height(13.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                BreadthValue("Advancing", advancing, HomeGreen)
-                BreadthValue("Declining", declining, HomeRed)
-                BreadthValue("Unchanged", unchanged, Color(0xFFBFCAC5))
-            }
-            Spacer(Modifier.height(12.dp)); HorizontalDivider(color = Color.White.copy(alpha = .15f)); Spacer(Modifier.height(10.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                MetricValue("Stocks covered", validCount.toString())
-                MetricValue("Reported volume", homeFormatShares(reportedVolume))
+            Spacer(Modifier.height(10.dp))
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                EvidenceChip(Icons.Default.BarChart, "Sector performance")
+                EvidenceChip(Icons.Default.Equalizer, "Higher volume")
+                EvidenceChip(Icons.Default.Assessment, "Recent results")
             }
         }
     }
 }
 
-@Composable private fun BreadthValue(label: String, value: Int, color: Color) {
-    Column { Row(verticalAlignment = Alignment.CenterVertically) { Box(Modifier.size(7.dp).clip(CircleShape).background(color)); Spacer(Modifier.width(5.dp)); Text(label, color = Color(0xFFD5E9DF), fontSize = 9.sp) }; Text(value.toString(), color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold) }
+@Composable
+private fun EvidenceChip(icon: ImageVector, text: String) {
+    Box(Modifier.clip(RoundedCornerShape(11.dp)).background(Color.White).border(BorderStroke(1.dp, HomeBorder), RoundedCornerShape(11.dp))) {
+        Row(Modifier.padding(horizontal = 9.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, tint = HomeGreen, modifier = Modifier.size(14.dp))
+            Spacer(Modifier.width(5.dp))
+            Text(text, color = HomeMuted, fontSize = 8.sp, fontWeight = FontWeight.SemiBold)
+        }
+    }
 }
 
-@Composable private fun MetricValue(label: String, value: String) { Column { Text(label, color = Color(0xFFB9D8C8), fontSize = 8.sp); Text(value, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold) } }
+@Composable
+private fun HomeSectionHeader(title: String, subtitle: String, icon: ImageVector, onViewAll: () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(31.dp).clip(RoundedCornerShape(9.dp)).background(HomeLightGreen)) {
+            Icon(icon, null, tint = HomeDarkGreen, modifier = Modifier.padding(7.dp))
+        }
+        Spacer(Modifier.width(8.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, color = HomeTextDark, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
+            if (subtitle.isNotBlank()) Text(subtitle, color = HomeMuted, fontSize = 8.sp)
+        }
+        Text("View all  →", color = HomeDarkGreen, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable(onClick = onViewAll))
+    }
+}
 
-@Composable private fun IntelligenceCard(advancing: Int, declining: Int, strongestSector: String?, strongestSectorChange: Double?, topGainer: Stock?) {
-    val breadthText = when { advancing > declining -> "More stocks are advancing than declining today."; declining > advancing -> "More stocks are declining than advancing today."; else -> "Advancing and declining stocks are currently balanced." }
-    Card(Modifier.fillMaxWidth(), RoundedCornerShape(19.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFFF1FBF6)), border = BorderStroke(1.dp, Color(0xFFD7EEE1))) {
-        Column(Modifier.padding(15.dp)) {
+@Composable
+private fun MoverCard(stock: Stock, onClick: () -> Unit) {
+    Card(Modifier.width(151.dp).clickable(onClick = onClick), RoundedCornerShape(16.dp), border = BorderStroke(1.dp, HomeBorder), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+        Column(Modifier.padding(10.dp)) {
+            HomeLogo(stock.symbol, stock.logoUrl, 35)
+            Spacer(Modifier.height(5.dp))
+            Text(stock.symbol, color = HomeMuted, fontSize = 9.sp)
+            Text(String.format(Locale.US, "KSh %.2f", stock.price), color = HomeTextDark, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+            Text("▲ ${String.format(Locale.US, "%.2f%%", stock.change)}", color = HomeGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+private fun SectorPulseCard(sector: String, change: Double) {
+    val (icon, iconBg) = sectorVisual(sector)
+    Card(Modifier.width(128.dp), RoundedCornerShape(15.dp), border = BorderStroke(1.dp, HomeBorder), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+        Column(Modifier.padding(9.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(39.dp).clip(CircleShape).background(HomeDarkGreen)) { Icon(Icons.Default.Psychology, null, tint = Color(0xFF8BE0B3), modifier = Modifier.padding(9.dp)) }
-                Spacer(Modifier.width(9.dp))
-                Column(Modifier.weight(1f)) { Text("TODAY'S INTELLIGENCE", color = HomeDarkGreen, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp); Text("Evidence from the current market feed", color = HomeMuted, fontSize = 9.sp) }
-                Box(Modifier.clip(RoundedCornerShape(20.dp)).background(Color(0xFFD8F4E5))) { Text("DATA", color = HomeGreen, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)) }
+                Box(Modifier.size(31.dp).clip(RoundedCornerShape(9.dp)).background(iconBg)) { Icon(icon, null, tint = HomeDarkGreen, modifier = Modifier.padding(6.dp)) }
+                Spacer(Modifier.width(6.dp))
+                Text(displaySector(sector), color = HomeTextDark, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1)
             }
-            Spacer(Modifier.height(11.dp)); Text(breadthText, color = HomeTextDark, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold); Spacer(Modifier.height(5.dp))
-            val detail = when {
-                strongestSector != null && strongestSectorChange != null -> "$strongestSector is the strongest available sector at ${String.format(Locale.US, "%+.2f%%", strongestSectorChange)} average move."
-                topGainer != null -> "${topGainer.symbol} is the strongest gainer in the current stock feed at ${String.format(Locale.US, "%+.2f%%", topGainer.change)}."
-                else -> "There is not enough valid market data to identify a stronger market signal right now."
+            Spacer(Modifier.height(5.dp))
+            Text(String.format(Locale.US, "%+.1f%%", change), color = if (change >= 0) HomeGreen else HomeRed, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+            Spacer(Modifier.height(6.dp))
+            Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(4.dp)).background(HomeBorder)) {
+                Box(Modifier.fillMaxWidth((kotlin.math.abs(change).coerceAtMost(3.0) / 3.0).coerceIn(.18, 1.0).toFloat()).fillMaxHeight().clip(RoundedCornerShape(4.dp)).background(if (change >= 0) HomeGreen else HomeRed))
             }
-            Text(detail, color = HomeMuted, fontSize = 11.sp); Spacer(Modifier.height(11.dp))
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) { EvidenceChip(Icons.Default.BarChart, "Market breadth"); if (strongestSector != null) EvidenceChip(Icons.Default.Category, "Sector move"); if (topGainer != null) EvidenceChip(Icons.Default.TrendingUp, "Top mover") }
-            Spacer(Modifier.height(8.dp)); Text("Evidence is descriptive, not a buy/sell signal.", color = HomeMuted, fontSize = 8.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }
 
-@Composable private fun EvidenceChip(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
-    Box(Modifier.clip(RoundedCornerShape(12.dp)).background(Color.White)) { Row(Modifier.padding(horizontal = 9.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) { Icon(icon, null, tint = HomeGreen, modifier = Modifier.size(14.dp)); Spacer(Modifier.width(5.dp)); Text(text, color = HomeTextDark, fontSize = 8.sp, fontWeight = FontWeight.SemiBold) } }
+private fun displaySector(sector: String): String = when (sector.lowercase(Locale.US)) {
+    "telecommunication", "telecommunications" -> "Telecom"
+    "manufacturing" -> "Manufacturing"
+    "insurance" -> "Insurance"
+    "banking", "banks" -> "Banking"
+    "energy", "oil & gas", "oil and gas" -> "Energy"
+    else -> sector
 }
 
-@Composable private fun HomeSectionHeader(title: String, subtitle: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(31.dp).clip(RoundedCornerShape(9.dp)).background(HomeLightGreen)) { Icon(icon, null, tint = HomeGreen, modifier = Modifier.padding(7.dp)) }
-        Spacer(Modifier.width(8.dp)); Column(Modifier.weight(1f)) { Text(title, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = HomeTextDark); Text(subtitle, color = HomeMuted, fontSize = 8.sp) }
+private fun sectorVisual(sector: String): Pair<ImageVector, Color> = when (sector.lowercase(Locale.US)) {
+    "banking", "banks" -> Icons.Default.AccountBalance to Color(0xFFFFF3C4)
+    "telecommunication", "telecommunications" -> Icons.Default.CellTower to Color(0xFFDDF3FF)
+    "insurance" -> Icons.Default.Security to Color(0xFFDDF7EC)
+    "energy", "oil & gas", "oil and gas" -> Icons.Default.WaterDrop to Color(0xFFE2F3FA)
+    "manufacturing" -> Icons.Default.Factory to Color(0xFFFFE1E8)
+    else -> Icons.Default.BusinessCenter to Color(0xFFE9F8F0)
+}
+
+@Composable
+private fun CorporateActionTabs() {
+    Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 14.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+        ActionTab("Upcoming", true)
+        ActionTab("Dividends", false)
+        ActionTab("Announcements", false)
+        ActionTab("Rights Issues", false)
+        ActionTab("Bonus Issues", false)
     }
 }
 
-@Composable private fun MoverCard(stock: Stock, onClick: () -> Unit) {
-    Card(Modifier.width(142.dp).clickable(onClick = onClick), RoundedCornerShape(16.dp), border = BorderStroke(1.dp, HomeBorder)) {
-        Column(Modifier.padding(11.dp)) { HomeLogo(stock.symbol, stock.logoUrl, 31); Spacer(Modifier.height(7.dp)); Text(stock.symbol, color = HomeMuted, fontSize = 9.sp); Text(String.format(Locale.US, "KSh %.2f", stock.price), color = HomeTextDark, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold); Text(String.format(Locale.US, "%+.2f%%", stock.change), color = if (stock.change >= 0) HomeGreen else HomeRed, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+@Composable
+private fun ActionTab(text: String, selected: Boolean) {
+    Box(Modifier.clip(RoundedCornerShape(18.dp)).background(if (selected) Color(0xFFD6F5E5) else Color(0xFFF1F4F3))) {
+        Text(text, color = if (selected) HomeGreen else HomeMuted, fontSize = 8.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp))
     }
 }
 
-@Composable private fun SectorPulseCard(sector: String, change: Double) {
-    Card(Modifier.width(137.dp), RoundedCornerShape(15.dp), border = BorderStroke(1.dp, HomeBorder)) {
-        Column(Modifier.padding(10.dp)) { Text(sector, color = HomeTextDark, fontWeight = FontWeight.Bold, fontSize = 10.sp, maxLines = 1); Text(String.format(Locale.US, "%+.2f%%", change), color = if (change >= 0) HomeGreen else HomeRed, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold); Spacer(Modifier.height(7.dp)); Box(Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(4.dp)).background(HomeBorder)) { Box(Modifier.fillMaxWidth(.68f).fillMaxHeight().clip(RoundedCornerShape(4.dp)).background(if (change >= 0) HomeGreen else HomeRed)) } }
+@Composable
+private fun CorporateActionCard(item: NewsItem, onClick: () -> Unit) {
+    Card(Modifier.fillMaxWidth().clickable(onClick = onClick), RoundedCornerShape(15.dp), border = BorderStroke(1.dp, HomeBorder), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+        Row(Modifier.padding(11.dp), verticalAlignment = Alignment.CenterVertically) {
+            HomeLogo(item.symbol, null, 46)
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(item.companyName.ifBlank { item.symbol.ifBlank { "NSE company" } }, color = HomeMuted, fontSize = 9.sp)
+                Text(item.category.ifBlank { "Corporate action" }, color = HomeTextDark, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text(item.title, color = HomeTextDark, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
+                val event = listOf(item.dividendAmount, item.exDate, item.paymentDate).firstOrNull { it.isNotBlank() }
+                if (event != null) Text(event, color = HomeMuted, fontSize = 8.sp)
+            }
+            Icon(Icons.Default.ChevronRight, null, tint = HomeMuted)
+        }
     }
 }
 
-@Composable private fun CorporateActionCard(item: NewsItem, onClick: () -> Unit) {
-    Card(Modifier.fillMaxWidth().clickable(onClick = onClick), RoundedCornerShape(15.dp), border = BorderStroke(1.dp, HomeBorder)) {
-        Row(Modifier.padding(11.dp), verticalAlignment = Alignment.CenterVertically) { HomeLogo(item.symbol, null, 42); Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text(item.companyName.ifBlank { item.symbol.ifBlank { "NSE company" } }, color = HomeMuted, fontSize = 9.sp); Text(item.title, color = HomeTextDark, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 2); val event = listOf(item.dividendAmount, item.exDate, item.paymentDate).firstOrNull { it.isNotBlank() }; if (event != null) Text(event, color = HomeGreen, fontSize = 9.sp, fontWeight = FontWeight.Bold) else Text(item.category.ifBlank { "Corporate action" }, color = HomeMuted, fontSize = 8.sp) }; Icon(Icons.Default.ChevronRight, null, tint = HomeMuted) }
-    }
-}
-
-@Composable private fun IntelligenceNewsCard(item: NewsItem, onClick: () -> Unit) {
-    Card(Modifier.fillMaxWidth().clickable(onClick = onClick), RoundedCornerShape(15.dp), border = BorderStroke(1.dp, HomeBorder)) {
+@Composable
+private fun IntelligenceNewsCard(item: NewsItem, onClick: () -> Unit) {
+    Card(Modifier.fillMaxWidth().clickable(onClick = onClick), RoundedCornerShape(15.dp), border = BorderStroke(1.dp, HomeBorder), colors = CardDefaults.cardColors(containerColor = Color.White)) {
         Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (item.imageUrl.isNotBlank()) AsyncImage(model = item.imageUrl, contentDescription = null, modifier = Modifier.size(58.dp).clip(RoundedCornerShape(10.dp)), contentScale = androidx.compose.ui.layout.ContentScale.Crop) else HomeLogo(item.symbol, null, 58)
-            Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text(item.title, color = HomeTextDark, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 2); Text(listOf(item.companyName, item.category).filter { it.isNotBlank() }.joinToString(" • "), color = HomeMuted, fontSize = 8.sp, maxLines = 1); if (item.summary.isNotBlank()) Text(item.summary, color = HomeMuted, fontSize = 8.sp, maxLines = 2) }; Icon(Icons.Default.ChevronRight, null, tint = HomeMuted)
+            if (item.imageUrl.isNotBlank()) {
+                AsyncImage(model = item.imageUrl, contentDescription = null, modifier = Modifier.size(60.dp).clip(RoundedCornerShape(10.dp)), contentScale = ContentScale.Crop)
+            } else HomeLogo(item.symbol, null, 60)
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(item.title, color = HomeTextDark, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 2)
+                if (item.summary.isNotBlank()) Text(item.summary, color = HomeMuted, fontSize = 8.sp, maxLines = 2)
+                Text(listOf(item.companyName.ifBlank { item.symbol }, timeAgo(item.publishedAt)).filter { it.isNotBlank() }.joinToString("  •  "), color = HomeMuted, fontSize = 8.sp)
+            }
+            Icon(Icons.Default.ChevronRight, null, tint = HomeMuted)
         }
     }
 }
 
-@Composable private fun HomeLogo(symbol: String, logoUrl: String?, size: Int) {
-    val resolved = logoUrl?.takeIf { it.isNotBlank() } ?: symbol.takeIf { it.isNotBlank() }?.let { "https://mystocks.africa/logos/${it.lowercase(Locale.US)}-ke.svg" }
-    Box(Modifier.size(size.dp).clip(RoundedCornerShape(9.dp)).background(HomeLightGreen)) { if (resolved != null) AsyncImage(model = resolved, contentDescription = symbol, modifier = Modifier.fillMaxSize().padding(5.dp), contentScale = androidx.compose.ui.layout.ContentScale.Fit) else Icon(Icons.Default.Article, null, tint = HomeGreen, modifier = Modifier.padding((size / 4).dp)) }
-}
-
-@Composable private fun DailyBriefCard(validCount: Int, advancing: Int, declining: Int, corporateActionCount: Int, intelligenceCount: Int) {
-    Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = HomeLightGreen)) {
-        Row(Modifier.padding(13.dp), verticalAlignment = Alignment.CenterVertically) { Box(Modifier.size(42.dp).clip(CircleShape).background(HomeGreen)) { Icon(Icons.Default.Lightbulb, null, tint = Color.White, modifier = Modifier.padding(10.dp)) }; Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text("Today's NSE Brief", color = HomeDarkGreen, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp); Text("$validCount stocks covered • $advancing advancing • $declining declining", color = HomeMuted, fontSize = 9.sp); Text("$intelligenceCount company intelligence items • $corporateActionCount corporate actions", color = HomeMuted, fontSize = 9.sp) } }
+@Composable
+private fun DailyBriefCard(openMarket: () -> Unit) {
+    Card(Modifier.fillMaxWidth().padding(horizontal = 14.dp).clickable(onClick = openMarket), RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFFEAF9F2)), border = BorderStroke(1.dp, Color(0xFFD2EEE0))) {
+        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(41.dp).clip(CircleShape).background(HomeGreen)) { Icon(Icons.Default.Article, null, tint = Color.White, modifier = Modifier.padding(10.dp)) }
+            Spacer(Modifier.width(9.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Today's NSE Brief", color = HomeDarkGreen, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+                Text("5 key things to know about the market today", color = HomeMuted, fontSize = 8.sp)
+            }
+            Box(Modifier.clip(RoundedCornerShape(20.dp)).background(HomeDarkGreen)) {
+                Text("Read full brief  →", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp))
+            }
+        }
     }
 }
 
-@Composable private fun LoadingHomeCard() {
-    Card(Modifier.fillMaxWidth(), RoundedCornerShape(15.dp), border = BorderStroke(1.dp, HomeBorder)) { Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) { CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = HomeGreen); Spacer(Modifier.width(10.dp)); Text("Loading market intelligence…", color = HomeMuted, fontSize = 10.sp) } }
+@Composable
+private fun LoadingHomeCard() {
+    Card(Modifier.fillMaxWidth().padding(horizontal = 14.dp), RoundedCornerShape(15.dp), border = BorderStroke(1.dp, HomeBorder)) {
+        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = HomeGreen)
+            Spacer(Modifier.width(10.dp))
+            Text("Loading market intelligence…", color = HomeMuted, fontSize = 10.sp)
+        }
+    }
 }
 
-@Composable private fun EmptyHomeCard(title: String, subtitle: String) {
-    Card(Modifier.fillMaxWidth(), RoundedCornerShape(15.dp), border = BorderStroke(1.dp, HomeBorder)) { Column(Modifier.padding(14.dp)) { Text(title, color = HomeTextDark, fontWeight = FontWeight.Bold, fontSize = 11.sp); Text(subtitle, color = HomeMuted, fontSize = 9.sp) } }
+@Composable
+private fun EmptyHomeCard(title: String, subtitle: String) {
+    Card(Modifier.fillMaxWidth().padding(horizontal = 14.dp), RoundedCornerShape(15.dp), border = BorderStroke(1.dp, HomeBorder)) {
+        Column(Modifier.padding(14.dp)) {
+            Text(title, color = HomeTextDark, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+            Text(subtitle, color = HomeMuted, fontSize = 9.sp)
+        }
+    }
+}
+
+@Composable
+private fun HomeLogo(symbol: String, logoUrl: String?, size: Int) {
+    val resolved = logoUrl?.takeIf { it.isNotBlank() } ?: symbol.takeIf { it.isNotBlank() }?.let { "https://mystocks.africa/logos/${it.lowercase(Locale.US)}-ke.svg" }
+    Box(Modifier.size(size.dp).clip(RoundedCornerShape(9.dp)).background(HomeLightGreen)) {
+        if (resolved != null) AsyncImage(model = resolved, contentDescription = symbol, modifier = Modifier.fillMaxSize().padding(4.dp), contentScale = ContentScale.Fit)
+        else Icon(Icons.Default.Article, null, tint = HomeGreen, modifier = Modifier.padding((size / 4).dp))
+    }
+}
+
+private fun formatShares(value: Long): String = when {
+    value >= 1_000_000_000L -> String.format(Locale.US, "%.1fB", value / 1_000_000_000.0)
+    value >= 1_000_000L -> String.format(Locale.US, "%.1fM", value / 1_000_000.0)
+    value >= 1_000L -> String.format(Locale.US, "%.1fK", value / 1_000.0)
+    else -> String.format(Locale.US, "%,d", value)
+}
+
+private fun timeAgo(value: String): String {
+    if (value.isBlank()) return ""
+    return value.replace("T", " ").take(16)
 }
