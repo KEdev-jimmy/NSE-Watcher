@@ -1,0 +1,88 @@
+name: Compact Home index
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/compact-home-index.yml'
+
+permissions:
+  contents: write
+
+env:
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply tighter Home layout
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/ke/co/nsewatcher/HomeDashboard.kt')
+          s = p.read_text()
+
+          replacements = [
+              ('Box(Modifier.fillMaxWidth().height(305.dp))', 'Box(Modifier.fillMaxWidth().height(272.dp))'),
+              ('Box(Modifier.fillMaxWidth().height(235.dp))', 'Box(Modifier.fillMaxWidth().height(202.dp))'),
+              ('Modifier.padding(start = 24.dp, end = 20.dp, top = 16.dp)', 'Modifier.padding(start = 24.dp, end = 20.dp, top = 10.dp)'),
+              ('Column(Modifier.padding(start = 30.dp, top = 13.dp, end = 24.dp))', 'Column(Modifier.padding(start = 30.dp, top = 8.dp, end = 24.dp))'),
+              ('Spacer(Modifier.height(7.dp))\n            Box(Modifier.fillMaxWidth().padding(horizontal = 14.dp)) {\n                MarketIndexCard(advancing, declining, unchanged, reportedVolume)\n            }', 'Spacer(Modifier.height(4.dp))\n            MarketIndexCard(advancing, declining, unchanged, reportedVolume)'),
+              ('Modifier.fillMaxWidth().padding(horizontal = 14.dp),\n        RoundedCornerShape(20.dp),\n        colors = CardDefaults.cardColors(containerColor = Color(0xEE04543C))', 'Modifier.fillMaxWidth(),\n        RoundedCornerShape(18.dp),\n        colors = CardDefaults.cardColors(containerColor = Color(0xEE04543C))'),
+              ('Row(Modifier.padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically)', 'Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically)'),
+              ('modifier = Modifier.height(78.dp))', 'modifier = Modifier.height(68.dp))'),
+              ('Spacer(Modifier.height(5.dp))\n                HorizontalDivider(color = Color.White.copy(alpha = .22f))\n                Spacer(Modifier.height(5.dp))', 'Spacer(Modifier.height(3.dp))\n                HorizontalDivider(color = Color.White.copy(alpha = .22f))\n                Spacer(Modifier.height(3.dp))'),
+          ]
+
+          for old, new in replacements:
+              if old not in s:
+                  raise SystemExit(f'Expected Home layout text not found: {old[:90]!r}')
+              s = s.replace(old, new, 1)
+
+          p.write_text(s)
+          PY
+
+      - name: Verify
+        run: |
+          grep -q 'height(272.dp)' app/src/main/java/ke/co/nsewatcher/HomeDashboard.kt
+          grep -q 'height(202.dp)' app/src/main/java/ke/co/nsewatcher/HomeDashboard.kt
+          grep -q 'MarketIndexCard(advancing, declining, unchanged, reportedVolume)' app/src/main/java/ke/co/nsewatcher/HomeDashboard.kt
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: ""
+
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Install Gradle
+        run: |
+          curl -fsSL https://services.gradle.org/distributions/gradle-8.14.4-bin.zip -o gradle.zip
+          unzip -q gradle.zip
+          echo "$GITHUB_WORKSPACE/gradle-8.14.4/bin" >> "$GITHUB_PATH"
+
+      - name: Build project
+        run: gradle --no-daemon build
+
+      - name: Commit and clean workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java/ke/co/nsewatcher/HomeDashboard.kt
+          git commit -m "ui: tighten Home hero and floating index" || true
+          git push
+          git rm .github/workflows/compact-home-index.yml
+          git commit -m "chore: remove temporary Home index workflow"
+          git push
