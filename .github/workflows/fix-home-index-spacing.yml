@@ -1,0 +1,35 @@
+name: Apply Home index spacing fix
+
+on:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply 2dp side spacing to NSE All Share card
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/ke/co/nsewatcher/HomeDashboard.kt')
+          text = p.read_text()
+          old = '''    Card(\n        Modifier.fillMaxWidth(),\n        RoundedCornerShape(18.dp),'''
+          new = '''    Card(\n        Modifier.fillMaxWidth().padding(horizontal = 2.dp),\n        RoundedCornerShape(18.dp),'''
+          if old not in text:
+              raise SystemExit('NSE All Share card pattern not found')
+          p.write_text(text.replace(old, new, 1))
+          PY
+      - name: Commit and remove this temporary workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java/ke/co/nsewatcher/HomeDashboard.kt .github/workflows/fix-home-index-spacing.yml
+          git commit -m "fix: add subtle spacing around home NSE index"
+          git rm .github/workflows/fix-home-index-spacing.yml
+          git commit -m "chore: remove temporary home spacing workflow"
+          git push
