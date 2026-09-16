@@ -201,7 +201,7 @@ fun NewsDashboard(open: (NewsItem) -> Unit) {
 @Composable
 private fun NewsDashboardFeatured(item: NewsItem, open: (NewsItem) -> Unit) {
     val meta = dashboardNewsMeta(item)
-    Card(Modifier.fillMaxWidth().height(270.dp).clickable { open(item) }, RoundedCornerShape(19.dp)) {
+    Card(Modifier.fillMaxWidth().height(200.dp).clickable { open(item) }, RoundedCornerShape(19.dp)) {
         Box(Modifier.fillMaxSize()) {
             AsyncImage(
                 model = NewsSkyline,
@@ -211,8 +211,8 @@ private fun NewsDashboardFeatured(item: NewsItem, open: (NewsItem) -> Unit) {
             )
             Box(Modifier.fillMaxSize().background(Color(0xA9083C27)))
             Column(
-                Modifier.fillMaxSize().padding(13.dp),
-                verticalArrangement = Arrangement.Bottom
+                Modifier.fillMaxSize().padding(horizontal = 13.dp, vertical = 13.dp),
+                verticalArrangement = Arrangement.Center
             ) {
                 Surface(shape = RoundedCornerShape(20.dp), color = NewsGreen) {
                     Row(Modifier.padding(horizontal = 9.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -221,9 +221,9 @@ private fun NewsDashboardFeatured(item: NewsItem, open: (NewsItem) -> Unit) {
                         Text("Top News", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 9.sp)
                     }
                 }
-                Spacer(Modifier.height(7.dp))
+                Spacer(Modifier.height(5.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    DashboardLogo(item, 42, true)
+                    DashboardLogo(item, 40, true)
                     Spacer(Modifier.width(7.dp))
                     Column(Modifier.weight(1f)) {
                         Text(
@@ -241,16 +241,16 @@ private fun NewsDashboardFeatured(item: NewsItem, open: (NewsItem) -> Unit) {
                         )
                     }
                 }
-                Spacer(Modifier.height(7.dp))
+                Spacer(Modifier.height(5.dp))
                 Text(
                     item.title,
                     color = Color.White,
                     fontWeight = FontWeight.ExtraBold,
-                    fontSize = 17.sp,
-                    lineHeight = 20.sp,
+                    fontSize = 16.sp,
+                    lineHeight = 19.sp,
                     maxLines = 3
                 )
-                Spacer(Modifier.height(7.dp))
+                Spacer(Modifier.height(5.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.CalendarMonth, null, tint = Color.White, modifier = Modifier.size(14.dp))
                     Spacer(Modifier.width(4.dp))
@@ -355,19 +355,18 @@ private fun NewsLatestCard(item: NewsItem, open: (NewsItem) -> Unit) {
 }
 
 @Composable
-private fun DashboardLogo(item: NewsItem, size: Int, dark: Boolean) {
+private fun DashboardLogo(item: NewsItem, size: Int, featured: Boolean) {
     val meta = dashboardNewsMeta(item)
-    Surface(Modifier.size(size.dp), RoundedCornerShape(10.dp), if (dark) Color.White.copy(alpha = .14f) else NewsLight) {
+    Surface(
+        Modifier.size(size.dp),
+        RoundedCornerShape(if (featured) 11.dp else 10.dp),
+        color = if (featured) Color(0x99DCEEE6) else NewsLight
+    ) {
         if (meta.logo.isNotBlank()) {
-            AsyncImage(
-                model = meta.logo,
-                contentDescription = meta.symbol,
-                modifier = Modifier.fillMaxSize().padding(5.dp),
-                contentScale = ContentScale.Fit
-            )
+            AsyncImage(model = meta.logo, contentDescription = meta.company, modifier = Modifier.fillMaxSize().padding(if (featured) 5.dp else 7.dp), contentScale = ContentScale.Fit)
         } else {
             Box(Modifier.fillMaxSize(), Alignment.Center) {
-                Icon(Icons.Default.Business, null, tint = if (dark) Color.White else NewsGreen, modifier = Modifier.size((size / 2).dp))
+                Icon(Icons.Default.Business, null, tint = NewsGreen, modifier = Modifier.size((size * .55f).dp))
             }
         }
     }
@@ -375,26 +374,22 @@ private fun DashboardLogo(item: NewsItem, size: Int, dark: Boolean) {
 
 @Composable
 private fun DashboardSymbol(symbol: String) {
-    Surface(shape = RoundedCornerShape(20.dp), color = NewsLight) {
-        Text(symbol, color = NewsGreen, fontSize = 7.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp))
+    Surface(shape = RoundedCornerShape(18.dp), color = NewsLight) {
+        Text(symbol, color = NewsGreen, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp))
     }
 }
 
 @Composable
-private fun DashboardChip(label: String, dark: Boolean, icon: androidx.compose.ui.graphics.vector.ImageVector? = null) {
-    Surface(shape = RoundedCornerShape(20.dp), color = if (dark) Color.White.copy(alpha = .16f) else NewsLight) {
-        Row(Modifier.padding(horizontal = 7.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (icon != null) {
-                Icon(icon, null, tint = if (dark) Color.White else NewsGreen, modifier = Modifier.size(11.dp))
-                Spacer(Modifier.width(3.dp))
+private fun DashboardChip(text: String, featured: Boolean, icon: androidx.compose.ui.graphics.vector.ImageVector? = null) {
+    Surface(shape = RoundedCornerShape(18.dp), color = if (featured) Color(0x99FFFFFF) else NewsLight) {
+        Row(Modifier.padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            icon?.let {
+                Icon(it, null, tint = if (featured) Color.White else NewsGreen, modifier = Modifier.size(12.dp))
+                Spacer(Modifier.width(4.dp))
             }
-            Text(label, color = if (dark) Color.White else NewsGreen, fontWeight = FontWeight.Bold, fontSize = 8.sp)
+            Text(text, color = if (featured) Color.White else NewsGreen, fontSize = 8.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
 
-private fun dashboardDate(value: String): String = when {
-    value.isBlank() -> "Latest"
-    value.length >= 10 -> value.take(10)
-    else -> value
-}
+private fun dashboardDate(value: String): String = value.take(10).ifBlank { "—" }
