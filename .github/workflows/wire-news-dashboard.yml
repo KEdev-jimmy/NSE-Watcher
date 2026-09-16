@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Wire News and Home spacing
+      - name: Wire News dashboard
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -19,12 +19,7 @@ jobs:
           old='Page.NEWS->News{selectedNews=it;go(Page.NEWS_DETAIL)}'
           new='Page.NEWS->NewsDashboard{selectedNews=it;go(Page.NEWS_DETAIL)}'
           if old not in s: raise SystemExit('News route not found')
-          s=s.replace(old,new,1)
-          old='            MarketIndexCard(advancing, declining, unchanged, reportedVolume)'
-          new='            Box(Modifier.fillMaxWidth().padding(horizontal = 2.dp)) {\n                MarketIndexCard(advancing, declining, unchanged, reportedVolume)\n            }'
-          if old not in s: raise SystemExit('Home index card not found')
-          s=s.replace(old,new,1)
-          p.write_text(s)
+          p.write_text(s.replace(old,new,1))
           PY
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -50,7 +45,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add app/src/main/java/ke/co/nsewatcher/DesignActivity.kt
-          git commit -m "ui: wire mobile News dashboard and index spacing"
+          git commit -m "ui: wire mobile News dashboard"
           git push
           git rm .github/workflows/wire-news-dashboard.yml
           git commit -m "chore: remove temporary News wiring workflow"
