@@ -77,17 +77,13 @@ function normalizeSymbol(value) {
   return String(value || '').trim().toUpperCase().replace(/\.KE$/, '');
 }
 
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 function resolveKnownCompany(symbol, companyName) {
   const normalized = normalizeSymbol(symbol);
   const bySymbol = NSE_COMPANIES.find(([ticker]) => ticker === normalized);
   if (bySymbol) return { symbol: bySymbol[0], companyName: bySymbol[1] };
 
   const name = String(companyName || '').trim();
-  if (!name) return { symbol: normalized, companyName: '' };
+  if (!name || name.toLowerCase() === 'mystocks africa') return { symbol: normalized, companyName: '' };
   const lower = name.toLowerCase();
   const byName = NSE_COMPANIES.find(([, company]) => lower === company.toLowerCase() || lower.includes(company.toLowerCase()));
   return byName ? { symbol: byName[0], companyName: byName[1] } : { symbol: normalized, companyName: name };
@@ -98,6 +94,15 @@ function resolveFromProvider(item) {
   const providerSymbol = symbolOf(item) || (nestedCompany && symbolOf(nestedCompany));
   const providerCompany = companyOf(item) || (nestedCompany && companyOf(nestedCompany));
   return resolveKnownCompany(providerSymbol, providerCompany);
+}
+
+function resolveFromTitle(item) {
+  const title = String(first(item, ['title', 'headline', 'name']) || '').toLowerCase();
+  if (!title) return { symbol: '', companyName: '' };
+  const match = NSE_COMPANIES.find(([symbol, company]) =>
+    title.includes(company.toLowerCase()) || title.includes(symbol.toLowerCase())
+  );
+  return match ? { symbol: match[0], companyName: match[1] } : { symbol: '', companyName: '' };
 }
 
 function categoryOf(item, fallback = 'Market') {
@@ -119,8 +124,9 @@ function normalizeItem(item, forcedCategory) {
   if (!title) return null;
 
   const resolved = resolveFromProvider(item);
-  const symbol = normalizeSymbol(resolved.symbol);
-  const companyName = resolved.companyName;
+  const titleResolved = resolveFromTitle(item);
+  const symbol = normalizeSymbol(resolved.symbol || titleResolved.symbol);
+  const companyName = resolved.companyName || titleResolved.companyName;
   const category = forcedCategory || categoryOf(item);
   const summary = String(first(item, ['summary', 'excerpt', 'description', 'dek']) || '').trim();
   const body = String(first(item, ['body', 'content', 'articleBody', 'text']) || '').trim();
@@ -164,21 +170,23 @@ function dedupe(items) {
 }
 
 async function enrichMissingCompanyMetadata(items) {
-  const candidates = items.filter(item => !item.symbol && !item.companyName).slice(0, 15);
+  const candidates = items
+    .filter(item => !item.symbol || !item.companyName)
+    .slice(0, 30);
+
   for (const item of candidates) {
     try {
       const detail = await mystocks(`/market-intel/${encodeURIComponent(item.id)}`);
       const raw = detail?.article || detail?.item || detail?.data || detail;
       const resolved = resolveFromProvider(raw);
-      if (resolved.symbol || resolved.companyName) {
-        item.symbol = normalizeSymbol(resolved.symbol);
-        item.companyName = resolved.companyName;
-      }
+      const titleResolved = resolveFromTitle(raw || item);
+      if (!item.symbol) item.symbol = normalizeSymbol(resolved.symbol || titleResolved.symbol);
+      if (!item.companyName) item.companyName = resolved.companyName || titleResolved.companyName;
       if (!item.body) item.body = String(first(raw, ['body', 'content', 'articleBody', 'text']) || '').trim();
       if (!item.summary) item.summary = String(first(raw, ['summary', 'excerpt', 'description', 'dek']) || '').trim();
       if (!item.url) item.url = String(first(raw, ['url', 'link', 'sourceUrl', 'articleUrl']) || '').trim();
     } catch (_) {
-      // Missing metadata is allowed; the UI will show a generic market-intelligence icon.
+      // Missing metadata is allowed; the UI will use title-based company matching and a generic icon when necessary.
     }
   }
   return items;
