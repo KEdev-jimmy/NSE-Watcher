@@ -26,7 +26,6 @@ jobs:
           p = Path('app/src/main/java/ke/co/nsewatcher/HomeDashboard.kt')
           s = p.read_text()
 
-          # Compact hero and place the index card immediately below the greeting.
           if 'height(286.dp)' not in s:
               s, n = re.subn(r'Box\(Modifier\.fillMaxWidth\(\)\.height\(366\.dp\)\) \{', 'Box(Modifier.fillMaxWidth().height(286.dp)) {', s, count=1)
               if n != 1:
@@ -35,7 +34,6 @@ jobs:
           if n != 1 and 'MarketIndexCard(advancing, declining, unchanged, reportedVolume)' in s:
               raise SystemExit('Hero spacer target not found')
 
-          # Compact the index card and remove the decorative mini graph.
           s = s.replace('Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {', 'Row(Modifier.padding(11.dp), verticalAlignment = Alignment.CenterVertically) {', 1)
           s = s.replace('Box(Modifier.size(35.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFF0B7652))) {', 'Box(Modifier.size(30.dp).clip(RoundedCornerShape(9.dp)).background(Color(0xFF0B7652))) {', 1)
           s = s.replace('Icon(Icons.Default.BarChart, null, tint = Color.White, modifier = Modifier.padding(7.dp))', 'Icon(Icons.Default.BarChart, null, tint = Color.White, modifier = Modifier.padding(6.dp))', 1)
@@ -54,7 +52,6 @@ jobs:
           ):
               s = s.replace(imp, '')
 
-          # Give Today's Intelligence more room to the right.
           s = s.replace('Box(Modifier.size(40.dp).clip(CircleShape).background(HomeDarkGreen)) {', 'Box(Modifier.size(32.dp).clip(CircleShape).background(HomeDarkGreen)) {', 1)
           s = s.replace('modifier = Modifier.padding(8.dp))', 'modifier = Modifier.padding(6.dp))', 1)
           s = s.replace('Spacer(Modifier.width(9.dp))', 'Spacer(Modifier.width(7.dp))', 1)
@@ -79,6 +76,8 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: ""
 
       - name: Install Android SDK packages
         run: |
