@@ -1,0 +1,108 @@
+name: Compact Home hero
+
+on:
+  push:
+    paths:
+      - '.github/workflows/compact-home-hero.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Apply requested Home layout
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('app/src/main/java/ke/co/nsewatcher/HomeDashboard.kt')
+          s = p.read_text()
+
+          # 1) Make the hero compact and put the index card directly after the greeting.
+          s = s.replace('Box(Modifier.fillMaxWidth().height(366.dp)) {', 'Box(Modifier.fillMaxWidth().height(286.dp)) {', 1)
+          old = '''            Spacer(Modifier.weight(1f))
+            MarketIndexCard(advancing, declining, unchanged, reportedVolume)'''
+          new = '''            Spacer(Modifier.height(10.dp))
+            MarketIndexCard(advancing, declining, unchanged, reportedVolume)'''
+          if old not in s:
+              raise SystemExit('Expected hero spacer block was not found')
+          s = s.replace(old, new, 1)
+
+          # 2) Make the NSE All Share Index card shorter and remove its decorative graph.
+          s = s.replace('Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {', 'Row(Modifier.padding(11.dp), verticalAlignment = Alignment.CenterVertically) {', 1)
+          s = s.replace('Box(Modifier.size(35.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFF0B7652))) {', 'Box(Modifier.size(30.dp).clip(RoundedCornerShape(9.dp)).background(Color(0xFF0B7652))) {', 1)
+          s = s.replace('Icon(Icons.Default.BarChart, null, tint = Color.White, modifier = Modifier.padding(7.dp))', 'Icon(Icons.Default.BarChart, null, tint = Color.White, modifier = Modifier.padding(6.dp))', 1)
+          s = s.replace('Spacer(Modifier.height(12.dp))', 'Spacer(Modifier.height(7.dp))', 1)
+          s = s.replace('fontSize = 31.sp, fontWeight = FontWeight.ExtraBold', 'fontSize = 25.sp, fontWeight = FontWeight.ExtraBold', 1)
+          s = s.replace('fontSize = 13.sp, fontWeight = FontWeight.Bold)', 'fontSize = 11.sp, fontWeight = FontWeight.Bold)', 1)
+          s = s.replace('modifier = Modifier.height(118.dp)', 'modifier = Modifier.height(91.dp)', 1)
+          s = s.replace('MiniIndexChart()\n            }', '            }', 1)
+
+          # Remove the now-unused mini chart implementation and its imports.
+          s = re.sub(r'\n@Composable\nprivate fun MiniIndexChart\(\) \{.*?\n\}\n\n@Composable\nprivate fun BreadthLine', '\n@Composable\nprivate fun BreadthLine', s, flags=re.S)
+          for imp in [
+              'import androidx.compose.foundation.Canvas\n',
+              'import androidx.compose.ui.graphics.Path\n',
+              'import androidx.compose.ui.graphics.StrokeCap\n',
+              'import androidx.compose.ui.graphics.StrokeJoin\n',
+          ]:
+              s = s.replace(imp, '')
+
+          # 3) Give Today's Intelligence more room to its right by shrinking its icon
+          # and widening the confidence panel; keep the existing design and content.
+          s = s.replace('Box(Modifier.size(40.dp).clip(CircleShape).background(HomeDarkGreen)) {', 'Box(Modifier.size(32.dp).clip(CircleShape).background(HomeDarkGreen)) {', 1)
+          s = s.replace('modifier = Modifier.padding(8.dp))', 'modifier = Modifier.padding(6.dp))', 1)
+          s = s.replace('Spacer(Modifier.width(9.dp))', 'Spacer(Modifier.width(7.dp))', 1)
+          s = s.replace('Column(Modifier.width(92.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFFE3F6EC)).padding(9.dp)) {', 'Column(Modifier.width(104.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFFE3F6EC)).padding(9.dp)) {', 1)
+
+          p.write_text(s)
+          PY
+
+      - name: Verify requested changes
+        run: |
+          grep -q 'height(286.dp)' app/src/main/java/ke/co/nsewatcher/HomeDashboard.kt
+          grep -q 'size(32.dp).clip(CircleShape)' app/src/main/java/ke/co/nsewatcher/HomeDashboard.kt
+          ! grep -q 'MiniIndexChart()' app/src/main/java/ke/co/nsewatcher/HomeDashboard.kt
+          ! grep -q 'fun MiniIndexChart' app/src/main/java/ke/co/nsewatcher/HomeDashboard.kt
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+          
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Install Gradle
+        run: |
+          curl -fsSL https://services.gradle.org/distributions/gradle-8.14.4-bin.zip -o gradle.zip
+          unzip -q gradle.zip
+          echo "$GITHUB_WORKSPACE/gradle-8.14.4/bin" >> "$GITHUB_PATH"
+
+      - name: Build project
+        run: gradle --no-daemon build
+
+      - name: Commit changes and remove temporary workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java/ke/co/nsewatcher/HomeDashboard.kt
+          git commit -m "Compact Home hero and index card" || true
+          git push origin main
+          git rm .github/workflows/compact-home-hero.yml
+          git commit -m "Remove temporary Home layout workflow"
+          git push origin main
