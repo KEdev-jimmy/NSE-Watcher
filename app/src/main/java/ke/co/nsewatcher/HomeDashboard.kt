@@ -193,8 +193,8 @@ fun HomeDashboard(
 
 @Composable
 private fun HomeHero(advancing: Int, declining: Int, unchanged: Int, reportedVolume: Long) {
-    Box(Modifier.fillMaxWidth().height(305.dp)) {
-        Box(Modifier.fillMaxWidth().height(235.dp)) {
+    Box(Modifier.fillMaxWidth().height(272.dp)) {
+        Box(Modifier.fillMaxWidth().height(202.dp)) {
             AsyncImage(
             model = NairobiSkyline,
             contentDescription = "Nairobi skyline",
@@ -207,7 +207,7 @@ private fun HomeHero(advancing: Int, declining: Int, unchanged: Int, reportedVol
 
         Column(Modifier.fillMaxWidth()) {
             Row(
-                Modifier.padding(start = 24.dp, end = 20.dp, top = 16.dp),
+                Modifier.padding(start = 24.dp, end = 20.dp, top = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(Modifier.size(52.dp).clip(RoundedCornerShape(16.dp)).background(HomeGreen)) {
@@ -224,15 +224,13 @@ private fun HomeHero(advancing: Int, declining: Int, unchanged: Int, reportedVol
                 }
             }
 
-            Column(Modifier.padding(start = 30.dp, top = 13.dp, end = 24.dp)) {
+            Column(Modifier.padding(start = 30.dp, top = 8.dp, end = 24.dp)) {
                 Text("Good morning, James", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
                 Text("Here's what's happening in the NSE today", color = Color(0xFFE0F2EA), fontSize = 12.sp)
             }
 
-            Spacer(Modifier.height(7.dp))
-            Box(Modifier.fillMaxWidth().padding(horizontal = 14.dp)) {
-                MarketIndexCard(advancing, declining, unchanged, reportedVolume)
-            }
+            Spacer(Modifier.height(4.dp))
+            MarketIndexCard(advancing, declining, unchanged, reportedVolume)
         }
     }
 }
@@ -240,12 +238,12 @@ private fun HomeHero(advancing: Int, declining: Int, unchanged: Int, reportedVol
 @Composable
 private fun MarketIndexCard(advancing: Int, declining: Int, unchanged: Int, reportedVolume: Long) {
     Card(
-        Modifier.fillMaxWidth().padding(horizontal = 14.dp),
-        RoundedCornerShape(20.dp),
+        Modifier.fillMaxWidth(),
+        RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xEE04543C)),
         border = BorderStroke(1.dp, Color(0xFF39D995))
     ) {
-        Row(Modifier.padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1.22f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(27.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFF0B7652))) {
@@ -265,15 +263,15 @@ private fun MarketIndexCard(advancing: Int, declining: Int, unchanged: Int, repo
       }
                   }
             Spacer(Modifier.width(10.dp))
-            VerticalDivider(color = Color.White.copy(alpha = .25f), modifier = Modifier.height(78.dp))
+            VerticalDivider(color = Color.White.copy(alpha = .25f), modifier = Modifier.height(68.dp))
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(.86f)) {
                 BreadthLine("Advancing", advancing, HomeGreen)
                 BreadthLine("Declining", declining, HomeRed)
                 BreadthLine("Unchanged", unchanged, Color(0xFFD4DFDB))
-                Spacer(Modifier.height(5.dp))
+                Spacer(Modifier.height(3.dp))
                 HorizontalDivider(color = Color.White.copy(alpha = .22f))
-                Spacer(Modifier.height(5.dp))
+                Spacer(Modifier.height(3.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     HeroMetric(Icons.Default.BarChart, "Volume", formatShares(reportedVolume))
                     HeroMetric(Icons.Default.Layers, "Turnover", "—")
