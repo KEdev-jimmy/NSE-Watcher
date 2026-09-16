@@ -238,7 +238,7 @@ private fun HomeHero(advancing: Int, declining: Int, unchanged: Int, reportedVol
 @Composable
 private fun MarketIndexCard(advancing: Int, declining: Int, unchanged: Int, reportedVolume: Long) {
     Card(
-        Modifier.fillMaxWidth(),
+        Modifier.fillMaxWidth().padding(horizontal = 2.dp),
         RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xEE04543C)),
         border = BorderStroke(1.dp, Color(0xFF39D995))
