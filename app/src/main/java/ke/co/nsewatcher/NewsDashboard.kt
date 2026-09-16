@@ -34,6 +34,8 @@ private val NewsDark = Color(0xFF083C27)
 private val NewsText = Color(0xFF12231B)
 private val NewsMuted = Color(0xFF6C7A72)
 private val NewsBorder = Color(0xFFE1EAE5)
+private val TrendingRed = Color(0xFFE53935)
+private val TrendingRedLight = Color(0xFFFFE5E5)
 private const val NewsSkyline = "https://upload.wikimedia.org/wikipedia/commons/8/80/Nairobi_Skyline_from_West.jpg"
 
 private data class NewsMeta(val symbol: String, val company: String, val logo: String, val label: String)
@@ -99,7 +101,7 @@ fun NewsDashboard(open: (NewsItem) -> Unit) {
 
     LazyColumn(
         contentPadding = PaddingValues(start = 14.dp, top = 4.dp, end = 14.dp, bottom = 22.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         item { NewsDashboardHeader("News", "NSE companies, dividends & market intelligence") }
         item {
@@ -146,7 +148,6 @@ fun NewsDashboard(open: (NewsItem) -> Unit) {
             }
         } else {
             top?.let { article ->
-                item { Text("Top News", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = NewsText) }
                 item { NewsDashboardFeatured(article, open) }
             }
 
@@ -306,7 +307,7 @@ private fun NewsTrendingCard(item: NewsItem, open: (NewsItem) -> Unit) {
                 Text(dashboardDate(item.publishedAt), color = NewsMuted, fontSize = 8.sp)
             }
             Spacer(Modifier.height(5.dp))
-            DashboardChip("Trending", false, Icons.Default.Whatshot)
+            DashboardChip("Trending", false, Icons.Default.Whatshot, TrendingRed, TrendingRedLight)
         }
     }
 }
@@ -380,14 +381,23 @@ private fun DashboardSymbol(symbol: String) {
 }
 
 @Composable
-private fun DashboardChip(text: String, featured: Boolean, icon: androidx.compose.ui.graphics.vector.ImageVector? = null) {
-    Surface(shape = RoundedCornerShape(18.dp), color = if (featured) Color(0x99FFFFFF) else NewsLight) {
+private fun DashboardChip(
+    text: String,
+    featured: Boolean,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    accent: Color = NewsGreen,
+    background: Color = NewsLight
+) {
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = if (featured) Color(0x99FFFFFF) else background
+    ) {
         Row(Modifier.padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             icon?.let {
-                Icon(it, null, tint = if (featured) Color.White else NewsGreen, modifier = Modifier.size(12.dp))
+                Icon(it, null, tint = if (featured) Color.White else accent, modifier = Modifier.size(12.dp))
                 Spacer(Modifier.width(4.dp))
             }
-            Text(text, color = if (featured) Color.White else NewsGreen, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+            Text(text, color = if (featured) Color.White else accent, fontSize = 8.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
