@@ -28,9 +28,6 @@ object MyStocksCache {
             ?: loadFromUrl(FALLBACK_URL)
         if (base.isEmpty()) return@withContext emptyList()
 
-        // Keep the first live slice deliberately small: the dashboard/company
-        // experience gets real historical data without firing dozens of API calls.
-        // The same chart endpoint will be used for lazy per-company loading next.
         base.map { stock ->
             if (stock.symbol in chartSymbols) {
                 val history = loadHistory(stock.symbol, "1y")
@@ -79,8 +76,6 @@ object MyStocksCache {
             if (connection.responseCode !in 200..299) return@runCatching emptyList()
             val root = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
 
-            // Backend response: { data: { stocks: [...] } }.
-            // GitHub fallback response: { content: "{ stocks: [...] }" }.
             val dataObject = root.optJSONObject("data")
             val rawContent = root.optString("content")
             val payload = when {
@@ -99,15 +94,31 @@ object MyStocksCache {
                     val name = item.optString("name", symbol)
                     val price = item.optDouble("price", Double.NaN)
                     if (!price.isFinite()) continue
-                    val previousClose = item.optDouble("previousClose", price)
-                    val changePct = item.optDouble("changePct", 0.0) * 100.0
+
+                    val previousClose = item.optDouble("previousClose", Double.NaN)
+                    val suppliedChange = item.optDouble("change", Double.NaN)
+                    val suppliedChangePct = item.optDouble("changePct", Double.NaN)
+                    val derivedChangePct = if (previousClose.isFinite() && previousClose > 0.0 && price.isFinite()) {
+                        ((price - previousClose) / previousClose) * 100.0
+                    } else Double.NaN
+                    val changePct = when {
+                        suppliedChange.isFinite() && suppliedChange != 0.0 -> suppliedChange
+                        suppliedChangePct.isFinite() && suppliedChangePct != 0.0 -> suppliedChangePct
+                        derivedChangePct.isFinite() -> derivedChangePct
+                        else -> 0.0
+                    }
+                    val historyStart = if (previousClose.isFinite() && previousClose > 0.0) previousClose else price
+
                     add(
                         Stock(
                             symbol = symbol,
                             name = name,
                             price = price,
                             change = changePct,
-                            history = listOf(previousClose, price)
+                            history = listOf(historyStart, price),
+                            logoUrl = item.optString("logoUrl").takeIf { it.isNotBlank() },
+                            sector = item.optString("sector", "Other").ifBlank { "Other" },
+                            volume = item.optLong("volume", 0L).coerceAtLeast(0L)
                         )
                     )
                 }

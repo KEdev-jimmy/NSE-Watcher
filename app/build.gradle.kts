@@ -19,6 +19,12 @@ android { namespace = "ke.co.nsewatcher"; compileSdk = 35
     }
 }
 
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
 kotlin {
     jvmToolchain(17)
 }
@@ -40,6 +46,9 @@ dependencies {
     implementation("com.squareup.retrofit2:converter-kotlinx-serialization:2.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("androidx.work:work-runtime-ktx:2.10.0")
+    implementation("io.coil-kt.coil3:coil-compose:3.1.0")
+    implementation("io.coil-kt.coil3:coil-network-okhttp:3.1.0")
+    implementation("io.coil-kt.coil3:coil-svg:3.1.0")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
