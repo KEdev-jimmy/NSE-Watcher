@@ -1,7 +1,6 @@
 package ke.co.nsewatcher
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,9 +20,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -197,7 +193,7 @@ fun HomeDashboard(
 
 @Composable
 private fun HomeHero(advancing: Int, declining: Int, unchanged: Int, reportedVolume: Long) {
-    Box(Modifier.fillMaxWidth().height(366.dp)) {
+    Box(Modifier.fillMaxWidth().height(286.dp)) {
         AsyncImage(
             model = NairobiSkyline,
             contentDescription = "Nairobi skyline",
@@ -231,7 +227,7 @@ private fun HomeHero(advancing: Int, declining: Int, unchanged: Int, reportedVol
                 Text("Here's what's happening in the NSE today", color = Color(0xFFE0F2EA), fontSize = 12.sp)
             }
 
-            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.height(10.dp))
             MarketIndexCard(advancing, declining, unchanged, reportedVolume)
         }
     }
@@ -245,28 +241,27 @@ private fun MarketIndexCard(advancing: Int, declining: Int, unchanged: Int, repo
         colors = CardDefaults.cardColors(containerColor = Color(0xEE04543C)),
         border = BorderStroke(1.dp, Color(0xFF39D995))
     ) {
-        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(11.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1.22f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(35.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFF0B7652))) {
-                        Icon(Icons.Default.BarChart, null, tint = Color.White, modifier = Modifier.padding(7.dp))
+                    Box(Modifier.size(30.dp).clip(RoundedCornerShape(9.dp)).background(Color(0xFF0B7652))) {
+                        Icon(Icons.Default.BarChart, null, tint = Color.White, modifier = Modifier.padding(6.dp))
                     }
                     Spacer(Modifier.width(8.dp))
-                    Text("NSE All Share Index", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text("NSE All Share Index", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(7.dp))
                 Row(verticalAlignment = Alignment.Bottom) {
-          Text("181.74", color = Color.White, fontSize = 31.sp, fontWeight = FontWeight.ExtraBold)
+          Text("181.74", color = Color.White, fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
           Spacer(Modifier.width(7.dp))
           Column {
               Text("▲ +0.84%", color = Color(0xFF58E8A8), fontSize = 13.sp, fontWeight = FontWeight.Bold)
               Text("(+1.52)", color = Color(0xFFA8E7C8), fontSize = 9.sp)
           }
       }
-      MiniIndexChart()
-            }
+                  }
             Spacer(Modifier.width(10.dp))
-            VerticalDivider(color = Color.White.copy(alpha = .25f), modifier = Modifier.height(118.dp))
+            VerticalDivider(color = Color.White.copy(alpha = .25f), modifier = Modifier.height(91.dp))
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(.86f)) {
                 BreadthLine("Advancing", advancing, HomeGreen)
@@ -281,20 +276,6 @@ private fun MarketIndexCard(advancing: Int, declining: Int, unchanged: Int, repo
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun MiniIndexChart() {
-    Canvas(Modifier.fillMaxWidth().height(43.dp)) {
-        val values = listOf(.18f,.27f,.23f,.36f,.32f,.42f,.51f,.46f,.59f,.54f,.65f,.72f,.69f,.84f,.78f,.92f)
-        val path = Path()
-        values.forEachIndexed { i, value ->
-            val x = size.width * i / (values.size - 1)
-            val y = size.height * (1f - value)
-            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
-        }
-        drawPath(path, color = Color(0xFF58E8A8), style = androidx.compose.ui.graphics.drawscope.Stroke(2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
     }
 }
 
@@ -340,10 +321,10 @@ private fun TodaysIntelligence(strongestSector: String?, strongestSectorChange: 
     ) {
         Column(Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.Top) {
-                Box(Modifier.size(40.dp).clip(CircleShape).background(HomeDarkGreen)) {
-                    Icon(Icons.Default.Psychology, null, tint = Color(0xFF8BE0B3), modifier = Modifier.padding(8.dp))
+                Box(Modifier.size(32.dp).clip(CircleShape).background(HomeDarkGreen)) {
+                    Icon(Icons.Default.Psychology, null, tint = Color(0xFF8BE0B3), modifier = Modifier.padding(6.dp))
                 }
-                Spacer(Modifier.width(9.dp))
+                Spacer(Modifier.width(7.dp))
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("Today's Intelligence", color = HomeTextDark, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
@@ -358,7 +339,7 @@ private fun TodaysIntelligence(strongestSector: String?, strongestSectorChange: 
                     Text(detail, color = HomeMuted, fontSize = 10.sp, lineHeight = 14.sp)
                 }
                 Spacer(Modifier.width(7.dp))
-                Column(Modifier.width(92.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFFE3F6EC)).padding(9.dp)) {
+                Column(Modifier.width(104.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFFE3F6EC)).padding(9.dp)) {
                     Text("Confidence", color = HomeTextDark, fontSize = 9.sp)
                     Spacer(Modifier.height(4.dp))
                     Box(Modifier.clip(RoundedCornerShape(15.dp)).background(Color(0xFFFFD36A))) {
