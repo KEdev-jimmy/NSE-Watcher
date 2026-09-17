@@ -1,7 +1,6 @@
 name: Add Financial Trend Panel
 
 on:
-  workflow_dispatch:
   push:
     branches: [ "main" ]
 
@@ -106,10 +105,11 @@ jobs:
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
 
-      - name: Commit implementation
+      - name: Commit implementation and remove temporary workflow
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app/src/main/java/ke/co/nsewatcher/CompanyIntelligence.kt
-          git commit -m "feat: add sourced financial trend panel" || true
+          rm .github/workflows/add-financial-trend-panel.yml
+          git add app/src/main/java/ke/co/nsewatcher/CompanyIntelligence.kt .github/workflows/add-financial-trend-panel.yml
+          git commit -m "feat: add sourced financial trend panel"
           git push
