@@ -60,24 +60,26 @@ jobs:
           print('Company route wired to CompanyIntelligence.kt')
           PY
 
+      - name: Repair Company Intelligence compile issues
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('app/src/main/java/ke/co/nsewatcher/CompanyIntelligence.kt')
+          text = path.read_text()
+          if 'import androidx.compose.foundation.lazy.LazyColumn' not in text:
+              text = text.replace('import androidx.compose.foundation.horizontalScroll\n', 'import androidx.compose.foundation.horizontalScroll\nimport androidx.compose.foundation.lazy.LazyColumn\n')
+          text = text.replace('''                    MiniFact("Sector", profile.sector.ifBlank { "Not available" })\n                    MiniFact("HQ", profile.headquarters.ifBlank { "Not available" })''', '''                    Box(Modifier.weight(1f)) { MiniFact("Sector", profile.sector.ifBlank { "Not available" }) }\n                    Box(Modifier.weight(1f)) { MiniFact("HQ", profile.headquarters.ifBlank { "Not available" }) }''')
+          text = text.replace('''private fun MiniFact(label: String, value: String) {\n    Surface(Modifier.weight(1f), RoundedCornerShape(12.dp), color = IntelligenceLight) {''', '''private fun MiniFact(label: String, value: String) {\n    Surface(Modifier.fillMaxWidth(), RoundedCornerShape(12.dp), color = IntelligenceLight) {''')
+          path.write_text(text)
+          PY
+
       - name: Build Android app
         run: gradle --no-daemon build
 
       - name: Commit implementation
-        if: steps.wire.outcome == 'success'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app/src/main/java/ke/co/nsewatcher/DesignActivity.kt
+          git add app/src/main/java/ke/co/nsewatcher/DesignActivity.kt app/src/main/java/ke/co/nsewatcher/CompanyIntelligence.kt
           git commit -m "feat: wire company intelligence into company route" || true
-          git push
-
-      - name: Remove temporary implementation workflow
-        if: steps.wire.outcome == 'skipped'
-        run: |
-          rm -f .github/workflows/implement-company-intelligence.yml
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .github/workflows/implement-company-intelligence.yml
-          git commit -m "chore: remove temporary company intelligence workflow" || true
           git push
