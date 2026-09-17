@@ -27,7 +27,8 @@ object MyStocksCache {
         val prices: List<Double> = emptyList(),
         val firstDate: String = "",
         val lastDate: String = "",
-        val interval: String = ""
+        val interval: String = "",
+        val observedAt: String = ""
     )
 
     suspend fun loadStocks(): List<Stock> = withContext(Dispatchers.IO) {
@@ -37,8 +38,24 @@ object MyStocksCache {
 
         base.map { stock ->
             if (stock.symbol in chartSymbols) {
-                val history = loadHistory(stock.symbol, "1y")
-                if (history.size >= 2) stock.copy(history = history) else stock
+                val history = loadHistory(stock.symbol, "1D")
+                if (history.size >= 2) {
+                    // Use the same 1D observation series shown in Company
+                    // Intelligence. The first point is the previous close and
+                    // the final point is the latest delayed observation. This
+                    // prevents the headline quote and 1D chart from using
+                    // different intraday baselines.
+                    val latest = history.last()
+                    val previousClose = history.first()
+                    val dayChange = if (previousClose > 0.0) {
+                        ((latest - previousClose) / previousClose) * 100.0
+                    } else stock.change
+                    stock.copy(
+                        price = latest,
+                        change = dayChange,
+                        history = history
+                    )
+                } else stock
             } else stock
         }
     }
@@ -71,16 +88,24 @@ object MyStocksCache {
                 }
             }
             val firstDate = if (candles.length() > 0) {
-                candles.optJSONObject(0)?.optString("date", "")?.ifBlank { candles.optJSONObject(0)?.optString("timestamp", "") ?: "" } ?: ""
+                candles.optJSONObject(0)?.optString("date", "")?.ifBlank {
+                    candles.optJSONObject(0)?.optString("timestamp", "") ?: ""
+                } ?: ""
             } else ""
             val lastDate = if (candles.length() > 0) {
-                candles.optJSONObject(candles.length() - 1)?.optString("date", "")?.ifBlank { candles.optJSONObject(candles.length() - 1)?.optString("timestamp", "") ?: "" } ?: ""
+                candles.optJSONObject(candles.length() - 1)?.optString("date", "")?.ifBlank {
+                    candles.optJSONObject(candles.length() - 1)?.optString("timestamp", "") ?: ""
+                } ?: ""
             } else ""
+            val observedAt = root.optString("asOf", "")
+                .ifBlank { data.optString("asOf", "") }
+                .ifBlank { data.optJSONObject("meta")?.optString("asOf", "") ?: "" }
             HistoryResult(
                 prices = prices,
                 firstDate = firstDate,
                 lastDate = lastDate,
-                interval = root.optString("interval", data.optString("interval", ""))
+                interval = root.optString("interval", data.optString("interval", "")),
+                observedAt = observedAt
             )
         } finally {
             connection.disconnect()
@@ -140,7 +165,8 @@ object MyStocksCache {
                             history = listOf(historyStart, price),
                             logoUrl = item.optString("logoUrl").takeIf { it.isNotBlank() },
                             sector = item.optString("sector", "Other").ifBlank { "Other" },
-                            volume = item.optLong("volume", 0L).coerceAtLeast(0L)
+                            volume = item.optLong("volume", 0L).coerceAtLeast(0L),
+                            lastPriceUpdate = item.optString("lastPriceUpdate", "")
                         )
                     )
                 }
