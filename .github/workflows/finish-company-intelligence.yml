@@ -37,129 +37,77 @@ jobs:
           unzip -q gradle.zip
           echo "$GITHUB_WORKSPACE/gradle-8.14.4/bin" >> "$GITHUB_PATH"
 
-      - name: Add missing intelligence evidence views
+      - name: Wire deterministic intelligence engine
         run: |
           python3 - <<'PY'
           from pathlib import Path
+
           path = Path('app/src/main/java/ke/co/nsewatcher/CompanyIntelligence.kt')
           text = path.read_text()
 
-          growth_marker = '''        item { SectionTitle("Valuation", "How the current price relates to reported metrics", Icons.Default.Calculate) }'''
-          growth_block = '''        item { SectionTitle("Financial trend", "Reported results across available periods", Icons.Default.Timeline) }
-          item {
-              IntelligenceCard {
-                  if (intelligence.financialHistory.isEmpty()) {
-                      Text("Historical financial statements are not available in the current provider response.", color = IntelligenceMuted, fontSize = 10.sp)
-                  } else {
-                      intelligence.financialHistory.takeLast(6).reversed().forEachIndexed { index, point ->
-                          Column(Modifier.fillMaxWidth().padding(vertical = 7.dp)) {
-                              Text(point.period.ifBlank { "Reported period" }, color = IntelligenceGreen, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold)
-                              MetricGrid(listOf(
-                                  "Revenue" to valueOrMissing(point.revenue),
-                                  "Profit" to valueOrMissing(point.profit),
-                                  "EPS" to valueOrMissing(point.eps),
-                                  "ROE" to valueOrMissing(point.roe)
-                              ))
-                          }
-                          if (index < intelligence.financialHistory.takeLast(6).lastIndex) HorizontalDivider(color = IntelligenceBorder)
-                      }
-                      Text("Only periods returned by the data provider are shown; no missing periods are interpolated.", color = IntelligenceMuted, fontSize = 8.sp)
-                  }
-              }
-          }
+          if 'import ke.co.nsewatcher.data.CompanyIntelligenceEngine' not in text:
+              text = text.replace(
+                  'import ke.co.nsewatcher.data.CompanyIntelligenceCache\n',
+                  'import ke.co.nsewatcher.data.CompanyIntelligenceCache\nimport ke.co.nsewatcher.data.CompanyIntelligenceEngine\n'
+              )
 
-          item { SectionTitle("Valuation history", "Historical valuation context when reported", Icons.Default.Calculate) }
-          item {
-              IntelligenceCard {
-                  val valuationHistory = intelligence.financialHistory.filter { it.pe.isNotBlank() || it.pb.isNotBlank() }.takeLast(6).reversed()
-                  if (valuationHistory.isEmpty()) {
-                      Text("Historical P/E and P/B values are not available from the current provider response.", color = IntelligenceMuted, fontSize = 10.sp)
-                  } else {
-                      valuationHistory.forEachIndexed { index, point ->
-                          Row(Modifier.fillMaxWidth().padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-                              Column(Modifier.weight(1f)) {
-                                  Text(point.period.ifBlank { "Reported period" }, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                                  Text("P/E  ${valueOrMissing(point.pe)}   •   P/B  ${valueOrMissing(point.pb)}", color = IntelligenceMuted, fontSize = 9.sp)
-                              }
-                          }
-                          if (index < valuationHistory.lastIndex) HorizontalDivider(color = IntelligenceBorder)
-                      }
-                  }
-              }
-          }
+          anchor = '    val monthlyReturn = percentReturn(monthHistory)\n'
+          if 'val intelligenceView = CompanyIntelligenceEngine.build' not in text:
+              text = text.replace(anchor, anchor + '    val intelligenceView = CompanyIntelligenceEngine.build(s, intelligence, monthHistory, news)\n')
 
-          item { SectionTitle("Valuation", "How the current price relates to reported metrics", Icons.Default.Calculate) }'''
-          if growth_marker not in text:
-              raise SystemExit('Valuation marker not found')
-          if 'SectionTitle("Financial trend"' not in text:
-              text = text.replace(growth_marker, growth_block, 1)
+          text = text.replace(
+              'Text(intelligenceLine, color = Color.White, fontSize = 11.sp, lineHeight = 17.sp)',
+              'Text(intelligenceView.summary, color = Color.White, fontSize = 11.sp, lineHeight = 17.sp)'
+          )
 
-          dividends_marker = '''                    intelligence.dividends.take(5).forEachIndexed { index, dividend ->'''
-          dividends_insert = '''                    val nextDividend = intelligence.dividends.firstOrNull { it.paymentDate.isNotBlank() && it.paymentDate >= java.time.LocalDate.now().toString() }
-                    if (profile.dividendYield.isNotBlank()) {
-                        Surface(Modifier.fillMaxWidth(), RoundedCornerShape(13.dp), IntelligenceLight) {
-                            Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Column(Modifier.weight(1f)) {
-                                    Text("Current dividend yield", color = IntelligenceMuted, fontSize = 8.sp)
-                                    Text(profile.dividendYield, color = IntelligenceText, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
-                                }
-                                if (nextDividend != null) {
-                                    Column(horizontalAlignment = Alignment.End) {
-                                        Text("Next payment", color = IntelligenceMuted, fontSize = 8.sp)
-                                        Text(nextDividend.paymentDate, color = IntelligenceText, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            }
-                        }
-                        Spacer(Modifier.height(8.dp))
-                    } else if (nextDividend != null) {
-                        Text("Next payment: ${nextDividend.paymentDate}", color = IntelligenceText, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.height(5.dp))
-                    }
+          start = text.find('        item { SectionTitle("Intelligence signals",')
+          end = text.find('item { SectionTitle("Bull / Bear / Unknown",', start)
+          if start >= 0 and end > start:
+              replacement = '''        item { SectionTitle("Intelligence signals", "Deterministic evidence signals — no invented conclusions", Icons.Default.Insights) }\n        item {\n            IntelligenceCard {\n                Text(intelligenceView.confidence, color = IntelligenceGreen, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold)\n                Spacer(Modifier.height(6.dp))\n                Text("Coverage: ${intelligenceView.quality.state} • ${intelligenceView.quality.availableCount}/5 evidence areas", color = IntelligenceMuted, fontSize = 9.sp)\n                Spacer(Modifier.height(10.dp))\n                SignalGroup("SUPPORTING", IntelligenceGreen, intelligenceView.signals.filter { it.type == CompanyIntelligenceEngine.SignalType.SUPPORTING }.map { it.text })\n                SignalGroup("CAUTION", IntelligenceRed, intelligenceView.signals.filter { it.type == CompanyIntelligenceEngine.SignalType.CAUTION }.map { it.text })\n                SignalGroup("UNKNOWN / NEEDS EVIDENCE", IntelligenceMuted, intelligenceView.unknowns)\n            }\n        }\n\n'''
+              text = text[:start] + replacement + text[end:]
 
-                    intelligence.dividends.take(5).forEachIndexed { index, dividend ->'''
-          if dividends_marker not in text:
-              raise SystemExit('Dividend marker not found')
-          if 'val nextDividend = intelligence.dividends.firstOrNull' not in text:
-              text = text.replace(dividends_marker, dividends_insert, 1)
+          start = text.find('        item { SectionTitle("Risks to investigate",')
+          end = text.find('        item { SectionTitle("Intelligence signals",', start)
+          if start >= 0 and end > start:
+              replacement = '''        item { SectionTitle("Risks to investigate", "Questions raised by the available evidence", Icons.Default.Warning) }\n        item {\n            IntelligenceCard {\n                if (intelligenceView.risks.isEmpty()) {\n                    Text("No automatic watchpoint was generated from the currently available evidence. This does not mean the company has no risks.", color = IntelligenceMuted, fontSize = 10.sp)\n                } else {\n                    intelligenceView.risks.forEach { Watchpoint(it) }\n                }\n            }\n        }\n\n'''
+              text = text[:start] + replacement + text[end:]
 
-          evidence_marker = '''                EvidenceRow("Market price", "MyStocks Africa • NSE exchange-supplied • ~15 min delayed")'''
-          evidence_block = '''                EvidenceRow("Market price", "MyStocks Africa • NSE exchange-supplied • ~15 min delayed")
-                if (intelligence.evidence.isNotEmpty()) {
-                    Spacer(Modifier.height(4.dp))
-                    Text("SOURCED EVIDENCE", color = IntelligenceGreen, fontSize = 8.sp, fontWeight = FontWeight.ExtraBold)
-                    intelligence.evidence.take(10).forEach { evidence ->
-                        Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-                            Text(evidence.claim.ifBlank { "Evidence" }, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = IntelligenceText)
-                            if (evidence.value.isNotBlank()) Text(evidence.value, fontSize = 9.sp, color = IntelligenceText)
-                            Text(
-                                listOf(evidence.source, evidence.fetchedAt.take(19)).filter(String::isNotBlank).joinToString(" • "),
-                                color = IntelligenceMuted,
-                                fontSize = 8.sp
-                            )
-                        }
-                    }
-                }'''
-          if evidence_marker not in text:
-              raise SystemExit('Evidence marker not found')
-          if 'Text("SOURCED EVIDENCE"' not in text:
-              text = text.replace(evidence_marker, evidence_block, 1)
-
-          quality_marker = '''                    if (intelligence.fetchedAt.isNotBlank()) EvidenceRow("Fetched", intelligence.fetchedAt)'''
-          quality_block = '''                    if (intelligence.fetchedAt.isNotBlank()) EvidenceRow("Fetched", intelligence.fetchedAt)
-                    EvidenceRow("Data quality", when {
-                        intelligence.error != null -> "Unavailable"
-                        intelligence.partial -> "Partial provider response"
-                        intelligence.evidence.isNotEmpty() -> "Sourced evidence available"
-                        else -> "Limited structured evidence"
-                    })'''
-          if quality_marker not in text:
-              raise SystemExit('Quality marker not found')
-          if 'EvidenceRow("Data quality"' not in text:
-              text = text.replace(quality_marker, quality_block, 1)
+          marker = '        item { SectionTitle("Evidence", "Where the important information came from", Icons.Default.Verified) }'
+          if 'intelligenceView.quality.evidenceCount' not in text:
+              quality = '''        item {\n            IntelligenceCard {\n                EvidenceRow("Coverage", "${intelligenceView.quality.state} • ${intelligenceView.quality.availableCount}/5 areas")\n                EvidenceRow("Evidence", "${intelligenceView.quality.evidenceCount} sourced claims returned")\n                EvidenceRow("Confidence", intelligenceView.confidence)\n            }\n        }\n\n'''
+              text = text.replace(marker, quality + marker)
 
           path.write_text(text)
-          print('Company Intelligence evidence, financial trend, valuation history and dividend context added.')
+          PY
+
+      - name: Strengthen company backend with merged news evidence
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('backend/api/company.js')
+          text = path.read_text()
+
+          old = '''    const [profileResponse, dividendResponse] = await Promise.allSettled([\n      mystocks(`/companies/${encodeURIComponent(symbol)}`),\n      mystocks(`/dividends/${encodeURIComponent(symbol)}/history?limit=12`),\n    ]);'''
+          new = '''    const [profileResponse, dividendResponse, newsResponse] = await Promise.allSettled([\n      mystocks(`/companies/${encodeURIComponent(symbol)}`),\n      mystocks(`/dividends/${encodeURIComponent(symbol)}/history?limit=12`),\n      mystocks(`/companies/${encodeURIComponent(symbol)}/news?limit=10`),\n    ]);'''
+          if old in text:
+              text = text.replace(old, new)
+
+          old = '''    const dividends = dividendResponse.status === 'fulfilled'\n      ? (dividendResponse.value.history || dividendResponse.value.data || [])\n      : [];\n    const fetchedAt = new Date().toISOString();'''
+          new = '''    const dividends = dividendResponse.status === 'fulfilled'\n      ? (dividendResponse.value.history || dividendResponse.value.data || [])\n      : [];\n    const news = newsResponse.status === 'fulfilled'\n      ? (newsResponse.value.items || newsResponse.value.news || newsResponse.value.data || [])\n      : [];\n    const fetchedAt = new Date().toISOString();'''
+          if old in text:
+              text = text.replace(old, new)
+
+          old = '''    const evidence = buildEvidence(profile || {}, Array.isArray(dividends) ? dividends : [], financialHistory, fetchedAt, symbol);'''
+          new = '''    const evidence = buildEvidence(profile || {}, Array.isArray(dividends) ? dividends : [], financialHistory, fetchedAt, symbol);\n    news.slice(0, 10).forEach((item, index) => {\n      const title = pick(item, ['title', 'headline', 'name']);\n      const publishedAt = pick(item, ['publishedAt', 'published', 'date', 'createdAt']);\n      if (title) evidence.push({\n        claim: `Company intelligence item ${index + 1}`,\n        value: [title, publishedAt].filter(Boolean).join(' • '),\n        source: 'MyStocks Africa',\n        endpoint: `/companies/${symbol}/news`,\n        symbol,\n        fetchedAt,\n      });\n    });'''
+          if old in text:
+              text = text.replace(old, new)
+
+          old = '''      financialHistory,\n      evidence,\n      dataQuality: {\n        profileAvailable: Boolean(profile),\n        dividendHistoryAvailable: Array.isArray(dividends) && dividends.length > 0,\n        financialHistoryAvailable: financialHistory.length > 0,\n        evidenceCount: evidence.length,\n      },\n      partial: !profile || dividendResponse.status !== 'fulfilled','''
+          new = '''      financialHistory,\n      news,\n      evidence,\n      dataQuality: {\n        profileAvailable: Boolean(profile),\n        dividendHistoryAvailable: Array.isArray(dividends) && dividends.length > 0,\n        financialHistoryAvailable: financialHistory.length > 0,\n        newsAvailable: Array.isArray(news) && news.length > 0,\n        evidenceCount: evidence.length,\n      },\n      providerStatus: {\n        profile: profileResponse.status,\n        dividends: dividendResponse.status,\n        news: newsResponse.status,\n      },\n      partial: !profile || dividendResponse.status !== 'fulfilled' || newsResponse.status !== 'fulfilled','''
+          if old in text:
+              text = text.replace(old, new)
+
+          path.write_text(text)
           PY
 
       - name: Build Android app
@@ -170,6 +118,6 @@ jobs:
           rm -f .github/workflows/finish-company-intelligence.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app/src/main/java/ke/co/nsewatcher/CompanyIntelligence.kt .github/workflows/finish-company-intelligence.yml
-          git commit -m "feat: complete company intelligence evidence views"
+          git add app/src/main/java/ke/co/nsewatcher/CompanyIntelligence.kt backend/api/company.js .github/workflows/finish-company-intelligence.yml
+          git commit -m "feat: connect company intelligence engine and evidence pipeline"
           git push
