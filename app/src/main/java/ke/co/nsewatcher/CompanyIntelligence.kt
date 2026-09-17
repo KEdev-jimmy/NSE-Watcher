@@ -44,7 +44,7 @@ private val IntelligenceRed = Color(0xFFE04444)
 @Composable
 fun CompanyIntelligence(s: Stock, back: () -> Unit) {
     val periods = listOf("1D", "1W", "1M", "3M", "6M", "1Y", "3Y", "5Y")
-    var period by rememberSaveable(s.symbol) { mutableStateOf("1Y") }
+    var period by rememberSaveable(s.symbol) { mutableStateOf("1D") }
     var history by remember(s.symbol) { mutableStateOf(s.history) }
     var historyLoading by remember(s.symbol) { mutableStateOf(false) }
     var monthHistory by remember(s.symbol) { mutableStateOf(emptyList<Double>()) }
@@ -78,6 +78,8 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit) {
 
     val profile = intelligence.profile
     val monthlyReturn = percentReturn(monthHistory)
+    val selectedPeriodReturn = percentReturn(history)
+    val latestFinancialPeriod = intelligence.financialHistory.lastOrNull()?.period.orEmpty()
     val intelligenceView = CompanyIntelligenceEngine.build(s, intelligence, monthHistory, news)
 
     LazyColumn(
@@ -155,9 +157,16 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit) {
             }
         }
 
-        item { SectionTitle("Financial health", "Latest company financial evidence", Icons.Default.Assessment) }
+        item { SectionTitle("Financial health", "Latest reported annual financial evidence", Icons.Default.Assessment) }
         item {
             IntelligenceCard {
+                Text(
+                    financialPeriodLabel(latestFinancialPeriod),
+                    color = IntelligenceMuted,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(Modifier.height(8.dp))
                 MetricGrid(listOf(
                     "Revenue" to formatFinancialValue(profile.revenue),
                     "Profit" to formatFinancialValue(profile.profit),
@@ -169,16 +178,16 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit) {
             }
         }
 
-        item { SectionTitle("Growth", "Latest reported growth signals", Icons.Default.TrendingUp) }
+        item { SectionTitle("Growth", "Year-over-year change in the latest reported figures", Icons.Default.TrendingUp) }
         item {
             IntelligenceCard {
                 MetricGrid(listOf(
                     "Revenue trend" to valueOrMissing(profile.revenueGrowth),
                     "Profit trend" to valueOrMissing(profile.profitGrowth),
-                    "EPS" to valueOrMissing(profile.eps)
+                    "EPS (latest)" to valueOrMissing(profile.eps)
                 ))
                 Spacer(Modifier.height(8.dp))
-                Text("Historical financial trend will only be shown when the source provides a comparable series; no figures are invented here.", color = IntelligenceMuted, fontSize = 9.sp)
+                Text("Growth compares the latest reported annual figures with the previous comparable annual period.", color = IntelligenceMuted, fontSize = 9.sp)
             }
         }
 
@@ -226,27 +235,54 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit) {
                         Text("${currencyLabel(s.price)}", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = IntelligenceText)
                         Text("NSE • 15 min delayed", color = IntelligenceMuted, fontSize = 9.sp)
                     }
-                    Text(
-                        String.format(Locale.US, "%+.2f%% today", s.change),
-                        color = if (s.change >= 0) IntelligenceGreen else IntelligenceRed,
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 13.sp
-                    )
+                    selectedPeriodReturn?.let { periodReturn ->
+                        Text(
+                            formatPeriodReturn(period, periodReturn),
+                            color = if (periodReturn >= 0) IntelligenceGreen else IntelligenceRed,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 13.sp,
+                            textAlign = TextAlign.End
+                        )
+                    }
                 }
                 Spacer(Modifier.height(14.dp))
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     periods.forEach { value ->
-                        FilterChip(selected = period == value, onClick = { period = value }, label = { Text(value, fontSize = 9.sp) })
+                        FilterChip(
+                            selected = period == value,
+                            onClick = { period = value },
+                            label = { Text(value, fontSize = 9.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = IntelligenceGreen,
+                                selectedLabelColor = Color.White,
+                                selectedLeadingIconColor = Color.White
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = period == value,
+                                borderColor = IntelligenceMuted.copy(alpha = 0.65f),
+                                selectedBorderColor = IntelligenceGreen
+                            )
+                        )
                     }
                 }
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    periodDescription(period),
+                    color = IntelligenceText,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.height(8.dp))
                 if (historyLoading) {
                     IntelligenceLoader("Loading $period market history", "Checking historical NSE data…")
                 } else if (history.size >= 2) {
-                    IntelligenceChart(history, if (s.change >= 0) IntelligenceGreen else IntelligenceRed)
+                    IntelligenceChart(history, if ((selectedPeriodReturn ?: s.change) >= 0) IntelligenceGreen else IntelligenceRed)
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("${history.size} data points", color = IntelligenceMuted, fontSize = 8.sp)
-                        percentReturn(history)?.let { Text("${formatSigned(it)} $period", color = if (it >= 0) IntelligenceGreen else IntelligenceRed, fontWeight = FontWeight.Bold, fontSize = 8.sp) }
+                        selectedPeriodReturn?.let { Text(formatPeriodReturn(period, it), color = if (it >= 0) IntelligenceGreen else IntelligenceRed, fontWeight = FontWeight.Bold, fontSize = 8.sp) }
                     }
                 } else {
                     Text("Historical market data is not available for this period.", color = IntelligenceMuted, fontSize = 10.sp)
@@ -610,6 +646,40 @@ private fun formatMarketCap(value: String): String {
         absoluteKsh >= 1_000_000.0 -> String.format(Locale.US, "KSh %.2fM", absoluteKsh / 1_000_000.0)
         else -> String.format(Locale.US, "KSh %,.0f", absoluteKsh)
     }
+}
+
+private fun financialPeriodLabel(period: String): String {
+    val clean = period.trim()
+    if (clean.isBlank()) return "Annual figures • Latest reported period"
+    val date = Regex("([A-Z][a-z]{2} \\d{1,2}, \\d{4})$").find(clean)?.groupValues?.getOrNull(1)
+    return if (date != null) "Annual figures • FY ended $date" else "Annual figures • Latest reported period"
+}
+
+private fun periodDescription(period: String): String = when (period) {
+    "1D" -> "Today"
+    "1W" -> "Past 1 week"
+    "1M" -> "Past 1 month"
+    "3M" -> "Past 3 months"
+    "6M" -> "Past 6 months"
+    "1Y" -> "Past 1 year"
+    "3Y" -> "Past 3 years"
+    "5Y" -> "Past 5 years"
+    else -> period
+}
+
+private fun formatPeriodReturn(period: String, value: Double): String {
+    val label = when (period) {
+        "1D" -> "today"
+        "1W" -> "1 week"
+        "1M" -> "1 month"
+        "3M" -> "3 months"
+        "6M" -> "6 months"
+        "1Y" -> "1 year"
+        "3Y" -> "3 years"
+        "5Y" -> "5 years"
+        else -> period
+    }
+    return String.format(Locale.US, "%+.2f%% $label", value)
 }
 
 private fun percentReturn(values: List<Double>): Double? {
