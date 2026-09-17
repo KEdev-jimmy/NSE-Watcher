@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   GRADLE_OPTS: "-Dorg.gradle.daemon=false"
@@ -53,6 +53,74 @@ jobs:
           grep -q 'private fun Home' app/src/main/java/ke/co/nsewatcher/DesignActivity.kt
           grep -q 'private fun Companies' app/src/main/java/ke/co/nsewatcher/DesignActivity.kt
           ! grep -R -q 'ApprovedMarketActivity' app/src/main/java || exit 1
+
+      - name: Apply first Company Intelligence enhancement
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('app/src/main/java/ke/co/nsewatcher/CompanyIntelligence.kt')
+          text = path.read_text()
+          anchor = '''        item { SectionTitle("Valuation", "How the current price relates to reported metrics", Icons.Default.Calculate) }'''
+          if 'SectionTitle("Financial trend"' not in text:
+              insert = '''        item { SectionTitle("Financial trend", "Reported periods returned by the company data source", Icons.Default.BarChart) }
+        item {
+            IntelligenceCard {
+                if (intelligence.financialHistory.isEmpty()) {
+                    Text(
+                        "No comparable historical financial series was returned for this company yet. NSE Watcher will not manufacture a trend from missing data.",
+                        color = IntelligenceMuted,
+                        fontSize = 10.sp,
+                        lineHeight = 15.sp
+                    )
+                } else {
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+                        Column(Modifier.width(82.dp)) {
+                            Text("Period", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = IntelligenceMuted)
+                            intelligence.financialHistory.takeLast(6).forEach { point ->
+                                Text(point.period.ifBlank { "Reported" }, fontSize = 9.sp, color = IntelligenceText, modifier = Modifier.padding(top = 11.dp))
+                            }
+                        }
+                        Column(Modifier.width(105.dp)) {
+                            Text("Revenue", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = IntelligenceMuted)
+                            intelligence.financialHistory.takeLast(6).forEach { point ->
+                                Text(valueOrMissing(point.revenue), fontSize = 9.sp, color = IntelligenceText, modifier = Modifier.padding(top = 11.dp))
+                            }
+                        }
+                        Column(Modifier.width(105.dp)) {
+                            Text("Profit", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = IntelligenceMuted)
+                            intelligence.financialHistory.takeLast(6).forEach { point ->
+                                Text(valueOrMissing(point.profit), fontSize = 9.sp, color = IntelligenceText, modifier = Modifier.padding(top = 11.dp))
+                            }
+                        }
+                        Column(Modifier.width(90.dp)) {
+                            Text("EPS", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = IntelligenceMuted)
+                            intelligence.financialHistory.takeLast(6).forEach { point ->
+                                Text(valueOrMissing(point.eps), fontSize = 9.sp, color = IntelligenceText, modifier = Modifier.padding(top = 11.dp))
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Source: MyStocks Africa company financial data. Periods are shown as supplied; no growth rate is inferred when comparable values are missing.",
+                        color = IntelligenceMuted,
+                        fontSize = 8.sp,
+                        lineHeight = 13.sp
+                    )
+                }
+            }
+        }
+
+'''
+              if anchor not in text:
+                  raise SystemExit('Valuation section anchor not found')
+              path.write_text(text.replace(anchor, insert + anchor, 1))
+              import subprocess
+              subprocess.run(['git','config','user.name','github-actions[bot]'], check=True)
+              subprocess.run(['git','config','user.email','41898282+github-actions[bot]@users.noreply.github.com'], check=True)
+              subprocess.run(['git','add',str(path)], check=True)
+              subprocess.run(['git','commit','-m','feat: add sourced financial trend panel'], check=True)
+              subprocess.run(['git','push'], check=True)
+          PY
 
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
