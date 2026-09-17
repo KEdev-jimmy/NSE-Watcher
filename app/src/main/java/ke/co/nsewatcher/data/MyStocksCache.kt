@@ -23,6 +23,13 @@ object MyStocksCache {
 
     private val chartSymbols = setOf("SCOM", "KCB", "EQTY", "ABSA", "COOP", "EABL", "KPLC")
 
+    data class HistoryResult(
+        val prices: List<Double> = emptyList(),
+        val firstDate: String = "",
+        val lastDate: String = "",
+        val interval: String = ""
+    )
+
     suspend fun loadStocks(): List<Stock> = withContext(Dispatchers.IO) {
         val base = loadFromUrl(BACKEND_STOCKS_URL).takeIf { it.isNotEmpty() }
             ?: loadFromUrl(FALLBACK_URL)
@@ -36,12 +43,15 @@ object MyStocksCache {
         }
     }
 
-    suspend fun loadHistory(symbol: String, period: String = "1y"): List<Double> = withContext(Dispatchers.IO) {
+    suspend fun loadHistory(symbol: String, period: String = "1y"): List<Double> =
+        loadHistoryDetails(symbol, period).prices
+
+    suspend fun loadHistoryDetails(symbol: String, period: String = "1y"): HistoryResult = withContext(Dispatchers.IO) {
         val qualified = if (symbol.contains('.')) symbol else "$symbol.KE"
         loadHistoryFromUrl("$BACKEND_CHART_URL&symbol=$qualified&period=$period")
     }
 
-    private fun loadHistoryFromUrl(url: String): List<Double> = runCatching {
+    private fun loadHistoryFromUrl(url: String): HistoryResult = runCatching {
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
             connectTimeout = 10_000
@@ -49,21 +59,33 @@ object MyStocksCache {
             setRequestProperty("Accept", "application/json")
         }
         try {
-            if (connection.responseCode !in 200..299) return@runCatching emptyList()
+            if (connection.responseCode !in 200..299) return@runCatching HistoryResult()
             val root = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
-            val data = root.optJSONObject("data") ?: return@runCatching emptyList()
-            val candles = data.optJSONArray("candles") ?: return@runCatching emptyList()
-            buildList {
+            val data = root.optJSONObject("data") ?: return@runCatching HistoryResult()
+            val candles = data.optJSONArray("candles") ?: return@runCatching HistoryResult()
+            val prices = buildList {
                 for (i in 0 until candles.length()) {
                     val candle = candles.optJSONObject(i) ?: continue
                     val close = candle.optDouble("close", Double.NaN)
                     if (close.isFinite() && close > 0.0) add(close)
                 }
             }
+            val firstDate = if (candles.length() > 0) {
+                candles.optJSONObject(0)?.optString("date", "")?.ifBlank { candles.optJSONObject(0)?.optString("timestamp", "") ?: "" } ?: ""
+            } else ""
+            val lastDate = if (candles.length() > 0) {
+                candles.optJSONObject(candles.length() - 1)?.optString("date", "")?.ifBlank { candles.optJSONObject(candles.length() - 1)?.optString("timestamp", "") ?: "" } ?: ""
+            } else ""
+            HistoryResult(
+                prices = prices,
+                firstDate = firstDate,
+                lastDate = lastDate,
+                interval = root.optString("interval", data.optString("interval", ""))
+            )
         } finally {
             connection.disconnect()
         }
-    }.getOrDefault(emptyList())
+    }.getOrDefault(HistoryResult())
 
     private fun loadFromUrl(url: String): List<Stock> = runCatching {
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
