@@ -56,8 +56,6 @@ fun HomeDashboard(
         newsLoading = false
     }
 
-    // Single source of Home truth: raw market/news data enters the engine, and the UI
-    // consumes the resulting structured snapshot. No market calculations are repeated here.
     val intelligence = remember(currentStocks, news) {
         HomeIntelligenceEngine.build(currentStocks, news)
     }
@@ -65,8 +63,6 @@ fun HomeDashboard(
     val gainers = intelligence.gainers
     val losers = intelligence.losers
     val sectorChanges = intelligence.sectors.map { it.sector to it.averageChangePct }
-    val strongestSector = intelligence.sectors.maxByOrNull { it.averageChangePct }
-    val weakestSector = intelligence.sectors.minByOrNull { it.averageChangePct }
     val corporateActions = intelligence.corporateActions
     val companyNews = intelligence.companyNews
 
@@ -92,6 +88,8 @@ fun HomeDashboard(
             Spacer(Modifier.height(7.dp))
             TodaysIntelligence(
                 items = intelligence.intelligence,
+                currentStocks = currentStocks,
+                news = news,
                 openCompany = openCompany,
                 openNews = openNews,
                 openMarket = openMarket
@@ -107,7 +105,6 @@ fun HomeDashboard(
             WhatChanged(
                 changes = intelligence.changes,
                 openCompany = openCompany,
-                openNews = openNews,
                 currentStocks = currentStocks
             )
         }
@@ -210,7 +207,6 @@ private fun HomeHero(advancing: Int, declining: Int, unchanged: Int, reportedVol
             Box(Modifier.fillMaxSize().background(Color(0xCC00523B)))
             Box(Modifier.fillMaxSize().background(Color(0x66002018)))
         }
-
         Column(Modifier.fillMaxWidth()) {
             Row(
                 Modifier.padding(start = 24.dp, end = 20.dp, top = 10.dp),
@@ -229,12 +225,10 @@ private fun HomeHero(advancing: Int, declining: Int, unchanged: Int, reportedVol
                     Box(Modifier.size(8.dp).clip(CircleShape).background(Color(0xFFFF4D5A)).align(Alignment.TopEnd))
                 }
             }
-
             Column(Modifier.padding(start = 30.dp, top = 7.dp, end = 24.dp)) {
                 Text("Good morning, James", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
                 Text("Here's what's happening in the NSE today", color = Color(0xFFE0F2EA), fontSize = 11.sp)
             }
-
             Spacer(Modifier.height(5.dp))
             NasiPulseCard()
             Spacer(Modifier.height(6.dp))
@@ -275,12 +269,7 @@ private fun BreadthLine(label: String, value: Int, color: Color) {
 }
 
 @Composable
-private fun SectionLabel(
-    title: String,
-    subtitle: String,
-    icon: ImageVector,
-    onViewAll: (() -> Unit)? = null
-) {
+private fun SectionLabel(title: String, subtitle: String, icon: ImageVector, onViewAll: (() -> Unit)? = null) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(30.dp).clip(RoundedCornerShape(9.dp)).background(HomeLightGreen)) {
             Icon(icon, null, tint = HomeDarkGreen, modifier = Modifier.padding(6.dp))
@@ -299,6 +288,8 @@ private fun SectionLabel(
 @Composable
 private fun TodaysIntelligence(
     items: List<HomeIntelligenceItem>,
+    currentStocks: List<Stock>,
+    news: List<NewsItem>,
     openCompany: (Stock) -> Unit,
     openNews: (NewsItem) -> Unit,
     openMarket: () -> Unit
@@ -311,9 +302,11 @@ private fun TodaysIntelligence(
                 HomeIntelligenceType.FACT -> HomeGreen
             }
             val targetStock = item.symbol.takeIf { it.isNotBlank() }?.let { symbol ->
-                currentStockForSymbol(symbol, item, openCompany)
+                currentStocks.firstOrNull { it.symbol.equals(symbol, ignoreCase = true) }
             }
-            val newsTarget = item.evidence.firstOrNull()?.takeIf { it.category.equals("news", ignoreCase = true) }
+            val targetNews = if (item.type == HomeIntelligenceType.NEWS) {
+                news.firstOrNull { it.id.toString() == item.evidence.firstOrNull()?.id?.removePrefix("NEWS-") || (item.fact.isNotBlank() && it.title == item.fact) }
+            } else null
 
             IntelligenceItem(
                 type = item.type.name,
@@ -323,13 +316,13 @@ private fun TodaysIntelligence(
                     .joinToString(" "),
                 source = item.source.ifBlank { item.evidence.firstOrNull()?.source ?: "Source unavailable" },
                 accent = accent,
-                actionLabel = if (item.type == HomeIntelligenceType.NEWS) "Source" else if (targetStock != null) "Open" else "Source",
+                actionLabel = when {
+                    targetNews != null -> "Source"
+                    targetStock != null -> "Open"
+                    else -> "Source"
+                },
                 onAction = when {
-                    item.type == HomeIntelligenceType.NEWS -> {
-                        // The engine exposes the source URL/evidence, while the existing app navigation
-                        // remains the source of truth for opening the corresponding NewsItem.
-                        { openMarket() }
-                    }
+                    targetNews != null -> { { openNews(targetNews) } }
                     targetStock != null -> { { openCompany(targetStock) } }
                     else -> openMarket
                 }
@@ -341,24 +334,9 @@ private fun TodaysIntelligence(
     }
 }
 
-private fun currentStockForSymbol(symbol: String, item: HomeIntelligenceItem, openCompany: (Stock) -> Unit): Stock? = null
-
 @Composable
-private fun IntelligenceItem(
-    type: String,
-    title: String,
-    detail: String,
-    source: String,
-    accent: Color,
-    actionLabel: String,
-    onAction: () -> Unit
-) {
-    Card(
-        Modifier.fillMaxWidth(),
-        RoundedCornerShape(15.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = BorderStroke(1.dp, HomeBorder)
-    ) {
+private fun IntelligenceItem(type: String, title: String, detail: String, source: String, accent: Color, actionLabel: String, onAction: () -> Unit) {
+    Card(Modifier.fillMaxWidth(), RoundedCornerShape(15.dp), colors = CardDefaults.cardColors(containerColor = Color.White), border = BorderStroke(1.dp, HomeBorder)) {
         Column(Modifier.padding(11.dp)) {
             Row(verticalAlignment = Alignment.Top) {
                 Box(Modifier.size(28.dp).clip(RoundedCornerShape(8.dp)).background(accent.copy(alpha = .11f)), contentAlignment = Alignment.Center) {
@@ -383,12 +361,7 @@ private fun IntelligenceItem(
 }
 
 @Composable
-private fun WhatChanged(
-    changes: List<HomeChangeItem>,
-    openCompany: (Stock) -> Unit,
-    openNews: (NewsItem) -> Unit,
-    currentStocks: List<Stock>
-) {
+private fun WhatChanged(changes: List<HomeChangeItem>, openCompany: (Stock) -> Unit, currentStocks: List<Stock>) {
     Column(Modifier.padding(horizontal = 14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
         changes.take(6).forEach { change ->
             val stock = change.symbol.takeIf { it.isNotBlank() }?.let { symbol -> currentStocks.firstOrNull { it.symbol.equals(symbol, ignoreCase = true) } }
@@ -396,10 +369,10 @@ private fun WhatChanged(
                 label = change.label,
                 detail = change.detail,
                 value = change.value ?: "—",
-                valueColor = when (change.type) {
-                    HomeIntelligenceType.FACT -> if (change.value?.startsWith("-") == true) HomeRed else HomeGreen
-                    HomeIntelligenceType.CALCULATION -> if (change.value?.startsWith("-") == true) HomeRed else HomeDarkGreen
-                    HomeIntelligenceType.NEWS -> HomeDarkGreen
+                valueColor = when {
+                    change.value?.startsWith("-") == true -> HomeRed
+                    change.type == HomeIntelligenceType.CALCULATION -> HomeDarkGreen
+                    else -> HomeGreen
                 },
                 onClick = stock?.let { { openCompany(it) } }
             )
@@ -411,17 +384,8 @@ private fun WhatChanged(
 }
 
 @Composable
-private fun ChangeRow(
-    label: String,
-    detail: String,
-    value: String,
-    valueColor: Color,
-    onClick: (() -> Unit)? = null
-) {
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(Color.White).border(1.dp, HomeBorder, RoundedCornerShape(13.dp)).clickable(enabled = onClick != null, onClick = { onClick?.invoke() }).padding(horizontal = 11.dp, vertical = 9.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+private fun ChangeRow(label: String, detail: String, value: String, valueColor: Color, onClick: (() -> Unit)? = null) {
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(Color.White).border(1.dp, HomeBorder, RoundedCornerShape(13.dp)).clickable(enabled = onClick != null, onClick = { onClick?.invoke() }).padding(horizontal = 11.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(label, color = HomeMuted, fontSize = 8.sp, fontWeight = FontWeight.SemiBold)
             Text(detail, color = HomeTextDark, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1)
@@ -463,10 +427,7 @@ private fun MoverTab(text: String, selected: Boolean, onClick: () -> Unit) {
 
 @Composable
 private fun CompactMoverRow(stock: Stock, onClick: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color.White).border(1.dp, HomeBorder, RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(horizontal = 9.dp, vertical = 7.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color.White).border(1.dp, HomeBorder, RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(horizontal = 9.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
         HomeLogo(stock.symbol, stock.logoUrl, 31)
         Spacer(Modifier.width(8.dp))
         Column(Modifier.weight(1f)) {
@@ -567,12 +528,7 @@ private fun QuickActions(openMarket: () -> Unit, openNews: (() -> Unit)?) {
 
 @Composable
 private fun QuickAction(label: String, icon: ImageVector, onClick: () -> Unit, modifier: Modifier, enabled: Boolean = true) {
-    Card(
-        modifier = modifier.clickable(enabled = enabled, onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = if (enabled) HomeLightGreen else Color(0xFFF3F5F4)),
-        border = BorderStroke(1.dp, HomeBorder)
-    ) {
+    Card(modifier = modifier.clickable(enabled = enabled, onClick = onClick), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = if (enabled) HomeLightGreen else Color(0xFFF3F5F4)), border = BorderStroke(1.dp, HomeBorder)) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
             Icon(icon, null, tint = if (enabled) HomeDarkGreen else HomeMuted, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(5.dp))
@@ -600,7 +556,6 @@ private fun EmptyHomeCard(title: String, subtitle: String) {
             Text(subtitle, color = HomeMuted, fontSize = 8.sp, lineHeight = 11.sp)
         }
     }
-
 }
 
 @Composable
