@@ -10,6 +10,7 @@ import java.net.URLEncoder
 
 object MovementIntelligenceCache {
     private const val BASE_URL = "https://nse-watcher.vercel.app/api/moving?symbol="
+    private const val CONNECTION_VERSION = "movement-ui-v1"
 
     data class Move(
         val periodDays: Int = 1,
