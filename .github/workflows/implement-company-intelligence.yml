@@ -1,0 +1,83 @@
+name: Implement Company Intelligence
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: ""
+
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Install Gradle
+        run: |
+          curl -fsSL https://services.gradle.org/distributions/gradle-8.14.4-bin.zip -o gradle.zip
+          unzip -q gradle.zip
+          echo "$GITHUB_WORKSPACE/gradle-8.14.4/bin" >> "$GITHUB_PATH"
+
+      - name: Wire Company Intelligence screen
+        id: wire
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('app/src/main/java/ke/co/nsewatcher/DesignActivity.kt')
+          text = path.read_text()
+          start = text.find('@Composable\nprivate fun Company(s: Stock, back: () -> Unit) {')
+          marker = '@Composable\nprivate fun CompanyNewsSection'
+          end = text.find(marker, start)
+
+          if start < 0 or end < 0:
+              raise SystemExit('Company function boundaries not found')
+
+          replacement = '''@Composable\nprivate fun Company(s: Stock, back: () -> Unit) {\n    CompanyIntelligence(s, back)\n}\n\n'''
+          text = text[:start] + replacement + text[end:]
+          path.write_text(text)
+          print('Company route wired to CompanyIntelligence.kt')
+          PY
+
+      - name: Build Android app
+        run: gradle --no-daemon build
+
+      - name: Commit implementation
+        if: steps.wire.outcome == 'success'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java/ke/co/nsewatcher/DesignActivity.kt
+          git commit -m "feat: wire company intelligence into company route" || true
+          git push
+
+      - name: Remove temporary implementation workflow
+        if: steps.wire.outcome == 'skipped'
+        run: |
+          rm -f .github/workflows/implement-company-intelligence.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/workflows/implement-company-intelligence.yml
+          git commit -m "chore: remove temporary company intelligence workflow" || true
+          git push
