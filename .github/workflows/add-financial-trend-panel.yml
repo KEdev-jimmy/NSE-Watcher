@@ -1,0 +1,115 @@
+name: Add Financial Trend Panel
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  contents: write
+
+env:
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: ""
+
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Install Gradle
+        run: |
+          curl -fsSL https://services.gradle.org/distributions/gradle-8.14.4-bin.zip -o gradle.zip
+          unzip -q gradle.zip
+          echo "$GITHUB_WORKSPACE/gradle-8.14.4/bin" >> "$GITHUB_PATH"
+
+      - name: Add sourced financial trend panel
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('app/src/main/java/ke/co/nsewatcher/CompanyIntelligence.kt')
+          text = path.read_text()
+          anchor = '''        item { SectionTitle("Valuation", "How the current price relates to reported metrics", Icons.Default.Calculate) }'''
+          if 'SectionTitle("Financial trend"' in text:
+              raise SystemExit('Financial trend panel already present')
+          insert = '''        item { SectionTitle("Financial trend", "Reported periods returned by the company data source", Icons.Default.BarChart) }
+        item {
+            IntelligenceCard {
+                if (intelligence.financialHistory.isEmpty()) {
+                    Text(
+                        "No comparable historical financial series was returned for this company yet. NSE Watcher will not manufacture a trend from missing data.",
+                        color = IntelligenceMuted,
+                        fontSize = 10.sp,
+                        lineHeight = 15.sp
+                    )
+                } else {
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+                        Column(Modifier.width(82.dp)) {
+                            Text("Period", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = IntelligenceMuted)
+                            intelligence.financialHistory.takeLast(6).forEach { point ->
+                                Text(point.period.ifBlank { "Reported" }, fontSize = 9.sp, color = IntelligenceText, modifier = Modifier.padding(top = 11.dp))
+                            }
+                        }
+                        Column(Modifier.width(105.dp)) {
+                            Text("Revenue", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = IntelligenceMuted)
+                            intelligence.financialHistory.takeLast(6).forEach { point ->
+                                Text(valueOrMissing(point.revenue), fontSize = 9.sp, color = IntelligenceText, modifier = Modifier.padding(top = 11.dp))
+                            }
+                        }
+                        Column(Modifier.width(105.dp)) {
+                            Text("Profit", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = IntelligenceMuted)
+                            intelligence.financialHistory.takeLast(6).forEach { point ->
+                                Text(valueOrMissing(point.profit), fontSize = 9.sp, color = IntelligenceText, modifier = Modifier.padding(top = 11.dp))
+                            }
+                        }
+                        Column(Modifier.width(90.dp)) {
+                            Text("EPS", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = IntelligenceMuted)
+                            intelligence.financialHistory.takeLast(6).forEach { point ->
+                                Text(valueOrMissing(point.eps), fontSize = 9.sp, color = IntelligenceText, modifier = Modifier.padding(top = 11.dp))
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Source: MyStocks Africa company financial data. Periods are shown as supplied; no growth rate is inferred when comparable values are missing.",
+                        color = IntelligenceMuted,
+                        fontSize = 8.sp,
+                        lineHeight = 13.sp
+                    )
+                }
+            }
+        }
+
+'''
+          if anchor not in text:
+              raise SystemExit('Valuation section anchor not found')
+          text = text.replace(anchor, insert + anchor, 1)
+          path.write_text(text)
+          PY
+
+      - name: Build debug APK
+        run: gradle --no-daemon assembleDebug
+
+      - name: Commit implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java/ke/co/nsewatcher/CompanyIntelligence.kt
+          git commit -m "feat: add sourced financial trend panel" || true
+          git push
