@@ -29,6 +29,10 @@ function periodConfig(period) {
   const start = new Date(end);
   let interval = '1d';
   switch (String(period || '1y').toLowerCase()) {
+    case '3d':
+      start.setDate(start.getDate() - 3);
+      interval = '1d';
+      break;
     case '1d':
       start.setDate(start.getDate() - 1);
       interval = '15m';
@@ -52,6 +56,10 @@ function periodConfig(period) {
     case '1y':
       start.setFullYear(start.getFullYear() - 1);
       interval = '1w';
+      break;
+    case '3y':
+      start.setFullYear(start.getFullYear() - 3);
+      interval = '1mo';
       break;
     case '5y':
       start.setFullYear(start.getFullYear() - 5);
