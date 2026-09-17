@@ -42,9 +42,7 @@ object MyStocksCache {
                 if (history.size >= 2) {
                     // Use the same 1D observation series shown in Company
                     // Intelligence. The first point is the previous close and
-                    // the final point is the latest delayed observation. This
-                    // prevents the headline quote and 1D chart from using
-                    // different intraday baselines.
+                    // the final point is the latest delayed observation.
                     val latest = history.last()
                     val previousClose = history.first()
                     val dayChange = if (previousClose > 0.0) {
@@ -165,8 +163,7 @@ object MyStocksCache {
                             history = listOf(historyStart, price),
                             logoUrl = item.optString("logoUrl").takeIf { it.isNotBlank() },
                             sector = item.optString("sector", "Other").ifBlank { "Other" },
-                            volume = item.optLong("volume", 0L).coerceAtLeast(0L),
-                            lastPriceUpdate = item.optString("lastPriceUpdate", "")
+                            volume = item.optLong("volume", 0L).coerceAtLeast(0L)
                         )
                     )
                 }
