@@ -79,12 +79,6 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit) {
     val profile = intelligence.profile
     val monthlyReturn = percentReturn(monthHistory)
     val intelligenceView = CompanyIntelligenceEngine.build(s, intelligence, monthHistory, news)
-    val intelligenceLine = when {
-        monthlyReturn != null && news.isNotEmpty() -> "${s.name} has moved ${formatSigned(monthlyReturn)} over the last month. ${news.size} recent company intelligence item${if (news.size == 1) " is" else "s are"} available below."
-        monthlyReturn != null -> "${s.name} has moved ${formatSigned(monthlyReturn)} over the last month. Historical market context is shown below."
-        news.isNotEmpty() -> "Recent company intelligence is available below. Historical monthly performance is not currently available from the data source."
-        else -> "Current NSE data is available. More company evidence will appear as the provider returns financial, dividend and news data."
-    }
 
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
@@ -165,8 +159,8 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit) {
         item {
             IntelligenceCard {
                 MetricGrid(listOf(
-                    "Revenue" to valueOrMissing(profile.revenue),
-                    "Profit" to valueOrMissing(profile.profit),
+                    "Revenue" to formatFinancialValue(profile.revenue),
+                    "Profit" to formatFinancialValue(profile.profit),
                     "EPS" to valueOrMissing(profile.eps),
                     "ROE" to valueOrMissing(profile.roe),
                     "Debt / Equity" to valueOrMissing(profile.debtToEquity),
@@ -195,7 +189,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit) {
                     "P/E" to valueOrMissing(profile.pe),
                     "P/B" to valueOrMissing(profile.pb),
                     "Dividend yield" to valueOrMissing(profile.dividendYield),
-                    "Market cap" to valueOrMissing(profile.marketCap)
+                    "Market cap" to formatMarketCap(profile.marketCap)
                 ))
                 Spacer(Modifier.height(8.dp))
                 Text("Historical valuation context is not displayed until a sourced valuation history is available.", color = IntelligenceMuted, fontSize = 9.sp)
@@ -307,107 +301,107 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit) {
             }
         }
 
-item { SectionTitle("Bull / Bear / Unknown", "A balanced view of the available evidence", Icons.Default.CompareArrows) }
-item {
-    IntelligenceCard {
-        EvidencePerspective("Supporting case", IntelligenceGreen, buildList {
-            if (profile.revenueGrowth.isNotBlank()) add("Revenue growth: ${profile.revenueGrowth}")
-            if (profile.profitGrowth.isNotBlank()) add("Profit growth: ${profile.profitGrowth}")
-            if (profile.roe.isNotBlank()) add("ROE: ${profile.roe}")
-            if (intelligence.dividends.isNotEmpty()) add("Dividend history is available for review")
-        })
-        EvidencePerspective("Counter-evidence", IntelligenceRed, buildList {
-            if (s.change < 0) add("Today's price change: ${String.format(Locale.US, "%+.2f%%", s.change)}")
-            if (profile.revenueGrowth.toDoubleOrNull()?.let { it < 0 } == true) add("Revenue growth is negative")
-            if (profile.profitGrowth.toDoubleOrNull()?.let { it < 0 } == true) add("Profit growth is negative")
-            if (profile.eps.toDoubleOrNull()?.let { it < 0 } == true) add("EPS is negative")
-        })
-        EvidencePerspective("Unknown / investigate", IntelligenceMuted, buildList {
-            if (profile.pe.isBlank()) add("P/E not available")
-            if (profile.pb.isBlank()) add("P/B not available")
-            if (profile.debtToEquity.isBlank()) add("Debt/equity not available")
-            if (news.isEmpty()) add("Recent events need verification from issuer/NSE sources")
-        })
-    }
-}
+        item { SectionTitle("Bull / Bear / Unknown", "A balanced view of the available evidence", Icons.Default.CompareArrows) }
+        item {
+            IntelligenceCard {
+                EvidencePerspective("Supporting case", IntelligenceGreen, buildList {
+                    if (profile.revenueGrowth.isNotBlank()) add("Revenue growth: ${profile.revenueGrowth}")
+                    if (profile.profitGrowth.isNotBlank()) add("Profit growth: ${profile.profitGrowth}")
+                    if (profile.roe.isNotBlank()) add("ROE: ${profile.roe}")
+                    if (intelligence.dividends.isNotEmpty()) add("Dividend history is available for review")
+                })
+                EvidencePerspective("Counter-evidence", IntelligenceRed, buildList {
+                    if (s.change < 0) add("Today's price change: ${String.format(Locale.US, "%+.2f%%", s.change)}")
+                    if (profile.revenueGrowth.toDoubleOrNull()?.let { it < 0 } == true) add("Revenue growth is negative")
+                    if (profile.profitGrowth.toDoubleOrNull()?.let { it < 0 } == true) add("Profit growth is negative")
+                    if (profile.eps.toDoubleOrNull()?.let { it < 0 } == true) add("EPS is negative")
+                })
+                EvidencePerspective("Unknown / investigate", IntelligenceMuted, buildList {
+                    if (profile.pe.isBlank()) add("P/E not available")
+                    if (profile.pb.isBlank()) add("P/B not available")
+                    if (profile.debtToEquity.isBlank()) add("Debt/equity not available")
+                    if (news.isEmpty()) add("Recent events need verification from issuer/NSE sources")
+                })
+            }
+        }
 
-item { SectionTitle("Company timeline", "Recent intelligence events in context", Icons.Default.Timeline) }
-item {
-    IntelligenceCard {
-        if (news.isEmpty()) {
-            Text("The timeline will populate when dated company intelligence is available.", color = IntelligenceMuted, fontSize = 10.sp)
-        } else {
-            news.take(8).forEachIndexed { index, item ->
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Surface(Modifier.size(10.dp), RoundedCornerShape(50), color = IntelligenceGreen) {}
-                        if (index < news.take(8).lastIndex) Box(Modifier.width(1.dp).height(42.dp).background(IntelligenceBorder))
-                    }
-                    Spacer(Modifier.width(10.dp))
-                    Column(Modifier.weight(1f).padding(bottom = 8.dp)) {
-                        Text(item.publishedAt.take(10).ifBlank { "Recent" }, color = IntelligenceMuted, fontSize = 8.sp)
-                        Text(item.title, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 3)
+        item { SectionTitle("Company timeline", "Recent intelligence events in context", Icons.Default.Timeline) }
+        item {
+            IntelligenceCard {
+                if (news.isEmpty()) {
+                    Text("The timeline will populate when dated company intelligence is available.", color = IntelligenceMuted, fontSize = 10.sp)
+                } else {
+                    news.take(8).forEachIndexed { index, item ->
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Surface(Modifier.size(10.dp), RoundedCornerShape(50), color = IntelligenceGreen) {}
+                                if (index < news.take(8).lastIndex) Box(Modifier.width(1.dp).height(42.dp).background(IntelligenceBorder))
+                            }
+                            Spacer(Modifier.width(10.dp))
+                            Column(Modifier.weight(1f).padding(bottom = 8.dp)) {
+                                Text(item.publishedAt.take(10).ifBlank { "Recent" }, color = IntelligenceMuted, fontSize = 8.sp)
+                                Text(item.title, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 3)
+                            }
+                        }
                     }
                 }
             }
         }
-    }
-}
 
-item { SectionTitle("Ask NSE Watcher", "Questions to investigate before making your own decision", Icons.Default.Psychology) }
-item {
-    IntelligenceCard {
-        Text("Use these prompts as an analyst checklist. AI answers will be connected to the sourced evidence layer after the intelligence data pipeline is complete.", color = IntelligenceMuted, fontSize = 10.sp, lineHeight = 15.sp)
-        Spacer(Modifier.height(9.dp))
-        listOf(
-            "Why did ${s.symbol} move recently?",
-            "Explain ${s.name} like I'm a beginner.",
-            "What changed in the latest company information?",
-            "What are the biggest risks I should investigate?",
-            "What evidence supports the current picture?"
-        ).forEach { prompt ->
-            Surface(Modifier.fillMaxWidth().padding(vertical = 3.dp), RoundedCornerShape(12.dp), color = IntelligenceLight) {
-                Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.QuestionMark, null, tint = IntelligenceGreen, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(prompt, fontSize = 10.sp, color = IntelligenceText)
+        item { SectionTitle("Ask NSE Watcher", "Questions to investigate before making your own decision", Icons.Default.Psychology) }
+        item {
+            IntelligenceCard {
+                Text("Use these prompts as an analyst checklist. AI answers will be connected to the sourced evidence layer after the intelligence data pipeline is complete.", color = IntelligenceMuted, fontSize = 10.sp, lineHeight = 15.sp)
+                Spacer(Modifier.height(9.dp))
+                listOf(
+                    "Why did ${s.symbol} move recently?",
+                    "Explain ${s.name} like I'm a beginner.",
+                    "What changed in the latest company information?",
+                    "What are the biggest risks I should investigate?",
+                    "What evidence supports the current picture?"
+                ).forEach { prompt ->
+                    Surface(Modifier.fillMaxWidth().padding(vertical = 3.dp), RoundedCornerShape(12.dp), color = IntelligenceLight) {
+                        Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.QuestionMark, null, tint = IntelligenceGreen, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(prompt, fontSize = 10.sp, color = IntelligenceText)
+                        }
+                    }
                 }
             }
         }
-    }
-}
 
-item { SectionTitle("Beginner guide", "Understand the numbers before interpreting them", Icons.Default.School) }
-item {
-    IntelligenceCard {
-        listOf(
-            "P/E" to "Price compared with earnings per share. Compare it with the company's history and sector, not in isolation.",
-            "ROE" to "Return on equity. It describes how efficiently reported profit is generated from shareholders' equity.",
-            "EPS" to "Earnings per share. It shows the portion of reported earnings attributable to each share.",
-            "Dividend yield" to "Dividend relative to the share price. A higher yield is not automatically a better investment.",
-            "Debt / equity" to "A leverage measure comparing debt with shareholders' equity. Compare it over time and with peers."
-        ).forEach { (term, explanation) ->
-            Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-                Text(term, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = IntelligenceGreen)
-                Text(explanation, fontSize = 9.sp, lineHeight = 14.sp, color = IntelligenceText)
+        item { SectionTitle("Beginner guide", "Understand the numbers before interpreting them", Icons.Default.School) }
+        item {
+            IntelligenceCard {
+                listOf(
+                    "P/E" to "Price compared with earnings per share. Compare it with the company's history and sector, not in isolation.",
+                    "ROE" to "Return on equity. It describes how efficiently reported profit is generated from shareholders' equity.",
+                    "EPS" to "Earnings per share. It shows the portion of reported earnings attributable to each share.",
+                    "Dividend yield" to "Dividend relative to the share price. A higher yield is not automatically a better investment.",
+                    "Debt / equity" to "A leverage measure comparing debt with shareholders' equity. Compare it over time and with peers."
+                ).forEach { (term, explanation) ->
+                    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+                        Text(term, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = IntelligenceGreen)
+                        Text(explanation, fontSize = 9.sp, lineHeight = 14.dp, color = IntelligenceText)
+                    }
+                    HorizontalDivider(color = IntelligenceBorder)
+                }
             }
-            HorizontalDivider(color = IntelligenceBorder)
         }
-    }
-}
 
-item { SectionTitle("What to investigate next", "A practical research checklist", Icons.Default.Checklist) }
-item {
-    IntelligenceCard {
-        listOf(
-            "Read the latest results and compare revenue, profit and EPS with prior periods.",
-            "Check the latest issuer and NSE announcements for material events.",
-            "Compare valuation measures with the company's own history and relevant peers.",
-            "Review dividend consistency, payout dates and sustainability.",
-            "Look at the price chart alongside company events instead of treating price movement as an explanation."
-        ).forEach { Watchpoint(it) }
-    }
-}
+        item { SectionTitle("What to investigate next", "A practical research checklist", Icons.Default.Checklist) }
+        item {
+            IntelligenceCard {
+                listOf(
+                    "Read the latest results and compare revenue, profit and EPS with prior periods.",
+                    "Check the latest issuer and NSE announcements for material events.",
+                    "Compare valuation measures with the company's own history and relevant peers.",
+                    "Review dividend consistency, payout dates and sustainability.",
+                    "Look at the price chart alongside company events instead of treating price movement as an explanation."
+                ).forEach { Watchpoint(it) }
+            }
+        }
 
         item {
             IntelligenceCard {
@@ -435,7 +429,6 @@ item {
         }
     }
 }
-
 
 @Composable
 private fun SignalGroup(title: String, tint: Color, items: List<String>) {
@@ -595,6 +588,29 @@ private fun currencyLabel(value: Double): String = String.format(Locale.US, "KSh
 private fun priceAxis(value: Double): String = String.format(Locale.US, "%.2f", value)
 
 private fun valueOrMissing(value: String): String = value.trim().takeIf { it.isNotBlank() } ?: "Not available"
+
+private fun formatFinancialValue(value: String): String {
+    val clean = value.trim()
+    if (clean.isBlank()) return "Not available"
+    val millions = clean.replace(",", "").toDoubleOrNull() ?: return clean
+    return if (millions >= 1000.0) {
+        String.format(Locale.US, "KSh %.2fB", millions / 1000.0)
+    } else {
+        String.format(Locale.US, "KSh %,.0fM", millions)
+    }
+}
+
+private fun formatMarketCap(value: String): String {
+    val clean = value.trim()
+    if (clean.isBlank()) return "Not available"
+    val absoluteKsh = clean.replace(",", "").toDoubleOrNull() ?: return clean
+    return when {
+        absoluteKsh >= 1_000_000_000_000.0 -> String.format(Locale.US, "KSh %.2fT", absoluteKsh / 1_000_000_000_000.0)
+        absoluteKsh >= 1_000_000_000.0 -> String.format(Locale.US, "KSh %.2fB", absoluteKsh / 1_000_000_000.0)
+        absoluteKsh >= 1_000_000.0 -> String.format(Locale.US, "KSh %.2fM", absoluteKsh / 1_000_000.0)
+        else -> String.format(Locale.US, "KSh %,.0f", absoluteKsh)
+    }
+}
 
 private fun percentReturn(values: List<Double>): Double? {
     val valid = values.filter { it.isFinite() && it > 0.0 }
