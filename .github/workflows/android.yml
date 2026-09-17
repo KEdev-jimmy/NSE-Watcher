@@ -8,7 +8,7 @@ on:
     branches: [ "main" ]
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   GRADLE_OPTS: "-Dorg.gradle.daemon=false"
@@ -40,24 +40,6 @@ jobs:
           curl -fsSL https://services.gradle.org/distributions/gradle-8.14.4-bin.zip -o gradle.zip
           unzip -q gradle.zip
           echo "$GITHUB_WORKSPACE/gradle-8.14.4/bin" >> "$GITHUB_PATH"
-
-      - name: Repair Android source compile error
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path("app/src/main/java/ke/co/nsewatcher/CompanyIntelligence.kt")
-          text = path.read_text()
-          fixed = text.replace("lineHeight = 14.dp", "lineHeight = 14.sp")
-          if fixed != text:
-              path.write_text(fixed)
-          PY
-          if ! git diff --quiet -- app/src/main/java/ke/co/nsewatcher/CompanyIntelligence.kt; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add app/src/main/java/ke/co/nsewatcher/CompanyIntelligence.kt
-            git commit -m "Fix Company Intelligence Android compile error [skip ci]"
-            git push origin HEAD:main
-          fi
 
       - name: Build with Gradle
         run: gradle --no-daemon build
