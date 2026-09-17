@@ -178,18 +178,27 @@ module.exports = async (req, res) => {
       });
     }
 
-    const [profileResponse, dividendResponse] = await Promise.allSettled([
+    const [profileResponse, dividendResponse, newsResponse] = await Promise.allSettled([
       mystocks(`/companies/${encodeURIComponent(symbol)}`),
       mystocks(`/dividends/${encodeURIComponent(symbol)}/history?limit=12`),
+      mystocks(`/companies/${encodeURIComponent(symbol)}/news?limit=10`),
     ]);
 
     const profile = profileResponse.status === 'fulfilled' ? firstObject(profileResponse.value) : null;
     const dividends = dividendResponse.status === 'fulfilled'
       ? (dividendResponse.value.history || dividendResponse.value.data || [])
       : [];
+    const news = newsResponse.status === 'fulfilled'
+      ? (newsResponse.value.items || newsResponse.value.news || newsResponse.value.data || [])
+      : [];
     const fetchedAt = new Date().toISOString();
     const financialHistory = profile ? normalizeFinancialHistory(profile) : [];
     const evidence = buildEvidence(profile || {}, Array.isArray(dividends) ? dividends : [], financialHistory, fetchedAt, symbol);
+    news.slice(0, 10).forEach((item, index) => {
+      const title = pick(item, ['title', 'headline', 'name']);
+      const publishedAt = pick(item, ['publishedAt', 'published', 'date', 'createdAt']);
+      if (title) evidence.push({ claim: `Company intelligence item ${index + 1}`, value: [title, publishedAt].filter(Boolean).join(' • '), source: 'MyStocks Africa', endpoint: `/companies/${symbol}/news`, symbol, fetchedAt });
+    });
 
     if (!profile && !dividends.length) {
       const firstError = profileResponse.status === 'rejected' ? profileResponse.reason : dividendResponse.reason;
@@ -210,14 +219,17 @@ module.exports = async (req, res) => {
       profile,
       dividends,
       financialHistory,
+      news,
       evidence,
       dataQuality: {
         profileAvailable: Boolean(profile),
         dividendHistoryAvailable: Array.isArray(dividends) && dividends.length > 0,
         financialHistoryAvailable: financialHistory.length > 0,
+        newsAvailable: Array.isArray(news) && news.length > 0,
         evidenceCount: evidence.length,
       },
-      partial: !profile || dividendResponse.status !== 'fulfilled',
+      providerStatus: { profile: profileResponse.status, dividends: dividendResponse.status, news: newsResponse.status },
+      partial: !profile || dividendResponse.status !== 'fulfilled' || newsResponse.status !== 'fulfilled',
     });
   } catch (error) {
     return json(res, error.status || 502, {

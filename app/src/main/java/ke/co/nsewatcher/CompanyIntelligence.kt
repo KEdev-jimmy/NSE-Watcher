@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import ke.co.nsewatcher.data.CompanyIntelligenceCache
+import ke.co.nsewatcher.data.CompanyIntelligenceEngine
 import ke.co.nsewatcher.data.MyStocksCache
 import ke.co.nsewatcher.data.NewsCache
 import java.util.Locale
@@ -77,6 +78,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit) {
 
     val profile = intelligence.profile
     val monthlyReturn = percentReturn(monthHistory)
+    val intelligenceView = CompanyIntelligenceEngine.build(s, intelligence, monthHistory, news)
     val intelligenceLine = when {
         monthlyReturn != null && news.isNotEmpty() -> "${s.name} has moved ${formatSigned(monthlyReturn)} over the last month. ${news.size} recent company intelligence item${if (news.size == 1) " is" else "s are"} available below."
         monthlyReturn != null -> "${s.name} has moved ${formatSigned(monthlyReturn)} over the last month. Historical market context is shown below."
@@ -140,7 +142,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit) {
                             Text("Building the company evidence view…", color = Color.White.copy(alpha = .82f), fontSize = 10.sp)
                         }
                     } else {
-                        Text(intelligenceLine, color = Color.White, fontSize = 11.sp, lineHeight = 17.sp)
+                        Text(intelligenceView.summary, color = Color.White, fontSize = 11.sp, lineHeight = 17.sp)
                     }
                 }
             }
@@ -284,47 +286,26 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit) {
         item { SectionTitle("Risks to investigate", "Questions raised by the available evidence", Icons.Default.Warning) }
         item {
             IntelligenceCard {
-                val risks = buildList {
-                    if (kotlin.math.abs(s.change) >= 5.0) add("The share moved ${String.format(Locale.US, "%+.2f%%", s.change)} today. Investigate the announcement or market event behind the move.")
-                    profile.debtToEquity.toDoubleOrNull()?.let { add("Debt / equity is ${profile.debtToEquity}. Compare it with the company's history and sector peers.") }
-                    profile.eps.toDoubleOrNull()?.takeIf { it < 0 }?.let { add("Latest EPS is negative. Review the latest reported results and management outlook.") }
-                    if (profile.revenue.isBlank() || profile.profit.isBlank()) add("Some financial fields are unavailable. Missing data should not be treated as a positive signal.")
-                    if (news.isEmpty()) add("No recent company intelligence was returned. Check official issuer and NSE announcements for material events.")
+                if (intelligenceView.risks.isEmpty()) {
+                    Text("No automatic watchpoint was generated from the currently available evidence. This does not mean the company has no risks.", color = IntelligenceMuted, fontSize = 10.sp)
+                } else {
+                    intelligenceView.risks.forEach { Watchpoint(it) }
                 }
-                if (risks.isEmpty()) Text("No automatic watchpoint was generated from the currently available fields. This is not a statement that the company has no risks.", color = IntelligenceMuted, fontSize = 10.sp)
-                risks.forEach { text -> Watchpoint(text) }
             }
         }
 
-        item { SectionTitle("Intelligence signals", "Supporting evidence, caution signals and unknowns", Icons.Default.Insights) }
-item {
-    IntelligenceCard {
-        val supporting = buildList {
-            if (monthlyReturn != null && monthlyReturn > 0) add("The share price is above its starting point for the selected monthly context.")
-            if (profile.revenueGrowth.toDoubleOrNull()?.let { it > 0 } == true) add("Reported revenue growth is positive.")
-            if (profile.profitGrowth.toDoubleOrNull()?.let { it > 0 } == true) add("Reported profit growth is positive.")
-            if (intelligence.dividends.isNotEmpty()) add("Dividend records are available for review.")
+        item { SectionTitle("Intelligence signals", "Deterministic evidence signals — no invented conclusions", Icons.Default.Insights) }
+        item {
+            IntelligenceCard {
+                Text(intelligenceView.confidence, color = IntelligenceGreen, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold)
+                Spacer(Modifier.height(6.dp))
+                Text("Coverage: ${intelligenceView.quality.state} • ${intelligenceView.quality.availableCount}/5 evidence areas", color = IntelligenceMuted, fontSize = 9.sp)
+                Spacer(Modifier.height(10.dp))
+                SignalGroup("SUPPORTING", IntelligenceGreen, intelligenceView.signals.filter { it.type == CompanyIntelligenceEngine.SignalType.SUPPORTING }.map { it.text })
+                SignalGroup("CAUTION", IntelligenceRed, intelligenceView.signals.filter { it.type == CompanyIntelligenceEngine.SignalType.CAUTION }.map { it.text })
+                SignalGroup("UNKNOWN / NEEDS EVIDENCE", IntelligenceMuted, intelligenceView.unknowns)
+            }
         }
-        val caution = buildList {
-            if (s.change < -5) add("Today's price move is sharply negative; investigate the underlying announcement or market event.")
-            if (profile.revenueGrowth.toDoubleOrNull()?.let { it < 0 } == true) add("Reported revenue growth is negative.")
-            if (profile.profitGrowth.toDoubleOrNull()?.let { it < 0 } == true) add("Reported profit growth is negative.")
-            if (profile.eps.toDoubleOrNull()?.let { it < 0 } == true) add("Reported EPS is negative.")
-        }
-        val unknown = buildList {
-            if (profile.revenue.isBlank()) add("Revenue is not available in the current provider response.")
-            if (profile.profit.isBlank()) add("Profit is not available in the current provider response.")
-            if (profile.pe.isBlank() || profile.pb.isBlank()) add("Complete valuation context is not available.")
-            if (news.isEmpty()) add("No recent company intelligence was returned.")
-        }
-        SignalGroup("SUPPORTING", IntelligenceGreen, supporting)
-        SignalGroup("CAUTION", IntelligenceRed, caution)
-        SignalGroup("UNKNOWN / NEEDS EVIDENCE", IntelligenceMuted, unknown)
-        if (supporting.isEmpty() && caution.isEmpty() && unknown.isEmpty()) {
-            Text("There is not enough structured evidence to generate signals yet.", color = IntelligenceMuted, fontSize = 10.sp)
-        }
-    }
-}
 
 item { SectionTitle("Bull / Bear / Unknown", "A balanced view of the available evidence", Icons.Default.CompareArrows) }
 item {
@@ -427,6 +408,14 @@ item {
         ).forEach { Watchpoint(it) }
     }
 }
+
+        item {
+            IntelligenceCard {
+                EvidenceRow("Coverage", "${intelligenceView.quality.state} • ${intelligenceView.quality.availableCount}/5 areas")
+                EvidenceRow("Evidence", "${intelligenceView.quality.evidenceCount} sourced claims returned")
+                EvidenceRow("Confidence", intelligenceView.confidence)
+            }
+        }
 
         item { SectionTitle("Evidence", "Where the important information came from", Icons.Default.Verified) }
         item {
