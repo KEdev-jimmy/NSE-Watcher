@@ -34,9 +34,9 @@ function periodConfig(period) {
       interval = '1d';
       break;
     case '1d':
-      // Intraday chart: NSE observations are 15-minute delayed.
-      // Include yesterday as the query boundary so the provider can return
-      // the latest trading-session observations when the market is closed.
+      // Fetch a small window that includes the previous session so we can use
+      // its close as the 1D performance baseline. The Android chart receives
+      // only the latest trading session plus that baseline.
       start.setDate(start.getDate() - 2);
       interval = '15m';
       break;
@@ -91,6 +91,16 @@ function candleArray(raw) {
   return [];
 }
 
+function candleTimestamp(candle) {
+  const raw = candle?.timestamp || candle?.date;
+  const value = raw ? new Date(raw) : null;
+  return value && Number.isFinite(value.getTime()) ? value : null;
+}
+
+function providerAsOf(raw) {
+  return raw?.asOf || raw?.meta?.asOf || raw?.data?.asOf || raw?.data?.meta?.asOf || null;
+}
+
 module.exports = async (req, res) => {
   if (req.method !== 'GET') return json(res, 405, { error: 'GET only' });
   const action = String(req.query.action || 'snapshot');
@@ -114,32 +124,62 @@ module.exports = async (req, res) => {
       const period = String(req.query.period || '1y').toLowerCase();
       const cfg = periodConfig(period);
       const data = await mystocks(`/stocks/${encodeURIComponent(symbol)}/candles?interval=${encodeURIComponent(cfg.interval)}&from=${cfg.from}&to=${cfg.to}`);
+      let chartAsOf = providerAsOf(data);
 
-      // For 1D, make the chart's first point the previous trading close when
-      // the provider supplies it. This makes the displayed 1D return mean
-      // "previous close -> latest delayed intraday observation", matching the
-      // NSE day-change convention instead of "first intraday candle -> last".
       if (period === '1d') {
         try {
           const stock = await mystocks(`/stocks/${encodeURIComponent(symbol)}`);
           const previousClose = previousCloseFromStock(stock);
-          const candles = candleArray(data);
-          if (previousClose !== null && candles.length) {
-            const first = candles[0];
-            const existingFirst = Number(first?.close);
-            if (!Number.isFinite(existingFirst) || Math.abs(existingFirst - previousClose) > 0.000001) {
-              candles.unshift({
-                date: first?.date || first?.timestamp || cfg.from,
-                close: previousClose,
-                synthetic: true,
-                label: 'Previous close',
+          const candles = candleArray(data).filter((candle) => Number.isFinite(Number(candle?.close)) && Number(candle.close) > 0);
+
+          if (candles.length) {
+            // Keep only the latest trading session. The provider can return
+            // multiple sessions inside the two-day query window.
+            const latestTimestamp = candleTimestamp(candles[candles.length - 1]);
+            if (latestTimestamp) {
+              const latestDay = latestTimestamp.toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' });
+              const currentSession = candles.filter((candle) => {
+                const timestamp = candleTimestamp(candle);
+                return timestamp?.toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' }) === latestDay;
               });
+
+              if (currentSession.length) {
+                const first = currentSession[0];
+                const firstTimestamp = candleTimestamp(first);
+                const baselineTimestamp = firstTimestamp ? new Date(firstTimestamp.getTime() - 1) : latestTimestamp;
+                const sessionCandles = [...currentSession];
+
+                if (previousClose !== null) {
+                  sessionCandles.unshift({
+                    timestamp: baselineTimestamp.toISOString(),
+                    date: baselineTimestamp.toISOString(),
+                    open: previousClose,
+                    high: previousClose,
+                    low: previousClose,
+                    close: previousClose,
+                    volume: 0,
+                    ohlcAvailable: true,
+                    volumeAvailable: false,
+                    synthetic: true,
+                    label: 'Previous close',
+                  });
+                }
+
+                if (data?.candles) data.candles = sessionCandles;
+                else if (data?.data?.candles) data.data.candles = sessionCandles;
+              }
             }
           }
+          chartAsOf = providerAsOf(data) || chartAsOf;
         } catch (_) {
-          // Keep the provider candles if the optional previous-close lookup fails.
+          // Keep provider candles if the optional previous-close/session shaping fails.
         }
       }
+
+      const candles = candleArray(data);
+      const latestCandle = candles[candles.length - 1];
+      const latestCandleTimestamp = candleTimestamp(latestCandle);
+      chartAsOf = providerAsOf(data) || latestCandleTimestamp?.toISOString() || chartAsOf;
 
       return json(res, 200, {
         source: 'MyStocks Africa',
@@ -148,7 +188,7 @@ module.exports = async (req, res) => {
         symbol,
         period,
         interval: cfg.interval,
-        asOf: new Date().toISOString(),
+        asOf: chartAsOf,
         data,
       });
     }
