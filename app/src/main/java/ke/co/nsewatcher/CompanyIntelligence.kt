@@ -383,7 +383,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit) {
                 ).forEach { (term, explanation) ->
                     Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
                         Text(term, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = IntelligenceGreen)
-                        Text(explanation, fontSize = 9.sp, lineHeight = 14.dp, color = IntelligenceText)
+                        Text(explanation, fontSize = 9.sp, lineHeight = 14.sp, color = IntelligenceText)
                     }
                     HorizontalDivider(color = IntelligenceBorder)
                 }
