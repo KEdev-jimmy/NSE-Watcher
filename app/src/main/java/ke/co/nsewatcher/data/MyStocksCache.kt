@@ -16,6 +16,8 @@ import java.net.URL
 object MyStocksCache {
     private const val BACKEND_STOCKS_URL =
         "https://nse-watcher.vercel.app/api/market?action=stocks"
+    private const val BACKEND_STATUS_URL =
+        "https://nse-watcher.vercel.app/api/market?action=status"
     private const val BACKEND_CHART_URL =
         "https://nse-watcher.vercel.app/api/market?action=chart"
     private const val FALLBACK_URL =
@@ -31,6 +33,33 @@ object MyStocksCache {
         val observedAt: String = ""
     )
 
+    data class MarketStatus(
+        val isOpen: Boolean = false,
+        val status: String = "CLOSED"
+    )
+
+    suspend fun loadMarketStatus(): MarketStatus = withContext(Dispatchers.IO) {
+        runCatching {
+            val connection = (URL(BACKEND_STATUS_URL).openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = 8_000
+                readTimeout = 8_000
+                setRequestProperty("Accept", "application/json")
+            }
+            try {
+                if (connection.responseCode !in 200..299) return@runCatching MarketStatus()
+                val root = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
+                val status = root.optString("status", "").ifBlank { "CLOSED" }
+                MarketStatus(
+                    isOpen = root.optBoolean("isOpen", status.equals("OPEN", ignoreCase = true)),
+                    status = status
+                )
+            } finally {
+                connection.disconnect()
+            }
+        }.getOrDefault(MarketStatus())
+    }
+
     suspend fun loadStocks(): List<Stock> = withContext(Dispatchers.IO) {
         val base = loadFromUrl(BACKEND_STOCKS_URL).takeIf { it.isNotEmpty() }
             ?: loadFromUrl(FALLBACK_URL)
@@ -40,9 +69,6 @@ object MyStocksCache {
             if (stock.symbol in chartSymbols) {
                 val history = loadHistory(stock.symbol, "1D")
                 if (history.size >= 2) {
-                    // Use the same 1D observation series shown in Company
-                    // Intelligence. The first point is the previous close and
-                    // the final point is the latest delayed observation.
                     val latest = history.last()
                     val previousClose = history.first()
                     val dayChange = if (previousClose > 0.0) {
@@ -95,7 +121,8 @@ object MyStocksCache {
                     candles.optJSONObject(candles.length() - 1)?.optString("timestamp", "") ?: ""
                 } ?: ""
             } else ""
-            val observedAt = root.optString("asOf", "")
+            val observedAt = root.optString("latestObservationAt", "")
+                .ifBlank { root.optString("asOf", "") }
                 .ifBlank { data.optString("asOf", "") }
                 .ifBlank { data.optJSONObject("meta")?.optString("asOf", "") ?: "" }
             HistoryResult(
