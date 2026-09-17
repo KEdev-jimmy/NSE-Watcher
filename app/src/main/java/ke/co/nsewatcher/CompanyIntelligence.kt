@@ -290,6 +290,8 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit) {
             }
         }
 
+        item { WhyStockMovingSection(s.symbol) }
+
         item { SectionTitle("What changed?", "Recent company events and intelligence", Icons.Default.Newspaper) }
         item {
             IntelligenceCard {
