@@ -85,18 +85,19 @@ object CompanyIntelligenceCache {
         val error = root.optString("error").trim()
         if (error.isNotBlank()) return@withContext Result(error = error)
 
+        val data = root.optJSONObject("data")
         val profileObject = root.optJSONObject("profile")
-            ?: root.optJSONObject("data")?.optJSONObject("profile")
-            ?: root.optJSONObject("data")
+            ?: data?.optJSONObject("profile")
+            ?: data
             ?: JSONObject()
         val dividendsArray = root.optJSONArray("dividends")
-            ?: root.optJSONObject("data")?.optJSONArray("dividends")
+            ?: data?.optJSONArray("dividends")
             ?: JSONArray()
         val historyArray = root.optJSONArray("financialHistory")
-            ?: root.optJSONObject("data")?.optJSONArray("financialHistory")
+            ?: data?.optJSONArray("financialHistory")
             ?: JSONArray()
         val evidenceArray = root.optJSONArray("evidence")
-            ?: root.optJSONObject("data")?.optJSONArray("evidence")
+            ?: data?.optJSONArray("evidence")
             ?: JSONArray()
         val quality = root.optJSONObject("dataQuality")
 
@@ -108,8 +109,8 @@ object CompanyIntelligenceCache {
             source = root.optString("source", "MyStocks Africa"),
             fetchedAt = root.optString("fetchedAt"),
             partial = root.optBoolean("partial", false),
-            financialHistoryAvailable = quality?.optBoolean("financialHistoryAvailable", historyArray.length() > 0)
-                ?: historyArray.length() > 0,
+            financialHistoryAvailable = quality?.optBoolean("financialHistoryAvailable")
+                ?: (historyArray.length() > 0),
             error = null
         )
     }
