@@ -1,0 +1,75 @@
+name: Repair Company Intelligence Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  contents: write
+
+env:
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: ""
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Install Gradle
+        run: |
+          curl -fsSL https://services.gradle.org/distributions/gradle-8.14.4-bin.zip -o gradle.zip
+          unzip -q gradle.zip
+          echo "$GITHUB_WORKSPACE/gradle-8.14.4/bin" >> "$GITHUB_PATH"
+
+      - name: Add Compose Foundation dependency
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('app/build.gradle.kts')
+          text = path.read_text()
+          dep = '    implementation("androidx.compose.foundation:foundation")\n'
+          if dep not in text:
+              anchor = '    implementation("androidx.compose.ui:ui")\n'
+              if anchor not in text:
+                  raise SystemExit('Compose UI dependency anchor not found')
+              text = text.replace(anchor, dep + anchor, 1)
+              path.write_text(text)
+          PY
+
+      - name: Build Android app
+        run: gradle --no-daemon assembleDebug
+
+      - name: Commit repair
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/build.gradle.kts
+          git commit -m "fix: add compose foundation for company intelligence" || true
+          git push
+
+      - name: Remove repair workflow
+        if: success()
+        run: |
+          rm -f .github/workflows/repair-company-intelligence-build.yml
+          git add .github/workflows/repair-company-intelligence-build.yml
+          git commit -m "chore: remove temporary company intelligence repair workflow" || true
+          git push
