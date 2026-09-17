@@ -1,5 +1,6 @@
 package ke.co.nsewatcher
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -22,6 +23,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import ke.co.nsewatcher.data.MyStocksCache
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import java.util.Locale
 
 private val MarketBg = Color(0xFF061326)
@@ -38,34 +42,49 @@ private val MarketLogoAliases = mapOf(
     "BRIT" to "brit", "KQ" to "kq", "BAT" to "bat", "JUB" to "jub", "DTK" to "dtk"
 )
 
-private data class PeriodPerformance(val stock: Stock, val gainPct: Double?)
-private val MarketPeriods = listOf("1W" to "1w", "1M" to "1m", "1Y" to "1y", "3Y" to "3y")
+private data class PeriodPerformance(val stock: Stock, val gainPct: Double)
+
+private val MarketPeriods = listOf(
+    "3D" to "3d",
+    "1W" to "1w",
+    "1M" to "1m",
+    "3M" to "3m",
+    "6M" to "6m",
+    "1Y" to "1y",
+    "3Y" to "3y"
+)
 
 @Composable
 fun MarketDashboard(stockFeed: List<Stock>) {
     var periodLabel by rememberSaveable { mutableStateOf("1W") }
-    val period = MarketPeriods.firstOrNull { it.first == periodLabel } ?: MarketPeriods.first()
+    val period = MarketPeriods.firstOrNull { it.first == periodLabel } ?: MarketPeriods[1]
     var performances by remember { mutableStateOf<List<PeriodPerformance>>(emptyList()) }
     var loading by remember(period.second, stockFeed) { mutableStateOf(true) }
 
     LaunchedEffect(period.second, stockFeed) {
         loading = true
-        performances = stockFeed
-            .filter { it.price.isFinite() && it.price > 0.0 }
-            .map { stock ->
-                val history = MyStocksCache.loadHistory(stock.symbol, period.second)
-                val first = history.firstOrNull()
-                val latest = history.lastOrNull() ?: stock.price
-                val gain = if (first != null && first > 0.0 && latest > 0.0) ((latest - first) / first) * 100.0 else null
-                PeriodPerformance(stock, gain)
-            }
-            .filter { it.gainPct != null }
-            .sortedByDescending { it.gainPct }
-            .take(5)
+        performances = emptyList()
+        val stocks = stockFeed.filter { it.price.isFinite() && it.price > 0.0 }
+        performances = coroutineScope {
+            stocks.map { stock ->
+                async {
+                    val history = MyStocksCache.loadHistory(stock.symbol, period.second)
+                    val first = history.firstOrNull()
+                    val latest = history.lastOrNull() ?: stock.price
+                    val gain = if (first != null && first > 0.0 && latest > 0.0) {
+                        ((latest - first) / first) * 100.0
+                    } else null
+                    gain?.let { PeriodPerformance(stock, it) }
+                }
+            }.awaitAll()
+                .filterNotNull()
+                .sortedByDescending { it.gainPct }
+                .take(5)
+        }
         loading = false
     }
 
-    val average = performances.mapNotNull { it.gainPct }.average().takeIf { it.isFinite() } ?: 0.0
+    val top = performances
 
     Box(Modifier.fillMaxSize().background(MarketBg)) {
         LazyColumn(
@@ -81,35 +100,42 @@ fun MarketDashboard(stockFeed: List<Stock>) {
                 }
                 Text("Top performing companies on the NSE", color = MarketBlue, fontSize = 15.sp, modifier = Modifier.padding(top = 3.dp))
             }
+
             item {
-                Surface(Modifier.fillMaxWidth().height(55.dp), RoundedCornerShape(28.dp), color = Color(0xFF0B1930), border = BorderStroke(1.dp, MarketBorder)) {
+                Surface(
+                    Modifier.fillMaxWidth().height(55.dp), RoundedCornerShape(28.dp),
+                    color = Color(0xFF0B1930), border = BorderStroke(1.dp, MarketBorder)
+                ) {
                     Row(Modifier.fillMaxSize()) {
                         MarketPeriods.forEach { (label, _) ->
                             val selected = periodLabel == label
-                            Box(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(28.dp)).clickable { periodLabel = label }, contentAlignment = Alignment.Center) {
+                            Box(
+                                Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(28.dp)).clickable { periodLabel = label },
+                                contentAlignment = Alignment.Center
+                            ) {
                                 if (selected) Box(Modifier.fillMaxSize().padding(1.dp).clip(RoundedCornerShape(28.dp)).background(MarketGreen))
-                                Text(label, color = if (selected) MarketWhite else MarketBlue, fontSize = 15.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
+                                Text(label, color = if (selected) MarketWhite else MarketBlue, fontSize = 13.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
                             }
                         }
                     }
                 }
             }
+
             item {
                 Surface(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), color = Color(0xFF0A2630), border = BorderStroke(1.dp, Color(0xFF08705E))) {
-                    Row(Modifier.padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Surface(Modifier.size(62.dp), CircleShape, Color(0xFF087451)) { Box(Modifier.fillMaxSize(), Alignment.Center) { Icon(Icons.Default.EmojiEvents, null, tint = Color.White, modifier = Modifier.size(35.dp)) } }
+                    Row(Modifier.padding(horizontal = 15.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Surface(Modifier.size(56.dp), CircleShape, Color(0xFF087451)) {
+                            Box(Modifier.fillMaxSize(), Alignment.Center) { Icon(Icons.Default.EmojiEvents, null, tint = Color.White, modifier = Modifier.size(31.dp)) }
+                        }
                         Spacer(Modifier.width(14.dp))
                         Column(Modifier.weight(1f)) {
                             Text("Top Performers (This $periodLabel)", color = MarketWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                            Text(if (loading) "Loading historical NSE performance…" else "Companies with the highest price gains", color = MarketBlue, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
-                        }
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text("↑ ${String.format(Locale.US, "%+.1f%%", average)}", color = MarketGreen, fontSize = 19.sp, fontWeight = FontWeight.Bold)
-                            Text("Avg. gain (Top 5)", color = MarketBlue, fontSize = 10.sp, modifier = Modifier.padding(top = 3.dp))
+                            Text("Companies with the highest price gains", color = MarketBlue, fontSize = 11.sp, modifier = Modifier.padding(top = 3.dp))
                         }
                     }
                 }
             }
+
             item {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("#", color = MarketBlue, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(34.dp))
@@ -118,12 +144,24 @@ fun MarketDashboard(stockFeed: List<Stock>) {
                     Text("Gain", color = MarketBlue, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.width(54.dp))
                 }
             }
-            itemsIndexed(performances) { index, item -> MarketPerformerRow(index + 1, item.stock, item.gainPct ?: 0.0) }
-            if (!loading && performances.isEmpty()) item { Text("Historical performance is unavailable for this period right now.", color = MarketBlue, fontSize = 13.sp, modifier = Modifier.padding(12.dp)) }
+
+            if (loading) {
+                item { MarketHistoricalLoader(periodLabel) }
+            } else {
+                itemsIndexed(top) { index, item -> MarketPerformerRow(index + 1, item.stock, item.gainPct) }
+                if (top.isEmpty()) {
+                    item {
+                        Text("Historical performance is unavailable for this period right now.", color = MarketBlue, fontSize = 13.sp, modifier = Modifier.padding(12.dp))
+                    }
+                }
+            }
+
             item {
                 Surface(Modifier.fillMaxWidth(), RoundedCornerShape(17.dp), color = Color(0xFF0A2630), border = BorderStroke(1.dp, Color(0xFF08705E))) {
                     Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Surface(Modifier.size(60.dp), CircleShape, Color(0xFF087451)) { Box(Modifier.fillMaxSize(), Alignment.Center) { Icon(Icons.Default.ShowChart, null, tint = MarketGreen, modifier = Modifier.size(34.dp)) } }
+                        Surface(Modifier.size(60.dp), CircleShape, Color(0xFF087451)) {
+                            Box(Modifier.fillMaxSize(), Alignment.Center) { Icon(Icons.Default.ShowChart, null, tint = MarketGreen, modifier = Modifier.size(34.dp)) }
+                        }
                         Spacer(Modifier.width(14.dp))
                         Column(Modifier.weight(1f)) {
                             Text("Track what's moving the market", color = MarketWhite, fontSize = 15.sp, fontWeight = FontWeight.Medium)
@@ -138,8 +176,53 @@ fun MarketDashboard(stockFeed: List<Stock>) {
 }
 
 @Composable
+private fun MarketHistoricalLoader(periodLabel: String) {
+    val transition = rememberInfiniteTransition(label = "marketLoader")
+    val pulse by transition.animateFloat(
+        initialValue = 0.65f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(850, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "pulse"
+    )
+    val dotOffset by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 8f,
+        animationSpec = infiniteRepeatable(tween(700, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "dot"
+    )
+
+    Surface(
+        Modifier.fillMaxWidth().height(190.dp),
+        RoundedCornerShape(20.dp),
+        color = MarketCard,
+        border = BorderStroke(1.dp, MarketBorder)
+    ) {
+        Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Box(contentAlignment = Alignment.Center) {
+                Surface(Modifier.size(72.dp), CircleShape, MarketGreen.copy(alpha = 0.10f)) {}
+                Surface(Modifier.size(48.dp), CircleShape, MarketGreen.copy(alpha = pulse * 0.22f)) {}
+                Icon(Icons.Default.ShowChart, null, tint = MarketGreen.copy(alpha = pulse), modifier = Modifier.size(30.dp))
+            }
+            Spacer(Modifier.height(14.dp))
+            Text("Checking ${periodLabel} market performance", color = MarketWhite, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(5.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Loading historical NSE data", color = MarketBlue, fontSize = 12.sp)
+                Spacer(Modifier.width(3.dp))
+                repeat(3) { index ->
+                    Text("•", color = MarketGreen.copy(alpha = if (dotOffset > index * 2.5f) 1f else 0.35f), fontSize = 15.sp, modifier = Modifier.offset(y = (-dotOffset / 2).dp))
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text("Please wait a moment…", color = MarketBlue.copy(alpha = 0.75f), fontSize = 10.sp)
+        }
+    }
+}
+
+@Composable
 private fun MarketPerformerRow(rank: Int, stock: Stock, gainPct: Double) {
-    val logo = stock.logoUrl?.takeIf { it.isNotBlank() } ?: "https://mystocks.africa/logos/${MarketLogoAliases[stock.symbol.uppercase(Locale.US)] ?: stock.symbol.lowercase(Locale.US)}-ke.svg"
+    val logo = stock.logoUrl?.takeIf { it.isNotBlank() }
+        ?: "https://mystocks.africa/logos/${MarketLogoAliases[stock.symbol.uppercase(Locale.US)] ?: stock.symbol.lowercase(Locale.US)}-ke.svg"
     Surface(Modifier.fillMaxWidth(), RoundedCornerShape(17.dp), color = MarketCard, border = BorderStroke(1.dp, MarketBorder)) {
         Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             Surface(Modifier.size(38.dp), CircleShape, MarketCard2) { Box(Modifier.fillMaxSize(), Alignment.Center) { Text(rank.toString(), color = MarketWhite, fontSize = 16.sp, fontWeight = FontWeight.Medium) } }
