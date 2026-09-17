@@ -34,6 +34,7 @@ jobs:
           import androidx.compose.material.icons.filled.*
           import androidx.compose.material3.*
           import androidx.compose.runtime.*
+          import androidx.compose.runtime.saveable.rememberSaveable
           import androidx.compose.ui.Alignment
           import androidx.compose.ui.Modifier
           import androidx.compose.ui.draw.clip
@@ -50,7 +51,6 @@ jobs:
           private val MarketGreen = Color(0xFF12E889)
           private val MarketBlue = Color(0xFF9DB6E0)
           private val MarketWhite = Color(0xFFF7FAFF)
-          private val MarketMuted = Color(0xFF91A7CC)
           private val MarketBorder = Color(0xFF1B3654)
 
           private val MarketLogoAliases = mapOf(
@@ -92,7 +92,7 @@ jobs:
                               border = BorderStroke(1.dp, MarketBorder)
                           ) {
                               Row(Modifier.fillMaxSize()) {
-                                  listOf("Weekly", "Monthly", "3M", "6M", "1Y").forEachIndexed { index, label ->
+                                  listOf("Weekly", "Monthly", "3M", "6M", "1Y").forEach { label ->
                                       val selected = period == label
                                       Box(
                                           Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(28.dp)).clickable { period = label },
