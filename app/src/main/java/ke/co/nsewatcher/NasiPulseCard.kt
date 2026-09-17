@@ -91,11 +91,14 @@ fun NasiPulseCard(
             Spacer(Modifier.height(8.dp))
 
             if (connected) {
+                val value = accountValue!!
+                val pct = changePct!!
+                val amount = changeAmount!!
                 Row(verticalAlignment = Alignment.Bottom) {
-                    Text(String.format(Locale.US, "KSh %,.2f", accountValue), color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, modifier = Modifier.weight(1f))
+                    Text(String.format(Locale.US, "KSh %,.2f", value), color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, modifier = Modifier.weight(1f))
                     Column(horizontalAlignment = Alignment.End) {
-                        Text(String.format(Locale.US, "%+.2f%%", changePct), color = if (changePct >= 0) AccountGreen else Color(0xFFFF817D), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
-                        Text(String.format(Locale.US, "%+,.2f", changeAmount).replace("+", "+KSh ").replace("-", "-KSh "), color = if (changeAmount >= 0) AccountGreen else Color(0xFFFF817D), fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                        Text(String.format(Locale.US, "%+.2f%%", pct), color = if (pct >= 0) AccountGreen else Color(0xFFFF817D), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                        Text(String.format(Locale.US, "%+,.2f", amount).replace("+", "+KSh ").replace("-", "-KSh "), color = if (amount >= 0) AccountGreen else Color(0xFFFF817D), fontSize = 9.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             } else {
