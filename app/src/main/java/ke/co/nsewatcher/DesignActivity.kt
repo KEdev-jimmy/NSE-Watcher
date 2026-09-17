@@ -62,17 +62,7 @@ data class NewsItem(
     val publishedAt:String, val category:String, val symbol:String, val companyName:String,
     val imageUrl:String, val url:String, val dividendAmount:String, val exDate:String, val paymentDate:String
 )
-private val fallbackStocks = listOf(
-    Stock("SCOM","Safaricom",18.50,5.24,listOf(15.2,15.5,15.3,16.1,16.8,16.5,17.2,17.9,18.5)),
-    Stock("KCB","KCB Group",42.30,3.26,listOf(38.0,38.8,39.2,40.1,39.7,40.8,41.5,41.9,42.3)),
-    Stock("EQTY","Equity Group",46.75,2.98,listOf(43.2,43.8,44.0,44.9,44.5,45.1,45.8,46.1,46.75)),
-    Stock("COOP","Co-operative Bank",21.10,2.41,listOf(19.5,19.7,20.0,19.9,20.3,20.5,20.8,20.9,21.1)),
-    Stock("ABSA","Absa Bank Kenya",14.30,-2.17,listOf(15.5,15.2,15.0,14.8,14.9,14.6,14.7,14.5,14.3)),
-    Stock("EABL","East African Breweries",155.00,-1.81,listOf(161.0,160.5,159.8,158.7,159.2,157.8,157.0,156.2,155.0)),
-    Stock("KPLC","Kenya Power",4.82,-1.22,listOf(5.2,5.1,5.0,5.05,4.9,4.95,4.88,4.86,4.82))
-)
-
-private val liveStocks = mutableStateOf(fallbackStocks)
+private val liveStocks = mutableStateOf(emptyList<Stock>())
 private val stocks: List<Stock> get() = liveStocks.value
 
 private enum class Page { HOME, MARKET, NEWS, COMPANIES, PAPER, MORE, COMPANY, NEWS_DETAIL, PROFILE, SETTINGS, THEME, NOTIFICATIONS, LIVE_DATA, CHARTS, ALERTS, LANGUAGE, SECURITY, PRIVACY, DISPLAY, HELP, ABOUT }
@@ -96,7 +86,7 @@ private fun App(pickAvatar:()->Unit) {
     var page by remember { mutableStateOf(Page.HOME) }
     var history by remember { mutableStateOf(emptyList<Page>()) }
     var tab by rememberSaveable { mutableIntStateOf(0) }
-    var selected by remember { mutableStateOf(stocks.first()) }
+    var selected by remember { mutableStateOf(Stock("", "", 0.0, 0.0, emptyList())) }
     var selectedNews by remember { mutableStateOf<NewsItem?>(null) }
     var dark by rememberSaveable { mutableStateOf(prefs.getBoolean("dark_mode", false)) }
     var name by rememberSaveable { mutableStateOf(prefs.getString("profile_name", "James Waweru") ?: "James Waweru") }
