@@ -26,40 +26,40 @@ private val AccountIconBg = Color(0xFF0B5D49)
 private val AccountLiveBg = Color(0xFF0A4D3E)
 
 /**
- * Hero portfolio card. HomeHero continues to call this in the same position.
- * The fixed height keeps the existing hero layout from moving while the
- * portfolio presentation replaces the old NSE index content.
- *
- * Portfolio values are parameters so a real holdings/account source can be
- * connected later. Zero is used until that source is connected rather than
- * inventing a user's portfolio value.
+ * Home portfolio placeholder. The component remains parameterized so a real
+ * holdings/account source can be connected later. Until then, it never
+ * presents zero as the user's actual account value or return.
  */
 @Composable
 fun NasiPulseCard(
-    accountValue: Double = 0.0,
-    changePct: Double = 0.0,
-    changeAmount: Double = 0.0,
-    live: Boolean = true
+    accountValue: Double? = null,
+    changePct: Double? = null,
+    changeAmount: Double? = null,
+    live: Boolean = false
 ) {
+    val connected = accountValue != null && accountValue.isFinite() &&
+        changePct != null && changePct.isFinite() &&
+        changeAmount != null && changeAmount.isFinite()
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 6.dp)
-            .height(175.dp),
-        shape = RoundedCornerShape(18.dp),
+            .height(108.dp),
+        shape = RoundedCornerShape(16.dp),
         border = BorderStroke(1.dp, AccountBorder),
         colors = CardDefaults.cardColors(containerColor = AccountCard)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 14.dp, vertical = 12.dp)
+                .padding(horizontal = 13.dp, vertical = 10.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
-                        .size(38.dp)
-                        .clip(RoundedCornerShape(11.dp))
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(9.dp))
                         .background(AccountIconBg),
                     contentAlignment = Alignment.Center
                 ) {
@@ -67,90 +67,43 @@ fun NasiPulseCard(
                         Icons.Default.AccountBalanceWallet,
                         contentDescription = "Total account value",
                         tint = AccountGreen,
-                        modifier = Modifier.size(22.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                 }
-
-                Spacer(Modifier.width(9.dp))
-
-                Text(
-                    "Total Account Value",
-                    color = Color.White,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    modifier = Modifier.weight(1f)
-                )
-
-                Surface(
-                    shape = RoundedCornerShape(18.dp),
-                    color = AccountLiveBg
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(if (live) AccountGreen else AccountMuted)
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            if (live) "Live" else "Offline",
-                            color = Color.White,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                Spacer(Modifier.width(8.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Total Account Value", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+                    Text(
+                        if (connected) "Portfolio connected" else "Portfolio not connected",
+                        color = AccountMuted,
+                        fontSize = 8.sp
+                    )
+                }
+                Surface(shape = RoundedCornerShape(16.dp), color = AccountLiveBg) {
+                    Row(Modifier.padding(horizontal = 8.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(7.dp).clip(CircleShape).background(if (connected && live) AccountGreen else AccountMuted))
+                        Spacer(Modifier.width(5.dp))
+                        Text(if (connected && live) "Live" else "Not connected", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
 
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(8.dp))
 
-            Text(
-                String.format(Locale.US, "KSh %,.2f", accountValue),
-                color = Color.White,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.ExtraBold,
-                maxLines = 1
-            )
-
-            Spacer(Modifier.height(5.dp))
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    String.format(Locale.US, "%+.2f%%", changePct),
-                    color = AccountGreen,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.ExtraBold
-                )
-                Spacer(Modifier.width(9.dp))
-                Box(
-                    Modifier
-                        .width(1.dp)
-                        .height(17.dp)
-                        .background(AccountMuted.copy(alpha = 0.45f))
-                )
-                Spacer(Modifier.width(9.dp))
-                Text(
-                    String.format(Locale.US, "%+,.2f", changeAmount)
-                        .replace("+", "+KSh ")
-                        .replace("-", "-KSh "),
-                    color = AccountGreen,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.ExtraBold
-                )
+            if (connected) {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(String.format(Locale.US, "KSh %,.2f", accountValue), color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, modifier = Modifier.weight(1f))
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(String.format(Locale.US, "%+.2f%%", changePct), color = if (changePct >= 0) AccountGreen else Color(0xFFFF817D), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                        Text(String.format(Locale.US, "%+,.2f", changeAmount).replace("+", "+KSh ").replace("-", "-KSh "), color = if (changeAmount >= 0) AccountGreen else Color(0xFFFF817D), fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Connect holdings to calculate your account value", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    Text("No data", color = AccountMuted, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
+                }
             }
-
-            Spacer(Modifier.height(3.dp))
-
-            Text(
-                "Today",
-                color = AccountMuted,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium
-            )
         }
     }
 }
