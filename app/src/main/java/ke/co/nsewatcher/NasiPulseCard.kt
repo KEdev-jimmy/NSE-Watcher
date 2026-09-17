@@ -1,125 +1,156 @@
 package ke.co.nsewatcher
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.ShowChart
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
 
-private val NasiGreen = Color(0xFF00A859)
-private val NasiLightGreen = Color(0xFFE9F8F0)
-private val NasiDarkGreen = Color(0xFF063D2A)
-private val NasiTextDark = Color(0xFF12352A)
-private val NasiMuted = Color(0xFF64756D)
-private val NasiBorder = Color(0xFFDDE9E3)
-private val NasiRed = Color(0xFFE94A4A)
+private val AccountGreen = Color(0xFF35E39A)
+private val AccountCard = Color(0xEE062F2A)
+private val AccountBorder = Color(0xFF138A68)
+private val AccountMuted = Color(0xFFA8C8BE)
+private val AccountIconBg = Color(0xFF0B5D49)
+private val AccountLiveBg = Color(0xFF0A4D3E)
 
+/**
+ * Hero portfolio card. HomeHero continues to call this in the same position.
+ * The fixed height keeps the existing hero layout from moving while the
+ * portfolio presentation replaces the old NSE index content.
+ *
+ * Portfolio values are parameters so a real holdings/account source can be
+ * connected later. Zero is used until that source is connected rather than
+ * inventing a user's portfolio value.
+ */
 @Composable
 fun NasiPulseCard(
-    value: Double = 237.59,
-    changePct: Double = -3.38,
-    observedLabel: String = "Latest available session"
+    accountValue: Double = 0.0,
+    changePct: Double = 0.0,
+    changeAmount: Double = 0.0,
+    live: Boolean = true
 ) {
-    var showDetails by remember { mutableStateOf(false) }
-    val positive = changePct >= 0.0
-    val accent = if (positive) NasiGreen else NasiRed
-    val bg = if (positive) NasiLightGreen else Color(0xFFFFF1F1)
-
     Card(
-        modifier = Modifier.fillMaxWidth().clickable { showDetails = true },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 6.dp)
+            .height(175.dp),
         shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, NasiBorder),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        border = BorderStroke(1.dp, AccountBorder),
+        colors = CardDefaults.cardColors(containerColor = AccountCard)
     ) {
-        Column(Modifier.padding(14.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 14.dp, vertical = 12.dp)
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(Modifier.size(34.dp), RoundedCornerShape(10.dp), bg) {
-                    Icon(Icons.Default.ShowChart, null, tint = accent, modifier = Modifier.padding(8.dp))
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(RoundedCornerShape(11.dp))
+                        .background(AccountIconBg),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.AccountBalanceWallet,
+                        contentDescription = "Total account value",
+                        tint = AccountGreen,
+                        modifier = Modifier.size(22.dp)
+                    )
                 }
+
                 Spacer(Modifier.width(9.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("NSE ALL-SHARE INDEX", color = NasiDarkGreen, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("Overall NSE market pulse", color = NasiMuted, fontSize = 9.sp)
-                }
-                Surface(shape = RoundedCornerShape(8.dp), color = NasiLightGreen) {
-                    Text("15 MIN DELAYED", color = NasiGreen, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp))
+
+                Text(
+                    "Total Account Value",
+                    color = Color.White,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier.weight(1f)
+                )
+
+                Surface(
+                    shape = RoundedCornerShape(18.dp),
+                    color = AccountLiveBg
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(if (live) AccountGreen else AccountMuted)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            if (live) "Live" else "Offline",
+                            color = Color.White,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
-            Spacer(Modifier.height(12.dp))
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(String.format(Locale.US, "%.2f", value), color = NasiTextDark, fontSize = 27.sp, fontWeight = FontWeight.ExtraBold)
-                Spacer(Modifier.width(8.dp))
-                Text(String.format(Locale.US, "%+.2f%% today", changePct), color = accent, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(bottom = 4.dp))
-            }
-            Spacer(Modifier.height(6.dp))
-            NasiSparkline(accent)
+
+            Spacer(Modifier.height(10.dp))
+
+            Text(
+                String.format(Locale.US, "KSh %,.2f", accountValue),
+                color = Color.White,
+                fontSize = 28.sp,
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 1
+            )
+
             Spacer(Modifier.height(5.dp))
+
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(7.dp).clip(CircleShape).background(NasiMuted))
-                Spacer(Modifier.width(5.dp))
-                Text(observedLabel, color = NasiMuted, fontSize = 9.sp, modifier = Modifier.weight(1f))
-                Text("View market pulse", color = NasiDarkGreen, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                Icon(Icons.Default.ChevronRight, null, tint = NasiMuted, modifier = Modifier.size(16.dp))
+                Text(
+                    String.format(Locale.US, "%+.2f%%", changePct),
+                    color = AccountGreen,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                Spacer(Modifier.width(9.dp))
+                Box(
+                    Modifier
+                        .width(1.dp)
+                        .height(17.dp)
+                        .background(AccountMuted.copy(alpha = 0.45f))
+                )
+                Spacer(Modifier.width(9.dp))
+                Text(
+                    String.format(Locale.US, "%+,.2f", changeAmount)
+                        .replace("+", "+KSh ")
+                        .replace("-", "-KSh "),
+                    color = AccountGreen,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
             }
+
+            Spacer(Modifier.height(3.dp))
+
+            Text(
+                "Today",
+                color = AccountMuted,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium
+            )
         }
     }
-
-    if (showDetails) {
-        NasiPulseDialog(value, changePct, observedLabel) { showDetails = false }
-    }
-}
-
-@Composable
-private fun NasiSparkline(tint: Color) {
-    Canvas(Modifier.fillMaxWidth().height(42.dp)) {
-        val values = listOf(38f, 48f, 44f, 57f, 52f, 61f, 55f, 68f, 62f, 74f)
-        val path = Path()
-        values.forEachIndexed { index, point ->
-            val x = if (values.size == 1) 0f else size.width * index / (values.size - 1)
-            val y = size.height - (point / 100f * size.height)
-            if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
-        }
-        drawPath(path, tint, style = Stroke(width = 3f, cap = StrokeCap.Round))
-    }
-}
-
-@Composable
-private fun NasiPulseDialog(value: Double, changePct: Double, observedLabel: String, onDismiss: () -> Unit) {
-    val positive = changePct >= 0.0
-    val accent = if (positive) NasiGreen else NasiRed
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("NSE All-Share Index", fontWeight = FontWeight.ExtraBold) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(String.format(Locale.US, "%.2f", value), fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, color = NasiTextDark)
-                Text(String.format(Locale.US, "%+.2f%% today", changePct), color = accent, fontWeight = FontWeight.Bold)
-                HorizontalDivider()
-                Text("What this shows", fontWeight = FontWeight.Bold)
-                Text("The All-Share Index gives a broad view of how the NSE market is moving. It is an index level, not a share price.", color = NasiMuted, fontSize = 11.sp)
-                Text("Data status: 15-minute delayed", color = NasiMuted, fontSize = 10.sp)
-                Text(observedLabel, color = NasiMuted, fontSize = 10.sp)
-            }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
-        shape = RoundedCornerShape(22.dp)
-    )
 }
