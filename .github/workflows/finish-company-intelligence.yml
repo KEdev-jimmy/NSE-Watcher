@@ -1,0 +1,175 @@
+name: Finish Company Intelligence
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: ""
+
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Install Gradle
+        run: |
+          curl -fsSL https://services.gradle.org/distributions/gradle-8.14.4-bin.zip -o gradle.zip
+          unzip -q gradle.zip
+          echo "$GITHUB_WORKSPACE/gradle-8.14.4/bin" >> "$GITHUB_PATH"
+
+      - name: Add missing intelligence evidence views
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('app/src/main/java/ke/co/nsewatcher/CompanyIntelligence.kt')
+          text = path.read_text()
+
+          growth_marker = '''        item { SectionTitle("Valuation", "How the current price relates to reported metrics", Icons.Default.Calculate) }'''
+          growth_block = '''        item { SectionTitle("Financial trend", "Reported results across available periods", Icons.Default.Timeline) }
+          item {
+              IntelligenceCard {
+                  if (intelligence.financialHistory.isEmpty()) {
+                      Text("Historical financial statements are not available in the current provider response.", color = IntelligenceMuted, fontSize = 10.sp)
+                  } else {
+                      intelligence.financialHistory.takeLast(6).reversed().forEachIndexed { index, point ->
+                          Column(Modifier.fillMaxWidth().padding(vertical = 7.dp)) {
+                              Text(point.period.ifBlank { "Reported period" }, color = IntelligenceGreen, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold)
+                              MetricGrid(listOf(
+                                  "Revenue" to valueOrMissing(point.revenue),
+                                  "Profit" to valueOrMissing(point.profit),
+                                  "EPS" to valueOrMissing(point.eps),
+                                  "ROE" to valueOrMissing(point.roe)
+                              ))
+                          }
+                          if (index < intelligence.financialHistory.takeLast(6).lastIndex) HorizontalDivider(color = IntelligenceBorder)
+                      }
+                      Text("Only periods returned by the data provider are shown; no missing periods are interpolated.", color = IntelligenceMuted, fontSize = 8.sp)
+                  }
+              }
+          }
+
+          item { SectionTitle("Valuation history", "Historical valuation context when reported", Icons.Default.Calculate) }
+          item {
+              IntelligenceCard {
+                  val valuationHistory = intelligence.financialHistory.filter { it.pe.isNotBlank() || it.pb.isNotBlank() }.takeLast(6).reversed()
+                  if (valuationHistory.isEmpty()) {
+                      Text("Historical P/E and P/B values are not available from the current provider response.", color = IntelligenceMuted, fontSize = 10.sp)
+                  } else {
+                      valuationHistory.forEachIndexed { index, point ->
+                          Row(Modifier.fillMaxWidth().padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+                              Column(Modifier.weight(1f)) {
+                                  Text(point.period.ifBlank { "Reported period" }, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                  Text("P/E  ${valueOrMissing(point.pe)}   •   P/B  ${valueOrMissing(point.pb)}", color = IntelligenceMuted, fontSize = 9.sp)
+                              }
+                          }
+                          if (index < valuationHistory.lastIndex) HorizontalDivider(color = IntelligenceBorder)
+                      }
+                  }
+              }
+          }
+
+          item { SectionTitle("Valuation", "How the current price relates to reported metrics", Icons.Default.Calculate) }'''
+          if growth_marker not in text:
+              raise SystemExit('Valuation marker not found')
+          if 'SectionTitle("Financial trend"' not in text:
+              text = text.replace(growth_marker, growth_block, 1)
+
+          dividends_marker = '''                    intelligence.dividends.take(5).forEachIndexed { index, dividend ->'''
+          dividends_insert = '''                    val nextDividend = intelligence.dividends.firstOrNull { it.paymentDate.isNotBlank() && it.paymentDate >= java.time.LocalDate.now().toString() }
+                    if (profile.dividendYield.isNotBlank()) {
+                        Surface(Modifier.fillMaxWidth(), RoundedCornerShape(13.dp), IntelligenceLight) {
+                            Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("Current dividend yield", color = IntelligenceMuted, fontSize = 8.sp)
+                                    Text(profile.dividendYield, color = IntelligenceText, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+                                }
+                                if (nextDividend != null) {
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text("Next payment", color = IntelligenceMuted, fontSize = 8.sp)
+                                        Text(nextDividend.paymentDate, color = IntelligenceText, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                    } else if (nextDividend != null) {
+                        Text("Next payment: ${nextDividend.paymentDate}", color = IntelligenceText, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(5.dp))
+                    }
+
+                    intelligence.dividends.take(5).forEachIndexed { index, dividend ->'''
+          if dividends_marker not in text:
+              raise SystemExit('Dividend marker not found')
+          if 'val nextDividend = intelligence.dividends.firstOrNull' not in text:
+              text = text.replace(dividends_marker, dividends_insert, 1)
+
+          evidence_marker = '''                EvidenceRow("Market price", "MyStocks Africa • NSE exchange-supplied • ~15 min delayed")'''
+          evidence_block = '''                EvidenceRow("Market price", "MyStocks Africa • NSE exchange-supplied • ~15 min delayed")
+                if (intelligence.evidence.isNotEmpty()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text("SOURCED EVIDENCE", color = IntelligenceGreen, fontSize = 8.sp, fontWeight = FontWeight.ExtraBold)
+                    intelligence.evidence.take(10).forEach { evidence ->
+                        Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+                            Text(evidence.claim.ifBlank { "Evidence" }, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = IntelligenceText)
+                            if (evidence.value.isNotBlank()) Text(evidence.value, fontSize = 9.sp, color = IntelligenceText)
+                            Text(
+                                listOf(evidence.source, evidence.fetchedAt.take(19)).filter(String::isNotBlank).joinToString(" • "),
+                                color = IntelligenceMuted,
+                                fontSize = 8.sp
+                            )
+                        }
+                    }
+                }'''
+          if evidence_marker not in text:
+              raise SystemExit('Evidence marker not found')
+          if 'Text("SOURCED EVIDENCE"' not in text:
+              text = text.replace(evidence_marker, evidence_block, 1)
+
+          quality_marker = '''                    if (intelligence.fetchedAt.isNotBlank()) EvidenceRow("Fetched", intelligence.fetchedAt)'''
+          quality_block = '''                    if (intelligence.fetchedAt.isNotBlank()) EvidenceRow("Fetched", intelligence.fetchedAt)
+                    EvidenceRow("Data quality", when {
+                        intelligence.error != null -> "Unavailable"
+                        intelligence.partial -> "Partial provider response"
+                        intelligence.evidence.isNotEmpty() -> "Sourced evidence available"
+                        else -> "Limited structured evidence"
+                    })'''
+          if quality_marker not in text:
+              raise SystemExit('Quality marker not found')
+          if 'EvidenceRow("Data quality"' not in text:
+              text = text.replace(quality_marker, quality_block, 1)
+
+          path.write_text(text)
+          print('Company Intelligence evidence, financial trend, valuation history and dividend context added.')
+          PY
+
+      - name: Build Android app
+        run: gradle --no-daemon build
+
+      - name: Remove temporary workflow and commit
+        run: |
+          rm -f .github/workflows/finish-company-intelligence.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java/ke/co/nsewatcher/CompanyIntelligence.kt .github/workflows/finish-company-intelligence.yml
+          git commit -m "feat: complete company intelligence evidence views"
+          git push
