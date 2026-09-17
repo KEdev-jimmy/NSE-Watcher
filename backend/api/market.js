@@ -34,7 +34,10 @@ function periodConfig(period) {
       interval = '1d';
       break;
     case '1d':
-      start.setDate(start.getDate() - 1);
+      // Intraday chart: NSE observations are 15-minute delayed.
+      // Include yesterday as the query boundary so the provider can return
+      // the latest trading-session observations when the market is closed.
+      start.setDate(start.getDate() - 2);
       interval = '15m';
       break;
     case '1w':
@@ -76,6 +79,18 @@ function periodConfig(period) {
   };
 }
 
+function previousCloseFromStock(raw) {
+  const data = raw?.data && !Array.isArray(raw.data) ? raw.data : raw;
+  const value = Number(String(data?.previousClose ?? '').replace(/,/g, ''));
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function candleArray(raw) {
+  if (Array.isArray(raw?.candles)) return raw.candles;
+  if (Array.isArray(raw?.data?.candles)) return raw.data.candles;
+  return [];
+}
+
 module.exports = async (req, res) => {
   if (req.method !== 'GET') return json(res, 405, { error: 'GET only' });
   const action = String(req.query.action || 'snapshot');
@@ -99,6 +114,33 @@ module.exports = async (req, res) => {
       const period = String(req.query.period || '1y').toLowerCase();
       const cfg = periodConfig(period);
       const data = await mystocks(`/stocks/${encodeURIComponent(symbol)}/candles?interval=${encodeURIComponent(cfg.interval)}&from=${cfg.from}&to=${cfg.to}`);
+
+      // For 1D, make the chart's first point the previous trading close when
+      // the provider supplies it. This makes the displayed 1D return mean
+      // "previous close -> latest delayed intraday observation", matching the
+      // NSE day-change convention instead of "first intraday candle -> last".
+      if (period === '1d') {
+        try {
+          const stock = await mystocks(`/stocks/${encodeURIComponent(symbol)}`);
+          const previousClose = previousCloseFromStock(stock);
+          const candles = candleArray(data);
+          if (previousClose !== null && candles.length) {
+            const first = candles[0];
+            const existingFirst = Number(first?.close);
+            if (!Number.isFinite(existingFirst) || Math.abs(existingFirst - previousClose) > 0.000001) {
+              candles.unshift({
+                date: first?.date || first?.timestamp || cfg.from,
+                close: previousClose,
+                synthetic: true,
+                label: 'Previous close',
+              });
+            }
+          }
+        } catch (_) {
+          // Keep the provider candles if the optional previous-close lookup fails.
+        }
+      }
+
       return json(res, 200, {
         source: 'MyStocks Africa',
         delayMinutes: 15,
@@ -106,6 +148,7 @@ module.exports = async (req, res) => {
         symbol,
         period,
         interval: cfg.interval,
+        asOf: new Date().toISOString(),
         data,
       });
     }
