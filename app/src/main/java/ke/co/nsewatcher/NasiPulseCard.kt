@@ -24,6 +24,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
 
+private val NasiGreen = Color(0xFF00A859)
+private val NasiLightGreen = Color(0xFFE9F8F0)
+private val NasiDarkGreen = Color(0xFF063D2A)
+private val NasiTextDark = Color(0xFF12352A)
+private val NasiMuted = Color(0xFF64756D)
+private val NasiBorder = Color(0xFFDDE9E3)
+private val NasiRed = Color(0xFFE94A4A)
+
 @Composable
 fun NasiPulseCard(
     value: Double = 237.59,
@@ -32,13 +40,13 @@ fun NasiPulseCard(
 ) {
     var showDetails by remember { mutableStateOf(false) }
     val positive = changePct >= 0.0
-    val accent = if (positive) Green else Red
-    val bg = if (positive) LightGreen else Color(0xFFFFF1F1)
+    val accent = if (positive) NasiGreen else NasiRed
+    val bg = if (positive) NasiLightGreen else Color(0xFFFFF1F1)
 
     Card(
         modifier = Modifier.fillMaxWidth().clickable { showDetails = true },
         shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, Border),
+        border = BorderStroke(1.dp, NasiBorder),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
         Column(Modifier.padding(14.dp)) {
@@ -48,16 +56,16 @@ fun NasiPulseCard(
                 }
                 Spacer(Modifier.width(9.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("NSE ALL-SHARE INDEX", color = DarkGreen, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("Overall NSE market pulse", color = Muted, fontSize = 9.sp)
+                    Text("NSE ALL-SHARE INDEX", color = NasiDarkGreen, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                    Text("Overall NSE market pulse", color = NasiMuted, fontSize = 9.sp)
                 }
-                Surface(shape = RoundedCornerShape(8.dp), color = LightGreen) {
-                    Text("15 MIN DELAYED", color = Green, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp))
+                Surface(shape = RoundedCornerShape(8.dp), color = NasiLightGreen) {
+                    Text("15 MIN DELAYED", color = NasiGreen, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp))
                 }
             }
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.Bottom) {
-                Text(String.format(Locale.US, "%.2f", value), color = TextDark, fontSize = 27.sp, fontWeight = FontWeight.ExtraBold)
+                Text(String.format(Locale.US, "%.2f", value), color = NasiTextDark, fontSize = 27.sp, fontWeight = FontWeight.ExtraBold)
                 Spacer(Modifier.width(8.dp))
                 Text(String.format(Locale.US, "%+.2f%% today", changePct), color = accent, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(bottom = 4.dp))
             }
@@ -65,17 +73,17 @@ fun NasiPulseCard(
             NasiSparkline(accent)
             Spacer(Modifier.height(5.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(7.dp).clip(CircleShape).background(Muted))
+                Box(Modifier.size(7.dp).clip(CircleShape).background(NasiMuted))
                 Spacer(Modifier.width(5.dp))
-                Text(observedLabel, color = Muted, fontSize = 9.sp, modifier = Modifier.weight(1f))
-                Text("View market pulse", color = DarkGreen, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                Icon(Icons.Default.ChevronRight, null, tint = Muted, modifier = Modifier.size(16.dp))
+                Text(observedLabel, color = NasiMuted, fontSize = 9.sp, modifier = Modifier.weight(1f))
+                Text("View market pulse", color = NasiDarkGreen, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                Icon(Icons.Default.ChevronRight, null, tint = NasiMuted, modifier = Modifier.size(16.dp))
             }
         }
     }
 
     if (showDetails) {
-        NasiPulseDialog(value, changePct, observedLabel, { showDetails = false })
+        NasiPulseDialog(value, changePct, observedLabel) { showDetails = false }
     }
 }
 
@@ -96,19 +104,19 @@ private fun NasiSparkline(tint: Color) {
 @Composable
 private fun NasiPulseDialog(value: Double, changePct: Double, observedLabel: String, onDismiss: () -> Unit) {
     val positive = changePct >= 0.0
-    val accent = if (positive) Green else Red
+    val accent = if (positive) NasiGreen else NasiRed
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("NSE All-Share Index", fontWeight = FontWeight.ExtraBold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(String.format(Locale.US, "%.2f", value), fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, color = TextDark)
+                Text(String.format(Locale.US, "%.2f", value), fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, color = NasiTextDark)
                 Text(String.format(Locale.US, "%+.2f%% today", changePct), color = accent, fontWeight = FontWeight.Bold)
-                Divider()
+                HorizontalDivider()
                 Text("What this shows", fontWeight = FontWeight.Bold)
-                Text("The All-Share Index gives a broad view of how the NSE market is moving. It is an index level, not a share price.", color = Muted, fontSize = 11.sp)
-                Text("Data status: 15-minute delayed", color = Muted, fontSize = 10.sp)
-                Text(observedLabel, color = Muted, fontSize = 10.sp)
+                Text("The All-Share Index gives a broad view of how the NSE market is moving. It is an index level, not a share price.", color = NasiMuted, fontSize = 11.sp)
+                Text("Data status: 15-minute delayed", color = NasiMuted, fontSize = 10.sp)
+                Text(observedLabel, color = NasiMuted, fontSize = 10.sp)
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
