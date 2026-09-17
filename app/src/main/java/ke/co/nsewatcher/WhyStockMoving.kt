@@ -97,7 +97,7 @@ fun WhyStockMovingSection(symbol: String) {
 
                         val evidence = result.evidence.take(5)
                         if (evidence.isEmpty()) {
-                            Surface(Modifier.fillMaxWidth(), RoundedCornerShape(12.dp), MovementLight) {
+                            Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), color = MovementLight) {
                                 Text("No dated company event was found close enough to the movement to link it as evidence.", Modifier.padding(11.dp), color = MovementText, fontSize = 10.sp)
                             }
                         } else {
@@ -131,9 +131,9 @@ private fun DailyCompanyOverview(symbol: String, day: MyStocksCache.HistoryResul
                 Text("Today at a glance", color = MovementText, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
                 Text("A simple summary of this company's trading day", color = MovementMuted, fontSize = 9.sp)
             }
-            Surface(RoundedCornerShape(50), color = if (market.isOpen) MovementLight else Color(0xFFF1F3F2)) {
+            Surface(shape = RoundedCornerShape(50), color = if (market.isOpen) MovementLight else Color(0xFFF1F3F2)) {
                 Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Surface(Modifier.size(7.dp), RoundedCornerShape(50), statusColor) {}
+                    Surface(modifier = Modifier.size(7.dp), shape = RoundedCornerShape(50), color = statusColor) {}
                     Spacer(Modifier.size(5.dp))
                     Text(statusLabel, color = statusColor, fontSize = 8.sp, fontWeight = FontWeight.ExtraBold)
                 }
@@ -155,7 +155,7 @@ private fun DailyCompanyOverview(symbol: String, day: MyStocksCache.HistoryResul
                         DayMetric("LATEST / CLOSE", "KSh ${money(day.sessionClose!!)}", Modifier.weight(1f))
                     }
                     Spacer(Modifier.height(10.dp))
-                    Surface(Modifier.fillMaxWidth(), RoundedCornerShape(12.dp), color = if ((sessionChange ?: 0.0) >= 0) MovementLight else Color(0xFFFFF0F0)) {
+                    Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), color = if ((sessionChange ?: 0.0) >= 0) MovementLight else Color(0xFFFFF0F0)) {
                         Column(Modifier.padding(10.dp)) {
                             Text(
                                 if (sessionChange != null) {
@@ -201,7 +201,7 @@ private fun DailyCompanyOverview(symbol: String, day: MyStocksCache.HistoryResul
 
 @Composable
 private fun DayMetric(label: String, value: String, modifier: Modifier) {
-    Surface(modifier, RoundedCornerShape(12.dp), MovementLight) {
+    Surface(modifier = modifier, shape = RoundedCornerShape(12.dp), color = MovementLight) {
         Column(Modifier.padding(10.dp)) {
             Text(label, color = MovementMuted, fontSize = 8.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(2.dp))
