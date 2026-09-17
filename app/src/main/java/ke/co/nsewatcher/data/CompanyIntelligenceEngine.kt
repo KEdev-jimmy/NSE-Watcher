@@ -70,6 +70,10 @@ object CompanyIntelligenceEngine {
             unknowns += "A complete monthly price history is not available, so recent market behaviour cannot be described reliably."
         }
 
+        val financialTrend = buildFinancialTrendSignals(source.financialHistory)
+        signals += financialTrend.signals
+        unknowns += financialTrend.unknowns
+
         parsePercent(profile.revenueGrowth)?.let { growth ->
             signals += Signal(
                 if (growth >= 0) SignalType.SUPPORTING else SignalType.CAUTION,
@@ -145,8 +149,11 @@ object CompanyIntelligenceEngine {
 
         val summary = when {
             quality.state == "LIMITED EVIDENCE" -> "The current data set is incomplete. NSE Watcher will show what is known and clearly mark what still needs evidence."
+            monthlyReturn != null && financialTrend.hasTrend && news.isNotEmpty() -> "${stock.name} has moved ${formatPercent(monthlyReturn)} over the loaded monthly history. Reported financial trend and recent company intelligence are available for context."
             monthlyReturn != null && news.isNotEmpty() -> "${stock.name} has moved ${formatPercent(monthlyReturn)} over the loaded monthly history, with recent company intelligence available for context."
+            monthlyReturn != null && financialTrend.hasTrend -> "${stock.name} has moved ${formatPercent(monthlyReturn)} over the loaded monthly history, with a reported financial trend available for context."
             monthlyReturn != null -> "${stock.name} has moved ${formatPercent(monthlyReturn)} over the loaded monthly history. Company context is still partial."
+            financialTrend.hasTrend -> "Reported financial trend is available, but recent price context is incomplete."
             else -> "Current company and market evidence is available, but recent price context is incomplete."
         }
 
@@ -157,6 +164,61 @@ object CompanyIntelligenceEngine {
             unknowns = unknowns.distinct().take(8),
             quality = quality,
             confidence = confidence
+        )
+    }
+
+    private data class FinancialTrendResult(
+        val signals: List<Signal>,
+        val unknowns: List<String>,
+        val hasTrend: Boolean
+    )
+
+    private fun buildFinancialTrendSignals(history: List<CompanyIntelligenceCache.FinancialPoint>): FinancialTrendResult {
+        if (history.size < 2) {
+            return FinancialTrendResult(
+                signals = emptyList(),
+                unknowns = listOf("At least two reported financial periods are needed before NSE Watcher describes a financial trend."),
+                hasTrend = false
+            )
+        }
+
+        val previous = history[history.lastIndex - 1]
+        val latest = history.last()
+        val signals = mutableListOf<Signal>()
+        val unknowns = mutableListOf<String>()
+
+        val revenuePrevious = parseNumber(previous.revenue)
+        val revenueLatest = parseNumber(latest.revenue)
+        when {
+            revenuePrevious != null && revenueLatest != null && revenuePrevious != 0.0 -> {
+                val change = ((revenueLatest - revenuePrevious) / abs(revenuePrevious)) * 100.0
+                signals += Signal(
+                    if (change >= 0) SignalType.SUPPORTING else SignalType.CAUTION,
+                    "Reported revenue is ${formatPercent(change)} versus the preceding returned period.",
+                    "MyStocks Africa financial history"
+                )
+            }
+            else -> unknowns += "Revenue trend cannot be calculated because comparable numeric values were not returned for the latest two periods."
+        }
+
+        val profitPrevious = parseNumber(previous.profit)
+        val profitLatest = parseNumber(latest.profit)
+        when {
+            profitPrevious != null && profitLatest != null && profitPrevious != 0.0 -> {
+                val change = ((profitLatest - profitPrevious) / abs(profitPrevious)) * 100.0
+                signals += Signal(
+                    if (change >= 0) SignalType.SUPPORTING else SignalType.CAUTION,
+                    "Reported profit is ${formatPercent(change)} versus the preceding returned period.",
+                    "MyStocks Africa financial history"
+                )
+            }
+            else -> unknowns += "Profit trend cannot be calculated because comparable numeric values were not returned for the latest two periods."
+        }
+
+        return FinancialTrendResult(
+            signals = signals,
+            unknowns = unknowns,
+            hasTrend = signals.isNotEmpty()
         )
     }
 
