@@ -169,7 +169,8 @@ function parseFinancials(html) {
     },
     financialHistory: [latest, ...history]
       .filter((row, index, all) => row.period && all.findIndex(item => item.period === row.period) === index)
-      .slice(0, 8),
+      .slice(0, 8)
+      .reverse(),
   };
 }
 
