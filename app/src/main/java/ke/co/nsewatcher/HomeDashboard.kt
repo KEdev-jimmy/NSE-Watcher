@@ -193,15 +193,15 @@ fun HomeDashboard(
 
 @Composable
 private fun HomeHero(advancing: Int, declining: Int, unchanged: Int, reportedVolume: Long) {
-    Box(Modifier.fillMaxWidth().height(272.dp)) {
+    Box(Modifier.fillMaxWidth().height(278.dp)) {
         Box(Modifier.fillMaxWidth().height(202.dp)) {
             AsyncImage(
-            model = NairobiSkyline,
-            contentDescription = "Nairobi skyline",
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
-        )
-        Box(Modifier.fillMaxSize().background(Color(0xCC00523B)))
+                model = NairobiSkyline,
+                contentDescription = "Nairobi skyline",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+            Box(Modifier.fillMaxSize().background(Color(0xCC00523B)))
             Box(Modifier.fillMaxSize().background(Color(0x66002018)))
         }
 
@@ -230,76 +230,41 @@ private fun HomeHero(advancing: Int, declining: Int, unchanged: Int, reportedVol
             }
 
             Spacer(Modifier.height(4.dp))
-            MarketIndexCard(advancing, declining, unchanged, reportedVolume)
+            NasiPulseCard()
+            Spacer(Modifier.height(7.dp))
+            CompactBreadthCard(advancing, declining, unchanged, reportedVolume)
         }
     }
 }
 
 @Composable
-private fun MarketIndexCard(advancing: Int, declining: Int, unchanged: Int, reportedVolume: Long) {
+private fun CompactBreadthCard(advancing: Int, declining: Int, unchanged: Int, reportedVolume: Long) {
     Card(
-        Modifier.fillMaxWidth().padding(horizontal = 2.dp),
-        RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xEE04543C)),
-        border = BorderStroke(1.dp, Color(0xFF39D995))
+        Modifier.fillMaxWidth().padding(horizontal = 14.dp),
+        RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xE604543C)),
+        border = BorderStroke(1.dp, Color(0x5539D995))
     ) {
-        Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1.22f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(27.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFF0B7652))) {
-                        Icon(Icons.Default.BarChart, null, tint = Color.White, modifier = Modifier.padding(6.dp))
-                    }
-                    Spacer(Modifier.width(7.dp))
-                    Text("NSE All Share Index", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                }
-                Spacer(Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.Bottom) {
-          Text("181.74", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold)
-          Spacer(Modifier.width(7.dp))
-          Column {
-              Text("▲ +0.84%", color = Color(0xFF58E8A8), fontSize = 13.sp, fontWeight = FontWeight.Bold)
-              Text("(+1.52)", color = Color(0xFFA8E7C8), fontSize = 9.sp)
-          }
-      }
-                  }
-            Spacer(Modifier.width(10.dp))
-            VerticalDivider(color = Color.White.copy(alpha = .25f), modifier = Modifier.height(68.dp))
+        Row(Modifier.padding(horizontal = 11.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+            BreadthLine("Advancing", advancing, HomeGreen)
+            Spacer(Modifier.width(9.dp))
+            BreadthLine("Declining", declining, HomeRed)
+            Spacer(Modifier.width(9.dp))
+            BreadthLine("Unchanged", unchanged, Color(0xFFD4DFDB))
             Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(.86f)) {
-                BreadthLine("Advancing", advancing, HomeGreen)
-                BreadthLine("Declining", declining, HomeRed)
-                BreadthLine("Unchanged", unchanged, Color(0xFFD4DFDB))
-                Spacer(Modifier.height(3.dp))
-                HorizontalDivider(color = Color.White.copy(alpha = .22f))
-                Spacer(Modifier.height(3.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    HeroMetric(Icons.Default.BarChart, "Volume", formatShares(reportedVolume))
-                    HeroMetric(Icons.Default.Layers, "Turnover", "—")
-                }
-            }
+            Text("Vol ${formatShares(reportedVolume)}", color = Color(0xFFD7EAE1), fontSize = 8.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }
 
 @Composable
 private fun BreadthLine(label: String, value: Int, color: Color) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(8.dp).clip(CircleShape).background(color))
-        Spacer(Modifier.width(6.dp))
-        Text(label, color = Color(0xFFD7EAE1), fontSize = 9.sp, modifier = Modifier.weight(1f))
-        Text(value.toString(), color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-    }
-}
-
-@Composable
-private fun HeroMetric(icon: ImageVector, label: String, value: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, tint = Color.White, modifier = Modifier.size(18.dp))
+        Box(Modifier.size(7.dp).clip(CircleShape).background(color))
+        Spacer(Modifier.width(5.dp))
+        Text(label, color = Color(0xFFD7EAE1), fontSize = 8.sp)
         Spacer(Modifier.width(4.dp))
-        Column {
-            Text(label, color = Color(0xFFB9D8C8), fontSize = 7.sp)
-            Text(value, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-        }
+        Text(value.toString(), color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
     }
 }
 
