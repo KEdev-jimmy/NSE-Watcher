@@ -1,0 +1,93 @@
+name: Refine Company Price Chart
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+
+jobs:
+  refine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: ""
+
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Install Gradle
+        run: |
+          curl -fsSL https://services.gradle.org/distributions/gradle-8.14.4-bin.zip -o gradle.zip
+          unzip -q gradle.zip
+          echo "$GITHUB_WORKSPACE/gradle-8.14.4/bin" >> "$GITHUB_PATH"
+
+      - name: Refine company price chart
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('app/src/main/java/ke/co/nsewatcher/CompanyIntelligence.kt')
+          text = path.read_text()
+
+          text = text.replace(
+              'import androidx.compose.ui.graphics.Color\n',
+              'import androidx.compose.ui.graphics.Brush\nimport androidx.compose.ui.graphics.Color\n'
+          )
+
+          text = text.replace(
+              'val periods = listOf("1W", "1M", "3M", "6M", "1Y", "3Y")',
+              'val periods = listOf("1D", "1W", "1M", "3M", "6M", "1Y", "3Y", "5Y")'
+          )
+
+          old = '''        item { SectionTitle("Market behaviour", "Price movement across time", Icons.Default.ShowChart) }\n        item {\n            IntelligenceCard {\n                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {\n                    periods.forEach { value ->\n                        FilterChip(selected = period == value, onClick = { period = value }, label = { Text(value, fontSize = 9.sp) })\n                    }\n                }\n                Spacer(Modifier.height(8.dp))\n                if (historyLoading) {\n                    IntelligenceLoader("Loading $period market history", "Checking historical NSE data…")\n                } else if (history.size >= 2) {\n                    IntelligenceChart(history, if (s.change >= 0) IntelligenceGreen else IntelligenceRed)\n                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {\n                        Text("${history.size} data points", color = IntelligenceMuted, fontSize = 8.sp)\n                        percentReturn(history)?.let { Text("${formatSigned(it)} $period", color = if (it >= 0) IntelligenceGreen else IntelligenceRed, fontWeight = FontWeight.Bold, fontSize = 8.sp) }\n                    }\n                } else {\n                    Text("Historical market data is not available for this period.", color = IntelligenceMuted, fontSize = 10.sp)\n                }\n            }\n        }'''
+
+          new = '''        item { SectionTitle("Market behaviour", "Price movement across time", Icons.Default.ShowChart) }\n        item {\n            IntelligenceCard {\n                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {\n                    Column(Modifier.weight(1f)) {\n                        Text("${currencyLabel(s.price)}", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = IntelligenceText)\n                        Text("NSE • 15 min delayed", color = IntelligenceMuted, fontSize = 9.sp)\n                    }\n                    Text(\n                        String.format(Locale.US, "%+.2f%% today", s.change),\n                        color = if (s.change >= 0) IntelligenceGreen else IntelligenceRed,\n                        fontWeight = FontWeight.ExtraBold,\n                        fontSize = 13.sp\n                    )\n                }\n                Spacer(Modifier.height(14.dp))\n                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {\n                    periods.forEach { value ->\n                        FilterChip(selected = period == value, onClick = { period = value }, label = { Text(value, fontSize = 9.sp) })\n                    }\n                }\n                Spacer(Modifier.height(10.dp))\n                if (historyLoading) {\n                    IntelligenceLoader("Loading $period market history", "Checking historical NSE data…")\n                } else if (history.size >= 2) {\n                    IntelligenceChart(history, if (s.change >= 0) IntelligenceGreen else IntelligenceRed)\n                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {\n                        Text("${history.size} data points", color = IntelligenceMuted, fontSize = 8.sp)\n                        percentReturn(history)?.let { Text("${formatSigned(it)} $period", color = if (it >= 0) IntelligenceGreen else IntelligenceRed, fontWeight = FontWeight.Bold, fontSize = 8.sp) }\n                    }\n                } else {\n                    Text("Historical market data is not available for this period.", color = IntelligenceMuted, fontSize = 10.sp)\n                }\n            }\n        }'''
+
+          if old not in text:
+              raise SystemExit('Market behaviour block not found')
+          text = text.replace(old, new, 1)
+
+          old_chart = '''@Composable\nprivate fun IntelligenceChart(values: List<Double>, tint: Color) {\n    val valid = values.filter { it.isFinite() && it > 0.0 }\n    if (valid.size < 2) return\n    Canvas(Modifier.fillMaxWidth().height(155.dp).padding(vertical = 8.dp)) {\n        val min = valid.minOrNull() ?: return@Canvas\n        val max = valid.maxOrNull() ?: return@Canvas\n        val range = (max - min).takeIf { it > 0.0 } ?: 1.0\n        val path = Path()\n        valid.forEachIndexed { index, value ->\n            val x = size.width * index / valid.lastIndex.coerceAtLeast(1)\n            val y = size.height - (((value - min) / range).toFloat() * size.height)\n            if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)\n        }\n        drawPath(path, tint, style = Stroke(width = 4f, cap = StrokeCap.Round))\n    }\n}'''
+
+          new_chart = '''@Composable\nprivate fun IntelligenceChart(values: List<Double>, tint: Color) {\n    val valid = values.filter { it.isFinite() && it > 0.0 }\n    if (valid.size < 2) return\n    val min = valid.minOrNull() ?: return\n    val max = valid.maxOrNull() ?: return\n    val range = (max - min).takeIf { it > 0.0 } ?: (max * 0.01).coerceAtLeast(1.0)\n    val top = max + range * 0.08\n    val bottom = (min - range * 0.08).coerceAtLeast(0.0)\n    val chartRange = (top - bottom).coerceAtLeast(0.0001)\n    val mid = (top + bottom) / 2.0\n\n    Row(Modifier.fillMaxWidth().height(218.dp), verticalAlignment = Alignment.CenterVertically) {\n        Column(\n            Modifier.width(42.dp).fillMaxHeight().padding(vertical = 7.dp),\n            verticalArrangement = Arrangement.SpaceBetween\n        ) {\n            Text(priceAxis(top), color = IntelligenceMuted, fontSize = 8.sp, maxLines = 1)\n            Text(priceAxis(mid), color = IntelligenceMuted, fontSize = 8.sp, maxLines = 1)\n            Text(priceAxis(bottom), color = IntelligenceMuted, fontSize = 8.sp, maxLines = 1)\n        }\n        Canvas(Modifier.weight(1f).fillMaxHeight().padding(vertical = 7.dp)) {\n            val line = Path()\n            val area = Path()\n            valid.forEachIndexed { index, value ->\n                val x = size.width * index / valid.lastIndex.coerceAtLeast(1)\n                val y = size.height - (((value - bottom) / chartRange).toFloat() * size.height)\n                if (index == 0) {\n                    line.moveTo(x, y)\n                    area.moveTo(x, size.height)\n                    area.lineTo(x, y)\n                } else {\n                    line.lineTo(x, y)\n                    area.lineTo(x, y)\n                }\n            }\n            area.lineTo(size.width, size.height)\n            area.close()\n            drawPath(\n                area,\n                Brush.verticalGradient(\n                    listOf(tint.copy(alpha = 0.34f), tint.copy(alpha = 0.03f)),\n                    startY = 0f,\n                    endY = size.height\n                )\n            )\n            drawPath(line, tint, style = Stroke(width = 3.5f, cap = StrokeCap.Round))\n        }\n    }\n}'''
+
+          if old_chart not in text:
+              raise SystemExit('Old chart function not found')
+          text = text.replace(old_chart, new_chart, 1)
+
+          marker = 'private fun valueOrMissing(value: String): String'
+          helper = '''private fun currencyLabel(value: Double): String = String.format(Locale.US, "KSh %.2f", value)\n\nprivate fun priceAxis(value: Double): String = String.format(Locale.US, "%.2f", value)\n\n'''
+          if helper.strip() not in text:
+              text = text.replace(marker, helper + marker, 1)
+
+          path.write_text(text)
+          PY
+
+      - name: Build Android app
+        run: gradle --no-daemon build
+
+      - name: Remove temporary workflow and commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f .github/workflows/refine-company-price-chart.yml
+          git add app/src/main/java/ke/co/nsewatcher/CompanyIntelligence.kt .github/workflows/refine-company-price-chart.yml
+          git commit -m "feat: refine company price chart with detailed market view"
+          git push
