@@ -134,6 +134,19 @@ function pctGrowth(current, previous) {
   return `${(((a - b) / Math.abs(b)) * 100).toFixed(2)}%`;
 }
 
+function normalizeMarketCap(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  const numeric = numericValue(text);
+  if (numeric === null) return text;
+  const upper = text.toUpperCase();
+  if (/\bTRILLION\b|\bT\b/.test(upper)) return String(Math.round(numeric * 1e12));
+  if (/\bBILLION\b|\bB\b/.test(upper)) return String(Math.round(numeric * 1e9));
+  if (/\bMILLION\b|\bM\b/.test(upper)) return String(Math.round(numeric * 1e6));
+  // StockAnalysis NASE ratios report market capitalization in millions of KES.
+  return String(Math.round(numeric * 1e6));
+}
+
 function parseFinancials(html) {
   const tables = parseTables(html);
   const revenue = findRow(tables, [/^Revenue(?:\s+Revenue Growth)?$/i, /^Revenue$/i]);
@@ -148,7 +161,6 @@ function parseFinancials(html) {
 
   const periodRow = periods || fiscalYears || [];
   const hasTtm = String(periodRow[1] || '').trim().toUpperCase() === 'TTM';
-  // StockAnalysis places TTM at index 1 and the latest full fiscal year at index 2.
   const annualIndex = hasTtm ? 2 : 1;
 
   const latestPeriod = normalizePeriod(
@@ -164,15 +176,17 @@ function parseFinancials(html) {
   const previousProfit = valueFromRow(netIncome, annualIndex + 1);
   const previousEps = valueFromRow(eps, annualIndex + 1);
 
+  // Growth is deliberately calculated from the annual FY values. This avoids
+  // accidentally exposing TTM growth when the profile is showing FY data.
   const latest = {
     period: latestPeriod || 'Latest reported',
     revenue: latestRevenue,
     profit: latestProfit,
     eps: latestEps,
     margin: valueFromRow(margin, annualIndex) || valueFromRow(margin),
-    revenueGrowth: valueFromRow(revenueGrowth, annualIndex) || pctGrowth(latestRevenue, previousRevenue),
-    profitGrowth: valueFromRow(netIncomeGrowth, annualIndex) || pctGrowth(latestProfit, previousProfit),
-    epsGrowth: valueFromRow(epsGrowth, annualIndex) || pctGrowth(latestEps, previousEps),
+    revenueGrowth: pctGrowth(latestRevenue, previousRevenue) || valueFromRow(revenueGrowth, annualIndex),
+    profitGrowth: pctGrowth(latestProfit, previousProfit) || valueFromRow(netIncomeGrowth, annualIndex),
+    epsGrowth: pctGrowth(latestEps, previousEps) || valueFromRow(epsGrowth, annualIndex),
     source: EXTERNAL_SOURCE,
   };
 
@@ -188,12 +202,16 @@ function parseFinancials(html) {
   for (let i = annualIndex; i < max; i += 1) {
     const period = normalizePeriod(valueFromRow(periods, i) || valueFromRow(fiscalYears, i));
     if (!period) continue;
+    const previous = i + 1;
     history.push({
       period,
       revenue: valueFromRow(revenue, i),
       profit: valueFromRow(netIncome, i),
       eps: valueFromRow(eps, i),
       margin: valueFromRow(margin, i),
+      revenueGrowth: pctGrowth(valueFromRow(revenue, i), valueFromRow(revenue, previous)),
+      profitGrowth: pctGrowth(valueFromRow(netIncome, i), valueFromRow(netIncome, previous)),
+      epsGrowth: pctGrowth(valueFromRow(eps, i), valueFromRow(eps, previous)),
       source: EXTERNAL_SOURCE,
     });
   }
@@ -224,7 +242,7 @@ function parseRatios(html) {
   const roe = findRow(tables, [/^Return on Equity \(ROE\)$/i, /^ROE$/i]);
   const dividendYield = findRow(tables, [/^Dividend Yield$/i]);
   return {
-    marketCap: valueFromRow(marketCap),
+    marketCap: normalizeMarketCap(valueFromRow(marketCap)),
     pe: valueFromRow(pe),
     pb: valueFromRow(pb),
     debtToEquity: valueFromRow(debt),
@@ -240,14 +258,15 @@ function parseDividends(html) {
   for (const table of tables) {
     const headerIndex = table.findIndex(row => {
       const headers = row.map(value => value.toLowerCase().replace(/\s+/g, ' ').trim());
-      return headers.some(value => /ex[- ]?div(?:idend)? date/.test(value)) &&
-        headers.some(value => value.includes('amount'));
+      const hasExDate = headers.some(value => /ex[- ]?(?:dividend|div)[ -]?date/.test(value) || value === 'ex-date');
+      const hasAmount = headers.some(value => /^(amount|dividend|dividend amount|dividend \(kes\)|cash dividend)/.test(value));
+      return hasExDate && hasAmount;
     });
     if (headerIndex < 0) continue;
 
     const header = table[headerIndex].map(value => value.toLowerCase().replace(/\s+/g, ' ').trim());
-    const exIndex = header.findIndex(value => /ex[- ]?div(?:idend)? date/.test(value));
-    const amountIndex = header.findIndex(value => value.includes('amount'));
+    const exIndex = header.findIndex(value => /ex[- ]?(?:dividend|div)[ -]?date/.test(value) || value === 'ex-date');
+    const amountIndex = header.findIndex(value => /^(amount|dividend|dividend amount|dividend \(kes\)|cash dividend)/.test(value));
     const payIndex = header.findIndex(value => value.includes('pay date') || value.includes('payment date'));
 
     const rows = table.slice(headerIndex + 1)
@@ -256,7 +275,7 @@ function parseDividends(html) {
         exDate: String(row[exIndex] || '').trim(),
         paymentDate: payIndex >= 0 ? String(row[payIndex] || '').trim() : '',
       }))
-      .filter(row => row.amount && row.exDate);
+      .filter(row => row.amount && row.exDate && numericValue(row.amount) !== null);
 
     if (rows.length > best.length) best = rows;
   }
@@ -395,10 +414,6 @@ function mergeProfile(primary, external) {
     'marketCap', 'revenue', 'profit', 'eps', 'roe', 'debtToEquity', 'margin',
     'revenueGrowth', 'profitGrowth', 'pe', 'pb', 'dividendYield',
   ];
-
-  // For financial and valuation fields, the structured fundamental source is
-  // preferred when it has a value. This prevents stale primary-provider values
-  // from masking fresher annual/TTM data.
   for (const key of keys) {
     if (String(external?.[key] || '').trim()) output[key] = external[key];
   }
@@ -432,13 +447,9 @@ function evidenceFor(profile, financialHistory, dividends, sourceInfo, fetchedAt
   });
 
   dividends.slice(0, 12).forEach((dividend, index) => {
-    add(
-      `Dividend ${index + 1}`,
+    add(`Dividend ${index + 1}`,
       `${dividend.amount || ''} • ${dividend.exDate || ''}${dividend.paymentDate ? ` • paid ${dividend.paymentDate}` : ''}`,
-      dividend.source || EXTERNAL_SOURCE,
-      'dividend-history',
-      sourceInfo.dividendsUrl
-    );
+      dividend.source || EXTERNAL_SOURCE, 'dividend-history', sourceInfo.dividendsUrl);
   });
 
   if (sourceInfo.officialUrl) {
