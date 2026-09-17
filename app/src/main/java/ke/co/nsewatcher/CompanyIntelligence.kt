@@ -16,6 +16,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -41,7 +42,7 @@ private val IntelligenceRed = Color(0xFFE04444)
 
 @Composable
 fun CompanyIntelligence(s: Stock, back: () -> Unit) {
-    val periods = listOf("1W", "1M", "3M", "6M", "1Y", "3Y")
+    val periods = listOf("1D", "1W", "1M", "3M", "6M", "1Y", "3Y", "5Y")
     var period by rememberSaveable(s.symbol) { mutableStateOf("1Y") }
     var history by remember(s.symbol) { mutableStateOf(s.history) }
     var historyLoading by remember(s.symbol) { mutableStateOf(false) }
@@ -224,12 +225,25 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit) {
         item { SectionTitle("Market behaviour", "Price movement across time", Icons.Default.ShowChart) }
         item {
             IntelligenceCard {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+                    Column(Modifier.weight(1f)) {
+                        Text("${currencyLabel(s.price)}", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = IntelligenceText)
+                        Text("NSE • 15 min delayed", color = IntelligenceMuted, fontSize = 9.sp)
+                    }
+                    Text(
+                        String.format(Locale.US, "%+.2f%% today", s.change),
+                        color = if (s.change >= 0) IntelligenceGreen else IntelligenceRed,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 13.sp
+                    )
+                }
+                Spacer(Modifier.height(14.dp))
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     periods.forEach { value ->
                         FilterChip(selected = period == value, onClick = { period = value }, label = { Text(value, fontSize = 9.sp) })
                     }
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(10.dp))
                 if (historyLoading) {
                     IntelligenceLoader("Loading $period market history", "Checking historical NSE data…")
                 } else if (history.size >= 2) {
@@ -378,17 +392,50 @@ private fun IntelligenceLoader(title: String, subtitle: String) {
 private fun IntelligenceChart(values: List<Double>, tint: Color) {
     val valid = values.filter { it.isFinite() && it > 0.0 }
     if (valid.size < 2) return
-    Canvas(Modifier.fillMaxWidth().height(155.dp).padding(vertical = 8.dp)) {
-        val min = valid.minOrNull() ?: return@Canvas
-        val max = valid.maxOrNull() ?: return@Canvas
-        val range = (max - min).takeIf { it > 0.0 } ?: 1.0
-        val path = Path()
-        valid.forEachIndexed { index, value ->
-            val x = size.width * index / valid.lastIndex.coerceAtLeast(1)
-            val y = size.height - (((value - min) / range).toFloat() * size.height)
-            if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+    val min = valid.minOrNull() ?: return
+    val max = valid.maxOrNull() ?: return
+    val range = (max - min).takeIf { it > 0.0 } ?: (max * 0.01).coerceAtLeast(1.0)
+    val top = max + range * 0.08
+    val bottom = (min - range * 0.08).coerceAtLeast(0.0)
+    val chartRange = (top - bottom).coerceAtLeast(0.0001)
+    val mid = (top + bottom) / 2.0
+
+    Row(Modifier.fillMaxWidth().height(218.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(
+            Modifier.width(42.dp).fillMaxHeight().padding(vertical = 7.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(priceAxis(top), color = IntelligenceMuted, fontSize = 8.sp, maxLines = 1)
+            Text(priceAxis(mid), color = IntelligenceMuted, fontSize = 8.sp, maxLines = 1)
+            Text(priceAxis(bottom), color = IntelligenceMuted, fontSize = 8.sp, maxLines = 1)
         }
-        drawPath(path, tint, style = Stroke(width = 4f, cap = StrokeCap.Round))
+        Canvas(Modifier.weight(1f).fillMaxHeight().padding(vertical = 7.dp)) {
+            val line = Path()
+            val area = Path()
+            valid.forEachIndexed { index, value ->
+                val x = size.width * index / valid.lastIndex.coerceAtLeast(1)
+                val y = size.height - (((value - bottom) / chartRange).toFloat() * size.height)
+                if (index == 0) {
+                    line.moveTo(x, y)
+                    area.moveTo(x, size.height)
+                    area.lineTo(x, y)
+                } else {
+                    line.lineTo(x, y)
+                    area.lineTo(x, y)
+                }
+            }
+            area.lineTo(size.width, size.height)
+            area.close()
+            drawPath(
+                area,
+                Brush.verticalGradient(
+                    listOf(tint.copy(alpha = 0.34f), tint.copy(alpha = 0.03f)),
+                    startY = 0f,
+                    endY = size.height
+                )
+            )
+            drawPath(line, tint, style = Stroke(width = 3.5f, cap = StrokeCap.Round))
+        }
     }
 }
 
@@ -402,6 +449,10 @@ private fun CompanyLogo(symbol: String, size: Int, logoUrl: String? = null) {
         }
     }
 }
+
+private fun currencyLabel(value: Double): String = String.format(Locale.US, "KSh %.2f", value)
+
+private fun priceAxis(value: Double): String = String.format(Locale.US, "%.2f", value)
 
 private fun valueOrMissing(value: String): String = value.trim().takeIf { it.isNotBlank() } ?: "Not available"
 
