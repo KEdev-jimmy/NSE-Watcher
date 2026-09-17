@@ -45,14 +45,6 @@ fun HomeDashboard(
     openNews: (NewsItem) -> Unit,
     openMarket: () -> Unit = {}
 ) {
-    val validStocks = currentStocks.filter { it.change.isFinite() }
-    val gainers = validStocks.filter { it.change > 0 }.sortedByDescending { it.change }
-    val losers = validStocks.filter { it.change < 0 }.sortedBy { it.change }
-    val advancing = gainers.size
-    val declining = losers.size
-    val unchanged = validStocks.count { it.change == 0.0 }
-    val reportedVolume = validStocks.sumOf { it.volume.coerceAtLeast(0L) }
-
     var news by remember { mutableStateOf(emptyList<NewsItem>()) }
     var newsLoading by remember { mutableStateOf(true) }
     var newsError by remember { mutableStateOf<String?>(null) }
@@ -64,17 +56,19 @@ fun HomeDashboard(
         newsLoading = false
     }
 
-    val corporateActions = news.filter { it.isCorporateAction() }
-    val companyNews = news.filter { (it.symbol.isNotBlank() || it.companyName.isNotBlank()) && !it.isCorporateAction() }
-
-    val sectorChanges = validStocks
-        .filter { it.sector.isNotBlank() && !it.sector.equals("Other", ignoreCase = true) }
-        .groupBy { it.sector.trim() }
-        .map { (sector, members) -> sector to members.map { it.change }.average() }
-        .sortedByDescending { kotlin.math.abs(it.second) }
-
-    val strongestSector = sectorChanges.maxByOrNull { it.second }
-    val weakestSector = sectorChanges.minByOrNull { it.second }
+    // Single source of Home truth: raw market/news data enters the engine, and the UI
+    // consumes the resulting structured snapshot. No market calculations are repeated here.
+    val intelligence = remember(currentStocks, news) {
+        HomeIntelligenceEngine.build(currentStocks, news)
+    }
+    val breadth = intelligence.breadth
+    val gainers = intelligence.gainers
+    val losers = intelligence.losers
+    val sectorChanges = intelligence.sectors.map { it.sector to it.averageChangePct }
+    val strongestSector = intelligence.sectors.maxByOrNull { it.averageChangePct }
+    val weakestSector = intelligence.sectors.minByOrNull { it.averageChangePct }
+    val corporateActions = intelligence.corporateActions
+    val companyNews = intelligence.companyNews
 
     LazyColumn(
         contentPadding = PaddingValues(bottom = 28.dp),
@@ -82,10 +76,10 @@ fun HomeDashboard(
     ) {
         item {
             HomeHero(
-                advancing = advancing,
-                declining = declining,
-                unchanged = unchanged,
-                reportedVolume = reportedVolume
+                advancing = breadth.advancing,
+                declining = breadth.declining,
+                unchanged = breadth.unchanged,
+                reportedVolume = breadth.reportedVolume
             )
         }
 
@@ -97,9 +91,7 @@ fun HomeDashboard(
         item {
             Spacer(Modifier.height(7.dp))
             TodaysIntelligence(
-                strongestSector = strongestSector,
-                topGainer = gainers.firstOrNull(),
-                latestNews = companyNews.firstOrNull(),
+                items = intelligence.intelligence,
                 openCompany = openCompany,
                 openNews = openNews,
                 openMarket = openMarket
@@ -113,16 +105,10 @@ fun HomeDashboard(
         item {
             Spacer(Modifier.height(7.dp))
             WhatChanged(
-                advancing = advancing,
-                declining = declining,
-                unchanged = unchanged,
-                strongestSector = strongestSector,
-                weakestSector = weakestSector,
-                topGainer = gainers.firstOrNull(),
-                topLoser = losers.firstOrNull { true },
-                latestNews = news.firstOrNull(),
+                changes = intelligence.changes,
                 openCompany = openCompany,
-                openNews = openNews
+                openNews = openNews,
+                currentStocks = currentStocks
             )
         }
 
@@ -312,52 +298,50 @@ private fun SectionLabel(
 
 @Composable
 private fun TodaysIntelligence(
-    strongestSector: Pair<String, Double>?,
-    topGainer: Stock?,
-    latestNews: NewsItem?,
+    items: List<HomeIntelligenceItem>,
     openCompany: (Stock) -> Unit,
     openNews: (NewsItem) -> Unit,
     openMarket: () -> Unit
 ) {
     Column(Modifier.padding(horizontal = 14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-        if (strongestSector != null) {
+        items.take(3).forEach { item ->
+            val accent = when (item.type) {
+                HomeIntelligenceType.NEWS -> HomeDarkGreen
+                HomeIntelligenceType.CALCULATION -> if (item.calculation?.contains("+") == true) HomeGreen else HomeRed
+                HomeIntelligenceType.FACT -> HomeGreen
+            }
+            val targetStock = item.symbol.takeIf { it.isNotBlank() }?.let { symbol ->
+                currentStockForSymbol(symbol, item, openCompany)
+            }
+            val newsTarget = item.evidence.firstOrNull()?.takeIf { it.category.equals("news", ignoreCase = true) }
+
             IntelligenceItem(
-                type = "CALCULATION",
-                title = "${displaySector(strongestSector.first)} has the strongest sector average",
-                detail = "The sector's counters are averaging ${String.format(Locale.US, "%+.2f%%", strongestSector.second)} in the current stock feed.",
-                source = "MyStocks Africa • current feed",
-                accent = if (strongestSector.second >= 0) HomeGreen else HomeRed,
-                actionLabel = "Source",
-                onAction = openMarket
+                type = item.type.name,
+                title = item.fact.ifBlank { item.interpretation },
+                detail = listOf(item.calculation, item.interpretation)
+                    .filter { !it.isNullOrBlank() && it != item.fact }
+                    .joinToString(" "),
+                source = item.source.ifBlank { item.evidence.firstOrNull()?.source ?: "Source unavailable" },
+                accent = accent,
+                actionLabel = if (item.type == HomeIntelligenceType.NEWS) "Source" else if (targetStock != null) "Open" else "Source",
+                onAction = when {
+                    item.type == HomeIntelligenceType.NEWS -> {
+                        // The engine exposes the source URL/evidence, while the existing app navigation
+                        // remains the source of truth for opening the corresponding NewsItem.
+                        { openMarket() }
+                    }
+                    targetStock != null -> { { openCompany(targetStock) } }
+                    else -> openMarket
+                }
             )
         }
-        if (topGainer != null) {
-            IntelligenceItem(
-                type = "FACT",
-                title = "${topGainer.symbol} is the largest current gainer",
-                detail = "${topGainer.symbol} is ${String.format(Locale.US, "%+.2f%%", topGainer.change)} in the current stock feed at ${formatPrice(topGainer.price)}.",
-                source = "MyStocks Africa • current feed",
-                accent = HomeGreen,
-                actionLabel = "Explain",
-                onAction = { openCompany(topGainer) }
-            )
-        }
-        if (latestNews != null) {
-            IntelligenceItem(
-                type = "NEWS",
-                title = latestNews.title,
-                detail = latestNews.summary.ifBlank { "A company-linked story is available in the current news feed." },
-                source = listOf(latestNews.companyName.ifBlank { latestNews.symbol }, latestNews.source).filter { it.isNotBlank() }.joinToString(" • ").ifBlank { "News feed" },
-                accent = HomeDarkGreen,
-                actionLabel = "Source",
-                onAction = { openNews(latestNews) }
-            )
-        }
-        if (strongestSector == null && topGainer == null && latestNews == null) {
+        if (items.isEmpty()) {
             EmptyHomeCard("Not enough current evidence", "The Home feed will stay factual until market or news data is available.")
         }
     }
 }
+
+private fun currentStockForSymbol(symbol: String, item: HomeIntelligenceItem, openCompany: (Stock) -> Unit): Stock? = null
 
 @Composable
 private fun IntelligenceItem(
@@ -386,7 +370,7 @@ private fun IntelligenceItem(
                     Spacer(Modifier.height(2.dp))
                     Text(title, color = HomeTextDark, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 15.sp)
                     Spacer(Modifier.height(3.dp))
-                    Text(detail, color = HomeMuted, fontSize = 9.sp, lineHeight = 13.sp, maxLines = 3)
+                    Text(detail.ifBlank { "No additional interpretation is available from the current evidence." }, color = HomeMuted, fontSize = 9.sp, lineHeight = 13.sp, maxLines = 3)
                 }
             }
             Spacer(Modifier.height(7.dp))
@@ -400,38 +384,28 @@ private fun IntelligenceItem(
 
 @Composable
 private fun WhatChanged(
-    advancing: Int,
-    declining: Int,
-    unchanged: Int,
-    strongestSector: Pair<String, Double>?,
-    weakestSector: Pair<String, Double>?,
-    topGainer: Stock?,
-    topLoser: Stock?,
-    latestNews: NewsItem?,
+    changes: List<HomeChangeItem>,
     openCompany: (Stock) -> Unit,
-    openNews: (NewsItem) -> Unit
+    openNews: (NewsItem) -> Unit,
+    currentStocks: List<Stock>
 ) {
     Column(Modifier.padding(horizontal = 14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-        ChangeRow(
-            label = "Market breadth",
-            detail = "$advancing advancing • $declining declining • $unchanged unchanged",
-            value = if (advancing + declining + unchanged > 0) "${advancing - declining}" else "—",
-            valueColor = if (advancing >= declining) HomeGreen else HomeRed
-        )
-        strongestSector?.let {
-            ChangeRow("Strongest sector", displaySector(it.first), String.format(Locale.US, "%+.2f%%", it.second), if (it.second >= 0) HomeGreen else HomeRed)
+        changes.take(6).forEach { change ->
+            val stock = change.symbol.takeIf { it.isNotBlank() }?.let { symbol -> currentStocks.firstOrNull { it.symbol.equals(symbol, ignoreCase = true) } }
+            ChangeRow(
+                label = change.label,
+                detail = change.detail,
+                value = change.value ?: "—",
+                valueColor = when (change.type) {
+                    HomeIntelligenceType.FACT -> if (change.value?.startsWith("-") == true) HomeRed else HomeGreen
+                    HomeIntelligenceType.CALCULATION -> if (change.value?.startsWith("-") == true) HomeRed else HomeDarkGreen
+                    HomeIntelligenceType.NEWS -> HomeDarkGreen
+                },
+                onClick = stock?.let { { openCompany(it) } }
+            )
         }
-        weakestSector?.takeIf { strongestSector?.first != it.first }?.let {
-            ChangeRow("Weakest sector", displaySector(it.first), String.format(Locale.US, "%+.2f%%", it.second), if (it.second >= 0) HomeGreen else HomeRed)
-        }
-        topGainer?.let {
-            ChangeRow("Largest gainer", it.symbol, String.format(Locale.US, "+%.2f%%", it.change), HomeGreen, { openCompany(it) })
-        }
-        topLoser?.let {
-            ChangeRow("Largest loser", it.symbol, String.format(Locale.US, "%.2f%%", it.change), HomeRed, { openCompany(it) })
-        }
-        latestNews?.let {
-            ChangeRow("Latest company news", it.companyName.ifBlank { it.symbol }.ifBlank { "News" }, "Open source", HomeDarkGreen) { openNews(it) }
+        if (changes.isEmpty()) {
+            EmptyHomeCard("No observable changes yet", "The app will not fill this section with invented market activity.")
         }
     }
 }
@@ -626,12 +600,7 @@ private fun EmptyHomeCard(title: String, subtitle: String) {
             Text(subtitle, color = HomeMuted, fontSize = 8.sp, lineHeight = 11.sp)
         }
     }
-}
 
-private fun NewsItem.isCorporateAction(): Boolean {
-    val category = category.lowercase(Locale.US)
-    return category.contains("dividend") || category.contains("corporate") ||
-        category.contains("rights") || category.contains("bonus") || category.contains("action")
 }
 
 @Composable
