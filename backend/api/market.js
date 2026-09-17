@@ -29,54 +29,18 @@ function periodConfig(period) {
   const start = new Date(end);
   let interval = '1d';
   switch (String(period || '1y').toLowerCase()) {
-    case '3d':
-      start.setDate(start.getDate() - 3);
-      interval = '1d';
-      break;
-    case '1d':
-      // Fetch a small window that includes the previous session so we can use
-      // its close as the 1D performance baseline. The Android chart receives
-      // only the latest trading session plus that baseline.
-      start.setDate(start.getDate() - 2);
-      interval = '15m';
-      break;
-    case '1w':
-      start.setDate(start.getDate() - 7);
-      interval = '1d';
-      break;
-    case '1m':
-      start.setMonth(start.getMonth() - 1);
-      interval = '1d';
-      break;
-    case '3m':
-      start.setMonth(start.getMonth() - 3);
-      interval = '1d';
-      break;
-    case '6m':
-      start.setMonth(start.getMonth() - 6);
-      interval = '1d';
-      break;
-    case '1y':
-      start.setFullYear(start.getFullYear() - 1);
-      interval = '1w';
-      break;
-    case '3y':
-      start.setFullYear(start.getFullYear() - 3);
-      interval = '1mo';
-      break;
-    case '5y':
-      start.setFullYear(start.getFullYear() - 5);
-      interval = '1mo';
-      break;
-    default:
-      start.setFullYear(start.getFullYear() - 1);
-      interval = '1w';
+    case '3d': start.setDate(start.getDate() - 3); interval = '1d'; break;
+    case '1d': start.setDate(start.getDate() - 2); interval = '15m'; break;
+    case '1w': start.setDate(start.getDate() - 7); interval = '1d'; break;
+    case '1m': start.setMonth(start.getMonth() - 1); interval = '1d'; break;
+    case '3m': start.setMonth(start.getMonth() - 3); interval = '1d'; break;
+    case '6m': start.setMonth(start.getMonth() - 6); interval = '1d'; break;
+    case '1y': start.setFullYear(start.getFullYear() - 1); interval = '1w'; break;
+    case '3y': start.setFullYear(start.getFullYear() - 3); interval = '1mo'; break;
+    case '5y': start.setFullYear(start.getFullYear() - 5); interval = '1mo'; break;
+    default: start.setFullYear(start.getFullYear() - 1); interval = '1w';
   }
-  return {
-    interval,
-    from: start.toISOString().slice(0, 10),
-    to: end.toISOString().slice(0, 10),
-  };
+  return { interval, from: start.toISOString().slice(0, 10), to: end.toISOString().slice(0, 10) };
 }
 
 function previousCloseFromStock(raw) {
@@ -101,13 +65,26 @@ function providerAsOf(raw) {
   return raw?.asOf || raw?.meta?.asOf || raw?.data?.asOf || raw?.data?.meta?.asOf || null;
 }
 
+function providerMeta(raw) {
+  return raw?.meta || raw?.data?.meta || null;
+}
+
 module.exports = async (req, res) => {
   if (req.method !== 'GET') return json(res, 405, { error: 'GET only' });
   const action = String(req.query.action || 'snapshot');
   try {
     if (action === 'status') {
       const data = await mystocks('/market/status?exchange=NSE');
-      return json(res, 200, { source: 'MyStocks Africa', delayMinutes: 15, fetchedAt: new Date().toISOString(), data });
+      const providerData = data?.data && !Array.isArray(data.data) ? data.data : data;
+      const statusValue = String(providerData?.status ?? providerData?.marketStatus ?? providerData?.state ?? '').trim();
+      const normalizedStatus = statusValue.toLowerCase();
+      const isOpen = typeof providerData?.isOpen === 'boolean'
+        ? providerData.isOpen
+        : normalizedStatus === 'open' || normalizedStatus === 'trading';
+      return json(res, 200, {
+        source: 'MyStocks Africa', delayMinutes: 15, fetchedAt: new Date().toISOString(),
+        isOpen, status: statusValue || (isOpen ? 'OPEN' : 'CLOSED'), data,
+      });
     }
     if (action === 'stocks') {
       const data = await mystocks('/stocks?exchange=NSE&limit=50');
@@ -131,10 +108,7 @@ module.exports = async (req, res) => {
           const stock = await mystocks(`/stocks/${encodeURIComponent(symbol)}`);
           const previousClose = previousCloseFromStock(stock);
           const candles = candleArray(data).filter((candle) => Number.isFinite(Number(candle?.close)) && Number(candle.close) > 0);
-
           if (candles.length) {
-            // Keep only the latest trading session. The provider can return
-            // multiple sessions inside the two-day query window.
             const latestTimestamp = candleTimestamp(candles[candles.length - 1]);
             if (latestTimestamp) {
               const latestDay = latestTimestamp.toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' });
@@ -142,29 +116,18 @@ module.exports = async (req, res) => {
                 const timestamp = candleTimestamp(candle);
                 return timestamp?.toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' }) === latestDay;
               });
-
               if (currentSession.length) {
-                const first = currentSession[0];
-                const firstTimestamp = candleTimestamp(first);
+                const firstTimestamp = candleTimestamp(currentSession[0]);
                 const baselineTimestamp = firstTimestamp ? new Date(firstTimestamp.getTime() - 1) : latestTimestamp;
                 const sessionCandles = [...currentSession];
-
                 if (previousClose !== null) {
                   sessionCandles.unshift({
-                    timestamp: baselineTimestamp.toISOString(),
-                    date: baselineTimestamp.toISOString(),
-                    open: previousClose,
-                    high: previousClose,
-                    low: previousClose,
-                    close: previousClose,
-                    volume: 0,
-                    ohlcAvailable: true,
-                    volumeAvailable: false,
-                    synthetic: true,
-                    label: 'Previous close',
+                    timestamp: baselineTimestamp.toISOString(), date: baselineTimestamp.toISOString(),
+                    open: previousClose, high: previousClose, low: previousClose, close: previousClose,
+                    volume: 0, ohlcAvailable: true, volumeAvailable: false,
+                    synthetic: true, label: 'Previous close',
                   });
                 }
-
                 if (data?.candles) data.candles = sessionCandles;
                 else if (data?.data?.candles) data.data.candles = sessionCandles;
               }
@@ -172,7 +135,7 @@ module.exports = async (req, res) => {
           }
           chartAsOf = providerAsOf(data) || chartAsOf;
         } catch (_) {
-          // Keep provider candles if the optional previous-close/session shaping fails.
+          // Keep provider candles if optional previous-close/session shaping fails.
         }
       }
 
@@ -180,15 +143,18 @@ module.exports = async (req, res) => {
       const latestCandle = candles[candles.length - 1];
       const latestCandleTimestamp = candleTimestamp(latestCandle);
       chartAsOf = providerAsOf(data) || latestCandleTimestamp?.toISOString() || chartAsOf;
+      const meta = providerMeta(data);
+      const latestObservationAt = meta?.asOf || latestCandleTimestamp?.toISOString() || chartAsOf || null;
 
       return json(res, 200, {
-        source: 'MyStocks Africa',
-        delayMinutes: 15,
-        fetchedAt: new Date().toISOString(),
-        symbol,
-        period,
-        interval: cfg.interval,
-        asOf: chartAsOf,
+        source: 'MyStocks Africa', delayMinutes: 15, fetchedAt: new Date().toISOString(),
+        symbol, period, interval: cfg.interval, asOf: chartAsOf, latestObservationAt,
+        dataQuality: meta ? {
+          qualityStatus: meta.qualityStatus || null,
+          qualityIssues: Array.isArray(meta.qualityIssues) ? meta.qualityIssues : [],
+          recommendedChartType: meta.recommendedChartType || null,
+          sandbox: meta.sandbox === true,
+        } : null,
         data,
       });
     }
@@ -200,12 +166,8 @@ module.exports = async (req, res) => {
     return json(res, 200, { source: 'MyStocks Africa', delayMinutes: 15, fetchedAt: new Date().toISOString(), data });
   } catch (error) {
     return json(res, error.status || 502, {
-      error: 'Market data unavailable',
-      detail: error.message,
-      source: 'MyStocks Africa',
-      delayMinutes: 15,
-      fetchedAt: new Date().toISOString(),
-      provider: error.data || null,
+      error: 'Market data unavailable', detail: error.message,
+      source: 'MyStocks Africa', delayMinutes: 15, fetchedAt: new Date().toISOString(), provider: error.data || null,
     });
   }
 };
