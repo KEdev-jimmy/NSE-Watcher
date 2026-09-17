@@ -1,0 +1,410 @@
+const BASE_URL = process.env.MYSTOCKS_BASE_URL || 'https://mystocks.africa/api/v1/partner';
+const API_KEY = process.env.MYSTOCKS_API_KEY;
+const STOCK_ANALYSIS_BASE = 'https://stockanalysis.com/quote/nase';
+const CACHE_CONTROL = 's-maxage=600, stale-while-revalidate=1800';
+
+const OFFICIAL_IR = {
+  SCOM: 'https://www.safaricom.co.ke/investor-relations-landing/meetings',
+  EQTY: 'https://equitygroupholdings.com/investor-relations/',
+  KCB: 'https://www.kcbgroup.com/investor-relations',
+  ABSA: 'https://www.absabank.co.ke/investor-relations/',
+  EABL: 'https://www.eabl.com/investors/announcements',
+  CIC: 'https://www.cicinsurancegroup.com/investor-relations/',
+};
+
+function json(res, status, body) {
+  res.status(status).setHeader('Content-Type', 'application/json');
+  res.setHeader('Cache-Control', CACHE_CONTROL);
+  res.end(JSON.stringify(body));
+}
+
+function symbolFor(raw) {
+  const upper = String(raw || '').trim().toUpperCase();
+  return upper.includes('.') ? upper : `${upper}.KE`;
+}
+function bareSymbol(raw) { return String(raw || '').toUpperCase().replace(/\.KE$/, ''); }
+
+async function mystocks(path) {
+  if (!API_KEY) throw new Error('MYSTOCKS_API_KEY is not configured');
+  const response = await fetch(`${BASE_URL}${path}`, {
+    headers: { 'x-api-key': API_KEY, Accept: 'application/json' },
+  });
+  const text = await response.text();
+  let data;
+  try { data = JSON.parse(text); } catch { data = { raw: text }; }
+  if (!response.ok) {
+    const error = new Error(`MyStocks ${response.status}`);
+    error.status = response.status;
+    error.data = data;
+    throw error;
+  }
+  return data;
+}
+
+async function fetchHtml(url) {
+  const response = await fetch(url, {
+    headers: {
+      Accept: 'text/html,application/xhtml+xml',
+      'User-Agent': 'NSE-Watcher/1.0 (+https://github.com/KEdev-jimmy/NSE-Watcher)',
+    },
+  });
+  const text = await response.text();
+  if (!response.ok) {
+    const error = new Error(`Source ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+  return text;
+}
+
+function decodeEntities(value) {
+  return String(value || '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCharCode(parseInt(n, 16)));
+}
+
+function cleanText(html) {
+  return decodeEntities(String(html || '')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<[^>]+>/g, ' '))
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function parseTables(html) {
+  const tables = [];
+  for (const tableMatch of String(html || '').matchAll(/<table\b[\s\S]*?<\/table>/gi)) {
+    const rows = [];
+    for (const rowMatch of tableMatch[0].matchAll(/<tr\b[\s\S]*?<\/tr>/gi)) {
+      const cells = [];
+      for (const cellMatch of rowMatch[0].matchAll(/<(?:th|td)\b[^>]*>([\s\S]*?)<\/(?:th|td)>/gi)) {
+        cells.push(cleanText(cellMatch[1]));
+      }
+      if (cells.length) rows.push(cells);
+    }
+    if (rows.length) tables.push(rows);
+  }
+  return tables;
+}
+
+function findRow(tables, patterns) {
+  const regexes = patterns.map(pattern => pattern instanceof RegExp ? pattern : new RegExp(`^${pattern}$`, 'i'));
+  for (const table of tables) {
+    for (const row of table) {
+      const label = String(row[0] || '').replace(/\s+/g, ' ').trim();
+      if (regexes.some(re => re.test(label))) return row;
+    }
+  }
+  return null;
+}
+
+function valueFromRow(row, index = 1) {
+  if (!row) return '';
+  return String(row[index] || '').trim();
+}
+
+function normalizePeriod(value) {
+  const text = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!text || /^-/i.test(text)) return '';
+  return text;
+}
+
+function parseFinancials(html) {
+  const tables = parseTables(html);
+  const revenue = findRow(tables, [/^Revenue(?:\s+Revenue Growth)?$/i, /^Revenue$/i]);
+  const revenueGrowth = findRow(tables, [/^Revenue Growth$/i]);
+  const netIncome = findRow(tables, [/^Net Income(?:\s+Net Income Growth)?$/i, /^Net Income$/i, /^Net Profit$/i]);
+  const netIncomeGrowth = findRow(tables, [/^Net Income Growth$/i]);
+  const eps = findRow(tables, [/^Earnings Per Share(?:\s+EPS Growth)?$/i, /^EPS(?:\s+EPS Growth)?$/i]);
+  const epsGrowth = findRow(tables, [/^EPS Growth$/i]);
+  const margin = findRow(tables, [/^Profit Margin$/i, /^Net Margin$/i]);
+  const periods = findRow(tables, [/^Period Ending$/i]);
+  const fiscalYears = findRow(tables, [/^Fiscal Year$/i]);
+
+  const latestPeriod = normalizePeriod(valueFromRow(periods) || valueFromRow(fiscalYears));
+  const latest = {
+    period: latestPeriod || 'Latest reported',
+    revenue: valueFromRow(revenue),
+    profit: valueFromRow(netIncome),
+    eps: valueFromRow(eps),
+    margin: valueFromRow(margin),
+    revenueGrowth: valueFromRow(revenueGrowth),
+    profitGrowth: valueFromRow(netIncomeGrowth),
+    epsGrowth: valueFromRow(epsGrowth),
+    source: 'StockAnalysis / S&P Global Market Intelligence',
+  };
+
+  const history = [];
+  const max = Math.max(revenue?.length || 0, netIncome?.length || 0, eps?.length || 0, periods?.length || 0, fiscalYears?.length || 0);
+  for (let i = 1; i < max; i += 1) {
+    const period = normalizePeriod(valueFromRow(periods, i) || valueFromRow(fiscalYears, i));
+    if (!period) continue;
+    history.push({
+      period,
+      revenue: valueFromRow(revenue, i),
+      profit: valueFromRow(netIncome, i),
+      eps: valueFromRow(eps, i),
+      margin: valueFromRow(margin, i),
+      source: 'StockAnalysis / S&P Global Market Intelligence',
+    });
+  }
+
+  return {
+    profile: {
+      revenue: latest.revenue,
+      profit: latest.profit,
+      eps: latest.eps,
+      margin: latest.margin,
+      revenueGrowth: latest.revenueGrowth,
+      profitGrowth: latest.profitGrowth,
+      epsGrowth: latest.epsGrowth,
+    },
+    financialHistory: [latest, ...history]
+      .filter((row, index, all) => row.period && all.findIndex(item => item.period === row.period) === index)
+      .slice(0, 8),
+  };
+}
+
+function parseRatios(html) {
+  const tables = parseTables(html);
+  const marketCap = findRow(tables, [/^Market Capitalization$/i]);
+  const pe = findRow(tables, [/^PE Ratio$/i]);
+  const pb = findRow(tables, [/^PB Ratio$/i]);
+  const debt = findRow(tables, [/^Debt \/ Equity Ratio$/i, /^Debt\/Equity Ratio$/i]);
+  const roe = findRow(tables, [/^Return on Equity \(ROE\)$/i, /^ROE$/i]);
+  const dividendYield = findRow(tables, [/^Dividend Yield$/i]);
+  return {
+    marketCap: valueFromRow(marketCap),
+    pe: valueFromRow(pe),
+    pb: valueFromRow(pb),
+    debtToEquity: valueFromRow(debt),
+    roe: valueFromRow(roe),
+    dividendYield: valueFromRow(dividendYield),
+  };
+}
+
+function parseDividends(html) {
+  const tables = parseTables(html);
+  let best = [];
+  for (const table of tables) {
+    const header = table[0]?.map(value => value.toLowerCase());
+    if (!header?.some(value => value.includes('ex-div date')) || !header.some(value => value.includes('amount'))) continue;
+    const exIndex = header.findIndex(value => value.includes('ex-div date'));
+    const amountIndex = header.findIndex(value => value.includes('amount'));
+    const recordIndex = header.findIndex(value => value.includes('record date'));
+    const payIndex = header.findIndex(value => value.includes('pay date'));
+    const rows = table.slice(1).map(row => ({
+      amount: String(row[amountIndex] || '').trim(),
+      exDate: String(row[exIndex] || '').trim(),
+      recordDate: recordIndex >= 0 ? String(row[recordIndex] || '').trim() : '',
+      paymentDate: payIndex >= 0 ? String(row[payIndex] || '').trim() : '',
+    })).filter(row => row.exDate && row.amount);
+    if (rows.length > best.length) best = rows;
+  }
+  return best.slice(0, 12).map(row => ({
+    amount: row.amount,
+    exDate: row.exDate,
+    paymentDate: row.paymentDate,
+    declaredDate: '',
+    type: 'Dividend',
+    status: 'Historical',
+    source: 'StockAnalysis / S&P Global Market Intelligence',
+  }));
+}
+
+function mergeProfile(base, enrichment) {
+  const output = { ...(base || {}) };
+  const keys = ['marketCap', 'revenue', 'profit', 'eps', 'roe', 'debtToEquity', 'margin', 'revenueGrowth', 'profitGrowth', 'pe', 'pb', 'dividendYield'];
+  for (const key of keys) {
+    if (!String(output[key] || '').trim() && String(enrichment[key] || '').trim()) output[key] = enrichment[key];
+  }
+  return output;
+}
+
+function normalizeMyStocksProfile(value) {
+  if (!value || typeof value !== 'object') return {};
+  if (Array.isArray(value)) return value.find(item => item && typeof item === 'object') || {};
+  if (value.data && typeof value.data === 'object' && !Array.isArray(value.data)) return value.data;
+  return value;
+}
+
+function pick(obj, keys) {
+  const wanted = new Set(keys.map(key => String(key).replace(/[^a-z0-9]/gi, '').toLowerCase()));
+  function walk(value) {
+    if (!value || typeof value !== 'object') return '';
+    if (Array.isArray(value)) {
+      for (const item of value) { const found = walk(item); if (found) return found; }
+      return '';
+    }
+    for (const [key, child] of Object.entries(value)) {
+      const normalized = key.replace(/[^a-z0-9]/gi, '').toLowerCase();
+      if (wanted.has(normalized) && (typeof child === 'string' || typeof child === 'number')) return String(child);
+      const found = walk(child);
+      if (found) return found;
+    }
+    return '';
+  }
+  return walk(obj);
+}
+
+async function loadMyStocks(symbol) {
+  const encoded = encodeURIComponent(symbol);
+  const [profileResult, dividendsResult, newsResult] = await Promise.allSettled([
+    mystocks(`/companies/${encoded}`),
+    mystocks(`/dividends/${encoded}/history?limit=12`),
+    mystocks(`/companies/${encoded}/news?limit=20`),
+  ]);
+  const profileRaw = profileResult.status === 'fulfilled' ? normalizeMyStocksProfile(profileResult.value) : {};
+  const dividendsRaw = dividendsResult.status === 'fulfilled'
+    ? (dividendsResult.value.history || dividendsResult.value.data || dividendsResult.value.dividends || []) : [];
+  const news = newsResult.status === 'fulfilled'
+    ? (newsResult.value.items || newsResult.value.news || newsResult.value.data || []) : [];
+  return {
+    profile: {
+      description: pick(profileRaw, ['description', 'businessDescription', 'companyDescription']),
+      sector: pick(profileRaw, ['sector', 'industry']),
+      headquarters: pick(profileRaw, ['headquarters', 'hq', 'location']),
+      website: pick(profileRaw, ['website', 'websiteUrl', 'url']),
+      marketCap: pick(profileRaw, ['marketCap', 'marketCapitalisation', 'marketCapitalization']),
+      revenue: pick(profileRaw, ['revenue', 'totalRevenue']),
+      profit: pick(profileRaw, ['profit', 'netIncome', 'netProfit', 'profitAfterTax']),
+      eps: pick(profileRaw, ['eps', 'earningsPerShare']),
+      roe: pick(profileRaw, ['roe', 'returnOnEquity']),
+      debtToEquity: pick(profileRaw, ['debtToEquity', 'debtEquity', 'debtToEquityRatio']),
+      margin: pick(profileRaw, ['netMargin', 'profitMargin', 'margin']),
+      revenueGrowth: pick(profileRaw, ['revenueGrowth', 'revenueGrowthRate']),
+      profitGrowth: pick(profileRaw, ['profitGrowth', 'netIncomeGrowth', 'profitGrowthRate']),
+      pe: pick(profileRaw, ['pe', 'peRatio', 'priceEarnings', 'priceToEarnings']),
+      pb: pick(profileRaw, ['pb', 'pbRatio', 'priceBook', 'priceToBook']),
+      dividendYield: pick(profileRaw, ['dividendYield', 'yield']),
+    },
+    dividends: Array.isArray(dividendsRaw) ? dividendsRaw : [],
+    news: Array.isArray(news) ? news : [],
+    providerStatus: { profile: profileResult.status, dividends: dividendsResult.status, news: newsResult.status },
+  };
+}
+
+async function loadStockAnalysis(symbol) {
+  const bare = bareSymbol(symbol);
+  const urls = {
+    financials: `${STOCK_ANALYSIS_BASE}/${bare}/financials/`,
+    ratios: `${STOCK_ANALYSIS_BASE}/${bare}/financials/ratios/`,
+    dividends: `${STOCK_ANALYSIS_BASE}/${bare}/dividend/`,
+  };
+  const [financialsResult, ratiosResult, dividendsResult] = await Promise.allSettled([
+    fetchHtml(urls.financials),
+    fetchHtml(urls.ratios),
+    fetchHtml(urls.dividends),
+  ]);
+  const financials = financialsResult.status === 'fulfilled' ? parseFinancials(financialsResult.value) : { profile: {}, financialHistory: [] };
+  const ratios = ratiosResult.status === 'fulfilled' ? parseRatios(ratiosResult.value) : {};
+  const dividends = dividendsResult.status === 'fulfilled' ? parseDividends(dividendsResult.value) : [];
+  return {
+    profile: { ...financials.profile, ...ratios },
+    financialHistory: financials.financialHistory,
+    dividends,
+    urls,
+    providerStatus: { financials: financialsResult.status, ratios: ratiosResult.status, dividends: dividendsResult.status },
+  };
+}
+
+function sourceUrls(symbol) {
+  const bare = bareSymbol(symbol);
+  return {
+    officialUrl: OFFICIAL_IR[bare] || '',
+    financialsUrl: `${STOCK_ANALYSIS_BASE}/${bare}/financials/`,
+    ratiosUrl: `${STOCK_ANALYSIS_BASE}/${bare}/financials/ratios/`,
+    dividendsUrl: `${STOCK_ANALYSIS_BASE}/${bare}/dividend/`,
+  };
+}
+
+function evidenceFor(profile, financialHistory, dividends, sourceInfo, fetchedAt, symbol) {
+  const evidence = [];
+  const add = (claim, value, source, endpoint, url) => {
+    if (String(value || '').trim()) evidence.push({ claim, value: String(value), source, endpoint, url, symbol, fetchedAt });
+  };
+  const externalSource = 'StockAnalysis / S&P Global Market Intelligence';
+  add('Revenue', profile.revenue, externalSource, 'financials', sourceInfo.financialsUrl);
+  add('Profit', profile.profit, externalSource, 'financials', sourceInfo.financialsUrl);
+  add('EPS', profile.eps, externalSource, 'financials', sourceInfo.financialsUrl);
+  add('Revenue growth', profile.revenueGrowth, externalSource, 'financials', sourceInfo.financialsUrl);
+  add('Profit growth', profile.profitGrowth, externalSource, 'financials', sourceInfo.financialsUrl);
+  add('Net margin', profile.margin, externalSource, 'financials', sourceInfo.financialsUrl);
+  add('P/E', profile.pe, externalSource, 'ratios', sourceInfo.ratiosUrl);
+  add('P/B', profile.pb, externalSource, 'ratios', sourceInfo.ratiosUrl);
+  add('ROE', profile.roe, externalSource, 'ratios', sourceInfo.ratiosUrl);
+  add('Debt / equity', profile.debtToEquity, externalSource, 'ratios', sourceInfo.ratiosUrl);
+  add('Dividend yield', profile.dividendYield, externalSource, 'ratios', sourceInfo.ratiosUrl);
+  add('Market capitalization', profile.marketCap, externalSource, 'ratios', sourceInfo.ratiosUrl);
+  financialHistory.slice(0, 8).forEach(row => {
+    add(`Revenue ${row.period}`, row.revenue, externalSource, 'financials', sourceInfo.financialsUrl);
+    add(`Profit ${row.period}`, row.profit, externalSource, 'financials', sourceInfo.financialsUrl);
+    add(`EPS ${row.period}`, row.eps, externalSource, 'financials', sourceInfo.financialsUrl);
+  });
+  dividends.slice(0, 12).forEach((dividend, index) => {
+    add(`Dividend ${index + 1}`, `${dividend.amount || ''} • ${dividend.exDate || ''}${dividend.paymentDate ? ` • paid ${dividend.paymentDate}` : ''}`, externalSource, 'dividend-history', sourceInfo.dividendsUrl);
+  });
+  if (sourceInfo.officialUrl) add('Official investor relations source', sourceInfo.officialUrl, 'Company investor relations', 'investor-relations', sourceInfo.officialUrl);
+  return evidence;
+}
+
+async function buildIntelligence(rawSymbol) {
+  const symbol = symbolFor(rawSymbol);
+  const fetchedAt = new Date().toISOString();
+  const [myStocksResult, stockAnalysisResult] = await Promise.allSettled([loadMyStocks(symbol), loadStockAnalysis(symbol)]);
+  const myStocks = myStocksResult.status === 'fulfilled' ? myStocksResult.value : { profile: {}, dividends: [], news: [], providerStatus: { error: myStocksResult.reason?.message || 'failed' } };
+  const external = stockAnalysisResult.status === 'fulfilled' ? stockAnalysisResult.value : { profile: {}, financialHistory: [], dividends: [], urls: sourceUrls(symbol), providerStatus: { error: stockAnalysisResult.reason?.message || 'failed' } };
+  const mergedProfile = mergeProfile(myStocks.profile, external.profile);
+  const dividends = myStocks.dividends.length ? myStocks.dividends : external.dividends;
+  const financialHistory = external.financialHistory;
+  const urls = sourceUrls(symbol);
+  const evidence = evidenceFor(mergedProfile, financialHistory, dividends, urls, fetchedAt, symbol);
+  const errors = [];
+  if (myStocksResult.status === 'rejected') errors.push(`MyStocks: ${myStocksResult.reason?.message || 'request failed'}`);
+  if (stockAnalysisResult.status === 'rejected') errors.push(`StockAnalysis: ${stockAnalysisResult.reason?.message || 'request failed'}`);
+  return {
+    source: 'NSE Watcher multi-source company intelligence', symbol, delayMinutes: 15, fetchedAt,
+    profile: mergedProfile, dividends, financialHistory, news: myStocks.news, evidence,
+    sources: {
+      primary: { name: 'MyStocks Africa', type: 'market-data-api' },
+      fundamentals: { name: 'StockAnalysis / S&P Global Market Intelligence', type: 'structured-financial-data', urls: external.urls || urls },
+      issuer: urls.officialUrl ? { name: 'Company investor relations', type: 'official-issuer-source', url: urls.officialUrl } : null,
+    },
+    dataQuality: {
+      profileAvailable: Object.values(mergedProfile).some(value => String(value || '').trim()),
+      dividendHistoryAvailable: dividends.length > 0,
+      financialHistoryAvailable: financialHistory.length > 0,
+      newsAvailable: myStocks.news.length > 0,
+      valuationAvailable: Boolean(mergedProfile.pe || mergedProfile.pb || mergedProfile.marketCap),
+      evidenceCount: evidence.length,
+    },
+    providerStatus: { myStocks: myStocks.providerStatus, stockAnalysis: external.providerStatus },
+    partial: errors.length > 0 || !financialHistory.length,
+    providerErrors: errors,
+  };
+}
+
+async function handle(req, res) {
+  if (req.method !== 'GET') return json(res, 405, { error: 'GET only' });
+  const rawSymbol = String(req.query.symbol || '').trim().toUpperCase();
+  if (!rawSymbol) return json(res, 400, { error: 'symbol is required' });
+  const action = String(req.query.action || 'intelligence').trim().toLowerCase();
+  try {
+    const result = await buildIntelligence(rawSymbol);
+    if (action === 'profile') return json(res, 200, result);
+    if (action === 'dividends') return json(res, 200, { source: result.source, symbol: result.symbol, fetchedAt: result.fetchedAt, dividends: result.dividends, sources: result.sources });
+    return json(res, 200, result);
+  } catch (error) {
+    return json(res, error.status || 502, { error: 'Company intelligence unavailable', detail: error.message, symbol: symbolFor(rawSymbol), fetchedAt: new Date().toISOString() });
+  }
+}
+
+module.exports = handle;
