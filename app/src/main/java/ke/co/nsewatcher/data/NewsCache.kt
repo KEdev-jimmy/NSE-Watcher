@@ -20,8 +20,9 @@ object NewsCache {
 
     suspend fun loadFeed(): List<NewsItem> = loadFeedResult().items
 
-    suspend fun loadFeedResult(): FeedResult = withContext(Dispatchers.IO) {
-        val response = request(FEED_URL)
+    suspend fun loadFeedResult(forceRefresh: Boolean = false): FeedResult = withContext(Dispatchers.IO) {
+        val feedUrl = if (forceRefresh) "$FEED_URL&refresh=${System.currentTimeMillis()}" else FEED_URL
+        val response = request(feedUrl)
         if (response == null) {
             return@withContext FeedResult(emptyList(), "Unable to reach the news service.")
         }

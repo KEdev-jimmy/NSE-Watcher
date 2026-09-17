@@ -13,8 +13,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -66,31 +70,45 @@ private fun dashboardNewsMeta(item: NewsItem): NewsMeta {
 }
 
 @Composable
-private fun NewsDashboardHeader(title: String, sub: String? = null) {
+private fun NewsDashboardHeader(title: String, sub: String? = null, onRefresh: (() -> Unit)? = null) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column {
+        Column(Modifier.weight(1f)) {
             Text(title, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
             if (sub != null) Text(sub, fontSize = 10.sp, color = NewsMuted)
+        }
+        onRefresh?.let { refresh ->
+            IconButton(onClick = refresh, enabled = true) {
+                Icon(Icons.Default.Refresh, contentDescription = "Refresh news", tint = NewsGreen)
+            }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NewsDashboard(open: (NewsItem) -> Unit) {
     var items by remember { mutableStateOf(emptyList<NewsItem>()) }
     var loading by remember { mutableStateOf(true) }
+    var refreshing by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var category by rememberSaveable { mutableStateOf("All") }
+    val refreshState = rememberPullToRefreshState()
+    val refreshScope = rememberCoroutineScope()
 
-    LaunchedEffect(Unit) {
-        val result = NewsCache.loadFeedResult()
-        items = result.items.sortedByDescending { it.publishedAt }
-        error = result.error
-        loading = false
+    fun refreshNews(force: Boolean) {
+        refreshScope.launch {
+            if (force) refreshing = true else loading = true
+            val result = NewsCache.loadFeedResult(forceRefresh = force)
+            items = result.items.sortedByDescending { it.publishedAt }
+            error = result.error
+            if (force) refreshing = false else loading = false
+        }
     }
+
+    LaunchedEffect(Unit) { refreshNews(false) }
 
     val categories = listOf("All", "Company News", "Dividends", "Market", "Corporate Actions", "Analysis")
     val filtered = if (category == "All") items else items.filter { it.category.equals(category, true) }
@@ -99,102 +117,116 @@ fun NewsDashboard(open: (NewsItem) -> Unit) {
     val trending = companyNews.drop(if (top != null && companyNews.firstOrNull()?.id == top.id) 1 else 0).take(3)
     val latest = filtered.filter { it.id != top?.id && trending.none { t -> t.id == it.id } }.take(3)
 
-    LazyColumn(
-        contentPadding = PaddingValues(start = 14.dp, top = 4.dp, end = 14.dp, bottom = 22.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        item { NewsDashboardHeader("News", "NSE companies, dividends & market intelligence") }
-        item {
-            Row(
-                Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(7.dp)
-            ) {
-                categories.forEach { c ->
-                    FilterChip(
-                        selected = category == c,
-                        onClick = { category = c },
-                        label = { Text(c, fontSize = 10.sp, maxLines = 1) },
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                }
-            }
+    PullToRefreshBox(
+        isRefreshing = refreshing,
+        onRefresh = { refreshNews(true) },
+        state = refreshState,
+        modifier = Modifier.fillMaxSize(),
+        indicator = {
+            PullToRefreshDefaults.Indicator(
+                state = refreshState,
+                isRefreshing = refreshing,
+                modifier = Modifier.align(Alignment.TopCenter),
+                containerColor = NewsLight,
+                color = NewsGreen
+            )
         }
-
-        if (loading) {
+    ) {
+        LazyColumn(
+            contentPadding = PaddingValues(start = 14.dp, top = 4.dp, end = 14.dp, bottom = 22.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            item { NewsDashboardHeader("News", "NSE companies, dividends & market intelligence", onRefresh = { refreshNews(true) }) }
             item {
-                Box(Modifier.fillMaxWidth().height(220.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = NewsGreen)
-                }
-            }
-        } else if (filtered.isEmpty()) {
-            item {
-                Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), border = BorderStroke(1.dp, NewsBorder)) {
-                    Column(
-                        Modifier.fillMaxWidth().padding(22.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(Icons.Default.Article, null, tint = NewsGreen, modifier = Modifier.size(40.dp))
-                        Spacer(Modifier.height(8.dp))
-                        Text("News unavailable", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
-                        Spacer(Modifier.height(3.dp))
-                        Text(
-                            error ?: "The live news provider returned no articles for this category.",
-                            color = NewsMuted,
-                            fontSize = 10.sp,
-                            textAlign = TextAlign.Center
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(7.dp)
+                ) {
+                    categories.forEach { c ->
+                        FilterChip(
+                            selected = category == c,
+                            onClick = { category = c },
+                            label = { Text(c, fontSize = 10.sp, maxLines = 1) },
+                            shape = RoundedCornerShape(12.dp)
                         )
                     }
                 }
             }
-        } else {
-            top?.let { article ->
-                item { NewsDashboardFeatured(article, open) }
-            }
 
-            if (trending.isNotEmpty()) {
+            if (loading) {
                 item {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Whatshot, null, tint = NewsGreen, modifier = Modifier.size(22.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("Most Trending News", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = NewsText)
-                        }
-                        Surface(shape = RoundedCornerShape(20.dp), color = NewsLight) {
-                            Text("View all trending →", color = NewsGreen, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
+                    Box(Modifier.fillMaxWidth().height(220.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = NewsGreen)
+                    }
+                }
+            } else if (filtered.isEmpty()) {
+                item {
+                    Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), border = BorderStroke(1.dp, NewsBorder)) {
+                        Column(
+                            Modifier.fillMaxWidth().padding(22.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(Icons.Default.Article, null, tint = NewsGreen, modifier = Modifier.size(40.dp))
+                            Spacer(Modifier.height(8.dp))
+                            Text("News unavailable", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
+                            Spacer(Modifier.height(3.dp))
+                            Text(
+                                error ?: "The live news provider returned no articles for this category.",
+                                color = NewsMuted,
+                                fontSize = 10.sp,
+                                textAlign = TextAlign.Center
+                            )
                         }
                     }
                 }
-                item {
-                    LazyRow(contentPadding = PaddingValues(horizontal = 1.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(trending) { article -> NewsTrendingCard(article, open) }
+            } else {
+                top?.let { article -> item { NewsDashboardFeatured(article, open) } }
+
+                if (trending.isNotEmpty()) {
+                    item {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Whatshot, null, tint = NewsGreen, modifier = Modifier.size(22.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Most Trending News", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = NewsText)
+                            }
+                            Surface(shape = RoundedCornerShape(20.dp), color = NewsLight) {
+                                Text("View all trending →", color = NewsGreen, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
+                            }
+                        }
                     }
+                    item {
+                        LazyRow(contentPadding = PaddingValues(horizontal = 1.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(trending) { article -> NewsTrendingCard(article, open) }
+                        }
+                    }
+                }
+
+                if (latest.isNotEmpty()) {
+                    item {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Article, null, tint = NewsGreen, modifier = Modifier.size(21.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Latest News", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = NewsText)
+                            }
+                            Surface(shape = RoundedCornerShape(20.dp), color = NewsLight) {
+                                Text("View all news →", color = NewsGreen, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
+                            }
+                        }
+                    }
+                    items(latest) { article -> NewsLatestCard(article, open) }
                 }
             }
 
-            if (latest.isNotEmpty()) {
-                item {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Article, null, tint = NewsGreen, modifier = Modifier.size(21.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text("Latest News", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = NewsText)
-                        }
-                        Surface(shape = RoundedCornerShape(20.dp), color = NewsLight) {
-                            Text("View all news →", color = NewsGreen, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
-                        }
-                    }
-                }
-                items(latest) { article -> NewsLatestCard(article, open) }
+            item {
+                Text(
+                    "Pull down to refresh. News and corporate-action information is sourced through the MyStocks market-intelligence feed. Verify important announcements against the issuer or exchange source.",
+                    color = NewsMuted,
+                    fontSize = 8.sp,
+                    modifier = Modifier.padding(horizontal = 3.dp)
+                )
             }
-        }
-
-        item {
-            Text(
-                "News and corporate-action information is sourced through the MyStocks market-intelligence feed. Verify important announcements against the issuer or exchange source.",
-                color = NewsMuted,
-                fontSize = 8.sp,
-                modifier = Modifier.padding(horizontal = 3.dp)
-            )
         }
     }
 }
@@ -260,6 +292,7 @@ private fun NewsDashboardFeatured(item: NewsItem, open: (NewsItem) -> Unit) {
                     Text("|", color = Color.White.copy(alpha = .7f), fontSize = 8.sp)
                     Spacer(Modifier.width(7.dp))
                     DashboardChip(item.category, true)
+                    if (item.source.isNotBlank()) { Spacer(Modifier.width(5.dp)); DashboardSourceTag(item.source, true) }
                     Spacer(Modifier.weight(1f))
                     Surface(
                         shape = RoundedCornerShape(20.dp),
@@ -307,7 +340,11 @@ private fun NewsTrendingCard(item: NewsItem, open: (NewsItem) -> Unit) {
                 Text(dashboardDate(item.publishedAt), color = NewsMuted, fontSize = 8.sp)
             }
             Spacer(Modifier.height(5.dp))
-            DashboardChip("Trending", false, Icons.Default.Whatshot, TrendingRed, TrendingRedLight)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (item.source.isNotBlank()) DashboardSourceTag(item.source, false)
+                Spacer(Modifier.width(5.dp))
+                DashboardChip("Trending", false, Icons.Default.Whatshot, TrendingRed, TrendingRedLight)
+            }
         }
     }
 }
@@ -348,9 +385,36 @@ private fun NewsLatestCard(item: NewsItem, open: (NewsItem) -> Unit) {
                     Text("|", color = NewsMuted, fontSize = 8.sp)
                     Spacer(Modifier.width(6.dp))
                     DashboardChip(item.category, false)
+                    if (item.source.isNotBlank()) { Spacer(Modifier.width(5.dp)); DashboardSourceTag(item.source, false) }
                 }
             }
             Icon(Icons.Default.ChevronRight, null, tint = NewsMuted, modifier = Modifier.size(21.dp))
+        }
+    }
+}
+
+@Composable
+private fun DashboardSourceTag(source: String, featured: Boolean) {
+    val label = source.trim().ifBlank { "Unknown source" }.take(28)
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = if (featured) Color(0x99FFFFFF) else NewsLight
+    ) {
+        Row(Modifier.padding(horizontal = 7.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Default.Public,
+                contentDescription = "News source",
+                tint = if (featured) Color.White else NewsGreen,
+                modifier = Modifier.size(11.dp)
+            )
+            Spacer(Modifier.width(3.dp))
+            Text(
+                label,
+                color = if (featured) Color.White else NewsGreen,
+                fontSize = 7.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1
+            )
         }
     }
 }
