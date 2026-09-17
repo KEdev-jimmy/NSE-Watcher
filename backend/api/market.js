@@ -69,13 +69,17 @@ function providerMeta(raw) {
   return raw?.meta || raw?.data?.meta || null;
 }
 
+function unwrapProviderData(raw) {
+  return raw?.data && !Array.isArray(raw.data) ? raw.data : raw;
+}
+
 module.exports = async (req, res) => {
   if (req.method !== 'GET') return json(res, 405, { error: 'GET only' });
   const action = String(req.query.action || 'snapshot');
   try {
     if (action === 'status') {
       const data = await mystocks('/market/status?exchange=NSE');
-      const providerData = data?.data && !Array.isArray(data.data) ? data.data : data;
+      const providerData = unwrapProviderData(data);
       const statusValue = String(providerData?.status ?? providerData?.marketStatus ?? providerData?.state ?? '').trim();
       const normalizedStatus = statusValue.toLowerCase();
       const isOpen = typeof providerData?.isOpen === 'boolean'
@@ -83,7 +87,10 @@ module.exports = async (req, res) => {
         : normalizedStatus === 'open' || normalizedStatus === 'trading';
       return json(res, 200, {
         source: 'MyStocks Africa', delayMinutes: 15, fetchedAt: new Date().toISOString(),
-        isOpen, status: statusValue || (isOpen ? 'OPEN' : 'CLOSED'), data,
+        isOpen, status: statusValue || (isOpen ? 'OPEN' : 'CLOSED'),
+        nextOpen: providerData?.nextOpen || providerData?.nextSessionOpen || null,
+        nextClose: providerData?.nextClose || providerData?.nextSessionClose || null,
+        data,
       });
     }
     if (action === 'stocks') {
@@ -102,6 +109,10 @@ module.exports = async (req, res) => {
       const cfg = periodConfig(period);
       const data = await mystocks(`/stocks/${encodeURIComponent(symbol)}/candles?interval=${encodeURIComponent(cfg.interval)}&from=${cfg.from}&to=${cfg.to}`);
       let chartAsOf = providerAsOf(data);
+      let sessionOpen = null;
+      let sessionClose = null;
+      let sessionOpenAt = null;
+      let sessionCloseAt = null;
 
       if (period === '1d') {
         try {
@@ -120,6 +131,13 @@ module.exports = async (req, res) => {
                 const firstTimestamp = candleTimestamp(currentSession[0]);
                 const baselineTimestamp = firstTimestamp ? new Date(firstTimestamp.getTime() - 1) : latestTimestamp;
                 const sessionCandles = [...currentSession];
+                const actualFirst = currentSession[0];
+                const actualLast = currentSession[currentSession.length - 1];
+                sessionOpen = Number(actualFirst?.open ?? actualFirst?.close);
+                sessionClose = Number(actualLast?.close);
+                sessionOpenAt = firstTimestamp?.toISOString() || null;
+                sessionCloseAt = candleTimestamp(actualLast)?.toISOString() || null;
+
                 if (previousClose !== null) {
                   sessionCandles.unshift({
                     timestamp: baselineTimestamp.toISOString(), date: baselineTimestamp.toISOString(),
@@ -145,10 +163,21 @@ module.exports = async (req, res) => {
       chartAsOf = providerAsOf(data) || latestCandleTimestamp?.toISOString() || chartAsOf;
       const meta = providerMeta(data);
       const latestObservationAt = meta?.asOf || latestCandleTimestamp?.toISOString() || chartAsOf || null;
+      if (sessionClose === null && Number.isFinite(Number(latestCandle?.close))) sessionClose = Number(latestCandle.close);
+      const sessionChangePct = Number.isFinite(sessionOpen) && sessionOpen > 0 && Number.isFinite(sessionClose)
+        ? ((sessionClose - sessionOpen) / sessionOpen) * 100
+        : null;
 
       return json(res, 200, {
         source: 'MyStocks Africa', delayMinutes: 15, fetchedAt: new Date().toISOString(),
         symbol, period, interval: cfg.interval, asOf: chartAsOf, latestObservationAt,
+        session: period === '1d' ? {
+          open: Number.isFinite(sessionOpen) ? sessionOpen : null,
+          close: Number.isFinite(sessionClose) ? sessionClose : null,
+          changePct: Number.isFinite(sessionChangePct) ? sessionChangePct : null,
+          openAt: sessionOpenAt,
+          closeAt: sessionCloseAt,
+        } : null,
         dataQuality: meta ? {
           qualityStatus: meta.qualityStatus || null,
           qualityIssues: Array.isArray(meta.qualityIssues) ? meta.qualityIssues : [],
