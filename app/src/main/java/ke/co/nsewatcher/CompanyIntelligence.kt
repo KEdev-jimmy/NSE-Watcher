@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -151,8 +152,8 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit) {
                 else Text("Business description is not available from the current company-data response.", color = IntelligenceMuted, fontSize = 11.sp)
                 Spacer(Modifier.height(10.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    MiniFact("Sector", profile.sector.ifBlank { "Not available" })
-                    MiniFact("HQ", profile.headquarters.ifBlank { "Not available" })
+                    Box(Modifier.weight(1f)) { MiniFact("Sector", profile.sector.ifBlank { "Not available" }) }
+                    Box(Modifier.weight(1f)) { MiniFact("HQ", profile.headquarters.ifBlank { "Not available" }) }
                 }
             }
         }
@@ -338,7 +339,7 @@ private fun MetricGrid(items: List<Pair<String, String>>) {
 
 @Composable
 private fun MiniFact(label: String, value: String) {
-    Surface(Modifier.weight(1f), RoundedCornerShape(12.dp), color = IntelligenceLight) {
+    Surface(Modifier.fillMaxWidth(), RoundedCornerShape(12.dp), color = IntelligenceLight) {
         Column(Modifier.padding(9.dp)) { Text(label, color = IntelligenceMuted, fontSize = 8.sp); Text(value, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 2) }
     }
 }
