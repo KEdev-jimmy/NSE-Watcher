@@ -34,6 +34,28 @@ object CompanyIntelligenceCache {
         val dividendYield: String = ""
     )
 
+    data class FinancialPoint(
+        val period: String = "",
+        val revenue: String = "",
+        val profit: String = "",
+        val eps: String = "",
+        val roe: String = "",
+        val margin: String = "",
+        val debtToEquity: String = "",
+        val pe: String = "",
+        val pb: String = "",
+        val source: String = "MyStocks Africa"
+    )
+
+    data class Evidence(
+        val claim: String = "",
+        val value: String = "",
+        val source: String = "MyStocks Africa",
+        val endpoint: String = "",
+        val symbol: String = "",
+        val fetchedAt: String = ""
+    )
+
     data class Dividend(
         val amount: String,
         val exDate: String,
@@ -46,8 +68,12 @@ object CompanyIntelligenceCache {
     data class Result(
         val profile: Profile = Profile(),
         val dividends: List<Dividend> = emptyList(),
+        val financialHistory: List<FinancialPoint> = emptyList(),
+        val evidence: List<Evidence> = emptyList(),
         val source: String = "MyStocks Africa",
         val fetchedAt: String = "",
+        val partial: Boolean = false,
+        val financialHistoryAvailable: Boolean = false,
         val error: String? = null
     )
 
@@ -66,12 +92,24 @@ object CompanyIntelligenceCache {
         val dividendsArray = root.optJSONArray("dividends")
             ?: root.optJSONObject("data")?.optJSONArray("dividends")
             ?: JSONArray()
+        val historyArray = root.optJSONArray("financialHistory")
+            ?: root.optJSONObject("data")?.optJSONArray("financialHistory")
+            ?: JSONArray()
+        val evidenceArray = root.optJSONArray("evidence")
+            ?: root.optJSONObject("data")?.optJSONArray("evidence")
+            ?: JSONArray()
+        val quality = root.optJSONObject("dataQuality")
 
         Result(
             profile = parseProfile(profileObject),
             dividends = parseDividends(dividendsArray),
+            financialHistory = parseFinancialHistory(historyArray),
+            evidence = parseEvidence(evidenceArray),
             source = root.optString("source", "MyStocks Africa"),
             fetchedAt = root.optString("fetchedAt"),
+            partial = root.optBoolean("partial", false),
+            financialHistoryAvailable = quality?.optBoolean("financialHistoryAvailable", historyArray.length() > 0)
+                ?: historyArray.length() > 0,
             error = null
         )
     }
@@ -94,6 +132,42 @@ object CompanyIntelligenceCache {
         pb = findText(root, "pb", "pbRatio", "priceBook", "priceToBook"),
         dividendYield = findText(root, "dividendYield", "yield")
     )
+
+    private fun parseFinancialHistory(array: JSONArray): List<FinancialPoint> = buildList {
+        for (i in 0 until array.length()) {
+            val item = array.optJSONObject(i) ?: continue
+            add(
+                FinancialPoint(
+                    period = findText(item, "period"),
+                    revenue = findText(item, "revenue"),
+                    profit = findText(item, "profit"),
+                    eps = findText(item, "eps"),
+                    roe = findText(item, "roe"),
+                    margin = findText(item, "margin"),
+                    debtToEquity = findText(item, "debtToEquity"),
+                    pe = findText(item, "pe"),
+                    pb = findText(item, "pb"),
+                    source = findText(item, "source").ifBlank { "MyStocks Africa" }
+                )
+            )
+        }
+    }
+
+    private fun parseEvidence(array: JSONArray): List<Evidence> = buildList {
+        for (i in 0 until array.length()) {
+            val item = array.optJSONObject(i) ?: continue
+            add(
+                Evidence(
+                    claim = findText(item, "claim"),
+                    value = findText(item, "value"),
+                    source = findText(item, "source").ifBlank { "MyStocks Africa" },
+                    endpoint = findText(item, "endpoint"),
+                    symbol = findText(item, "symbol"),
+                    fetchedAt = findText(item, "fetchedAt")
+                )
+            )
+        }
+    }
 
     private fun parseDividends(array: JSONArray): List<Dividend> = buildList {
         for (i in 0 until array.length()) {
