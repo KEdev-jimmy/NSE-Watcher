@@ -269,7 +269,7 @@ object HomeIntelligenceEngine {
                     symbol = it.symbol,
                     type = HomeIntelligenceType.FACT,
                     source = evidenceGraph.record("market:${it.symbol.lowercase()}")?.let {
-                        HomeEvidenceReference(it.id, it.source, symbol = it.symbol, category = "market movement")
+                        HomeEvidenceReference(it.id, it.source ?: "MyStocks Africa", symbol = it.symbol, category = "market movement")
                     }
                 ))
             }
