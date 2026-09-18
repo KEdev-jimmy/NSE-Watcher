@@ -36,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ke.co.nsewatcher.data.MovementIntelligenceCache
+import ke.co.nsewatcher.data.NewsCache
 import ke.co.nsewatcher.domain.EvidenceAdapters
 import ke.co.nsewatcher.data.MyStocksCache
 import java.text.SimpleDateFormat
