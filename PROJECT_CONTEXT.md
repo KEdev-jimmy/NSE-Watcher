@@ -1644,7 +1644,7 @@ After CI verification, continue Phase 12 Step 2: carry actual stock provenance (
 
 ## Status
 
-**IMPLEMENTED — PENDING CI VERIFICATION**
+**IMPLEMENTED — CI FIX APPLIED; PENDING VERIFICATION**
 
 Step 2 carries stock provenance from ingestion into the existing `Stock` model and evidence graph without creating a parallel data architecture.
 
@@ -1670,3 +1670,9 @@ Android CI still needs to be checked before Step 2 is marked fully verified.
 ### Next safe step
 
 After CI verification, continue with Step 3: make Home evidence and related calculations consistently consume the carried stock provenance, then strengthen news freshness handling.
+
+# 49. PHASE 12 — STEP 2 CI FAILURE FIX
+
+Runs 481, 482 and 483 all failed. Repository inspection identified the compile-breaking issue in `MyStocksCache.kt`: the new `loadFromUrl()` block was missing its terminating `}.getOrDefault(emptyList())` before `stockFreshnessMode()`. The function therefore became syntactically malformed. This was a tooling/edit sequencing error, not an Android/Gradle configuration problem.
+
+Fixed in commit `0acb96b5fd8a1330679aeb22c681c4d4a3633577` (`Fix Phase 12 stock loader compilation`). A new Android CI run is required before Step 2 is considered verified.
