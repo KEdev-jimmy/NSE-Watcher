@@ -420,6 +420,47 @@ function mergeProfile(primary, external) {
   return output;
 }
 
+function normalizedComparable(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  const numeric = numericValue(text);
+  if (numeric !== null) return String(numeric);
+  return text.toLowerCase().replace(/\\s+/g, ' ');
+}
+
+function buildFieldQuality(primary, external) {
+  const fields = [
+    'marketCap', 'revenue', 'profit', 'eps', 'roe', 'debtToEquity', 'margin',
+    'revenueGrowth', 'profitGrowth', 'pe', 'pb', 'dividendYield'
+  ];
+  const fieldSources = {};
+  const fieldQuality = {};
+  const conflicts = {};
+
+  for (const field of fields) {
+    const primaryValue = String(primary?.[field] || '').trim();
+    const externalValue = String(external?.[field] || '').trim();
+    const sources = [];
+    if (primaryValue) sources.push('MyStocks Africa');
+    if (externalValue) sources.push(EXTERNAL_SOURCE);
+    const conflict = Boolean(primaryValue && externalValue &&
+      normalizedComparable(primaryValue) !== normalizedComparable(externalValue));
+
+    fieldSources[field] = sources;
+    fieldQuality[field] = conflict ? 'CONFLICT' : (sources.length ? 'AVAILABLE' : 'UNAVAILABLE');
+    if (conflict) {
+      conflicts[field] = {
+        status: 'CONFLICT',
+        values: [
+          { source: 'MyStocks Africa', value: primaryValue },
+          { source: EXTERNAL_SOURCE, value: externalValue }
+        ]
+      };
+    }
+  }
+  return { fieldSources, fieldQuality, conflicts };
+}
+
 function evidenceFor(profile, financialHistory, dividends, sourceInfo, fetchedAt, symbol) {
   const evidence = [];
   const add = (claim, value, source, endpoint, url) => {
@@ -474,6 +515,7 @@ async function buildIntelligence(rawSymbol) {
     : { profile: {}, financialHistory: [], dividends: [], urls: sourceUrls(symbol), providerStatus: { error: stockAnalysisResult.reason?.message || 'failed' } };
 
   const mergedProfile = mergeProfile(myStocks.profile, external.profile);
+  const fieldQuality = buildFieldQuality(myStocks.profile, external.profile);
   const dividends = myStocks.dividends.length ? myStocks.dividends : external.dividends;
   const financialHistory = external.financialHistory;
   const urls = sourceUrls(symbol);
@@ -506,6 +548,10 @@ async function buildIntelligence(rawSymbol) {
     },
     dataQuality: {
       profileAvailable: Object.values(mergedProfile).some(value => String(value || '').trim()),
+      fieldSources: fieldQuality.fieldSources,
+      fieldQuality: fieldQuality.fieldQuality,
+      conflicts: fieldQuality.conflicts,
+      conflictCount: Object.keys(fieldQuality.conflicts).length,
       dividendHistoryAvailable: dividends.length > 0,
       financialHistoryAvailable: financialHistory.length > 0,
       newsAvailable: myStocks.news.length > 0,
