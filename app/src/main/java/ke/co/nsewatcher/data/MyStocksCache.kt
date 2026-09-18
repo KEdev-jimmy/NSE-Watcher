@@ -1,6 +1,7 @@
 package ke.co.nsewatcher.data
 
 import ke.co.nsewatcher.Stock
+import ke.co.nsewatcher.MarketRefreshController
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
