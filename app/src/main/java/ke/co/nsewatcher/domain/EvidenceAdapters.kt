@@ -12,7 +12,7 @@ data class AdaptedMovementEvidence(
 
 object EvidenceAdapters {
     fun fromStock(stock: Stock): EvidenceRecord? {
-        if (stock.symbol.isBlank() || !stock.price.isFinite()) return null
+        if (stock.symbol.isBlank() || !stock.price.isFinite() || !stock.changeAvailable) return null
         return EvidenceRecord(
             id = "market:" + stock.symbol.lowercase(),
             symbol = stock.symbol.takeIf { it.isNotBlank() },
