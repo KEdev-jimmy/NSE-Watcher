@@ -86,7 +86,9 @@ object HomeIntelligenceEngine {
 
         val corporateActions = news.filter { it.isCorporateAction() }
         val companyNews = news.filter {
-            (it.symbol.isNotBlank() || it.companyName.isNotBlank()) && !it.isCorporateAction()
+            (it.symbol.isNotBlank() || it.companyName.isNotBlank()) &&
+                !it.isCorporateAction() &&
+                it.intelligenceRelevance == "market"
         }
 
         val strongest = sectors.maxByOrNull { it.averageChangePct }
