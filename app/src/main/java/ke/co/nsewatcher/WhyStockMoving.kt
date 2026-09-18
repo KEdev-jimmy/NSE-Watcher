@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import ke.co.nsewatcher.data.MovementIntelligenceCache
 import ke.co.nsewatcher.data.NewsCache
 import ke.co.nsewatcher.domain.EvidenceAdapters
+import ke.co.nsewatcher.domain.EvidenceGraph
 import ke.co.nsewatcher.data.MyStocksCache
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -109,7 +110,13 @@ fun WhyStockMovingSection(symbol: String) {
                         val evidence = result.evidence.take(5)
                         val relatedEvidence = companyNews.mapNotNull { EvidenceAdapters.fromNews(it) }
                         val adaptedMovement = EvidenceAdapters.fromMovementResult(result, relatedEvidence)
-                        val normalizedEvidence = adaptedMovement.evidence.take(5)
+                        val evidenceGraph = EvidenceGraph.of(
+                            adaptedMovement.evidence + relatedEvidence,
+                            adaptedMovement.relationships
+                        )
+                        val normalizedEvidence = adaptedMovement.evidence
+                            .mapNotNull { evidenceGraph.record(it.id) }
+                            .take(5)
                         if (evidence.isEmpty()) {
                             Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), color = MovementLight) {
                                 Text("No dated company event was found close enough to the movement to link it as evidence.", Modifier.padding(11.dp), color = MovementText, fontSize = 10.sp)
