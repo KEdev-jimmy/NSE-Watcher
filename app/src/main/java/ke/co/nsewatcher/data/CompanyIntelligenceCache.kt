@@ -162,7 +162,7 @@ object CompanyIntelligenceCache {
                     claim = findText(item, "claim"),
                     value = findText(item, "value"),
                     source = findText(item, "source").ifBlank { "MyStocks Africa" },
-                    endpoint = findText(item, "endpoint"),
+                    endpoint = findText(item, "url", "sourceUrl", "endpoint"),
                     symbol = findText(item, "symbol"),
                     fetchedAt = findText(item, "fetchedAt")
                 )
