@@ -225,6 +225,7 @@ object MyStocksCache {
                 }
             }
         } finally { connection.disconnect() }
+    }.getOrDefault(emptyList())
 
     private fun stockFreshnessMode(observedAt: String): String {
         if (observedAt.isBlank()) return "UNKNOWN"
