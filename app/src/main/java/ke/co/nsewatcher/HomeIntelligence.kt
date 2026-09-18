@@ -139,7 +139,7 @@ object HomeIntelligenceEngine {
                 type = EvidenceType.MARKET_DATA,
                 claim = "Market breadth calculated from the available stock feed",
                 value = breadth.advancing.toString() + " advancing, " + breadth.declining + " declining, " + breadth.unchanged + " unchanged",
-                source = "MyStocks Africa"
+                source = calculationSource(marketEvidence)
             )
             marketEvidence.forEach { evidence ->
                 graphRelationships += EvidenceRelationship(
@@ -158,7 +158,7 @@ object HomeIntelligenceEngine {
                 type = EvidenceType.MARKET_DATA,
                 claim = displaySector(sector.sector) + " sector average calculated from available counters",
                 value = sector.memberCount.toString() + " counters average " + signedPercent(sector.averageChangePct),
-                source = "MyStocks Africa"
+                source = calculationSource(valid.mapNotNull(EvidenceAdapters::fromStock))
             )
             valid.filter { it.sector.trim().equals(sector.sector, ignoreCase = true) }
                 .mapNotNull(EvidenceAdapters::fromStock)
@@ -389,6 +389,15 @@ object HomeIntelligenceEngine {
             category = category,
             freshness = record.freshness.orEmpty()
         )
+
+    private fun calculationSource(evidence: List<EvidenceRecord>): String {
+        val sources = evidence.map { it.source.trim() }.filter { it.isNotBlank() }.distinct()
+        return when {
+            sources.size == 1 -> "Calculated from ${sources.first()} stock observations"
+            sources.size > 1 -> "Calculated from multiple stock data sources"
+            else -> "Calculated from available stock observations"
+        }
+    }
 
     private fun signedPercent(value: Double): String = String.format(Locale.US, "%+.2f%%", value)
     private fun signedInt(value: Int): String = String.format(Locale.US, "%+d", value)
