@@ -15,8 +15,14 @@ object MyStocksCache {
 
     private val chartSymbols = setOf("SCOM", "KCB", "EQTY", "ABSA", "COOP", "EABL", "KPLC")
 
+    data class HistoryPoint(
+        val close: Double,
+        val date: String = ""
+    )
+
     data class HistoryResult(
         val prices: List<Double> = emptyList(),
+        val points: List<HistoryPoint> = emptyList(),
         val firstDate: String = "",
         val lastDate: String = "",
         val interval: String = "",
@@ -88,12 +94,17 @@ object MyStocksCache {
             val root = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
             val data = root.optJSONObject("data") ?: return@runCatching HistoryResult()
             val candles = data.optJSONArray("candles") ?: return@runCatching HistoryResult()
-            val prices = buildList {
+            val points = buildList {
                 for (i in 0 until candles.length()) {
-                    val close = candles.optJSONObject(i)?.optDouble("close", Double.NaN) ?: Double.NaN
-                    if (close.isFinite() && close > 0.0) add(close)
+                    val candle = candles.optJSONObject(i) ?: continue
+                    val close = candle.optDouble("close", Double.NaN)
+                    if (close.isFinite() && close > 0.0) {
+                        val date = candle.optString("date", "").ifBlank { candle.optString("timestamp", "") }
+                        add(HistoryPoint(close, date))
+                    }
                 }
             }
+            val prices = points.map { it.close }
             val first = candles.optJSONObject(0)
             val last = candles.optJSONObject(candles.length() - 1)
             val firstDate = first?.optString("date", "")?.ifBlank { first.optString("timestamp", "") } ?: ""
@@ -101,6 +112,7 @@ object MyStocksCache {
             val session = root.optJSONObject("session")
             HistoryResult(
                 prices = prices,
+                points = points,
                 firstDate = firstDate,
                 lastDate = lastDate,
                 interval = root.optString("interval", data.optString("interval", "")),
