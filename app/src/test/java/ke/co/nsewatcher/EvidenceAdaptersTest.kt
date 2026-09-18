@@ -82,6 +82,62 @@ class EvidenceAdaptersTest {
     }
 
     @Test
+    fun movementResultLinksEvidenceToMatchingNewsWithoutInventingRelationships() {
+        val movementEvidence = MovementIntelligenceCache.Evidence(
+            eventType = "news",
+            title = "KCB annual results",
+            date = "2026-09-17",
+            source = "Issuer",
+            sourceUrl = "https://example.com/results",
+            description = "Annual results",
+            relationship = "related",
+            daysFromMove = 0
+        )
+        val result = MovementIntelligenceCache.Result(
+            symbol = "KCB",
+            evidence = listOf(movementEvidence)
+        )
+        val newsEvidence = EvidenceRecord(
+            id = "news:article-123",
+            symbol = "KCB",
+            type = EvidenceType.NEWS,
+            claim = "KCB annual results",
+            source = "Issuer",
+            sourceUrl = "https://example.com/results",
+            publishedAt = "2026-09-17T08:00:00Z"
+        )
+
+        val adapted = EvidenceAdapters.fromMovementResult(result, listOf(newsEvidence))
+
+        assertEquals(1, adapted.evidence.size)
+        assertEquals(1, adapted.relationships.size)
+        assertEquals("news:article-123", adapted.relationships.single().toEvidenceId)
+        assertEquals(EvidenceRelationshipType.RELATED, adapted.relationships.single().type)
+    }
+
+    @Test
+    fun movementResultDoesNotCreateRelationshipWhenTargetEvidenceCannotBeMatched() {
+        val result = MovementIntelligenceCache.Result(
+            symbol = "KCB",
+            evidence = listOf(
+                MovementIntelligenceCache.Evidence(
+                    eventType = "news",
+                    title = "KCB annual results",
+                    date = "2026-09-17",
+                    source = "Issuer",
+                    sourceUrl = "https://example.com/results",
+                    relationship = "possible"
+                )
+            )
+        )
+
+        val adapted = EvidenceAdapters.fromMovementResult(result, emptyList())
+
+        assertEquals(1, adapted.evidence.size)
+        assertEquals(0, adapted.relationships.size)
+    }
+
+    @Test
     fun movementRelationshipPreservesExistingNonCausalClassification() {
         val movementEvidence = MovementIntelligenceCache.Evidence(
             eventType = "news",
