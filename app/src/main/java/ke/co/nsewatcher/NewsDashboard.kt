@@ -238,7 +238,7 @@ private fun NewsDashboardFeatured(item: NewsItem, open: (NewsItem) -> Unit) {
                     Row(Modifier.padding(horizontal = 9.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Whatshot, null, tint = Color.White, modifier = Modifier.size(14.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("Top News", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 9.sp)
+                        Text("Latest story", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 9.sp)
                     }
                 }
                 Spacer(Modifier.height(5.dp))
@@ -330,7 +330,7 @@ private fun NewsTrendingCard(item: NewsItem, open: (NewsItem) -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (item.source.isNotBlank()) DashboardSourceTag(item.source, false)
                 Spacer(Modifier.width(5.dp))
-                DashboardChip("Trending", false, Icons.Default.Whatshot, TrendingRed, TrendingRedLight)
+                DashboardChip("Company-linked", false)
             }
         }
     }
