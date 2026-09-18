@@ -1,5 +1,6 @@
 package ke.co.nsewatcher.domain
 
+import ke.co.nsewatcher.Stock
 import ke.co.nsewatcher.NewsItem
 import ke.co.nsewatcher.data.CompanyIntelligenceCache
 import ke.co.nsewatcher.data.MovementIntelligenceCache
@@ -10,10 +11,23 @@ data class AdaptedMovementEvidence(
 )
 
 object EvidenceAdapters {
+    fun fromStock(stock: Stock): EvidenceRecord? {
+        if (stock.symbol.isBlank() || !stock.price.isFinite()) return null
+        return EvidenceRecord(
+            id = "market:" + stock.symbol.lowercase(),
+            symbol = stock.symbol.takeIf { it.isNotBlank() },
+            companyName = stock.name.takeIf { it.isNotBlank() },
+            type = EvidenceType.MARKET_DATA,
+            claim = "Current market quote for " + stock.symbol,
+            value = "KSh %.2f; daily movement %+.2f%%".format(stock.price, stock.change),
+            source = "MyStocks Africa"
+        )
+    }
+
     fun fromNews(item: NewsItem): EvidenceRecord? {
         if (item.id.isBlank() || item.title.isBlank()) return null
         return EvidenceRecord(
-            id = "news:${item.id}",
+            id = "news:" + item.id,
             symbol = item.symbol.takeIf { it.isNotBlank() },
             companyName = item.companyName.takeIf { it.isNotBlank() },
             type = when {
@@ -67,26 +81,14 @@ object EvidenceAdapters {
         result: MovementIntelligenceCache.Result,
         relatedEvidence: List<EvidenceRecord> = emptyList()
     ): AdaptedMovementEvidence {
-        val movementEvidence = result.evidence.mapNotNull {
-            fromMovementEvidence(result.symbol, it)
-        }
-
+        val movementEvidence = result.evidence.mapNotNull { fromMovementEvidence(result.symbol, it) }
         val relationships = result.evidence.mapNotNull { source ->
             val movementRecord = fromMovementEvidence(result.symbol, source) ?: return@mapNotNull null
             val target = findRelatedEvidence(result.symbol, source, relatedEvidence)
                 ?: return@mapNotNull null
-
-            relationshipFromMovement(
-                movementEvidenceId = movementRecord.id,
-                targetEvidenceId = target.id,
-                evidence = source
-            )
+            relationshipFromMovement(movementRecord.id, target.id, source)
         }
-
-        return AdaptedMovementEvidence(
-            evidence = movementEvidence,
-            relationships = relationships
-        )
+        return AdaptedMovementEvidence(movementEvidence, relationships)
     }
 
     fun relationshipFromMovement(
@@ -102,7 +104,7 @@ object EvidenceAdapters {
             else -> return null
         }
         return EvidenceRelationship(
-            id = "relationship:$movementEvidenceId:$targetEvidenceId",
+            id = "relationship:" + movementEvidenceId + ":" + targetEvidenceId,
             fromEvidenceId = movementEvidenceId,
             toEvidenceId = targetEvidenceId,
             type = type
@@ -120,16 +122,12 @@ object EvidenceAdapters {
                 it.sourceUrl?.trim()?.equals(url, ignoreCase = true) == true
             }?.let { return it }
         }
-
         val normalizedTitle = movementEvidence.title.trim().lowercase()
         val date = movementEvidence.date.trim()
         return relatedEvidence.firstOrNull {
             it.symbol?.equals(symbol, ignoreCase = true) == true &&
                 it.claim.trim().lowercase() == normalizedTitle &&
-                (
-                    date.isBlank() ||
-                        it.publishedAt?.take(10)?.equals(date.take(10), ignoreCase = true) == true
-                )
+                (date.isBlank() || it.publishedAt?.take(10)?.equals(date.take(10), ignoreCase = true) == true)
         }
     }
 
@@ -145,12 +143,13 @@ object EvidenceAdapters {
     }
 
     private fun companyEvidenceId(evidence: CompanyIntelligenceCache.Evidence): String =
-        "company:${evidence.symbol}:${evidence.source}:${evidence.endpoint}:${evidence.claim}:${evidence.value}"
+        "company:" + evidence.symbol + ":" + evidence.source + ":" + evidence.endpoint + ":" +
+            evidence.claim + ":" + evidence.value
             .lowercase()
             .replace(Regex("[^a-z0-9:.%+/_-]+"), "-")
 
     private fun movementEvidenceId(symbol: String, evidence: MovementIntelligenceCache.Evidence): String =
-        "movement:$symbol:${evidence.eventType}:${evidence.date}:${evidence.title}"
+        "movement:" + symbol + ":" + evidence.eventType + ":" + evidence.date + ":" + evidence.title
             .lowercase()
             .replace(Regex("[^a-z0-9:.%+/_-]+"), "-")
 }
