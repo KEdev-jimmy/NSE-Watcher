@@ -86,14 +86,14 @@ data class HomeIntelligenceSnapshot(
 
 object HomeIntelligenceEngine {
     fun build(stocks: List<Stock>, news: List<NewsItem>, marketIndices: List<HomeMarketIndex> = emptyList()): HomeIntelligenceSnapshot {
-        val valid = stocks.filter { it.change.isFinite() }
+        val valid = stocks.filter { it.changeAvailable && it.change.isFinite() }
         val gainers = valid.filter { it.change > 0 }.sortedByDescending { it.change }
         val losers = valid.filter { it.change < 0 }.sortedBy { it.change }
         val breadth = HomeMarketBreadth(
             advancing = gainers.size,
             declining = losers.size,
             unchanged = valid.count { it.change == 0.0 },
-            reportedVolume = valid.sumOf { it.volume.coerceAtLeast(0L) }
+            reportedVolume = valid.filter { it.volumeAvailable }.sumOf { it.volume.coerceAtLeast(0L) }
         )
 
         val sectors = valid
