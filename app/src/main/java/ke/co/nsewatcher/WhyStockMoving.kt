@@ -95,11 +95,33 @@ fun WhyStockMovingSection(symbol: String) {
                     Spacer(Modifier.size(9.dp))
                     Text("Checking price movement and dated company evidence…", color = MovementMuted, fontSize = 10.sp)
                 }
-                result.error != null -> Text(result.error.orEmpty(), color = MovementMuted, fontSize = 10.sp)
+                result.error != null -> {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFFFFF7F0)
+                    ) {
+                        Column(Modifier.padding(11.dp)) {
+                            Text("Movement data is temporarily unavailable", color = MovementText, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
+                            Spacer(Modifier.height(3.dp))
+                            Text(result.error.orEmpty().ifBlank { "The connected market feed did not return a usable movement result." }, color = MovementMuted, fontSize = 9.sp, lineHeight = 13.sp)
+                        }
+                    }
+                }
                 else -> {
                     val move = result.move
                     if (move == null) {
-                        Text("A reliable movement window is not available yet.", color = MovementMuted, fontSize = 10.sp)
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFFF4F6F5)
+                        ) {
+                            Column(Modifier.padding(11.dp)) {
+                                Text("No reliable movement window yet", color = MovementText, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
+                                Spacer(Modifier.height(3.dp))
+                                Text("The available price history does not contain enough valid observations to calculate this move. No value is being estimated.", color = MovementMuted, fontSize = 9.sp, lineHeight = 13.sp)
+                            }
+                        }
                     } else {
                         Text(move.change.ifBlank { "Movement available" }, color = if (move.change.startsWith("-")) MovementRed else MovementGreen, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
                         Text(movementWindow(move), color = MovementMuted, fontSize = 9.sp)
