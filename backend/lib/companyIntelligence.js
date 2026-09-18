@@ -298,6 +298,26 @@ function normalizeMyStocksProfile(value) {
   return value;
 }
 
+function normalizeWebsite(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  const candidate = /^https?:\/\//i.test(text) ? text : `https://${text}`;
+  try {
+    const url = new URL(candidate);
+    if (!/^https?:$/i.test(url.protocol)) return '';
+    return url.toString().replace(/\/$/, '');
+  } catch {
+    return '';
+  }
+}
+
+function normalizeLocation(value) {
+  return String(value || '')
+    .replace(/\s+/g, ' ')
+    .replace(/^\s*(?:headquarters?|hq|location)\s*[:\-]\s*/i, '')
+    .trim();
+}
+
 function pick(obj, keys) {
   const wanted = new Set(keys.map(key => String(key).replace(/[^a-z0-9]/gi, '').toLowerCase()));
   function walk(value) {
@@ -336,8 +356,8 @@ async function loadMyStocks(symbol) {
     profile: {
       description: pick(profileRaw, ['description', 'businessDescription', 'companyDescription']),
       sector: pick(profileRaw, ['sector', 'industry']),
-      headquarters: pick(profileRaw, ['headquarters', 'hq', 'location']),
-      website: pick(profileRaw, ['website', 'websiteUrl', 'url']),
+      headquarters: normalizeLocation(pick(profileRaw, ['headquarters', 'hq', 'location'])),
+      website: normalizeWebsite(pick(profileRaw, ['website', 'websiteUrl', 'url'])),
       marketCap: pick(profileRaw, ['marketCap', 'marketCapitalisation', 'marketCapitalization']),
       revenue: pick(profileRaw, ['revenue', 'totalRevenue']),
       profit: pick(profileRaw, ['profit', 'netIncome', 'netProfit', 'profitAfterTax']),
