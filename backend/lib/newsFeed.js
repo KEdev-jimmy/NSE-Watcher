@@ -146,8 +146,16 @@ function normalizeItem(item, forcedCategory) {
     imageUrl, url, dividendAmount, exDate, paymentDate,
     sourceId: String(item.sourceId || '').trim(), sourceKind, verification,
     intelligenceRelevance: intelligence.level,
-    intelligenceRelevanceReason: intelligence.reason
+    intelligenceRelevanceReason: intelligence.reason,
+    freshnessMode: newsFreshnessMode(publishedAt)
   };
+}
+
+function newsFreshnessMode(publishedAt) {
+  if (!publishedAt) return 'UNKNOWN';
+  const time = Date.parse(publishedAt);
+  if (!Number.isFinite(time)) return 'UNKNOWN';
+  return time >= Date.now() - HISTORY_DAYS * 24 * 60 * 60 * 1000 ? 'WITHIN_WINDOW' : 'STALE';
 }
 
 function withinWindow(item) {
