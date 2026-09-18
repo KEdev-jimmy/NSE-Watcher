@@ -35,4 +35,4 @@ function isMarketRelevantText(title, description) {
   return intelligenceRelevance({ title, summary: description, body: '', symbol: '', companyName: '' }).level === 'market';
 }
 
-module.exports = { intelligenceRelevance, isMarketRelevantText };
+module.exports = { intelligenceRelevance, isMarketRelevantText, INTELLIGENCE_MARKET_TERMS };
