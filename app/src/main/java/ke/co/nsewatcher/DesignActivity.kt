@@ -47,6 +47,7 @@ import ke.co.nsewatcher.data.MyStocksCache
 import ke.co.nsewatcher.data.NewsCache
 import ke.co.nsewatcher.data.WatchlistStore
 import kotlinx.coroutines.launch
+import ke.co.nsewatcher.data.WatchlistStore
 
 private val Green = Color(0xFF00A859)
 private val LightGreen = Color(0xFFE9F8F0)
@@ -304,46 +305,17 @@ private fun Company(s: Stock, back: () -> Unit) {
     val scope = rememberCoroutineScope()
     val watched = watchedSymbols.contains(s.symbol.trim().uppercase())
 
-    LazyColumn(
-        contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 20.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        item {
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = back) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                }
-                Column(Modifier.weight(1f)) {
-                    Text(s.name, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
-                    Text(s.symbol, color = Muted, fontSize = 10.sp)
-                }
-                OutlinedButton(
-                    onClick = {
-                        scope.launch {
-                            if (watched) watchlistStore.remove(s.symbol)
-                            else watchlistStore.add(s.symbol)
-                        }
-                    },
-                    shape = RoundedCornerShape(20.dp),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Icon(
-                        if (watched) Icons.Default.Star else Icons.Default.StarBorder,
-                        contentDescription = if (watched) "Remove from watchlist" else "Add to watchlist",
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(Modifier.width(5.dp))
-                    Text(if (watched) "Watching" else "Watch")
-                }
+    CompanyIntelligence(
+        s = s,
+        back = back,
+        watched = watched,
+        onWatchToggle = {
+            scope.launch {
+                if (watched) watchlistStore.remove(s.symbol)
+                else watchlistStore.add(s.symbol)
             }
         }
-        item {
-            CompanyIntelligence(s, {})
-        }
-    }
+    )
 }
 
 @Composable
