@@ -202,7 +202,7 @@ fun HomeDashboard(
             QuickActions(openMarket, if (news.isNotEmpty()) { { openNews(news.first()) } } else null)
             Spacer(Modifier.height(11.dp))
             Text(
-                "Market data is supplied through MyStocks Africa and is approximately 15 minutes delayed. Intelligence is informational; verify material announcements with the issuer or NSE.",
+                marketDataFooter(currentStocks),
                 color = HomeMuted,
                 fontSize = 8.sp,
                 lineHeight = 11.sp,
@@ -703,6 +703,21 @@ private fun formatShares(value: Long): String = when {
     value >= 1_000_000L -> String.format(Locale.US, "%.1fM", value / 1_000_000.0)
     value >= 1_000L -> String.format(Locale.US, "%.1fK", value / 1_000.0)
     else -> String.format(Locale.US, "%,d", value)
+}
+
+private fun marketDataFooter(stocks: List<Stock>): String {
+    val sources = stocks.map { it.source.trim() }.filter { it.isNotBlank() }.distinct()
+    val fallbackOnly = stocks.isNotEmpty() && stocks.all { it.dataOrigin == "fallback" }
+    return when {
+        fallbackOnly -> "Market data: NSE Watcher fallback catalogue • not live provider data. Intelligence is informational; verify material announcements with the issuer or NSE."
+        sources.size == 1 -> {
+            val source = sources.first()
+            val delay = if (stocks.all { it.dataOrigin == "backend" && it.source.equals("MyStocks Africa", ignoreCase = true) }) " • approximately 15 minutes delayed" else ""
+            "Market data: $source$delay. Intelligence is informational; verify material announcements with the issuer or NSE."
+        }
+        sources.size > 1 -> "Market data: multiple sources • delays may vary. Intelligence is informational; verify material announcements with the issuer or NSE."
+        else -> "Market data source unavailable. Intelligence is informational; verify material announcements with the issuer or NSE."
+    }
 }
 
 private fun timeAgo(value: String): String {
