@@ -129,7 +129,7 @@ module.exports = async (req, res) => {
         .filter((item) => item.symbol && item.value !== null);
       return json(res, 200, {
         source: 'MyStocks Africa',
-        delayMinutes: 15,
+        delayMinutes: null,
         fetchedAt: new Date().toISOString(),
         indices,
         requested: ['^NASI', '^N20I', '^N25I'],
