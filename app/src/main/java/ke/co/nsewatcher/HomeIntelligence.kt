@@ -235,7 +235,7 @@ object HomeIntelligenceEngine {
                     label = "Market breadth",
                     detail = "${breadth.advancing} advancing • ${breadth.declining} declining • ${breadth.unchanged} unchanged",
                     value = signedInt(breadth.advancing - breadth.declining),
-                    source = breadthEvidence?.let { HomeEvidenceReference(it.id, it.source, category = "market calculation") }
+                    source = breadthEvidence?.let { HomeEvidenceReference(it.id, it.source, sourceUrl = it.sourceUrl.orEmpty(), date = it.publishedAt.orEmpty(), category = "market calculation") }
                 ))
             }
             strongest?.let {
@@ -245,7 +245,7 @@ object HomeIntelligenceEngine {
                     detail = "${displaySector(it.sector)} • ${it.memberCount} counters",
                     value = signedPercent(it.averageChangePct),
                     source = evidenceGraph.record("calculation:sector-${it.sector.lowercase(Locale.US)}")?.let {
-                        HomeEvidenceReference(it.id, it.source, category = "sector calculation")
+                        HomeEvidenceReference(it.id, it.source, sourceUrl = it.sourceUrl.orEmpty(), date = it.publishedAt.orEmpty(), category = "sector calculation")
                     }
                 ))
             }
