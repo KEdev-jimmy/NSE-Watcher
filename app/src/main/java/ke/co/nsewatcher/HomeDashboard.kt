@@ -61,7 +61,9 @@ fun HomeDashboard(
     }
 
     val intelligence = remember(currentStocks, news) {
-        HomeIntelligenceEngine.build(currentStocks, news)
+        HomeIntelligenceEngine.build(currentStocks, news, marketIndices.map { index ->
+        HomeMarketIndex(index.symbol, index.name, index.value, index.changePct, index.asOf)
+    })
     }
     val breadth = intelligence.breadth
     val gainers = intelligence.gainers
@@ -306,11 +308,14 @@ private fun MarketIndexPulse(indices: List<MyStocksCache.MarketIndex>) {
                             fontWeight = FontWeight.Bold
                         )
                     }
+                    if (index.asOf.isNotBlank()) {
+                        Text("As of ${index.asOf.take(10)}", color = HomeMuted, fontSize = 7.sp, maxLines = 1)
+                    }
                 }
             }
         }
         Text(
-            "NSE index data • MyStocks Africa • delayed where indicated",
+            "NSE index data • MyStocks Africa • provider timestamp when available",
             color = HomeMuted,
             fontSize = 7.sp,
             modifier = Modifier.padding(start = 2.dp, top = 4.dp)
