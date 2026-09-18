@@ -63,7 +63,7 @@ data class NewsItem(
     val id:String, val title:String, val summary:String, val body:String, val source:String,
     val publishedAt:String, val category:String, val symbol:String, val companyName:String,
     val imageUrl:String, val url:String, val dividendAmount:String, val exDate:String, val paymentDate:String,
-    val intelligenceRelevance:String = "unknown", val intelligenceRelevanceReason:String = ""
+    val intelligenceRelevance:String = "unknown", val intelligenceRelevanceReason:String = "", val freshnessMode:String = "UNKNOWN"
 )
 private val liveStocks = mutableStateOf(emptyList<Stock>())
 private val stocks: List<Stock> get() = liveStocks.value
