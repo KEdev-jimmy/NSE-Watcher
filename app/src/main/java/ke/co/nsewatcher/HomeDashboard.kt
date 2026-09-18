@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import java.util.Locale
 import ke.co.nsewatcher.data.NewsCache
+import ke.co.nsewatcher.data.MyStocksCache
 
 private val HomeGreen = Color(0xFF00A859)
 private val HomeLightGreen = Color(0xFFE9F8F0)
@@ -49,8 +50,10 @@ fun HomeDashboard(
     var news by remember { mutableStateOf(emptyList<NewsItem>()) }
     var newsLoading by remember { mutableStateOf(true) }
     var newsError by remember { mutableStateOf<String?>(null) }
+    var marketIndices by remember { mutableStateOf(emptyList<MyStocksCache.MarketIndex>()) }
 
     LaunchedEffect(Unit) {
+        marketIndices = MyStocksCache.loadMarketIndices()
         val result = NewsCache.loadFeedResult()
         news = result.items
         newsError = result.error
@@ -78,6 +81,13 @@ fun HomeDashboard(
                 unchanged = breadth.unchanged,
                 reportedVolume = breadth.reportedVolume
             )
+        }
+
+        if (marketIndices.isNotEmpty()) {
+            item {
+                Spacer(Modifier.height(10.dp))
+                MarketIndexPulse(marketIndices)
+            }
         }
 
         item {
@@ -267,6 +277,52 @@ private fun BreadthLine(label: String, value: Int, color: Color) {
         Spacer(Modifier.width(4.dp))
         Text(value.toString(), color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
     }
+}
+
+@Composable
+private fun MarketIndexPulse(indices: List<MyStocksCache.MarketIndex>) {
+    val shown = indices.filter { it.symbol in setOf("^NASI", "^N20I", "^N25I") }.take(3)
+    if (shown.isEmpty()) return
+    Column(Modifier.padding(horizontal = 14.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            shown.forEach { index ->
+                Column(
+                    Modifier.weight(1f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(HomeLightGreen)
+                        .border(1.dp, HomeBorder, RoundedCornerShape(12.dp))
+                        .padding(horizontal = 9.dp, vertical = 8.dp)
+                ) {
+                    Text(indexLabel(index.symbol), color = HomeMuted, fontSize = 8.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                    Text(String.format(Locale.US, "%.2f", index.value), color = HomeTextDark, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+                    index.changePct?.let {
+                        Text(
+                            String.format(Locale.US, "%+.2f%%", it),
+                            color = if (it >= 0) HomeGreen else HomeRed,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+        Text(
+            "Official index values • MyStocks Africa • delayed where indicated",
+            color = HomeMuted,
+            fontSize = 7.sp,
+            modifier = Modifier.padding(start = 2.dp, top = 4.dp)
+        )
+    }
+}
+
+private fun indexLabel(symbol: String): String = when (symbol) {
+    "^NASI" -> "NASI"
+    "^N20I" -> "NSE 20"
+    "^N25I" -> "NSE 25"
+    else -> symbol.removePrefix("^")
 }
 
 @Composable
