@@ -6,7 +6,7 @@ import org.junit.Test
 
 class HomeIntelligenceEngineTest {
     private fun stock(symbol: String, change: Double, sector: String, volume: Long = 1_000L) =
-        Stock(symbol, symbol, 10.0, change, listOf(9.0, 10.0), sector = sector, volume = volume)
+        Stock(symbol, symbol, 10.0, change, listOf(9.0, 10.0), sector = sector, volume = volume, source = "MyStocks Africa", observedAt = "2026-09-18T09:30:00Z")
 
     @Test
     fun buildsStrictGainersAndLosersWithoutOverlap() {
@@ -24,7 +24,7 @@ class HomeIntelligenceEngineTest {
         assertEquals(1, snapshot.breadth.unchanged)
         assertTrue(snapshot.evidenceGraph.validationErrors().isEmpty())
         assertTrue(snapshot.evidenceGraph.records.any { it.id == "calculation:market-breadth" })
-        assertTrue(snapshot.changes.first { it.id == "breadth" }.source?.source == "MyStocks Africa")
+        assertEquals("Calculated from MyStocks Africa stock observations", snapshot.changes.first { it.id == "breadth" }.source?.source)
     }
 
     @Test
@@ -129,4 +129,21 @@ class HomeIntelligenceEngineTest {
         assertTrue(snapshot.evidenceGraph.record("market:unknown") == null)
     }
 
+    @Test
+    fun homeCalculationKeepsFallbackStockProvenance() {
+        val fallback = Stock(
+            "ABC", "ABC", 10.0, 2.0, listOf(9.0, 10.0),
+            sector = "Banking", volume = 0L,
+            source = "NSE Watcher fallback catalogue",
+            dataOrigin = "fallback"
+        )
+        val snapshot = HomeIntelligenceEngine.build(listOf(fallback), emptyList())
+        val marketEvidence = snapshot.evidenceGraph.record("market:abc")
+        val breadthEvidence = snapshot.evidenceGraph.record("calculation:market-breadth")
+        val sectorEvidence = snapshot.evidenceGraph.record("calculation:sector-banking")
+
+        assertEquals("NSE Watcher fallback catalogue", marketEvidence?.source)
+        assertEquals("Calculated from NSE Watcher fallback catalogue stock observations", breadthEvidence?.source)
+        assertEquals("Calculated from NSE Watcher fallback catalogue stock observations", sectorEvidence?.source)
+    }
 }
