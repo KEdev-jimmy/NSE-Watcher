@@ -88,13 +88,6 @@ private fun App(pickAvatar:()->Unit) {
     LaunchedEffect(Unit) {
         MyStocksCache.loadStocks().takeIf { it.isNotEmpty() }?.let { liveStocks.value = it }
     }
-    LaunchedEffect(autoRefresh) {
-        if (!autoRefresh) return@LaunchedEffect
-        while (isActive) {
-            delay(15 * 60 * 1000L)
-            MyStocksCache.loadStocks().takeIf { it.isNotEmpty() }?.let { liveStocks.value = it }
-        }
-    }
     var page by remember { mutableStateOf(Page.HOME) }
     var history by remember { mutableStateOf(emptyList<Page>()) }
     var tab by rememberSaveable { mutableIntStateOf(0) }
@@ -110,6 +103,13 @@ private fun App(pickAvatar:()->Unit) {
     var newsAlerts by rememberSaveable { mutableStateOf(prefs.getBoolean("news_alerts", true)) }
     var appAlerts by rememberSaveable { mutableStateOf(prefs.getBoolean("app_alerts", true)) }
     var autoRefresh by rememberSaveable { mutableStateOf(prefs.getBoolean("auto_refresh", true)) }
+    LaunchedEffect(autoRefresh) {
+        if (!autoRefresh) return@LaunchedEffect
+        while (isActive) {
+            delay(15 * 60 * 1000L)
+            MyStocksCache.loadStocks().takeIf { it.isNotEmpty() }?.let { liveStocks.value = it }
+        }
+    }
     var showVolume by rememberSaveable { mutableStateOf(prefs.getBoolean("show_volume", true)) }
     var showChanges by rememberSaveable { mutableStateOf(prefs.getBoolean("show_changes", true)) }
     fun put(k:String,v:Boolean){prefs.edit().putBoolean(k,v).apply()}
