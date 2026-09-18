@@ -24,6 +24,7 @@ class HomeIntelligenceEngineTest {
         assertEquals(1, snapshot.breadth.unchanged)
         assertTrue(snapshot.evidenceGraph.validationErrors().isEmpty())
         assertTrue(snapshot.evidenceGraph.records.any { it.id == "calculation:market-breadth" })
+        assertTrue(snapshot.changes.first { it.id == "breadth" }.source?.source == "MyStocks Africa")
     }
 
     @Test
@@ -44,6 +45,7 @@ class HomeIntelligenceEngineTest {
         val sectorEvidence = snapshot.evidenceGraph.record("calculation:sector-banking")
         assertTrue(sectorEvidence != null)
         assertEquals(2, snapshot.evidenceGraph.relatedTo("calculation:sector-banking").size)
+        assertTrue(snapshot.changes.first { it.id == "strongest-sector" }.source != null)
     }
 
     @Test
