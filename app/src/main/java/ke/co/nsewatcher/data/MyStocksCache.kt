@@ -212,8 +212,12 @@ object MyStocksCache {
                         derived.isFinite() -> derived
                         else -> 0.0
                     }
+                    val changeAvailable = suppliedChange.isFinite() || suppliedChangePct.isFinite() || derived.isFinite()
+                    val volumeValue = item.optDouble("volume", Double.NaN)
+                    val volumeAvailable = volumeValue.isFinite() && volumeValue >= 0.0
+                    val volume = if (volumeAvailable) volumeValue.toLong() else 0L
                     val historyStart = if (previousClose.isFinite() && previousClose > 0.0) previousClose else price
-                    add(Stock(symbol, name, price, changePct, listOf(historyStart, price), item.optString("logoUrl").takeIf { it.isNotBlank() }, item.optString("sector", "Other").ifBlank { "Other" }, item.optLong("volume", 0L).coerceAtLeast(0L)))
+                    add(Stock(symbol, name, price, changePct, listOf(historyStart, price), item.optString("logoUrl").takeIf { it.isNotBlank() }, item.optString("sector", "Other").ifBlank { "Other" }, volume, changeAvailable, volumeAvailable))
                 }
             }
         } finally { connection.disconnect() }
