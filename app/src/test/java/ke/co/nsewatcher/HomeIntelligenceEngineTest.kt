@@ -111,6 +111,7 @@ class HomeIntelligenceEngineTest {
         val snapshot = HomeIntelligenceEngine.build(emptyList(), emptyList(), listOf(current, endOfDay))
         assertEquals(HomeMarketDataMode.CURRENT_SESSION, snapshot.marketIndices.first().dataMode)
         assertEquals(HomeMarketDataMode.END_OF_DAY, snapshot.marketIndices[1].dataMode)
+        assertEquals("CURRENT_SESSION", snapshot.evidenceGraph.record("index:^nasi")?.freshness)
     }
 
 }
