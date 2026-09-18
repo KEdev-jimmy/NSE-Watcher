@@ -98,6 +98,14 @@ fun HomeDashboard(
         }
 
         item {
+            MarketFreshnessStrip(currentStocks)
+        }
+
+        item {
+            MarketFreshnessStrip(currentStocks)
+        }
+
+        item {
             Spacer(Modifier.height(11.dp))
             SectionLabel("Today's Intelligence", "Evidence from the current market and news feed", Icons.Default.Psychology)
         }
@@ -348,6 +356,43 @@ private fun indexLabel(symbol: String): String = when (symbol) {
     "^N20I" -> "NSE 20"
     "^N25I" -> "NSE 25"
     else -> symbol.removePrefix("^")
+}
+
+@Composable
+private fun MarketFreshnessStrip(stocks: List<Stock>) {
+    val available = stocks.filter { it.price.isFinite() && it.price > 0.0 }
+    val source = available.map { it.source.trim() }.firstOrNull { it.isNotBlank() } ?: "Market source unavailable"
+    val freshness = when {
+        available.any { it.freshnessMode == "CURRENT_SESSION" } -> "Current session"
+        available.any { it.freshnessMode == "END_OF_DAY" } -> "End-of-day observation"
+        available.any { it.freshnessMode == "STALE" } -> "Previous session"
+        else -> "Freshness unknown"
+    }
+    val coverage = if (available.isNotEmpty()) available.size.toString() + " valid quotes" else "No valid quotes"
+    Surface(
+        Modifier.fillMaxWidth().padding(horizontal = 14.dp),
+        RoundedCornerShape(10.dp),
+        color = HomeLightGreen,
+        border = BorderStroke(1.dp, HomeBorder)
+    ) {
+        Column(Modifier.padding(horizontal = 10.dp, vertical = 7.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Schedule, null, tint = HomeDarkGreen, modifier = Modifier.size(15.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Market data", color = HomeTextDark, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.width(5.dp))
+                Text("• $freshness", color = HomeMuted, fontSize = 8.sp)
+                Spacer(Modifier.weight(1f))
+                Text(coverage, color = HomeMuted, fontSize = 8.sp)
+            }
+            Text(
+                "Source: $source • No value is estimated when valid market data is missing.",
+                color = HomeMuted,
+                fontSize = 7.sp,
+                modifier = Modifier.padding(start = 21.dp, top = 3.dp)
+            )
+        }
+    }
 }
 
 @Composable
