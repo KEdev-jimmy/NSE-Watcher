@@ -1489,3 +1489,20 @@ The genuine watchlist flow now has a dedicated view connected to the existing na
 ### Next step
 
 Run and inspect the new Android CI result. If green, perform a focused Phase 11 audit of the watchlist/company interaction and evidence integration before moving to Phase 12. Do not add portfolio/holdings assumptions or AI explanations.
+
+# 44. PHASE 11 — WATCHLIST AUDIT HARDENING
+
+## Status
+
+**IMPLEMENTED — REQUIRES CI VERIFICATION**
+
+Focused audit after the dedicated Watchlist view passed CI found two small integration improvements worth making before closing Phase 11:
+
+- The Watchlist page now refreshes the existing MyStocksCache stock feed when the page is opened, so it does not depend only on the app-level initial load.
+- The Watchlist page explicitly identifies its price/daily-change provenance as MyStocks Africa and warns that market data may be delayed and material announcements should be verified with the issuer or NSE.
+
+No new provider, duplicate data architecture, fabricated values, or portfolio assumptions were introduced.
+
+Implementation commit: ee9d839824b601f6812a2dbd2486bf763733a570b
+
+Next step: verify the Android CI result. If green, Phase 11 can undergo final closure review; otherwise inspect the actual CI failure before further changes.
