@@ -161,12 +161,10 @@ object HomeIntelligenceEngine {
                         fact = "${displaySector(sector.sector)} has the strongest sector average in the current stock feed.",
                         calculation = "${sector.memberCount} counters average ${signedPercent(sector.averageChangePct)}.",
                         interpretation = "This is an average of the available counters, not an official NSE sector index.",
-                        evidence = listOf(
-                            HomeEvidenceReference(
-                                id = "MKT-SECTOR-${sector.sector.uppercase(Locale.US)}",
-                                source = "MyStocks Africa",
-                                category = "market calculation"
-                            )
+                        evidence = listOfNotNull(
+                            evidenceGraph.record("calculation:sector-${sector.sector.lowercase(Locale.US)}")?.let {
+                                homeEvidenceReference(it, "market calculation")
+                            }
                         ),
                         source = "MyStocks Africa • calculated from current stock feed"
                     )
@@ -182,13 +180,10 @@ object HomeIntelligenceEngine {
                         company = stock.name,
                         fact = "${stock.symbol} is the largest current gainer in the available stock feed.",
                         calculation = "Price ${formatPrice(stock.price)}; daily movement ${signedPercent(stock.change)}.",
-                        evidence = listOf(
-                            HomeEvidenceReference(
-                                id = "MKT-MOVER-${stock.symbol}",
-                                source = "MyStocks Africa",
-                                symbol = stock.symbol,
-                                category = "market movement"
-                            )
+                        evidence = listOfNotNull(
+                            evidenceGraph.record("market:${stock.symbol.lowercase()}")?.let {
+                                homeEvidenceReference(it, "market movement")
+                            }
                         ),
                         source = "MyStocks Africa • current stock feed"
                     )
@@ -314,6 +309,16 @@ object HomeIntelligenceEngine {
             evidenceGraph = evidenceGraph
         )
     }
+
+    private fun homeEvidenceReference(record: EvidenceRecord, category: String): HomeEvidenceReference =
+        HomeEvidenceReference(
+            id = record.id,
+            source = record.source,
+            sourceUrl = record.sourceUrl.orEmpty(),
+            date = record.publishedAt ?: record.observedAt.orEmpty(),
+            symbol = record.symbol.orEmpty(),
+            category = category
+        )
 
     private fun signedPercent(value: Double): String = String.format(Locale.US, "%+.2f%%", value)
     private fun signedInt(value: Int): String = String.format(Locale.US, "%+d", value)
