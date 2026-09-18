@@ -356,6 +356,14 @@ private fun indexLabel(symbol: String): String = when (symbol) {
 
 @Composable
 private fun MarketFreshnessStrip(stocks: List<Stock>) {
+    val controllerState by MarketRefreshController.state
+    var nowMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            nowMs = System.currentTimeMillis()
+            kotlinx.coroutines.delay(1000L)
+        }
+    }
     val available = stocks.filter { it.price.isFinite() && it.price > 0.0 }
     val source = available.map { it.source.trim() }.firstOrNull { it.isNotBlank() } ?: "Market source unavailable"
     val freshness = when {
@@ -365,6 +373,12 @@ private fun MarketFreshnessStrip(stocks: List<Stock>) {
         else -> "Freshness unknown"
     }
     val coverage = if (available.isNotEmpty()) available.size.toString() + " valid quotes" else "No valid quotes"
+    val refreshStatus = when {
+        controllerState.refreshInProgress -> "Refreshing market data…"
+        controllerState.lastRefreshFailed -> "Last refresh failed"
+        controllerState.lastSuccessfulRefreshMs == null -> "Waiting for first refresh"
+        else -> "Next data check " + MarketRefreshController.formatCountdown(MarketRefreshController.secondsUntilNextCheck(nowMs))
+    }
     Surface(
         Modifier.fillMaxWidth().padding(horizontal = 14.dp),
         RoundedCornerShape(10.dp),
@@ -381,11 +395,10 @@ private fun MarketFreshnessStrip(stocks: List<Stock>) {
                 Spacer(Modifier.weight(1f))
                 Text(coverage, color = HomeMuted, fontSize = 8.sp)
             }
+            Text(refreshStatus, color = HomeDarkGreen, fontSize = 8.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 21.dp, top = 3.dp))
             Text(
-                "Source: $source • No value is estimated when valid market data is missing.",
-                color = HomeMuted,
-                fontSize = 7.sp,
-                modifier = Modifier.padding(start = 21.dp, top = 3.dp)
+                "Source: $source • Next check means the app will check the feed; the provider may return unchanged data.",
+                color = HomeMuted, fontSize = 7.sp, modifier = Modifier.padding(start = 21.dp, top = 2.dp)
             )
         }
     }
