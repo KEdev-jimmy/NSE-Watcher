@@ -633,3 +633,5 @@ module.exports = handle;
 module.exports.normalizedComparable = normalizedComparable;
 module.exports.buildFieldQuality = buildFieldQuality;
 module.exports.evidenceFor = evidenceFor;
+module.exports.normalizeWebsite = normalizeWebsite;
+module.exports.normalizeLocation = normalizeLocation;
