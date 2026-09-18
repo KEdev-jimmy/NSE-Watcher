@@ -315,6 +315,35 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit) {
             }
         }
 
+        item { SectionTitle("Evidence", "The source records behind this intelligence view", Icons.Default.Verified) }
+        item {
+            IntelligenceCard {
+                if (intelligenceView.evidenceRecords.isEmpty()) {
+                    Text("No normalized evidence records are available from the current response.", color = IntelligenceMuted, fontSize = 10.sp)
+                } else {
+                    intelligenceView.evidenceRecords.take(8).forEachIndexed { index, evidence ->
+                        Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(evidence.type.name.replace('_', ' '), color = IntelligenceGreen, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.width(7.dp))
+                                Text(evidence.source, color = IntelligenceMuted, fontSize = 8.sp, maxLines = 1)
+                            }
+                            Spacer(Modifier.height(3.dp))
+                            Text(evidence.claim, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 3)
+                            evidence.value?.takeIf { it.isNotBlank() }?.let { Text(it, color = IntelligenceMuted, fontSize = 9.sp, maxLines = 2) }
+                            (evidence.publishedAt ?: evidence.observedAt)?.takeIf { it.isNotBlank() }?.let { Text(it.take(19), color = IntelligenceMuted, fontSize = 8.sp) }
+                            evidence.sourceUrl?.takeIf { it.isNotBlank() }?.let { Text("Source available", color = IntelligenceGreen, fontSize = 8.sp, fontWeight = FontWeight.SemiBold) }
+                        }
+                        if (index < intelligenceView.evidenceRecords.take(8).lastIndex) HorizontalDivider(color = IntelligenceBorder)
+                    }
+                    if (intelligenceView.evidenceRecords.size > 8) {
+                        Spacer(Modifier.height(4.dp))
+                        Text("+${intelligenceView.evidenceRecords.size - 8} more evidence records", color = IntelligenceMuted, fontSize = 8.sp)
+                    }
+                }
+            }
+        }
+
         item { SectionTitle("Risks to investigate", "Questions raised by the available evidence", Icons.Default.Warning) }
         item {
             IntelligenceCard {
@@ -329,7 +358,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit) {
         item { SectionTitle("Intelligence signals", "Deterministic evidence signals — no invented conclusions", Icons.Default.Insights) }
         item {
             IntelligenceCard {
-                Text(intelligenceView.confidence, color = IntelligenceGreen, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold)
+                Text("Evidence coverage: ${intelligenceView.confidence}", color = IntelligenceGreen, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold)
                 Spacer(Modifier.height(6.dp))
                 Text("Coverage: ${intelligenceView.quality.state} • ${intelligenceView.quality.availableCount}/5 evidence areas", color = IntelligenceMuted, fontSize = 9.sp)
                 Spacer(Modifier.height(10.dp))
