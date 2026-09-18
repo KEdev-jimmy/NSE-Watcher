@@ -85,7 +85,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit) {
 
     val profile = intelligence.profile
     val monthlyReturn = percentReturn(monthHistory)
-    val selectedPeriodReturn = percentReturn(history)
+    val selectedPeriodReturn = percentReturn(history.map { it.close })
     val latestFinancialPeriod = intelligence.financialHistory.lastOrNull()?.period.orEmpty()
     val intelligenceView = CompanyIntelligenceEngine.build(s, intelligence, monthHistory, news)
 
