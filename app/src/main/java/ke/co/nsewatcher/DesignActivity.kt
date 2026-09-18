@@ -57,7 +57,7 @@ private val Border = Color(0xFFE1EAE5)
 private val Red = Color(0xFFE04444)
 private const val PREFS = "nse_watcher_preferences"
 
-data class Stock(val symbol:String,val name:String,val price:Double,val change:Double,val history:List<Double>,val logoUrl:String?=null,val sector:String="Other",val volume:Long=0L,val changeAvailable:Boolean=true,val volumeAvailable:Boolean=true)
+data class Stock(val symbol:String,val name:String,val price:Double,val change:Double,val history:List<Double>,val logoUrl:String?=null,val sector:String="Other",val volume:Long=0L,val changeAvailable:Boolean=true,val volumeAvailable:Boolean=true,val source:String="",val observedAt:String="",val freshnessMode:String="UNKNOWN",val dataOrigin:String="unknown")
 
 data class NewsItem(
     val id:String, val title:String, val summary:String, val body:String, val source:String,
