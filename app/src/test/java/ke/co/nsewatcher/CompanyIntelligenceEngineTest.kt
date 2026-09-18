@@ -55,6 +55,8 @@ class CompanyIntelligenceEngineTest {
         )
 
         assertEquals(2, result.evidenceRecords.size)
+        assertEquals(2, result.evidenceGraph.records.size)
+        assertTrue(result.evidenceGraph.validationErrors().isEmpty())
         assertTrue(result.evidenceRecords.any { it.id.startsWith("company:kcb:") })
         assertTrue(result.evidenceRecords.any { it.id == "news:article-1" })
         assertEquals("https://example.com/financials", result.evidenceRecords.first { it.id.startsWith("company:kcb:") }.sourceUrl)
