@@ -26,30 +26,6 @@ const NSE_COMPANIES = [
   ['WPP', 'WPP Scangroup']
 ];
 
-const INTELLIGENCE_MARKET_TERMS = [
-  'nse', 'nairobi securities exchange', 'capital markets', 'stock market', 'share price',
-  'share price', 'shareholders', 'listed company', 'listing', 'dividend', 'payout',
-  'earnings', 'revenue', 'financial results', 'financial statements', 'eps',
-  'rights issue', 'bonus issue', 'share split', 'acquisition', 'merger', 'takeover',
-  'ipo', 'bond', 'treasury', 'cbk', 'central bank', 'cma', 'investor', 'investors',
-  'trading', 'broker', 'brokerage', 'fund manager', 'reit', 'etf', 'interest rate',
-  'inflation', 'forex', 'shilling', 'corporate action', 'agm', 'annual general meeting',
-  'profit warning', 'profit after tax', 'profit before tax', 'operating profit',
-  'net income', 'guidance', 'outlook', 'material contract', 'stake acquisition',
-  'stake sale', 'disposal', 'regulatory approval', 'regulatory action', 'fine',
-  'penalty', 'license', 'licence', 'suspension', 'appointment of', 'resignation of'
-];
-
-const MARKET_RELEVANCE_TERMS = [
-  'nse', 'nairobi securities exchange', 'capital markets', 'stock market', 'share price',
-  'shares', 'listed', 'listing', 'dividend', 'earnings', 'profit', 'loss', 'revenue',
-  'results', 'financial results', 'rights issue', 'bonus issue', 'split', 'acquisition',
-  'merger', 'takeover', 'ipo', 'bond', 'treasury', 'cbk', 'central bank', 'cma',
-  'investor', 'investors', 'trading', 'market', 'equity', 'banking', 'broker',
-  'brokerage', 'fund manager', 'reit', 'etf', 'interest rate', 'inflation', 'forex',
-  'shilling', 'corporate action', 'agm', 'annual general meeting'
-];
-
 function json(res, status, body) {
   res.status(status).setHeader('Content-Type', 'application/json');
   res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
