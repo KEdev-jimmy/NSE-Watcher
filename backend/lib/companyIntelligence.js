@@ -610,3 +610,6 @@ async function handle(req, res) {
 }
 
 module.exports = handle;
+module.exports.normalizedComparable = normalizedComparable;
+module.exports.buildFieldQuality = buildFieldQuality;
+module.exports.evidenceFor = evidenceFor;
