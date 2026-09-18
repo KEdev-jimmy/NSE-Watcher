@@ -44,24 +44,11 @@ private const val NewsSkyline = "https://upload.wikimedia.org/wikipedia/commons/
 
 private data class NewsMeta(val symbol: String, val company: String, val logo: String, val label: String)
 
-private val KnownNewsCompanies = listOf(
-    "SCOM" to "Safaricom", "KCB" to "KCB Group", "EQTY" to "Equity Group", "COOP" to "Co-operative Bank",
-    "ABSA" to "Absa Bank Kenya", "EABL" to "East African Breweries", "KPLC" to "Kenya Power",
-    "KEGN" to "KenGen", "BRIT" to "Britam Holdings", "KNRE" to "Kenya Re", "BAT" to "BAT Kenya",
-    "NCBA" to "NCBA Group", "KQ" to "Kenya Airways", "JUB" to "Jubilee Holdings", "DTK" to "Diamond Trust Bank",
-    "SBIC" to "Stanbic Holdings", "I&M" to "I&M Group", "CTUM" to "Centum Investment", "TOTL" to "TotalEnergies Marketing Kenya",
-    "CARB" to "Carbacid Investments", "BOC" to "BOC Kenya", "UNGA" to "Unga Group", "LONG" to "Longhorn Publishers"
-)
-
 private fun dashboardNewsMeta(item: NewsItem): NewsMeta {
-    val directSymbol = item.symbol.trim().uppercase(Locale.US).removeSuffix(".KE")
-    val text = "${item.companyName} ${item.title}".lowercase(Locale.US)
-    val resolved = KnownNewsCompanies.firstOrNull { (symbol, company) ->
-        directSymbol == symbol || text.contains(company.lowercase(Locale.US)) || text.contains(symbol.lowercase(Locale.US))
-    }
-    val symbol = if (directSymbol.isNotBlank()) directSymbol else resolved?.first.orEmpty()
-    val company = item.companyName.takeIf { it.isNotBlank() && !it.equals("MyStocks Africa", true) }
-        ?: resolved?.second.orEmpty()
+    val symbol = item.symbol.trim().uppercase(Locale.US).removeSuffix(".KE")
+    val company = item.companyName.takeIf {
+        it.isNotBlank() && !it.equals("MyStocks Africa", true)
+    }.orEmpty()
     val logo = symbol.takeIf { it.isNotBlank() }?.let {
         "https://mystocks.africa/logos/${it.lowercase(Locale.US)}-ke.svg"
     }.orEmpty()
