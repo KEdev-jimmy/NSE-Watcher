@@ -1425,3 +1425,27 @@ Latest completed CI before the watchlist UI changes was run 459 and successful. 
 ### Next step
 
 After CI passes, audit the Companies screen for the cleanest place to expose watchlist state and then add a dedicated Watchlist view only if the existing navigation structure can support it without duplicating data architecture. The view must read the user's persisted symbols and hydrate them from the existing real stock feed; an empty watchlist must remain a valid state.
+
+
+# 42. PHASE 11 — CI COMPILATION FIX
+
+## Status
+
+**FIXED — REQUIRES NEW CI VERIFICATION**
+
+Android CI runs 464 and 465 both failed during Kotlin compilation because `DesignActivity.kt` contained two imports of the same `WatchlistStore` class, making the import ambiguous.
+
+### Fix
+
+Removed the duplicate `ke.co.nsewatcher.data.WatchlistStore` import from `app/src/main/java/ke/co/nsewatcher/DesignActivity.kt`.
+
+### Verification
+
+- CI run 464: failed at Kotlin compilation due to duplicate `WatchlistStore` import.
+- CI run 465: failed at Kotlin compilation due to the same duplicate import.
+- Fix commit: `53e03450f4e94760be87c2066014d8417c07a83e`
+- A new CI run is required before declaring the build green.
+
+### Next step
+
+Wait for the new Android CI run and inspect the actual result. If green, continue the Phase 11 watchlist UI audit. Do not add further watchlist functionality until the build is verified.
