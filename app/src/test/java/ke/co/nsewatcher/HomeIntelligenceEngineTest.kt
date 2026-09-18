@@ -86,4 +86,22 @@ class HomeIntelligenceEngineTest {
         assertEquals("2026-09-17", evidence?.observedAt)
     }
 
+    @Test
+    fun marketIndexPulseUsesObservedDirectionWithoutPrediction() {
+        val snapshot = HomeIntelligenceEngine.build(
+            listOf(stock("ABC", 1.0, "Banking")),
+            emptyList(),
+            listOf(
+                HomeMarketIndex("^NASI", "NASI", 235.26, -0.98, "2026-09-17"),
+                HomeMarketIndex("^N20I", "NSE 20", 1900.0, -0.50, "2026-09-17")
+            )
+        )
+
+        val pulse = snapshot.intelligence.first { it.id == "market-index-pulse" }
+        assertTrue(pulse.fact.contains("lower"))
+        assertTrue(pulse.interpretation.contains("not a forecast"))
+        assertEquals(2, pulse.evidence.size)
+        assertTrue(snapshot.evidenceGraph.relatedTo("calculation:market-breadth").isNotEmpty())
+    }
+
 }
