@@ -2,6 +2,11 @@ package ke.co.nsewatcher
 
 import java.util.Locale
 import ke.co.nsewatcher.domain.EvidenceAdapters
+import ke.co.nsewatcher.domain.EvidenceGraph
+import ke.co.nsewatcher.domain.EvidenceRecord
+import ke.co.nsewatcher.domain.EvidenceRelationship
+import ke.co.nsewatcher.domain.EvidenceRelationshipType
+import ke.co.nsewatcher.domain.EvidenceType
 
 /**
  * Home-facing domain models. These keep market calculations and provenance out
@@ -62,7 +67,8 @@ data class HomeIntelligenceSnapshot(
     val intelligence: List<HomeIntelligenceItem>,
     val changes: List<HomeChangeItem>,
     val corporateActions: List<NewsItem>,
-    val companyNews: List<NewsItem>
+    val companyNews: List<NewsItem>,
+    val evidenceGraph: EvidenceGraph
 )
 
 object HomeIntelligenceEngine {
@@ -92,6 +98,54 @@ object HomeIntelligenceEngine {
                 it.intelligenceRelevance == "market"
         }
         val companyNewsEvidence = companyNews.mapNotNull(EvidenceAdapters::fromNews)
+
+        val marketEvidence = valid.mapNotNull(EvidenceAdapters::fromStock)
+        val graphRecords = mutableListOf<EvidenceRecord>()
+        graphRecords += marketEvidence
+        graphRecords += companyNewsEvidence
+
+        val graphRelationships = mutableListOf<EvidenceRelationship>()
+        if (valid.isNotEmpty()) {
+            val breadthId = "calculation:market-breadth"
+            graphRecords += EvidenceRecord(
+                id = breadthId,
+                type = EvidenceType.MARKET_DATA,
+                claim = "Market breadth calculated from the available stock feed",
+                value = breadth.advancing.toString() + " advancing, " + breadth.declining + " declining, " + breadth.unchanged + " unchanged",
+                source = "MyStocks Africa"
+            )
+            marketEvidence.forEach { evidence ->
+                graphRelationships += EvidenceRelationship(
+                    id = "relationship:" + breadthId + ":" + evidence.id,
+                    fromEvidenceId = breadthId,
+                    toEvidenceId = evidence.id,
+                    type = EvidenceRelationshipType.RELATED
+                )
+            }
+        }
+
+        sectors.forEach { sector ->
+            val sectorId = "calculation:sector-" + sector.sector.lowercase(Locale.US)
+            graphRecords += EvidenceRecord(
+                id = sectorId,
+                type = EvidenceType.MARKET_DATA,
+                claim = displaySector(sector.sector) + " sector average calculated from available counters",
+                value = sector.memberCount.toString() + " counters average " + signedPercent(sector.averageChangePct),
+                source = "MyStocks Africa"
+            )
+            valid.filter { it.sector.trim().equals(sector.sector, ignoreCase = true) }
+                .mapNotNull(EvidenceAdapters::fromStock)
+                .forEach { evidence ->
+                    graphRelationships += EvidenceRelationship(
+                        id = "relationship:" + sectorId + ":" + evidence.id,
+                        fromEvidenceId = sectorId,
+                        toEvidenceId = evidence.id,
+                        type = EvidenceRelationshipType.RELATED
+                    )
+                }
+        }
+
+        val evidenceGraph = EvidenceGraph.of(graphRecords, graphRelationships)
 
         val strongest = sectors.maxByOrNull { it.averageChangePct }
         val weakest = sectors.minByOrNull { it.averageChangePct }
@@ -244,7 +298,8 @@ object HomeIntelligenceEngine {
             intelligence = intelligence,
             changes = changes,
             corporateActions = corporateActions,
-            companyNews = companyNews
+            companyNews = companyNews,
+            evidenceGraph = evidenceGraph
         )
     }
 
