@@ -3,6 +3,7 @@ package ke.co.nsewatcher
 import ke.co.nsewatcher.data.CompanyIntelligenceCache
 import ke.co.nsewatcher.data.MovementIntelligenceCache
 import ke.co.nsewatcher.domain.EvidenceAdapters
+import ke.co.nsewatcher.domain.EvidenceRecord
 import ke.co.nsewatcher.domain.EvidenceRelationshipType
 import ke.co.nsewatcher.domain.EvidenceType
 import org.junit.Assert.assertEquals
