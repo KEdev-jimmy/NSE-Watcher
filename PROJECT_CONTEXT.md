@@ -1730,3 +1730,45 @@ Step 4 strengthens news evidence freshness so missing or malformed publication d
 ### Next step
 
 After CI verification, continue Step 5: field-level company data quality/source attribution and conflict handling.
+
+# 52. PHASE 12 — STEP 4 CI FAILURE FIX
+
+## Status
+
+**FIXED — REQUIRES NEW CI VERIFICATION**
+
+Android CI runs **#495** and **#496** both failed in the Gradle build at `:app:testDebugUnitTest`.
+
+### Root cause
+
+Both runs failed the same regression test:
+
+`HomeIntelligenceEngineTest.newsIsEvidenceNotAnInventedFinancialConclusion`
+
+The new news freshness field was correctly carried into the underlying `EvidenceRecord` by `EvidenceAdapters.fromNews()`. However, when `HomeIntelligence.kt` converted that record into the Home-facing `HomeEvidenceReference`, it manually reconstructed the reference and omitted the `freshness` field.
+
+As a result:
+
+- the Evidence Graph contained `freshness = "UNKNOWN"`
+- the Home intelligence item's evidence reference lost that value and exposed the default empty string
+- the new test at `HomeIntelligenceEngineTest.kt:73` failed
+
+This was a **provenance propagation bug**, not a Gradle/Android SDK problem.
+
+### Fix
+
+Commit **4484661fc2c1a6194abf8dcce483e8a80d6e93b1**:
+
+**`Fix Phase 12 news evidence freshness propagation`**
+
+The Home news intelligence item now reuses the existing `homeEvidenceReference()` adapter, so source, URL, date, symbol, category and freshness stay consistent with the underlying EvidenceRecord.
+
+### Verification
+
+A new Android CI run is required for commit 4484661fc2c1a6194abf8dcce483e8a80d6e93b1.
+
+Do not mark Step 4 complete until that run is green.
+
+### Next step
+
+After the fix is verified, continue Phase 12 Step 5: field-level company data quality, source attribution and conflict handling.
