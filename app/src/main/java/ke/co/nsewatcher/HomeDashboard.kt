@@ -57,17 +57,17 @@ fun HomeDashboard(
     var marketStatus by remember { mutableStateOf(MyStocksCache.MarketStatus()) }
 
     LaunchedEffect(Unit) {
-        marketIndices = MyStocksCache.loadMarketIndices()
         marketStatus = MyStocksCache.loadMarketStatus()
+        marketIndices = MyStocksCache.loadMarketIndices(marketStatus.isOpen)
         val result = NewsCache.loadFeedResult()
         news = result.items
         newsError = result.error
         newsLoading = false
     }
 
-    val intelligence = remember(currentStocks, news, marketIndices) {
+    val intelligence = remember(currentStocks, news, marketIndices, marketStatus.isOpen) {
         HomeIntelligenceEngine.build(currentStocks, news, marketIndices.map { index ->
-        HomeMarketIndex(index.symbol, index.name, index.value, index.changePct, index.asOf, indexFreshness(index.asOf, marketStatus.isOpen))
+        HomeMarketIndex(index.symbol, index.name, index.value, index.changePct, index.asOf, freshnessMode(index.freshnessMode))
     })
     }
     val breadth = intelligence.breadth
@@ -314,7 +314,7 @@ private fun MarketIndexPulse(indices: List<MyStocksCache.MarketIndex>, marketSta
                         )
                     }
                     if (index.asOf.isNotBlank()) {
-                        Text(freshnessLabel(index.asOf, marketStatus.isOpen), color = HomeMuted, fontSize = 7.sp, maxLines = 1)
+                        Text(freshnessLabel(index.asOf, index.freshnessMode), color = HomeMuted, fontSize = 7.sp, maxLines = 1)
                     }
                 }
             }
@@ -328,25 +328,23 @@ private fun MarketIndexPulse(indices: List<MyStocksCache.MarketIndex>, marketSta
     }
 }
 
-private fun indexFreshness(asOf: String, marketOpen: Boolean): HomeMarketDataMode {
-    if (asOf.isBlank()) return HomeMarketDataMode.UNKNOWN
-    return try {
-        val instant = Instant.parse(asOf)
-        val local = instant.atZone(ZoneId.of("Africa/Nairobi"))
-        val now = Instant.now().atZone(ZoneId.of("Africa/Nairobi"))
-        if (local.toLocalDate() != now.toLocalDate()) HomeMarketDataMode.STALE
-        else if (asOf.contains("T") && marketOpen) HomeMarketDataMode.CURRENT_SESSION
-        else HomeMarketDataMode.END_OF_DAY
-    } catch (_: DateTimeParseException) {
-        if (asOf.length == 10) HomeMarketDataMode.END_OF_DAY else HomeMarketDataMode.UNKNOWN
-    }
+private fun freshnessMode(mode: String): HomeMarketDataMode = when (mode) {
+    "CURRENT_SESSION" -> HomeMarketDataMode.CURRENT_SESSION
+    "END_OF_DAY" -> HomeMarketDataMode.END_OF_DAY
+    "STALE" -> HomeMarketDataMode.STALE
+    else -> HomeMarketDataMode.UNKNOWN
 }
 
-private fun freshnessLabel(asOf: String, marketOpen: Boolean): String = when (indexFreshness(asOf, marketOpen)) {
-    HomeMarketDataMode.CURRENT_SESSION -> "Current session • " + asOf.replace("T", " ").take(16)
+private fun freshnessLabel(asOf: String, freshnessMode: String): String = when (freshnessMode(freshnessMode)) {
+    HomeMarketDataMode.CURRENT_SESSION -> {
+        val display = runCatching {
+            Instant.parse(asOf).atZone(ZoneId.of("Africa/Nairobi")).toLocalTime().toString().take(5)
+        }.getOrDefault(asOf.replace("T", " ").take(16))
+        "Current observation • $display EAT"
+    }
     HomeMarketDataMode.END_OF_DAY -> "End of day • " + asOf.take(10)
-    HomeMarketDataMode.STALE -> "Stale • " + asOf.take(10)
-    HomeMarketDataMode.UNKNOWN -> "Observation time unavailable"
+    HomeMarketDataMode.STALE -> "Previous session • " + asOf.take(10)
+    HomeMarketDataMode.UNKNOWN -> "As of " + asOf.replace("T", " ").removeSuffix("Z").take(16)
 }
 
 private fun indexLabel(symbol: String): String = when (symbol) {
