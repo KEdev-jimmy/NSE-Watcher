@@ -66,22 +66,21 @@ object EvidenceAdapters {
     }
 
     fun relationshipFromMovement(
-        symbol: String,
         movementEvidenceId: String,
+        targetEvidenceId: String,
         evidence: MovementIntelligenceCache.Evidence
     ): EvidenceRelationship? {
-        if (movementEvidenceId.isBlank() || evidence.title.isBlank()) return null
+        if (movementEvidenceId.isBlank() || targetEvidenceId.isBlank() || evidence.title.isBlank()) return null
         val type = when (evidence.relationship.lowercase().trim()) {
             "related" -> EvidenceRelationshipType.RELATED
             "possible" -> EvidenceRelationshipType.POSSIBLE
             "not-established", "not established", "not_established" -> EvidenceRelationshipType.NOT_ESTABLISHED
             else -> return null
         }
-        val targetId = movementEvidenceId(symbol, evidence)
         return EvidenceRelationship(
-            id = "relationship:$movementEvidenceId:$targetId",
+            id = "relationship:$movementEvidenceId:$targetEvidenceId",
             fromEvidenceId = movementEvidenceId,
-            toEvidenceId = targetId,
+            toEvidenceId = targetEvidenceId,
             type = type
         )
     }
@@ -97,7 +96,7 @@ object EvidenceAdapters {
     }
 
     private fun companyEvidenceId(evidence: CompanyIntelligenceCache.Evidence): String =
-        "company:${evidence.symbol}:${evidence.claim}:${evidence.value}:${evidence.fetchedAt}"
+        "company:${evidence.symbol}:${evidence.source}:${evidence.endpoint}:${evidence.claim}:${evidence.value}"
             .lowercase()
             .replace(Regex("[^a-z0-9:.%+/_-]+"), "-")
 
