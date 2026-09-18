@@ -105,5 +105,4 @@ class EvidenceAdaptersTest {
         assertEquals("movement:kcb:1d", relationship?.fromEvidenceId)
         assertEquals("news:article-123", relationship?.toEvidenceId)
     }
-    }
 }
