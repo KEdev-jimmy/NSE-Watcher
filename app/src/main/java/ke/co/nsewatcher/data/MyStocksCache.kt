@@ -40,10 +40,11 @@ object MyStocksCache {
         val name: String,
         val value: Double,
         val changePct: Double?,
-        val asOf: String = ""
+        val asOf: String = "",
+        val freshnessMode: String = "UNKNOWN"
     )
 
-    suspend fun loadMarketIndices(): List<MarketIndex> = withContext(Dispatchers.IO) {
+    suspend fun loadMarketIndices(marketOpen: Boolean = false): List<MarketIndex> = withContext(Dispatchers.IO) {
         runCatching {
             val connection = (URL(BACKEND_INDICES_URL).openConnection() as HttpURLConnection).apply {
                 requestMethod = "GET"; connectTimeout = 8_000; readTimeout = 8_000
@@ -61,7 +62,8 @@ object MyStocksCache {
                         val value = item.optDouble("value", Double.NaN)
                         if (symbol.isBlank() || !value.isFinite()) continue
                         val change = item.optDouble("changePct", Double.NaN)
-                        add(MarketIndex(symbol, name, value, change.takeIf { it.isFinite() }, item.optString("asOf", "")))
+                        val asOf = item.optString("asOf", "")
+                        add(MarketIndex(symbol, name, value, change.takeIf { it.isFinite() }, asOf, indexFreshnessMode(asOf, marketOpen)))
                     }
                 }
             } finally { connection.disconnect() }
@@ -159,6 +161,27 @@ object MyStocksCache {
             )
         } finally { connection.disconnect() }
     }.getOrDefault(HistoryResult())
+
+    private fun indexFreshnessMode(asOf: String, marketOpen: Boolean): String {
+        if (asOf.isBlank()) return "UNKNOWN"
+        val now = java.time.Instant.now().atZone(java.time.ZoneId.of("Africa/Nairobi"))
+        if (asOf.length == 10) {
+            val date = runCatching { java.time.LocalDate.parse(asOf) }.getOrNull() ?: return "UNKNOWN"
+            return when {
+                date.isBefore(now.toLocalDate()) -> "STALE"
+                !marketOpen -> "END_OF_DAY"
+                else -> "UNKNOWN"
+            }
+        }
+        return runCatching {
+            val observed = java.time.Instant.parse(asOf).atZone(java.time.ZoneId.of("Africa/Nairobi"))
+            when {
+                observed.toLocalDate().isBefore(now.toLocalDate()) -> "STALE"
+                observed.toLocalDate() == now.toLocalDate() && marketOpen -> "CURRENT_SESSION"
+                else -> "UNKNOWN"
+            }
+        }.getOrDefault("UNKNOWN")
+    }
 
     private fun loadFromUrl(url: String): List<Stock> = runCatching {
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
