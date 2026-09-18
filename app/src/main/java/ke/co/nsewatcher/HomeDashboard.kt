@@ -60,7 +60,7 @@ fun HomeDashboard(
         newsLoading = false
     }
 
-    val intelligence = remember(currentStocks, news) {
+    val intelligence = remember(currentStocks, news, marketIndices) {
         HomeIntelligenceEngine.build(currentStocks, news, marketIndices.map { index ->
         HomeMarketIndex(index.symbol, index.name, index.value, index.changePct, index.asOf)
     })
