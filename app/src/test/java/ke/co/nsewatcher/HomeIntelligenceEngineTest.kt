@@ -46,6 +46,10 @@ class HomeIntelligenceEngineTest {
         assertTrue(sectorEvidence != null)
         assertEquals(2, snapshot.evidenceGraph.relatedTo("calculation:sector-banking").size)
         assertTrue(snapshot.changes.first { it.id == "strongest-sector" }.source != null)
+        val sectorItem = snapshot.intelligence.first { it.id == "sector-banking" }
+        assertEquals("calculation:sector-banking", sectorItem.evidence.single().id)
+        val gainerItem = snapshot.intelligence.first { it.id == "gainer-A" }
+        assertEquals("market:a", gainerItem.evidence.single().id)
     }
 
     @Test
@@ -64,5 +68,7 @@ class HomeIntelligenceEngineTest {
         assertEquals("Company announcement", item.fact)
         assertTrue(item.interpretation.contains("no financial conclusion"))
         assertEquals("https://example.com/news", item.sourceUrl)
+        assertEquals("Issuer", item.evidence.single().source)
+        assertEquals("2026-09-17", item.evidence.single().date)
     }
 }
