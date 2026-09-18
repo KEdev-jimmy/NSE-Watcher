@@ -25,6 +25,14 @@ data class HomeSectorPulse(
     val memberCount: Int
 )
 
+data class HomeMarketIndex(
+    val symbol: String,
+    val name: String,
+    val value: Double,
+    val changePct: Double?,
+    val asOf: String = ""
+)
+
 enum class HomeIntelligenceType { FACT, CALCULATION, NEWS }
 
 data class HomeEvidenceReference(
@@ -68,11 +76,12 @@ data class HomeIntelligenceSnapshot(
     val changes: List<HomeChangeItem>,
     val corporateActions: List<NewsItem>,
     val companyNews: List<NewsItem>,
+    val marketIndices: List<HomeMarketIndex>,
     val evidenceGraph: EvidenceGraph
 )
 
 object HomeIntelligenceEngine {
-    fun build(stocks: List<Stock>, news: List<NewsItem>): HomeIntelligenceSnapshot {
+    fun build(stocks: List<Stock>, news: List<NewsItem>, marketIndices: List<HomeMarketIndex> = emptyList()): HomeIntelligenceSnapshot {
         val valid = stocks.filter { it.change.isFinite() }
         val gainers = valid.filter { it.change > 0 }.sortedByDescending { it.change }
         val losers = valid.filter { it.change < 0 }.sortedBy { it.change }
@@ -103,6 +112,19 @@ object HomeIntelligenceEngine {
         val graphRecords = mutableListOf<EvidenceRecord>()
         graphRecords += marketEvidence
         graphRecords += companyNewsEvidence
+
+        marketIndices.forEach { index ->
+            graphRecords += EvidenceRecord(
+                id = "index:${index.symbol.lowercase(Locale.US)}",
+                symbol = index.symbol,
+                type = EvidenceType.MARKET_DATA,
+                claim = "${index.name.ifBlank { index.symbol }} market index observation",
+                value = "${String.format(Locale.US, "%.2f", index.value)}${index.changePct?.let { " (${signedPercent(it)})" } ?: ""}",
+                source = "MyStocks Africa",
+                observedAt = index.asOf.ifBlank { null },
+                period = "current observation"
+            )
+        }
 
         val graphRelationships = mutableListOf<EvidenceRelationship>()
         if (valid.isNotEmpty()) {
@@ -306,6 +328,7 @@ object HomeIntelligenceEngine {
             changes = changes,
             corporateActions = corporateActions,
             companyNews = companyNews,
+            marketIndices = marketIndices,
             evidenceGraph = evidenceGraph
         )
     }
