@@ -1860,6 +1860,57 @@ Commits:
 - `5866f0782e0b1d62f57e62f5a1e7136f26ea672a` — add company quality regression tests
 - `9e72070d6af16384edb2e5072fde2227515a9ccd` — run company quality regression tests in CI
 
+### Verification
+
+Android/backend quality regression coverage was added and the user confirmed the CI run passed. The repository is now ready for the final Phase 12 closure audit.
+
 ### Next step
 
-Wait for the CI run triggered by commit 9e72070d6af16384edb2e5072fde2227515a9ccd. If green, mark Step 5 complete and proceed to the final Phase 12 evidence-quality closure audit.
+Complete the final Phase 12 evidence-quality closure audit before starting Phase 13.
+# 54. PHASE 12 — FINAL EVIDENCE QUALITY CLOSURE AUDIT
+
+## Status
+
+**AUDIT COMPLETE — PHASE 12 CLOSED**
+
+The final audit reviewed the evidence path across stock ingestion, Home intelligence, news, company intelligence, movement intelligence, watchlist data and CI coverage. The goal was to determine whether the app now has a sufficiently explicit boundary between observed data, calculations, provenance, freshness and uncertainty to proceed to the AI Explanation Layer without using AI to hide data-quality gaps.
+
+### Closure findings
+
+**1. Stock provenance and missing-data semantics — CLOSED**
+
+Stock observations now carry source, observed-at information, freshness mode and data origin. Backend observations and the checked-in fallback catalogue are distinguishable. Missing movement and missing volume are represented with explicit availability flags, so missing values are not treated as genuine unchanged/zero-volume observations.
+
+**2. Home provenance — CLOSED**
+
+Market breadth, sector calculations and mover intelligence consume evidence derived from the actual stock observations. Calculation evidence identifies its source or multiple-source nature. Fallback stock observations cannot silently inherit a MyStocks Africa label.
+
+**3. News freshness — CLOSED**
+
+News evidence preserves source, publication date and freshness state. Missing or malformed publication dates remain UNKNOWN rather than being treated as fresh. The backend feed-window classification and Android display classification remain distinct.
+
+**4. Company field quality and source attribution — CLOSED**
+
+Material company fields now expose field-level sources and AVAILABLE / UNAVAILABLE / CONFLICT quality states. When MyStocks Africa and StockAnalysis / S&P Global Market Intelligence disagree, both values are retained in conflict evidence instead of silently selecting one as verified. Focused Node regression tests cover the main invariants and are included in CI.
+
+**5. Evidence graph integrity — CLOSED**
+
+The shared EvidenceGraph remains the common structure for Home, company and movement evidence. Relationships remain explicit and do not become causal claims merely because two observations are temporally related.
+
+### Deliberately retained limitations
+
+- fetchedAt is a retrieval/response timestamp, not automatically the reporting period or market observation timestamp for every company metric.
+- Financial history has explicit reporting periods, but valuation/ratio fields do not yet have a universal normalized observation-period model.
+- Company-field conflict handling currently covers the material profile fields; it does not claim that every historical financial row or every dividend event has been cross-provider reconciled.
+- The merged company profile can still display one provider's value while the data-quality panel identifies a conflict. The conflict evidence and quality state prevent the disagreement from being hidden, but a future UI refinement could make the conflicted display value itself more explicit.
+- Index freshness remains conservative and depends on provider asOf metadata; the app must not invent an index delay when the provider does not supply one.
+- The deployed production index endpoint has not been independently verified from this environment. Absence of that verification is not treated as permission to add fallback index values.
+- Watchlist interaction still lacks a dedicated Android DataStore/UI unit-test suite; Phase 11 closure documented this as a future QA improvement.
+
+### Closure rule for Phase 13
+
+Phase 13 may build explanations only on evidence that survives the existing provenance and quality boundary. AI must receive actual evidence and its metadata; it must not invent missing facts, source links, freshness, causation, confidence scores or investment recommendations.
+
+### Result
+
+**Phase 12 — Evidence Quality & Data Confidence is complete.** The next phase is Phase 13 — AI Explanation Layer, with the evidence-quality boundary above treated as a hard architectural constraint.
