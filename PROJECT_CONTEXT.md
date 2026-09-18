@@ -1336,3 +1336,49 @@ Verify the correction with a new Android CI run. Then verify the deployed index 
 ## 39.1 POST-CHANGE CI STATUS
 
 After the freshness correction, GitHub Actions run **457** was created for commit `943e9b70bdc115e98fb6cd9865f9c73a4dc7a64a`. At the latest audit check it was **in progress**, so the correction is **not yet declared CI-green**. No further code changes are being made until that verification completes.
+
+
+# 40. PHASE 11 — WATCHLIST FOUNDATION AUDIT / SAFE START
+
+## Status
+
+**STARTED — STORAGE FOUNDATION CLEANED**
+
+The Phase 11 audit confirmed that the repository contained a WatchlistStore / MarketRepository foundation, but also contained an unused DemoMarketRepository with hardcoded sample prices, movements, historical series, demo news, and a pre-populated watchlist. Repository tree/code inspection found no active references to DemoMarketRepository, so it was not safe to use it as the basis for genuine personal intelligence.
+
+The safe first step was therefore to remove the demo repository implementation and make the retained watchlist storage genuinely user-owned:
+
+- WatchlistStore now starts with an empty list.
+- No NSE symbols are pre-populated.
+- A symbol is stored only after an explicit add() call.
+- Added symbols are normalized by trimming and uppercasing.
+- Blank symbols are ignored.
+- Removal uses the same normalization.
+- The existing DataStore persistence mechanism is preserved.
+- No Home UI was wired to this storage yet.
+- No portfolio/holding values were added or inferred.
+
+This keeps the Phase 11 boundary honest: a watchlist is a user's explicitly selected list of companies, not an inferred portfolio and not a demo list.
+
+## Commit
+
+- e33f2aa04ef2b964339dc6da99d32954728d8c37
+  - Phase 11: make watchlist storage empty by default
+
+## Verification
+
+- Latest Android CI verification before this change: run 459, successful, for commit 5b0605d194fe6bd880a6e7d6c2c08a8386098bf7.
+- The Phase 11 storage change itself now requires a new Android CI run before it is declared verified.
+- Repository inspection found no code-search references to DemoMarketRepository; the implementation was therefore treated as unused demo architecture rather than active functionality.
+
+## Next step
+
+Build the first genuine user-facing watchlist flow using the existing real stock feed:
+
+1. explicitly add/remove a real company from the user's watchlist;
+2. persist only those user selections;
+3. display current provider-backed data for selected symbols;
+4. keep watchlist separate from portfolio/ownership;
+5. keep all resulting market observations inside the existing evidence/intelligence architecture.
+
+Do not add default symbols, fake holdings, broker/CDS integration, or portfolio value calculations.
