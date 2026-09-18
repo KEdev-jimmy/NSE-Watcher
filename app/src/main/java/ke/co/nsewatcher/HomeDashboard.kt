@@ -377,7 +377,7 @@ private fun MarketFreshnessStrip(stocks: List<Stock>, marketStatus: MyStocksCach
         controllerState.refreshInProgress -> "Refreshing market data…"
         controllerState.lastRefreshFailed -> "Last refresh failed"
         controllerState.lastSuccessfulRefreshMs == null -> "Waiting for first refresh"
-        !marketStatus.isOpen -> closedMarketStatus(marketStatus, controllerState.lastSuccessfulRefreshMs)
+        !marketStatus.isOpen -> controllerState.lastSuccessfulRefreshMs?.let { closedMarketStatus(marketStatus, it) } ?: "Market closed"
         else -> "Next data check " + MarketRefreshController.formatCountdown(MarketRefreshController.secondsUntilNextCheck(nowMs))
     }
     Surface(
