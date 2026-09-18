@@ -25,12 +25,15 @@ data class HomeSectorPulse(
     val memberCount: Int
 )
 
+enum class HomeMarketDataMode { CURRENT_SESSION, END_OF_DAY, STALE, UNKNOWN }
+
 data class HomeMarketIndex(
     val symbol: String,
     val name: String,
     val value: Double,
     val changePct: Double?,
-    val asOf: String = ""
+    val asOf: String = "",
+    val dataMode: HomeMarketDataMode = HomeMarketDataMode.UNKNOWN
 )
 
 enum class HomeIntelligenceType { FACT, CALCULATION, NEWS }
