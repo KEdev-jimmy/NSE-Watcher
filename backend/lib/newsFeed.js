@@ -25,6 +25,18 @@ const NSE_COMPANIES = [
   ['WPP', 'WPP Scangroup']
 ];
 
+const INTELLIGENCE_MARKET_TERMS = [
+  'nse', 'nairobi securities exchange', 'capital markets', 'stock market', 'share price',
+  'shares', 'listed', 'listing', 'dividend', 'payout', 'earnings', 'profit', 'loss', 'revenue',
+  'results', 'financial results', 'eps', 'rights issue', 'bonus issue', 'split', 'acquisition',
+  'merger', 'takeover', 'ipo', 'bond', 'treasury', 'cbk', 'central bank', 'cma',
+  'investor', 'investors', 'trading', 'broker', 'brokerage', 'fund manager', 'reit', 'etf',
+  'interest rate', 'inflation', 'forex', 'shilling', 'corporate action', 'agm',
+  'annual general meeting', 'financial statements', 'outlook', 'guidance', 'contract',
+  'agreement', 'stake', 'disposal', 'regulator', 'regulatory', 'license', 'fine',
+  'penalty', 'approval', 'appointment', 'resign'
+];
+
 const MARKET_RELEVANCE_TERMS = [
   'nse', 'nairobi securities exchange', 'capital markets', 'stock market', 'share price',
   'shares', 'listed', 'listing', 'dividend', 'earnings', 'profit', 'loss', 'revenue',
@@ -146,13 +158,16 @@ function normalizeItem(item, forcedCategory) {
   const exDate = String(first(item, ['exDate', 'ex_date', 'bookClosureDate']) || '').trim();
   const paymentDate = String(first(item, ['paymentDate', 'payment_date', 'payDate']) || '').trim();
   const sourceKind = String(item.sourceKind || '').trim();
+  const verification = (sourceKind === 'rss' || sourceKind === 'web' || sourceKind === 'company-ir' || sourceKind === 'rss-licensed') && url
+    ? 'source-linked'
+    : url ? 'provider-linked' : 'provider-only';
+  const intelligence = intelligenceRelevance({ title, summary, body, symbol, companyName });
   return {
     id: normalizedId(item), title, summary, body, source, publishedAt, category, symbol, companyName,
     imageUrl, url, dividendAmount, exDate, paymentDate,
-    sourceId: String(item.sourceId || '').trim(), sourceKind,
-    verification: (sourceKind === 'rss' || sourceKind === 'web' || sourceKind === 'company-ir' || sourceKind === 'rss-licensed') && url
-      ? 'source-linked'
-      : url ? 'provider-linked' : 'provider-only'
+    sourceId: String(item.sourceId || '').trim(), sourceKind, verification,
+    intelligenceRelevance: intelligence.level,
+    intelligenceRelevanceReason: intelligence.reason
   };
 }
 
@@ -161,6 +176,20 @@ function withinWindow(item) {
   const time = Date.parse(item.publishedAt);
   if (!Number.isFinite(time)) return true;
   return time >= Date.now() - HISTORY_DAYS * 24 * 60 * 60 * 1000;
+}
+
+function intelligenceRelevance(item) {
+  const haystack = [item.title, item.summary, item.body].filter(Boolean).join(' ').toLowerCase();
+  const hasCompany = Boolean(item.symbol || item.companyName);
+  const hasMarketSignal = INTELLIGENCE_MARKET_TERMS.some(term => haystack.includes(term));
+
+  if (hasMarketSignal) {
+    return { level: 'market', reason: 'market-relevant terms or events are present in the story text' };
+  }
+  if (hasCompany) {
+    return { level: 'company', reason: 'a listed company is identified, but no market-relevant signal was established' };
+  }
+  return { level: 'general', reason: 'no listed-company or market-relevant signal was established' };
 }
 
 function isRelevantExternalNews(item) {
