@@ -31,6 +31,11 @@ import ke.co.nsewatcher.data.CompanyIntelligenceCache
 import ke.co.nsewatcher.data.CompanyIntelligenceEngine
 import ke.co.nsewatcher.data.MyStocksCache
 import ke.co.nsewatcher.data.NewsCache
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
 import java.util.Locale
 
 private val IntelligenceGreen = Color(0xFF00A859)
@@ -45,7 +50,9 @@ private val IntelligenceRed = Color(0xFFE04444)
 fun CompanyIntelligence(s: Stock, back: () -> Unit) {
     val periods = listOf("1D", "1W", "1M", "3M", "6M", "1Y", "3Y", "5Y")
     var period by rememberSaveable(s.symbol) { mutableStateOf("1D") }
-    var history by remember(s.symbol) { mutableStateOf(s.history) }
+    var history by remember(s.symbol) {
+        mutableStateOf(s.history.map { MyStocksCache.HistoryPoint(it) })
+    }
     var historyLoading by remember(s.symbol) { mutableStateOf(false) }
     var monthHistory by remember(s.symbol) { mutableStateOf(emptyList<Double>()) }
     var intelligence by remember(s.symbol) { mutableStateOf(CompanyIntelligenceCache.Result()) }
@@ -71,8 +78,8 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit) {
 
     LaunchedEffect(s.symbol, period) {
         historyLoading = true
-        val live = MyStocksCache.loadHistory(s.symbol, period)
-        if (live.size >= 2) history = live
+        val live = MyStocksCache.loadHistoryDetails(s.symbol, period)
+        if (live.points.size >= 2) history = live.points
         historyLoading = false
     }
 
@@ -279,7 +286,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit) {
                 if (historyLoading) {
                     IntelligenceLoader("Loading $period market history", "Checking historical NSE data…")
                 } else if (history.size >= 2) {
-                    IntelligenceChart(history, if ((selectedPeriodReturn ?: s.change) >= 0) IntelligenceGreen else IntelligenceRed)
+                    IntelligenceChart(history, period, if ((selectedPeriodReturn ?: s.change) >= 0) IntelligenceGreen else IntelligenceRed)
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("${history.size} data points", color = IntelligenceMuted, fontSize = 8.sp)
                         selectedPeriodReturn?.let { Text(formatPeriodReturn(period, it), color = if (it >= 0) IntelligenceGreen else IntelligenceRed, fontWeight = FontWeight.Bold, fontSize = 8.sp) }
@@ -588,54 +595,167 @@ private fun IntelligenceLoader(title: String, subtitle: String) {
 }
 
 @Composable
-private fun IntelligenceChart(values: List<Double>, tint: Color) {
-    val valid = values.filter { it.isFinite() && it > 0.0 }
+private fun IntelligenceChart(
+    points: List<MyStocksCache.HistoryPoint>,
+    period: String,
+    tint: Color
+) {
+    val valid = points.filter { it.close.isFinite() && it.close > 0.0 }
     if (valid.size < 2) return
-    val min = valid.minOrNull() ?: return
-    val max = valid.maxOrNull() ?: return
+    val min = valid.minOf { it.close }
+    val max = valid.maxOf { it.close }
     val range = (max - min).takeIf { it > 0.0 } ?: (max * 0.01).coerceAtLeast(1.0)
     val top = max + range * 0.08
     val bottom = (min - range * 0.08).coerceAtLeast(0.0)
     val chartRange = (top - bottom).coerceAtLeast(0.0001)
     val mid = (top + bottom) / 2.0
+    val labels = chartAxisLabels(valid, period)
 
-    Row(Modifier.fillMaxWidth().height(218.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(
-            Modifier.width(42.dp).fillMaxHeight().padding(vertical = 7.dp),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(priceAxis(top), color = IntelligenceMuted, fontSize = 8.sp, maxLines = 1)
-            Text(priceAxis(mid), color = IntelligenceMuted, fontSize = 8.sp, maxLines = 1)
-            Text(priceAxis(bottom), color = IntelligenceMuted, fontSize = 8.sp, maxLines = 1)
+    Column(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth().height(218.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(
+                Modifier.width(42.dp).fillMaxHeight().padding(vertical = 7.dp),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(priceAxis(top), color = IntelligenceMuted, fontSize = 8.sp, maxLines = 1)
+                Text(priceAxis(mid), color = IntelligenceMuted, fontSize = 8.sp, maxLines = 1)
+                Text(priceAxis(bottom), color = IntelligenceMuted, fontSize = 8.sp, maxLines = 1)
+            }
+            Canvas(Modifier.weight(1f).fillMaxHeight().padding(vertical = 7.dp)) {
+                val line = Path()
+                val area = Path()
+                valid.forEachIndexed { index, point ->
+                    val x = size.width * index / valid.lastIndex.coerceAtLeast(1)
+                    val y = size.height - (((point.close - bottom) / chartRange).toFloat() * size.height)
+                    if (index == 0) {
+                        line.moveTo(x, y)
+                        area.moveTo(x, size.height)
+                        area.lineTo(x, y)
+                    } else {
+                        line.lineTo(x, y)
+                        area.lineTo(x, y)
+                    }
+                }
+                area.lineTo(size.width, size.height)
+                area.close()
+                drawPath(
+                    area,
+                    Brush.verticalGradient(
+                        listOf(tint.copy(alpha = 0.34f), tint.copy(alpha = 0.03f)),
+                        startY = 0f,
+                        endY = size.height
+                    )
+                )
+                drawPath(line, tint, style = Stroke(width = 3.5f, cap = StrokeCap.Round))
+            }
         }
-        Canvas(Modifier.weight(1f).fillMaxHeight().padding(vertical = 7.dp)) {
-            val line = Path()
-            val area = Path()
-            valid.forEachIndexed { index, value ->
-                val x = size.width * index / valid.lastIndex.coerceAtLeast(1)
-                val y = size.height - (((value - bottom) / chartRange).toFloat() * size.height)
-                if (index == 0) {
-                    line.moveTo(x, y)
-                    area.moveTo(x, size.height)
-                    area.lineTo(x, y)
-                } else {
-                    line.lineTo(x, y)
-                    area.lineTo(x, y)
+
+        if (labels.isNotEmpty()) {
+            Spacer(Modifier.height(2.dp))
+            Row(
+                Modifier.fillMaxWidth().padding(start = 42.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                labels.forEach { label ->
+                    Text(
+                        label,
+                        color = IntelligenceMuted,
+                        fontSize = 8.sp,
+                        maxLines = 1
+                    )
                 }
             }
-            area.lineTo(size.width, size.height)
-            area.close()
-            drawPath(
-                area,
-                Brush.verticalGradient(
-                    listOf(tint.copy(alpha = 0.34f), tint.copy(alpha = 0.03f)),
-                    startY = 0f,
-                    endY = size.height
-                )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                chartAxisDescription(period),
+                color = IntelligenceMuted,
+                fontSize = 8.sp,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
             )
-            drawPath(line, tint, style = Stroke(width = 3.5f, cap = StrokeCap.Round))
         }
     }
+}
+
+private data class ChartLabel(val index: Int, val text: String)
+
+private fun chartAxisLabels(
+    points: List<MyStocksCache.HistoryPoint>,
+    period: String
+): List<String> {
+    val dated = points.mapIndexedNotNull { index, point ->
+        parseChartDate(point.date)?.let { ChartLabel(index, it) }
+    }
+    if (dated.size < 2) return fallbackChartLabels(period)
+
+    val count = when (period) {
+        "1D" -> 5
+        "1W" -> 5
+        "1M" -> 5
+        "3M" -> 4
+        "6M" -> 6
+        "1Y" -> 5
+        "3Y", "5Y" -> 4
+        else -> 5
+    }
+    val selected = evenlySpacedIndices(dated.size, count)
+    return selected.map { dated[it].text }.distinct()
+}
+
+private fun evenlySpacedIndices(size: Int, count: Int): List<Int> {
+    if (size <= 1) return listOf(0)
+    if (count >= size) return (0 until size).toList()
+    return (0 until count).map { i ->
+        kotlin.math.round(i * (size - 1).toDouble() / (count - 1).coerceAtLeast(1)).toInt()
+    }.distinct()
+}
+
+private fun parseChartDate(raw: String): String? {
+    val value = raw.trim()
+    if (value.isBlank()) return null
+    return try {
+        val instant = Instant.parse(value)
+        instant.atZone(ZoneId.of("Africa/Nairobi")).toLocalDateTime()
+            .let { formatChartDateTime(it, value) }
+    } catch (_: DateTimeParseException) {
+        try {
+            formatChartDateTime(LocalDate.parse(value).atStartOfDay(), value)
+        } catch (_: DateTimeParseException) {
+            null
+        }
+    }
+}
+
+private fun formatChartDateTime(
+    dateTime: java.time.LocalDateTime,
+    raw: String
+): String {
+    val hasTime = raw.contains("T") || raw.contains(":")
+    return if (hasTime) {
+        dateTime.format(DateTimeFormatter.ofPattern("HH:mm", Locale.US))
+    } else {
+        dateTime.format(DateTimeFormatter.ofPattern("dd MMM", Locale.US))
+    }
+}
+
+private fun chartAxisDescription(period: String): String = when (period) {
+    "1D" -> "Time • Nairobi trading session"
+    "1W" -> "Trading dates"
+    "1M" -> "Weeks across the selected month"
+    "3M", "6M" -> "Months across the selected period"
+    "1Y" -> "Selected points across the year"
+    "3Y", "5Y" -> "Years across the selected period"
+    else -> "Time"
+}
+
+private fun fallbackChartLabels(period: String): List<String> = when (period) {
+    "1D" -> listOf("Start", "Mid", "Now")
+    "1W" -> listOf("Start", "Mid", "Now")
+    "1M" -> listOf("Wk 1", "Wk 2", "Wk 3", "Wk 4")
+    "3M", "6M" -> listOf("Start", "Mid", "Now")
+    "1Y" -> listOf("Start", "Mid", "Now")
+    "3Y", "5Y" -> listOf("Year 1", "Year 2", "Year 3")
+    else -> listOf("Start", "Now")
 }
 
 @Composable
