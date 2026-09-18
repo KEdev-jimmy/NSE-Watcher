@@ -254,7 +254,7 @@ async function handle(req, res) {
       const result = await loadFeed();
       const sources = { primary: { id: 'mystocks', name: 'MyStocks Africa', kind: 'market-intelligence-api', homepage: 'https://mystocks.africa/' }, secondary: sourceRegistry() };
       if (!result.items.length && result.providerErrors.length) return json(res, 502, { error: 'News data unavailable', source: 'NSE Watcher news aggregation', historyDays: HISTORY_DAYS, partial: true, providerErrors: result.providerErrors, sources, items: [] });
-      return json(res, 200, { source: 'NSE Watcher news aggregation', fetchedAt: new Date().toISOString(), historyDays: HISTORY_DAYS, windowStart: new Date(Date.now() - HISTORY_DAYS * 86400000).toISOString(), partial: result.partial, providerErrors: result.providerErrors, sources, items: result.items });
+      return json(res, 200, { source: 'NSE Watcher news aggregation', fetchedAt: new Date().toISOString(), historyDays: HISTORY_DAYS, windowStart: new Date(Date.now() - HISTORY_DAYS * 86400000).toISOString(), partial: result.partial, providerErrors: result.providerErrors, sources, sourceCount: Object.keys(sources).length, freshnessPolicy: `Published within the last ${HISTORY_DAYS} days; invalid dates are marked UNKNOWN`, items: result.items });
     }
     if (action === 'detail') {
       const id = String(req.query.id || '').trim();
