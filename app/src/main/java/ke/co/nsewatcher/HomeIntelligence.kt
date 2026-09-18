@@ -270,14 +270,7 @@ object HomeIntelligenceEngine {
                         calculation = evidence.value.orEmpty(),
                         interpretation = "The story is presented as news; no financial conclusion is inferred from the headline alone.",
                         evidence = listOf(
-                            HomeEvidenceReference(
-                                id = evidence.id,
-                                source = evidence.source.ifBlank { "News feed" },
-                                sourceUrl = evidence.sourceUrl.orEmpty(),
-                                date = evidence.publishedAt.orEmpty(),
-                                symbol = evidence.symbol.orEmpty(),
-                                category = item.category
-                            )
+                            homeEvidenceReference(evidence, item.category)
                         ),
                         source = listOf(evidence.companyName.orEmpty().ifBlank { evidence.symbol.orEmpty() }, evidence.source)
                             .filter { it.isNotBlank() }
