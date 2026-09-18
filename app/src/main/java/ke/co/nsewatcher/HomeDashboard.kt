@@ -451,13 +451,28 @@ private fun IntelligenceItem(
             }
             Spacer(Modifier.height(7.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = listOf("Evidence", evidenceSource, evidenceDate).filter { it.isNotBlank() }.joinToString(" • "),
-                    color = HomeMuted,
-                    fontSize = 7.sp,
+                val freshness = primaryEvidence?.freshness?.takeIf { it.isNotBlank() }
+                val provenanceText = listOf(
+                    evidenceSource,
+                    evidenceDate,
+                    freshness?.let(::homeFreshnessLabel)
+                ).filter { it.isNotBlank() }.joinToString(" • ")
+
+                Surface(
                     modifier = Modifier.weight(1f),
-                    maxLines = 1
-                )
+                    shape = RoundedCornerShape(8.dp),
+                    color = HomeLightGreen
+                ) {
+                    Text(
+                        text = provenanceText.ifBlank { "Evidence source unavailable" },
+                        color = HomeDarkGreen,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp),
+                        maxLines = 1
+                    )
+                }
+                Spacer(Modifier.width(5.dp))
                 if (sourceUrl != null) {
                     Text(
                         "Source ↗",
@@ -482,6 +497,17 @@ private fun IntelligenceItem(
 
 private fun compactEvidenceDate(value: String): String =
     value.replace("T", " ").removeSuffix("Z").take(16)
+
+private fun homeFreshnessLabel(value: String): String = when (value) {
+    "CURRENT_SESSION" -> "Current session"
+    "CURRENT_DAY" -> "Current day"
+    "END_OF_DAY" -> "End of day"
+    "STALE" -> "Stale"
+    "UNKNOWN" -> "Freshness unknown"
+    else -> value.replace("_", " ").lowercase(Locale.US)
+        .replaceFirstChar { it.uppercase(Locale.US) }
+}
+
 
 @Composable
 private fun WhatChanged(changes: List<HomeChangeItem>, openCompany: (Stock) -> Unit, currentStocks: List<Stock>) {
