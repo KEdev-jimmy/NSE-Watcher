@@ -1296,3 +1296,38 @@ When a new coding chat starts, tell the assistant:
 
 > Read `PROJECT_CONTEXT.md` before making any code changes. This file is the persistent handoff for NSE Watcher. Do not restart completed phases, do not recreate deleted fabricated data, and do not redesign existing architecture. First verify the current repository and latest CI state against this document, then continue from the exact unfinished Phase 10 step.
 
+
+
+# 39. PHASE 10 — FRESHNESS IMPLEMENTATION AUDIT / CORRECTION
+
+## Status
+
+**IMPLEMENTED AND CORRECTED**
+
+The repository audit found that the previous handover had already added a first freshness implementation in commits `0f11fe8c4916668b6d9d93c38eb7c49a9ceaaf93`, `db6f4942418c47032ffd4d6964583790548daa63`, and `f11d5d2612c8683b2b36dae3cc4ff00653d3d4e3`. Those freshness commits passed Android CI.
+
+Before continuing, the audit found two gaps: freshness was calculated in Compose instead of being preserved through the provider data → intelligence → evidence path, and the Home intelligence `remember(...)` key did not include market-open state.
+
+This correction now:
+
+- calculates index freshness in the existing `MyStocksCache` path from provider `asOf` and Nairobi time;
+- loads market status before classifying index observations;
+- preserves freshness through `MarketIndex → HomeMarketIndex → EvidenceRecord → Home UI`;
+- records the freshness mode in evidence provenance;
+- keeps stock-feed delay separate from index freshness;
+- converts exact current-session timestamps to East Africa Time in the UI;
+- uses only neutral labels supported by the available information.
+
+Same-day timestamped observations while the market is closed remain **UNKNOWN / As of** unless the provider gives enough metadata to establish end-of-day status. No freshness claim is invented.
+
+### Verification at audit start
+
+- Repository: `KEdev-jimmy/NSE-Watcher`
+- Latest handover commit before this correction: `87ffedd658f17bb631eb2a9d997657619db27c6a`
+- Latest verified Android CI run before this correction: run 452, successful
+- Freshness test run 451 was also successful
+- The deployed `/api/market?action=indices` endpoint could not be independently fetched from this environment, so live provider receipt of NASI/N20/N25 remains to be verified separately.
+
+### Next step
+
+Verify the correction with a new Android CI run. Then verify the deployed index endpoint returns actual NASI/N20/N25 observations. If provider data is empty, keep the UI omitted and investigate the supported provider endpoint/symbol format; never add fallback values.
