@@ -47,7 +47,7 @@ private val IntelligenceBorder = Color(0xFFE1EAE5)
 private val IntelligenceRed = Color(0xFFE04444)
 
 @Composable
-fun CompanyIntelligence(s: Stock, back: () -> Unit) {
+fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, onWatchToggle: (() -> Unit)? = null) {
     val periods = listOf("1D", "1W", "1M", "3M", "6M", "1Y", "3Y", "5Y")
     var period by rememberSaveable(s.symbol) { mutableStateOf("1D") }
     var history by remember(s.symbol) {
@@ -101,6 +101,21 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit) {
                 Column(Modifier.weight(1f)) {
                     Text(s.name, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = IntelligenceText)
                     Text("${s.symbol} • NSE", fontSize = 10.sp, color = IntelligenceMuted)
+                }
+                if (onWatchToggle != null) {
+                    OutlinedButton(
+                        onClick = onWatchToggle,
+                        shape = RoundedCornerShape(20.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 5.dp)
+                    ) {
+                        Icon(
+                            if (watched) Icons.Default.Star else Icons.Default.StarBorder,
+                            contentDescription = if (watched) "Remove from watchlist" else "Add to watchlist",
+                            modifier = Modifier.size(17.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(if (watched) "Watching" else "Watch", fontSize = 11.sp)
+                    }
                 }
             }
         }
