@@ -1548,3 +1548,68 @@ The app now has a genuine, user-controlled watchlist foundation and user-facing 
 **Phase 12 — Evidence Quality & Data Confidence**
 
 Focus on the quality, completeness, freshness and transparency of evidence across the app. Preserve the existing principle: raw data → calculation → explanation → evidence. Do not jump to AI-generated conclusions until the evidence/data-quality layer is sufficiently trustworthy.
+
+
+# 46. PHASE 12 — EVIDENCE QUALITY & DATA CONFIDENCE AUDIT
+
+## Status
+
+**AUDIT COMPLETE — NO CODE CHANGES YET**
+
+Phase 12 began with a repository audit of the existing evidence, market-data, company-intelligence, news, movement-intelligence and test layers. The goal was to identify where the app can currently distinguish a real observation from a calculation, how freshness is represented, and where missing/partial data can be mistaken for a valid value.
+
+### What is already strong
+
+- EvidenceGraph is shared across Home intelligence and validates duplicate records and invalid relationships.
+- Home calculations explicitly identify their source and calculation nature.
+- Market-index observations carry provider timestamps where supplied and preserve a freshness mode.
+- Company intelligence exposes provider status, partial state, provider errors, evidence count and availability flags.
+- Company financial history is explicitly sourced to StockAnalysis / S&P Global Market Intelligence rather than presented as issuer data.
+- Movement intelligence uses dated events and labels relationships as related, possible or not-established; it explicitly states that timing does not prove causation.
+- News items preserve source, URL, publication date, symbol/company metadata, verification classification and deterministic relevance reasoning.
+- Existing tests cover evidence graph structure, Home calculations, index provenance/freshness and evidence-grounded news behavior.
+
+### Findings requiring Phase 12 attention
+
+**1. HIGH — Stock-feed fallback can lose provenance.**
+MyStocksCache.loadStocks() falls back from the Vercel stocks response to the repository data/mystocks/stocks.json when the backend response is empty. The resulting Stock model does not carry source, observation timestamp, freshness mode or whether the record came from fallback. Downstream Home evidence currently labels valid stock observations as MyStocks Africa, so a fallback observation could be represented as if it were provider-live data. This must be fixed before stronger confidence labels are introduced.
+
+**2. HIGH — Missing stock change currently becomes 0.0.**
+The stock parser chooses supplied change, supplied changePct, or a derived change; if none is available it currently assigns 0.0. A missing movement should remain unavailable, not become an unchanged observation. This can affect gainers/losers/breadth and any intelligence built from the change field.
+
+**3. MEDIUM — Stock observations lack first-class freshness/provenance in the Android model.**
+Stock currently carries price/change/history but not provider source, observed-at timestamp, freshness mode, or quality issues. Home evidence reconstructs source as MyStocks Africa instead of carrying observation provenance from ingestion. Phase 12 should move provenance through the data model rather than infer it at presentation time.
+
+**4. MEDIUM — Volume availability is not distinguished from zero volume.**
+The stock parser defaults missing volume to 0L. A true zero-volume observation and an unavailable volume are therefore indistinguishable. Home breadth sums non-negative volume, so a missing value can silently participate as zero. Phase 12 should represent volume availability explicitly.
+
+**5. MEDIUM — News date validation is permissive.**
+News normalization filters malformed dates in some paths, but withinWindow() allows an item through when its publication date is missing or cannot be parsed. Such records can then enter evidence with an empty/unknown date. This is acceptable only if the UI clearly labels freshness as unknown; it should not be treated as fresh evidence.
+
+**6. MEDIUM — Company data has availability flags but no normalized field-level quality model.**
+Company intelligence reports profile/dividend/history/news/valuation availability and provider status, but it does not yet consistently express field-level freshness, period type, conflict status, completeness, or whether a value is provider-reported versus calculated. Phase 12 should strengthen this without replacing the existing architecture.
+
+**7. MEDIUM — Cache age is not separated from provider observation age.**
+Company intelligence uses cache-control with s-maxage=600 and stale-while-revalidate=1800, while responses expose fetchedAt. That timestamp represents response generation, not necessarily the age of the underlying provider observation or the age at which a client received cached content. The app should not use fetchedAt alone as proof that the market observation itself is fresh.
+
+**8. MEDIUM — External fundamentals need clearer field-level attribution.**
+The company intelligence layer correctly identifies StockAnalysis / S&P Global Market Intelligence as the fundamentals source, but merged profile fields can combine MyStocks and external values. The evidence layer should make the source of each material field explicit and avoid presenting a merged value as if one source supplied the entire profile.
+
+**9. LOW — Dedicated Watchlist interaction tests are still absent.**
+Phase 11 closure recorded that there are no dedicated unit tests for the DataStore-backed WatchlistStore/UI interaction. This remains a QA improvement for later, but it is not a blocker for the evidence-quality work.
+
+### Audit conclusion
+
+The repository already has a strong evidence-graph foundation, but the ingestion layer is not yet strict enough for a trustworthy confidence system. The most important Phase 12 work is therefore provenance and missing-data correctness first, followed by freshness/completeness/conflict representation. No AI expansion should be used to mask these gaps.
+
+### Safe implementation order
+
+1. Fix missing-vs-zero semantics for stock movement and volume.
+2. Carry source, observed-at and freshness/provenance through stock ingestion, including explicit fallback identification.
+3. Make evidence records consume actual ingestion provenance rather than assuming MyStocks Africa.
+4. Strengthen news freshness/unknown-date handling.
+5. Add field-level company data quality/source attribution and conflict handling.
+6. Add focused tests for the new quality rules.
+7. Run Android/backend CI verification before closing each meaningful change.
+
+No Phase 12 production-data claims are made by this audit. Live provider receipt remains a separate verification task when the environment permits it.
