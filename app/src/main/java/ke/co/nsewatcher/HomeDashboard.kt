@@ -350,7 +350,7 @@ private fun IntelligenceItem(
     val uriHandler = LocalUriHandler.current
     val primaryEvidence = evidence.firstOrNull()
     val evidenceSource = primaryEvidence?.source?.takeIf { it.isNotBlank() } ?: source
-    val evidenceDate = primaryEvidence?.date?.takeIf { it.isNotBlank() }?.let(::compactEvidenceDate)
+    val evidenceDate = primaryEvidence?.date?.takeIf { it.isNotBlank() }?.let(::compactEvidenceDate) ?: ""
     val sourceUrl = primaryEvidence?.sourceUrl?.takeIf { it.startsWith("http://") || it.startsWith("https://") }
 
     Card(Modifier.fillMaxWidth(), RoundedCornerShape(15.dp), colors = CardDefaults.cardColors(containerColor = Color.White), border = BorderStroke(1.dp, HomeBorder)) {
