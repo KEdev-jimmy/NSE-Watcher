@@ -1449,3 +1449,43 @@ Removed the duplicate `ke.co.nsewatcher.data.WatchlistStore` import from `app/sr
 ### Next step
 
 Wait for the new Android CI run and inspect the actual result. If green, continue the Phase 11 watchlist UI audit. Do not add further watchlist functionality until the build is verified.
+
+# 43. PHASE 11 — DEDICATED WATCHLIST VIEW
+
+## Status
+
+**IMPLEMENTED — REQUIRES CI VERIFICATION**
+
+The genuine watchlist flow now has a dedicated view connected to the existing navigation and real stock feed.
+
+### Behavior
+
+- The Companies screen now exposes a compact Watchlist action.
+- A dedicated Watchlist page reads persisted symbols from the existing WatchlistStore.
+- Only explicitly watched symbols are displayed; there are no default/demo companies.
+- Selected symbols are hydrated from the existing in-memory real stock feed loaded by MyStocksCache.
+- Each available watched company shows its provider-backed current price and daily change.
+- Tapping a watched company opens the existing Company Intelligence page.
+- Users can remove a company directly from the Watchlist page.
+- If a persisted symbol is temporarily missing from the current provider feed, it is shown honestly as unavailable instead of receiving a placeholder price.
+- An empty watchlist has an explicit empty state explaining how to add a company.
+- Watchlist remains separate from portfolio/ownership.
+- No new market-data provider or parallel intelligence architecture was introduced.
+
+### Files changed
+
+- app/src/main/java/ke/co/nsewatcher/DesignActivity.kt
+  - added Page.WATCHLIST navigation
+  - added dedicated Watchlist composable
+  - added Companies-screen Watchlist entry point
+  - wired existing WatchlistStore and existing real stock feed
+
+### Verification
+
+- Implementation commit: 729fff704dd9b7cd892017c29c7ce18681e43b5d
+- Android CI verification is required for this change before declaring it green.
+- No provider fallback/demo market values were added.
+
+### Next step
+
+Run and inspect the new Android CI result. If green, perform a focused Phase 11 audit of the watchlist/company interaction and evidence integration before moving to Phase 12. Do not add portfolio/holdings assumptions or AI explanations.
