@@ -98,19 +98,30 @@ object MyStocksCache {
     }
 
     suspend fun loadStocks(): List<Stock> = withContext(Dispatchers.IO) {
-        val backend = loadFromUrl(BACKEND_STOCKS_URL, "backend")
-        val base = backend.takeIf { it.isNotEmpty() } ?: loadFromUrl(FALLBACK_URL, "fallback")
-        if (base.isEmpty()) return@withContext emptyList()
-        base.map { stock ->
-            if (stock.symbol in chartSymbols) {
-                val history = loadHistoryDetails(stock.symbol, "1D")
-                if (history.prices.size >= 2) {
-                    val latest = history.prices.last()
-                    val previousClose = history.prices.first()
-                    val dayChange = if (previousClose > 0.0) ((latest - previousClose) / previousClose) * 100.0 else stock.change
-                    stock.copy(price = latest, change = dayChange, history = history.prices)
+        MarketRefreshController.markStarted()
+        try {
+            val backend = loadFromUrl(BACKEND_STOCKS_URL, "backend")
+            val base = backend.takeIf { it.isNotEmpty() } ?: loadFromUrl(FALLBACK_URL, "fallback")
+            if (base.isEmpty()) {
+                MarketRefreshController.markFailed()
+                return@withContext emptyList()
+            }
+            val refreshed = base.map { stock ->
+                if (stock.symbol in chartSymbols) {
+                    val history = loadHistoryDetails(stock.symbol, "1D")
+                    if (history.prices.size >= 2) {
+                        val latest = history.prices.last()
+                        val previousClose = history.prices.first()
+                        val dayChange = if (previousClose > 0.0) ((latest - previousClose) / previousClose) * 100.0 else stock.change
+                        stock.copy(price = latest, change = dayChange, history = history.prices)
+                    } else stock
                 } else stock
-            } else stock
+            }
+            MarketRefreshController.markSucceeded()
+            refreshed
+        } catch (_: Exception) {
+            MarketRefreshController.markFailed()
+            emptyList()
         }
     }
 
