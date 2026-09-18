@@ -41,6 +41,24 @@ class EvidenceAdaptersTest {
     }
 
     @Test
+    fun companyEvidenceIdDoesNotChangeWhenFetchTimestampChanges() {
+        val first = CompanyIntelligenceCache.Evidence(
+            claim = "Revenue",
+            value = "100",
+            source = "Provider",
+            endpoint = "/api/company",
+            symbol = "KCB",
+            fetchedAt = "2026-09-17T08:00:00Z"
+        )
+        val second = first.copy(fetchedAt = "2026-09-18T08:00:00Z")
+
+        assertEquals(
+            EvidenceAdapters.fromCompanyEvidence(first)?.id,
+            EvidenceAdapters.fromCompanyEvidence(second)?.id
+        )
+    }
+
+    @Test
     fun dividendNewsIsTypedAsDividendEvidence() {
         val news = NewsItem(
             id = "div-1", title = "Dividend declared", summary = "KSh 2.00 per share", body = "",
@@ -76,10 +94,16 @@ class EvidenceAdaptersTest {
             daysFromMove = 0
         )
 
-        val relationship = EvidenceAdapters.relationshipFromMovement("KCB", "movement:kcb:1d", movementEvidence)
+        val relationship = EvidenceAdapters.relationshipFromMovement(
+            movementEvidenceId = "movement:kcb:1d",
+            targetEvidenceId = "news:article-123",
+            evidence = movementEvidence
+        )
 
         assertNotNull(relationship)
         assertEquals(EvidenceRelationshipType.RELATED, relationship?.type)
         assertEquals("movement:kcb:1d", relationship?.fromEvidenceId)
+        assertEquals("news:article-123", relationship?.toEvidenceId)
+    }
     }
 }
