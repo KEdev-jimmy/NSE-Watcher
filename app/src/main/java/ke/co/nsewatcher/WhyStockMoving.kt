@@ -59,11 +59,16 @@ fun WhyStockMovingSection(symbol: String) {
     var day by remember(symbol) { mutableStateOf(MyStocksCache.HistoryResult()) }
     var market by remember(symbol) { mutableStateOf(MyStocksCache.MarketStatus()) }
     var dayLoading by remember(symbol) { mutableStateOf(true) }
+    var companyNews by remember(symbol) { mutableStateOf(emptyList<NewsItem>()) }
 
     LaunchedEffect(symbol) {
         loading = true
         result = MovementIntelligenceCache.load(symbol)
         loading = false
+    }
+
+    LaunchedEffect(symbol) {
+        companyNews = NewsCache.loadCompanyNews(symbol).items
     }
 
     LaunchedEffect(symbol) {
@@ -101,7 +106,9 @@ fun WhyStockMovingSection(symbol: String) {
                         Spacer(Modifier.height(12.dp))
 
                         val evidence = result.evidence.take(5)
-                        val normalizedEvidence = EvidenceAdapters.fromMovementResult(result).evidence.take(5)
+                        val relatedEvidence = companyNews.mapNotNull { EvidenceAdapters.fromNews(it) }
+                        val adaptedMovement = EvidenceAdapters.fromMovementResult(result, relatedEvidence)
+                        val normalizedEvidence = adaptedMovement.evidence.take(5)
                         if (evidence.isEmpty()) {
                             Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), color = MovementLight) {
                                 Text("No dated company event was found close enough to the movement to link it as evidence.", Modifier.padding(11.dp), color = MovementText, fontSize = 10.sp)
