@@ -1638,3 +1638,35 @@ Code and test changes are committed, but Phase 12 Step 1 is not yet considered v
 ### Next step
 
 After CI verification, continue Phase 12 Step 2: carry actual stock provenance (source, observed-at/freshness and explicit fallback identity) through ingestion into evidence, rather than reconstructing MyStocks Africa at the Home evidence adapter.
+
+
+# 48. PHASE 12 — STEP 2: STOCK PROVENANCE THROUGH INGESTION
+
+## Status
+
+**IMPLEMENTED — PENDING CI VERIFICATION**
+
+Step 2 carries stock provenance from ingestion into the existing `Stock` model and evidence graph without creating a parallel data architecture.
+
+### Implemented
+
+- `Stock` now preserves `source`, `observedAt`, `freshnessMode`, and `dataOrigin`.
+- `MyStocksCache.loadStocks()` distinguishes the Vercel/MyStocks-backed `backend` path from the checked-in `fallback` catalogue.
+- Backend records use a provider/source field when present, otherwise identify the source as `MyStocks Africa`.
+- Fallback records are explicitly identified as `NSE Watcher fallback catalogue`, so they cannot silently appear as live MyStocks observations.
+- Provider observation time is read from `lastPriceUpdate`, then `asOf` when available.
+- Freshness is conservative: older observations are `STALE`; same-day observations remain `UNKNOWN` until a verified market-session state is combined with them; missing/unparseable times are `UNKNOWN`.
+- `EvidenceAdapters.fromStock()` now consumes the stock's actual source, observation time and freshness instead of always reconstructing `MyStocks Africa`.
+- Step 1 missing-change and missing-volume semantics remain intact.
+
+### Important limitation
+
+This step does not infer `CURRENT_SESSION` or `END_OF_DAY` for stock observations because stock loading is not yet joined to verified market-status state. No provider delay is invented.
+
+### Verification
+
+Android CI still needs to be checked before Step 2 is marked fully verified.
+
+### Next safe step
+
+After CI verification, continue with Step 3: make Home evidence and related calculations consistently consume the carried stock provenance, then strengthen news freshness handling.
