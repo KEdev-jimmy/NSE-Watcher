@@ -1676,3 +1676,30 @@ After CI verification, continue with Step 3: make Home evidence and related calc
 Runs 481, 482 and 483 all failed. Repository inspection identified the compile-breaking issue in `MyStocksCache.kt`: the new `loadFromUrl()` block was missing its terminating `}.getOrDefault(emptyList())` before `stockFreshnessMode()`. The function therefore became syntactically malformed. This was a tooling/edit sequencing error, not an Android/Gradle configuration problem.
 
 Fixed in commit `0acb96b5fd8a1330679aeb22c681c4d4a3633577` (`Fix Phase 12 stock loader compilation`). A new Android CI run is required before Step 2 is considered verified.
+# 50. PHASE 12 — STEP 3: HOME PROVENANCE PROPAGATION
+
+## Status
+
+**IMPLEMENTED — REQUIRES CI VERIFICATION**
+
+Step 3 makes Home calculations and displayed intelligence consume the stock provenance carried by Step 2 instead of assuming MyStocks Africa.
+
+### Implemented
+
+- Market-breadth evidence now derives its source from the actual stock evidence inputs.
+- Sector-calculation evidence now derives its source from the actual stock evidence inputs.
+- Sector and largest-gainer intelligence display source now comes from their corresponding evidence records.
+- A single-source calculation is identified as calculated from that source; mixed-source calculations are identified as calculated from multiple stock data sources.
+- Home footer provenance was hardened so the approximately 15-minute MyStocks Africa delay is shown only when the loaded records are backend MyStocks Africa data. Fallback-only data is explicitly identified as the NSE Watcher fallback catalogue and is not presented as live provider data.
+- Existing evidence IDs and relationships remain unchanged; no parallel market-data architecture was introduced.
+- Added a regression test proving fallback stock provenance remains visible through market, breadth and sector evidence.
+
+### Verification
+
+- Android CI for the preceding Step 2 fix was confirmed successful by the user.
+- Step 3 changes themselves require a new Android CI run before being marked verified.
+- No production-data claim is made by this implementation.
+
+### Next step
+
+After CI verification, audit and strengthen Step 4: news freshness and unknown publication-date handling. News evidence must not be treated as fresh merely because it passed the feed window when its publication date is missing or unparseable.
