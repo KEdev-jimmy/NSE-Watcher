@@ -1703,3 +1703,30 @@ Step 3 makes Home calculations and displayed intelligence consume the stock prov
 ### Next step
 
 After CI verification, audit and strengthen Step 4: news freshness and unknown publication-date handling. News evidence must not be treated as fresh merely because it passed the feed window when its publication date is missing or unparseable.
+# 51. PHASE 12 — STEP 4: NEWS FRESHNESS & UNKNOWN DATES
+
+## Status
+
+**IMPLEMENTED — REQUIRES CI VERIFICATION**
+
+Step 4 strengthens news evidence freshness so missing or malformed publication dates are never silently treated as fresh.
+
+### Implemented
+
+- `NewsItem` now carries a `freshnessMode` field.
+- Android news ingestion classifies publication dates conservatively using Nairobi time: older valid dates are `STALE`, same-day valid dates are `CURRENT_DAY`, and missing/unparseable dates are `UNKNOWN`.
+- Backend news normalization now exposes `freshnessMode` as `WITHIN_WINDOW`, `STALE`, or `UNKNOWN`. This describes the 90-day feed-window state; it does not claim that the underlying article is newly published.
+- Existing feed-window behavior is preserved: undated/malformed stories may remain visible, but they are now explicitly represented as unknown freshness rather than implicitly fresh.
+- News evidence now carries the item's freshness mode into the existing Evidence Graph.
+- Added regression coverage for unknown/undated news freshness.
+- No AI-generated freshness judgment, source invention, or parallel news architecture was introduced.
+
+### Verification
+
+- Phase 12 Step 3 Android CI run #490 was verified successful.
+- Step 4 changes require a new Android/backend CI verification before closure.
+- No production news-feed claim is made by this implementation.
+
+### Next step
+
+After CI verification, continue Step 5: field-level company data quality/source attribution and conflict handling.
