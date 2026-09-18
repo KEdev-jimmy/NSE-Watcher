@@ -46,7 +46,7 @@ object CompanyIntelligenceEngine {
         val risks: List<String>,
         val unknowns: List<String>,
         val quality: DataQuality,
-        val confidence: String,
+        val evidenceCoverage: String,
         val evidenceRecords: List<EvidenceRecord>
     )
 
@@ -148,7 +148,7 @@ object CompanyIntelligenceEngine {
             evidenceCount = source.evidence.size
         )
 
-        val confidence = when {
+        val evidenceCoverage = when {
             quality.availableCount >= 4 && quality.evidenceCount >= 5 -> "HIGHER EVIDENCE COVERAGE"
             quality.availableCount >= 2 -> "MODERATE EVIDENCE COVERAGE"
             else -> "INSUFFICIENT EVIDENCE"
@@ -170,7 +170,7 @@ object CompanyIntelligenceEngine {
             risks = risks.distinct().take(8),
             unknowns = unknowns.distinct().take(8),
             quality = quality,
-            confidence = confidence,
+            evidenceCoverage = evidenceCoverage,
             evidenceRecords = evidenceRecords
         )
     }
