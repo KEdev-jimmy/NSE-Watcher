@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -315,6 +316,7 @@ private fun TodaysIntelligence(
                     .filter { !it.isNullOrBlank() && it != item.fact }
                     .joinToString(" "),
                 source = item.source.ifBlank { item.evidence.firstOrNull()?.source ?: "Source unavailable" },
+                evidence = item.evidence,
                 accent = accent,
                 actionLabel = when {
                     targetNews != null -> "Source"
@@ -335,7 +337,22 @@ private fun TodaysIntelligence(
 }
 
 @Composable
-private fun IntelligenceItem(type: String, title: String, detail: String, source: String, accent: Color, actionLabel: String, onAction: () -> Unit) {
+private fun IntelligenceItem(
+    type: String,
+    title: String,
+    detail: String,
+    source: String,
+    evidence: List<HomeEvidenceReference>,
+    accent: Color,
+    actionLabel: String,
+    onAction: () -> Unit
+) {
+    val uriHandler = LocalUriHandler.current
+    val primaryEvidence = evidence.firstOrNull()
+    val evidenceSource = primaryEvidence?.source?.takeIf { it.isNotBlank() } ?: source
+    val evidenceDate = primaryEvidence?.date?.takeIf { it.isNotBlank() }?.let(::compactEvidenceDate)
+    val sourceUrl = primaryEvidence?.sourceUrl?.takeIf { it.startsWith("http://") || it.startsWith("https://") }
+
     Card(Modifier.fillMaxWidth(), RoundedCornerShape(15.dp), colors = CardDefaults.cardColors(containerColor = Color.White), border = BorderStroke(1.dp, HomeBorder)) {
         Column(Modifier.padding(11.dp)) {
             Row(verticalAlignment = Alignment.Top) {
@@ -353,12 +370,37 @@ private fun IntelligenceItem(type: String, title: String, detail: String, source
             }
             Spacer(Modifier.height(7.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(source, color = HomeMuted, fontSize = 7.sp, modifier = Modifier.weight(1f), maxLines = 1)
-                Text(actionLabel, color = HomeGreen, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable(onClick = onAction).padding(4.dp))
+                Text(
+                    text = listOf("Evidence", evidenceSource, evidenceDate).filter { it.isNotBlank() }.joinToString(" • "),
+                    color = HomeMuted,
+                    fontSize = 7.sp,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1
+                )
+                if (sourceUrl != null) {
+                    Text(
+                        "Source ↗",
+                        color = HomeGreen,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.clickable { uriHandler.openUri(sourceUrl) }.padding(4.dp)
+                    )
+                } else {
+                    Text(
+                        actionLabel,
+                        color = HomeGreen,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.clickable(onClick = onAction).padding(4.dp)
+                    )
+                }
             }
         }
     }
 }
+
+private fun compactEvidenceDate(value: String): String =
+    value.replace("T", " ").removeSuffix("Z").take(16)
 
 @Composable
 private fun WhatChanged(changes: List<HomeChangeItem>, openCompany: (Stock) -> Unit, currentStocks: List<Stock>) {
