@@ -93,6 +93,10 @@ fun MarketDashboard(stockFeed: List<Stock>) {
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
+                MarketFreshnessStrip(stockFeed)
+            }
+
+            item {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.ShowChart, null, tint = MarketGreen, modifier = Modifier.size(43.dp))
                     Spacer(Modifier.width(6.dp))
@@ -171,6 +175,41 @@ fun MarketDashboard(stockFeed: List<Stock>) {
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun MarketFreshnessStrip(stocks: List<Stock>) {
+    val valid = stocks.filter { it.price.isFinite() && it.price > 0.0 }
+    val source = valid.map { it.source.trim() }.firstOrNull { it.isNotBlank() } ?: "Market source unavailable"
+    val freshness = when {
+        valid.any { it.freshnessMode == "CURRENT_SESSION" } -> "Current session"
+        valid.any { it.freshnessMode == "END_OF_DAY" } -> "End-of-day observation"
+        valid.any { it.freshnessMode == "STALE" } -> "Previous session"
+        else -> "Freshness unknown"
+    }
+    Surface(
+        Modifier.fillMaxWidth(), RoundedCornerShape(12.dp),
+        color = MarketCard,
+        border = BorderStroke(1.dp, MarketBorder)
+    ) {
+        Column(Modifier.padding(horizontal = 11.dp, vertical = 8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Schedule, null, tint = MarketGreen, modifier = Modifier.size(15.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Data freshness", color = MarketWhite, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.width(5.dp))
+                Text("• $freshness", color = MarketBlue, fontSize = 8.sp)
+                Spacer(Modifier.weight(1f))
+                Text(valid.size.toString() + " valid quotes", color = MarketBlue, fontSize = 8.sp)
+            }
+            Text(
+                "Source: $source • Historical rankings use the connected market-data feed.",
+                color = MarketBlue,
+                fontSize = 7.sp,
+                modifier = Modifier.padding(start = 21.dp, top = 3.dp)
+            )
         }
     }
 }
