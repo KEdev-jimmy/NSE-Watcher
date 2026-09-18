@@ -425,7 +425,7 @@ function normalizedComparable(value) {
   if (!text) return '';
   const numeric = numericValue(text);
   if (numeric !== null) return String(numeric);
-  return text.toLowerCase().replace(/\\s+/g, ' ');
+  return text.toLowerCase().replace(/\s+/g, ' ');
 }
 
 function buildFieldQuality(primary, external) {
