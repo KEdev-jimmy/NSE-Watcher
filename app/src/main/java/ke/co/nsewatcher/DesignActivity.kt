@@ -221,6 +221,7 @@ private fun Companies(open:(Stock)->Unit, openWatchlist:()->Unit){
                     Column(Modifier.fillMaxSize().padding(10.dp,20.dp,10.dp,18.dp),verticalArrangement=Arrangement.Bottom){Text("Discover",color=Color.White,fontSize=25.sp,fontWeight=FontWeight.ExtraBold);Text("Great Companies",color=Color.White,fontSize=25.sp,fontWeight=FontWeight.ExtraBold);Spacer(Modifier.height(5.dp));Text("Research. Analyze. Invest.\nFind the right companies for your future.",color=Color.White,fontSize=11.sp)}
                 }
             }
+            item{CompanyDataCoverage(stocks)}
             item{OutlinedTextField(value=query,onValueChange={query=it},modifier=Modifier.fillMaxWidth(),singleLine=true,placeholder={Text("Search companies...",color=Muted)},leadingIcon={Icon(Icons.Default.Search,null,tint=Muted)},shape=RoundedCornerShape(24.dp),colors=OutlinedTextFieldDefaults.colors(unfocusedContainerColor=Color.White,focusedContainerColor=Color.White,unfocusedBorderColor=Color.Transparent,focusedBorderColor=Green,unfocusedTextColor=TextDark,focusedTextColor=TextDark))}
             item{Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text("Companies",color=Color.White,fontWeight=FontWeight.ExtraBold,fontSize=17.sp);Spacer(Modifier.weight(1f));OutlinedButton(onClick=openWatchlist,shape=RoundedCornerShape(18.dp),border=BorderStroke(1.dp,Color(0xFF55E0A0)),contentPadding=PaddingValues(horizontal=11.dp,vertical=4.dp)){Icon(Icons.Default.StarBorder,null,tint=Color(0xFF55E0A0),modifier=Modifier.size(16.dp));Spacer(Modifier.width(4.dp));Text("Watchlist",color=Color(0xFF55E0A0),fontSize=10.sp,fontWeight=FontWeight.Bold)}}}
             item{Card(Modifier.fillMaxWidth(),RoundedCornerShape(17.dp),colors=CardDefaults.cardColors(containerColor=Color.White)){Column(Modifier.padding(horizontal=12.dp)){filtered.forEachIndexed{index,s->Row(Modifier.fillMaxWidth().clickable{open(s)}.padding(vertical=10.dp),verticalAlignment=Alignment.CenterVertically){Logo(s.symbol,40,s.logoUrl);Spacer(Modifier.width(10.dp));Column(Modifier.weight(1f)){Text(s.name,color=TextDark,fontWeight=FontWeight.ExtraBold,fontSize=12.sp);Text(s.symbol,color=Muted,fontSize=10.sp);Text(String.format(Locale.US,"KSh %.2f",s.price),color=Muted,fontSize=10.sp)};Column(horizontalAlignment=Alignment.End){Text(String.format(Locale.US,"KSh %.2f",s.price),color=TextDark,fontWeight=FontWeight.Bold,fontSize=11.sp);Text(String.format(Locale.US,"%+.1f%%",s.change),color=if(s.change>=0)Green else Red,fontWeight=FontWeight.Bold,fontSize=10.sp)}};if(index<filtered.lastIndex)HorizontalDivider(color=Border)}}}}
@@ -298,6 +299,40 @@ private fun Watchlist(open: (Stock) -> Unit, back: () -> Unit) {
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun CompanyDataCoverage(stocks: List<Stock>) {
+    val valid = stocks.count { it.price.isFinite() && it.price > 0.0 }
+    val sourced = stocks.count { it.source.isNotBlank() }
+    val freshness = when {
+        stocks.any { it.freshnessMode == "CURRENT_SESSION" } -> "Current session"
+        stocks.any { it.freshnessMode == "END_OF_DAY" } -> "End-of-day"
+        stocks.any { it.freshnessMode == "STALE" } -> "Previous session"
+        else -> "Freshness unknown"
+    }
+    Card(
+        Modifier.fillMaxWidth(),
+        RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.97f))
+    ) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 9.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Verified, null, tint = Green, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Data coverage", color = TextDark, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
+                Spacer(Modifier.weight(1f))
+                Text("$valid valid quotes", color = Muted, fontSize = 8.sp)
+            }
+            Spacer(Modifier.height(3.dp))
+            Text(
+                "$sourced/${stocks.size} quotes have a recorded source • $freshness",
+                color = Muted,
+                fontSize = 8.sp
+            )
+            Text("Prices may be delayed. Missing values are not estimated.", color = Muted, fontSize = 8.sp)
         }
     }
 }
