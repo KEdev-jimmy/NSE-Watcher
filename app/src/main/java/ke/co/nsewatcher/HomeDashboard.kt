@@ -98,7 +98,7 @@ fun HomeDashboard(
         }
 
         item {
-            MarketFreshnessStrip(currentStocks)
+            MarketFreshnessStrip(currentStocks, marketStatus)
         }
 
         item {
@@ -355,7 +355,7 @@ private fun indexLabel(symbol: String): String = when (symbol) {
 }
 
 @Composable
-private fun MarketFreshnessStrip(stocks: List<Stock>) {
+private fun MarketFreshnessStrip(stocks: List<Stock>, marketStatus: MyStocksCache.MarketStatus) {
     val controllerState by MarketRefreshController.state
     var nowMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
@@ -377,6 +377,7 @@ private fun MarketFreshnessStrip(stocks: List<Stock>) {
         controllerState.refreshInProgress -> "Refreshing market data…"
         controllerState.lastRefreshFailed -> "Last refresh failed"
         controllerState.lastSuccessfulRefreshMs == null -> "Waiting for first refresh"
+        !marketStatus.isOpen -> closedMarketStatus(marketStatus, controllerState.lastSuccessfulRefreshMs)
         else -> "Next data check " + MarketRefreshController.formatCountdown(MarketRefreshController.secondsUntilNextCheck(nowMs))
     }
     Surface(
@@ -397,12 +398,32 @@ private fun MarketFreshnessStrip(stocks: List<Stock>) {
             }
             Text(refreshStatus, color = HomeDarkGreen, fontSize = 8.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 21.dp, top = 3.dp))
             Text(
-                "Source: $source • Next check means the app will check the feed; the provider may return unchanged data.",
+                if (marketStatus.isOpen) {
+                    "Source: $source • Next check means the app will check the feed; the provider may return unchanged data."
+                } else {
+                    "Source: $source • Market is closed, so no countdown is shown."
+                },
                 color = HomeMuted, fontSize = 7.sp, modifier = Modifier.padding(start = 21.dp, top = 2.dp)
             )
         }
     }
 }
+
+private fun closedMarketStatus(status: MyStocksCache.MarketStatus, lastSuccessfulRefreshMs: Long): String {
+    val nextOpen = status.nextOpen?.let(::formatNairobiTime)
+    return if (nextOpen != null) {
+        "Market closed • Next open $nextOpen"
+    } else {
+        "Market closed • Last checked " + formatLocalTime(lastSuccessfulRefreshMs)
+    }
+}
+
+private fun formatNairobiTime(value: String): String? = runCatching {
+    Instant.parse(value).atZone(ZoneId.of("Africa/Nairobi")).toLocalTime().toString().take(5) + " EAT"
+}.getOrNull()
+
+private fun formatLocalTime(valueMs: Long): String =
+    Instant.ofEpochMilli(valueMs).atZone(ZoneId.of("Africa/Nairobi")).toLocalTime().toString().take(5) + " EAT"
 
 @Composable
 private fun SectionLabel(title: String, subtitle: String, icon: ImageVector, onViewAll: (() -> Unit)? = null) {
