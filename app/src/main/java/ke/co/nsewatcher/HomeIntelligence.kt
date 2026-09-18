@@ -229,21 +229,24 @@ object HomeIntelligenceEngine {
 
         val changes = buildList {
             if (valid.isNotEmpty()) {
-                add(
-                    HomeChangeItem(
-                        id = "breadth",
-                        label = "Market breadth",
-                        detail = "${breadth.advancing} advancing • ${breadth.declining} declining • ${breadth.unchanged} unchanged",
-                        value = signedInt(breadth.advancing - breadth.declining)
-                    )
-                )
+                val breadthEvidence = evidenceGraph.record("calculation:market-breadth")
+                add(HomeChangeItem(
+                    id = "breadth",
+                    label = "Market breadth",
+                    detail = "${breadth.advancing} advancing • ${breadth.declining} declining • ${breadth.unchanged} unchanged",
+                    value = signedInt(breadth.advancing - breadth.declining),
+                    source = breadthEvidence?.let { HomeEvidenceReference(it.id, it.source, category = "market calculation") }
+                ))
             }
             strongest?.let {
                 add(HomeChangeItem(
                     id = "strongest-sector",
                     label = "Strongest sector",
                     detail = "${displaySector(it.sector)} • ${it.memberCount} counters",
-                    value = signedPercent(it.averageChangePct)
+                    value = signedPercent(it.averageChangePct),
+                    source = evidenceGraph.record("calculation:sector-${it.sector.lowercase(Locale.US)}")?.let {
+                        HomeEvidenceReference(it.id, it.source, category = "sector calculation")
+                    }
                 ))
             }
             weakest?.takeIf { strongest?.sector != it.sector }?.let {
@@ -251,7 +254,10 @@ object HomeIntelligenceEngine {
                     id = "weakest-sector",
                     label = "Weakest sector",
                     detail = "${displaySector(it.sector)} • ${it.memberCount} counters",
-                    value = signedPercent(it.averageChangePct)
+                    value = signedPercent(it.averageChangePct),
+                    source = evidenceGraph.record("calculation:sector-${it.sector.lowercase(Locale.US)}")?.let {
+                        HomeEvidenceReference(it.id, it.source, category = "sector calculation")
+                    }
                 ))
             }
             topGainer?.let {
@@ -261,7 +267,10 @@ object HomeIntelligenceEngine {
                     detail = it.symbol,
                     value = signedPercent(it.change),
                     symbol = it.symbol,
-                    type = HomeIntelligenceType.FACT
+                    type = HomeIntelligenceType.FACT,
+                    source = evidenceGraph.record("market:${it.symbol.lowercase()}")?.let {
+                        HomeEvidenceReference(it.id, it.source, symbol = it.symbol, category = "market movement")
+                    }
                 ))
             }
             topLoser?.let {
@@ -271,10 +280,14 @@ object HomeIntelligenceEngine {
                     detail = it.symbol,
                     value = signedPercent(it.change),
                     symbol = it.symbol,
-                    type = HomeIntelligenceType.FACT
+                    type = HomeIntelligenceType.FACT,
+                    source = evidenceGraph.record("market:${it.symbol.lowercase()}")?.let {
+                        HomeEvidenceReference(it.id, it.source, symbol = it.symbol, category = "market movement")
+                    }
                 ))
             }
             companyNews.firstOrNull()?.let {
+                val evidence = companyNewsEvidence.firstOrNull { e -> e.id == "news:${it.id}" }
                 add(HomeChangeItem(
                     id = "latest-company-news",
                     label = "Latest company news",
@@ -282,10 +295,9 @@ object HomeIntelligenceEngine {
                     value = "Open",
                     symbol = it.symbol,
                     type = HomeIntelligenceType.NEWS,
-                    source = HomeEvidenceReference(
-                        id = "NEWS-${it.id}", source = it.source, sourceUrl = it.url,
-                        date = it.publishedAt, symbol = it.symbol, category = it.category
-                    )
+                    source = evidence?.let { e ->
+                        HomeEvidenceReference(e.id, e.source, e.sourceUrl.orEmpty(), e.publishedAt.orEmpty(), e.symbol.orEmpty(), it.category)
+                    }
                 ))
             }
         }
