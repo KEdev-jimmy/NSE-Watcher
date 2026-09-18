@@ -461,25 +461,38 @@ function buildFieldQuality(primary, external) {
   return { fieldSources, fieldQuality, conflicts };
 }
 
-function evidenceFor(profile, financialHistory, dividends, sourceInfo, fetchedAt, symbol) {
+function evidenceFor(profile, primaryProfile, externalProfile, financialHistory, dividends, sourceInfo, fetchedAt, symbol) {
   const evidence = [];
   const add = (claim, value, source, endpoint, url) => {
     if (String(value || '').trim()) evidence.push({ claim, value: String(value), source, endpoint, url, symbol, fetchedAt });
   };
 
-  add('Revenue', profile.revenue, EXTERNAL_SOURCE, 'financials', sourceInfo.financialsUrl);
-  add('Profit', profile.profit, EXTERNAL_SOURCE, 'financials', sourceInfo.financialsUrl);
-  add('EPS', profile.eps, EXTERNAL_SOURCE, 'financials', sourceInfo.financialsUrl);
-  add('Revenue growth', profile.revenueGrowth, EXTERNAL_SOURCE, 'financials', sourceInfo.financialsUrl);
-  add('Profit growth', profile.profitGrowth, EXTERNAL_SOURCE, 'financials', sourceInfo.financialsUrl);
-  add('EPS growth', profile.epsGrowth, EXTERNAL_SOURCE, 'financials', sourceInfo.financialsUrl);
-  add('Net margin', profile.margin, EXTERNAL_SOURCE, 'financials', sourceInfo.financialsUrl);
-  add('P/E', profile.pe, EXTERNAL_SOURCE, 'ratios', sourceInfo.ratiosUrl);
-  add('P/B', profile.pb, EXTERNAL_SOURCE, 'ratios', sourceInfo.ratiosUrl);
-  add('ROE', profile.roe, EXTERNAL_SOURCE, 'ratios', sourceInfo.ratiosUrl);
-  add('Debt / equity', profile.debtToEquity, EXTERNAL_SOURCE, 'ratios', sourceInfo.ratiosUrl);
-  add('Dividend yield', profile.dividendYield, EXTERNAL_SOURCE, 'ratios', sourceInfo.ratiosUrl);
-  add('Market capitalization', profile.marketCap, EXTERNAL_SOURCE, 'ratios', sourceInfo.ratiosUrl);
+  const fieldEvidence = [
+    ['Revenue', 'revenue', 'financials', sourceInfo.financialsUrl],
+    ['Profit', 'profit', 'financials', sourceInfo.financialsUrl],
+    ['EPS', 'eps', 'financials', sourceInfo.financialsUrl],
+    ['Revenue growth', 'revenueGrowth', 'financials', sourceInfo.financialsUrl],
+    ['Profit growth', 'profitGrowth', 'financials', sourceInfo.financialsUrl],
+    ['EPS growth', 'epsGrowth', 'financials', sourceInfo.financialsUrl],
+    ['Net margin', 'margin', 'financials', sourceInfo.financialsUrl],
+    ['P/E', 'pe', 'ratios', sourceInfo.ratiosUrl],
+    ['P/B', 'pb', 'ratios', sourceInfo.ratiosUrl],
+    ['ROE', 'roe', 'ratios', sourceInfo.ratiosUrl],
+    ['Debt / equity', 'debtToEquity', 'ratios', sourceInfo.ratiosUrl],
+    ['Dividend yield', 'dividendYield', 'ratios', sourceInfo.ratiosUrl],
+    ['Market capitalization', 'marketCap', 'ratios', sourceInfo.ratiosUrl],
+  ];
+  fieldEvidence.forEach(([claim, key, endpoint, url]) => {
+    const primaryValue = String(primaryProfile?.[key] || '').trim();
+    const externalValue = String(externalProfile?.[key] || '').trim();
+    if (primaryValue && externalValue && normalizedComparable(primaryValue) !== normalizedComparable(externalValue)) {
+      add(claim, `MyStocks Africa: ${primaryValue} | ${EXTERNAL_SOURCE}: ${externalValue}`, 'CONFLICT', endpoint, url);
+    } else if (externalValue) {
+      add(claim, externalValue, EXTERNAL_SOURCE, endpoint, url);
+    } else if (primaryValue) {
+      add(claim, primaryValue, 'MyStocks Africa', endpoint, '');
+    }
+  });
 
   financialHistory.slice(0, 8).forEach(row => {
     add(`Revenue ${row.period}`, row.revenue, EXTERNAL_SOURCE, 'financials', sourceInfo.financialsUrl);
@@ -519,7 +532,7 @@ async function buildIntelligence(rawSymbol) {
   const dividends = myStocks.dividends.length ? myStocks.dividends : external.dividends;
   const financialHistory = external.financialHistory;
   const urls = sourceUrls(symbol);
-  const evidence = evidenceFor(mergedProfile, financialHistory, dividends, urls, fetchedAt, symbol);
+  const evidence = evidenceFor(mergedProfile, myStocks.profile, external.profile, financialHistory, dividends, urls, fetchedAt, symbol);
   const errors = [];
 
   if (myStocksResult.status === 'rejected') errors.push(`MyStocks: ${myStocksResult.reason?.message || 'request failed'}`);
