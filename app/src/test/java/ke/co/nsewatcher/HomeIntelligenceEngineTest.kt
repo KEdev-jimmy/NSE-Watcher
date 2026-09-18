@@ -22,6 +22,8 @@ class HomeIntelligenceEngineTest {
         assertEquals(listOf("UP"), snapshot.gainers.map { it.symbol })
         assertEquals(listOf("DOWN"), snapshot.losers.map { it.symbol })
         assertEquals(1, snapshot.breadth.unchanged)
+        assertTrue(snapshot.evidenceGraph.validationErrors().isEmpty())
+        assertTrue(snapshot.evidenceGraph.records.any { it.id == "calculation:market-breadth" })
     }
 
     @Test
@@ -39,6 +41,9 @@ class HomeIntelligenceEngineTest {
         assertEquals(3.0, banking.averageChangePct, 0.0001)
         assertEquals(2, banking.memberCount)
         assertTrue(snapshot.intelligence.any { it.type == HomeIntelligenceType.CALCULATION })
+        val sectorEvidence = snapshot.evidenceGraph.record("calculation:sector-banking")
+        assertTrue(sectorEvidence != null)
+        assertEquals(2, snapshot.evidenceGraph.relatedTo("calculation:sector-banking").size)
     }
 
     @Test
