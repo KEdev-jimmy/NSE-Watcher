@@ -32,6 +32,7 @@ data class EvidenceRecord(
     val sourceUrl: String? = null,
     val publishedAt: String? = null,
     val observedAt: String? = null,
+    val freshness: String? = null,
     val period: String? = null
 )
 
