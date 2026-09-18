@@ -92,8 +92,21 @@ object NewsCache {
             exDate = item.optString("exDate").trim(),
             paymentDate = item.optString("paymentDate").trim(),
             intelligenceRelevance = item.optString("intelligenceRelevance", "unknown").trim(),
-            intelligenceRelevanceReason = item.optString("intelligenceRelevanceReason").trim()
+            intelligenceRelevanceReason = item.optString("intelligenceRelevanceReason").trim(),
+            freshnessMode = item.optString("freshnessMode", "").trim().ifBlank { newsFreshnessMode(item.optString("publishedAt").trim()) }
         )
+    }
+
+    private fun newsFreshnessMode(publishedAt: String): String {
+        if (publishedAt.isBlank()) return "UNKNOWN"
+        val now = java.time.Instant.now().atZone(java.time.ZoneId.of("Africa/Nairobi"))
+        val instant = runCatching { java.time.Instant.parse(publishedAt) }.getOrNull()
+        if (instant != null) {
+            val date = instant.atZone(java.time.ZoneId.of("Africa/Nairobi")).toLocalDate()
+            return if (date.isBefore(now.toLocalDate())) "STALE" else "CURRENT_DAY"
+        }
+        val date = runCatching { java.time.LocalDate.parse(publishedAt.take(10)) }.getOrNull() ?: return "UNKNOWN"
+        return if (date.isBefore(now.toLocalDate())) "STALE" else "CURRENT_DAY"
     }
 
     private fun request(url: String): JSONObject? = runCatching {
