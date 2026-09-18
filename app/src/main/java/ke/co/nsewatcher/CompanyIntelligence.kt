@@ -315,7 +315,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit) {
             }
         }
 
-        item { SectionTitle("Evidence", "The source records behind this intelligence view", Icons.Default.Verified) }
+        item { SectionTitle("Evidence", "Sourced records behind this intelligence view", Icons.Default.Verified) }
         item {
             IntelligenceCard {
                 if (intelligenceView.evidenceRecords.isEmpty()) {
@@ -358,7 +358,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit) {
         item { SectionTitle("Intelligence signals", "Deterministic evidence signals — no invented conclusions", Icons.Default.Insights) }
         item {
             IntelligenceCard {
-                Text("Evidence coverage: ${intelligenceView.confidence}", color = IntelligenceGreen, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold)
+                Text("Evidence coverage: ${intelligenceView.evidenceCoverage}", color = IntelligenceGreen, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold)
                 Spacer(Modifier.height(6.dp))
                 Text("Coverage: ${intelligenceView.quality.state} • ${intelligenceView.quality.availableCount}/5 evidence areas", color = IntelligenceMuted, fontSize = 9.sp)
                 Spacer(Modifier.height(10.dp))
@@ -478,7 +478,6 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit) {
             }
         }
 
-        item { SectionTitle("Evidence", "Where the important information came from", Icons.Default.Verified) }
         item {
             IntelligenceCard {
                 EvidenceRow("Market price", "MyStocks Africa • NSE exchange-supplied • ~15 min delayed")
