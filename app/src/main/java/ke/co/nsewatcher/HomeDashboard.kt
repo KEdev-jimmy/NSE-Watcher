@@ -310,7 +310,7 @@ private fun MarketIndexPulse(indices: List<MyStocksCache.MarketIndex>) {
             }
         }
         Text(
-            "Official index values • MyStocks Africa • delayed where indicated",
+            "NSE index data • MyStocks Africa • delayed where indicated",
             color = HomeMuted,
             fontSize = 7.sp,
             modifier = Modifier.padding(start = 2.dp, top = 4.dp)
