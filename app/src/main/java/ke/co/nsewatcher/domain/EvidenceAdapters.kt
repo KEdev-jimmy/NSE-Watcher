@@ -20,7 +20,10 @@ object EvidenceAdapters {
             type = EvidenceType.MARKET_DATA,
             claim = "Current market quote for " + stock.symbol,
             value = "KSh %.2f; daily movement %+.2f%%".format(stock.price, stock.change),
-            source = "MyStocks Africa"
+            source = stock.source.ifBlank { "Unknown market source" },
+            observedAt = stock.observedAt.takeIf { it.isNotBlank() },
+            freshness = stock.freshnessMode,
+            period = "current observation"
         )
     }
 
