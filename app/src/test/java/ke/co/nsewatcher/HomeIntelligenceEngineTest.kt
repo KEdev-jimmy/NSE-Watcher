@@ -114,4 +114,19 @@ class HomeIntelligenceEngineTest {
         assertEquals("CURRENT_SESSION", snapshot.evidenceGraph.record("index:^nasi")?.freshness)
     }
 
+    @Test
+    fun unavailableStockMovementDoesNotEnterBreadthOrMovers() {
+        val unavailable = Stock("UNKNOWN", "UNKNOWN", 10.0, 0.0, listOf(10.0), sector = "Banking", volume = 0L, changeAvailable = false, volumeAvailable = false)
+        val snapshot = HomeIntelligenceEngine.build(
+            listOf(unavailable, stock("UP", 2.0, "Banking", 0L)),
+            emptyList()
+        )
+
+        assertTrue(snapshot.gainers.none { it.symbol == "UNKNOWN" })
+        assertTrue(snapshot.losers.none { it.symbol == "UNKNOWN" })
+        assertEquals(1, snapshot.breadth.advancing)
+        assertEquals(0L, snapshot.breadth.reportedVolume)
+        assertTrue(snapshot.evidenceGraph.record("market:unknown") == null)
+    }
+
 }
