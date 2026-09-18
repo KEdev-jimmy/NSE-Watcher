@@ -102,10 +102,6 @@ fun HomeDashboard(
         }
 
         item {
-            MarketFreshnessStrip(currentStocks)
-        }
-
-        item {
             Spacer(Modifier.height(11.dp))
             SectionLabel("Today's Intelligence", "Evidence from the current market and news feed", Icons.Default.Psychology)
         }
