@@ -2,6 +2,8 @@ package ke.co.nsewatcher.data
 
 import ke.co.nsewatcher.NewsItem
 import ke.co.nsewatcher.Stock
+import ke.co.nsewatcher.domain.EvidenceAdapters
+import ke.co.nsewatcher.domain.EvidenceRecord
 import java.util.Locale
 import kotlin.math.abs
 
@@ -44,7 +46,8 @@ object CompanyIntelligenceEngine {
         val risks: List<String>,
         val unknowns: List<String>,
         val quality: DataQuality,
-        val confidence: String
+        val confidence: String,
+        val evidenceRecords: List<EvidenceRecord>
     )
 
     fun build(
@@ -132,6 +135,10 @@ object CompanyIntelligenceEngine {
             risks += "The company intelligence service reported an error: ${source.error}."
         }
 
+        val evidenceRecords = (source.evidence.mapNotNull { EvidenceAdapters.fromCompanyEvidence(it) } +
+            news.mapNotNull { EvidenceAdapters.fromNews(it) })
+            .distinctBy { it.id }
+
         val quality = DataQuality(
             profile = profile.description.isNotBlank() || profile.sector.isNotBlank() || profile.revenue.isNotBlank(),
             financialHistory = source.financialHistoryAvailable && source.financialHistory.isNotEmpty(),
@@ -163,7 +170,8 @@ object CompanyIntelligenceEngine {
             risks = risks.distinct().take(8),
             unknowns = unknowns.distinct().take(8),
             quality = quality,
-            confidence = confidence
+            confidence = confidence,
+            evidenceRecords = evidenceRecords
         )
     }
 
