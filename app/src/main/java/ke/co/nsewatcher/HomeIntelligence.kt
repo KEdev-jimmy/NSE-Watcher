@@ -167,6 +167,18 @@ object HomeIntelligenceEngine {
                 }
         }
 
+        if (marketIndices.isNotEmpty() && valid.isNotEmpty()) {
+            val breadthId = "calculation:market-breadth"
+            marketIndices.forEach { index ->
+                graphRelationships += EvidenceRelationship(
+                    id = "relationship:index:" + index.symbol.lowercase(Locale.US) + ":" + breadthId,
+                    fromEvidenceId = "index:" + index.symbol.lowercase(Locale.US),
+                    toEvidenceId = breadthId,
+                    type = EvidenceRelationshipType.RELATED
+                )
+            }
+        }
+
         val evidenceGraph = EvidenceGraph.of(graphRecords, graphRelationships)
 
         val strongest = sectors.maxByOrNull { it.averageChangePct }
@@ -175,6 +187,35 @@ object HomeIntelligenceEngine {
         val topLoser = losers.firstOrNull()
 
         val intelligence = buildList {
+            val availableIndices = marketIndices.filter { it.value.isFinite() }
+            if (availableIndices.isNotEmpty()) {
+                val changedIndices = availableIndices.filter { it.changePct?.isFinite() == true }
+                val directionText = when {
+                    changedIndices.isEmpty() -> "Index direction is unavailable."
+                    changedIndices.all { it.changePct!! > 0.0 } -> "The available tracked indices are higher."
+                    changedIndices.all { it.changePct!! < 0.0 } -> "The available tracked indices are lower."
+                    else -> "The available tracked indices are mixed."
+                }
+                val indexEvidence = availableIndices.mapNotNull { index ->
+                    evidenceGraph.record("index:" + index.symbol.lowercase(Locale.US))?.let { record ->
+                        homeEvidenceReference(record, "index observation")
+                    }
+                }
+                add(
+                    HomeIntelligenceItem(
+                        id = "market-index-pulse",
+                        type = HomeIntelligenceType.CALCULATION,
+                        fact = "Market index pulse: " + directionText,
+                        calculation = changedIndices.joinToString(" • ") { index ->
+                            index.name.ifBlank { index.symbol } + " " + (index.changePct?.let { signedPercent(it) } ?: "change unavailable")
+                        },
+                        interpretation = "This describes the latest available index observations; it is not a forecast or trading signal.",
+                        evidence = indexEvidence,
+                        source = "MyStocks Africa • current index observations"
+                    )
+                )
+            }
+
             strongest?.let { sector ->
                 add(
                     HomeIntelligenceItem(
