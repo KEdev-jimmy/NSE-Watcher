@@ -1613,3 +1613,28 @@ The repository already has a strong evidence-graph foundation, but the ingestion
 7. Run Android/backend CI verification before closing each meaningful change.
 
 No Phase 12 production-data claims are made by this audit. Live provider receipt remains a separate verification task when the environment permits it.
+
+
+# 47. PHASE 12 — STEP 1 COMPLETE: MISSING-DATA SEMANTICS
+
+Step 1 was implemented without changing the public numeric shape of Stock, avoiding a broad nullable refactor.
+
+### Changes
+
+- Stock now carries changeAvailable and volumeAvailable.
+- Existing Stock constructors default these flags to true, preserving existing test/UI construction semantics.
+- MyStocks stock ingestion now distinguishes a real supplied/derived movement from a missing movement, and a real non-negative volume from unavailable volume.
+- Missing movement no longer semantically means unchanged: the numeric field remains 0.0 only as a compatibility placeholder while changeAvailable=false marks it unavailable.
+- Missing volume similarly retains 0L only as a compatibility placeholder while volumeAvailable=false marks it unavailable.
+- Home intelligence excludes stocks without available movement from gainers, losers, unchanged count, sector calculations and market breadth.
+- Reported market volume only sums stocks whose volume is explicitly available.
+- Stock evidence is not created when movement data is unavailable, preventing an unavailable movement from entering the Evidence Graph as a valid market observation.
+- Added a regression test proving an unavailable stock is excluded from movers, breadth and evidence, while available zero-volume data remains usable.
+
+### Verification state
+
+Code and test changes are committed, but Phase 12 Step 1 is not yet considered verified complete until Android CI is inspected for the latest commit sequence. No production-data claim is made here.
+
+### Next step
+
+After CI verification, continue Phase 12 Step 2: carry actual stock provenance (source, observed-at/freshness and explicit fallback identity) through ingestion into evidence, rather than reconstructing MyStocks Africa at the Home evidence adapter.
