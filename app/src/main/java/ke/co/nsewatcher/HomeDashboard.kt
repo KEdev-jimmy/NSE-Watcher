@@ -368,12 +368,13 @@ private fun WhatChanged(changes: List<HomeChangeItem>, openCompany: (Stock) -> U
             ChangeRow(
                 label = change.label,
                 detail = change.detail,
-                value = change.value ?: "—",
+                value = change.value,
                 valueColor = when {
-                    change.value?.startsWith("-") == true -> HomeRed
+                    change.value.startsWith("-") -> HomeRed
                     change.type == HomeIntelligenceType.CALCULATION -> HomeDarkGreen
                     else -> HomeGreen
                 },
+                source = change.source?.source.orEmpty(),
                 onClick = stock?.let { { openCompany(it) } }
             )
         }
@@ -384,11 +385,12 @@ private fun WhatChanged(changes: List<HomeChangeItem>, openCompany: (Stock) -> U
 }
 
 @Composable
-private fun ChangeRow(label: String, detail: String, value: String, valueColor: Color, onClick: (() -> Unit)? = null) {
+private fun ChangeRow(label: String, detail: String, value: String, valueColor: Color, source: String = "", onClick: (() -> Unit)? = null) {
     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(Color.White).border(1.dp, HomeBorder, RoundedCornerShape(13.dp)).clickable(enabled = onClick != null, onClick = { onClick?.invoke() }).padding(horizontal = 11.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(label, color = HomeMuted, fontSize = 8.sp, fontWeight = FontWeight.SemiBold)
             Text(detail, color = HomeTextDark, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+            if (source.isNotBlank()) Text("Source: $source", color = HomeMuted, fontSize = 7.sp, maxLines = 1)
         }
         Text(value, color = valueColor, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
         if (onClick != null) {
