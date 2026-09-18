@@ -1382,3 +1382,46 @@ Build the first genuine user-facing watchlist flow using the existing real stock
 5. keep all resulting market observations inside the existing evidence/intelligence architecture.
 
 Do not add default symbols, fake holdings, broker/CDS integration, or portfolio value calculations.
+
+
+# 41. PHASE 11 — FIRST GENUINE WATCHLIST ACTION
+
+## Status
+
+**IMPLEMENTED — REQUIRES CI VERIFICATION**
+
+The first user-facing watchlist flow is now connected to the existing company intelligence screen.
+
+### Behavior
+
+- The company intelligence header now exposes an explicit Watch / Watching action.
+- The action reads the persisted WatchlistStore state.
+- Tapping Watch adds only that selected company's normalized symbol.
+- Tapping Watching removes it.
+- The watchlist remains separate from portfolio/ownership.
+- No default companies are added.
+- Existing company intelligence data, history, news, evidence and navigation remain in the existing architecture.
+- No new market-data provider or intelligence architecture was introduced.
+
+### Files changed
+
+- app/src/main/java/ke/co/nsewatcher/CompanyIntelligence.kt
+  - added optional watchlist state/action to the existing company header.
+- app/src/main/java/ke/co/nsewatcher/DesignActivity.kt
+  - connects the company screen to WatchlistStore.
+- app/src/main/java/ke/co/nsewatcher/data/MarketRepository.kt
+  - retained the empty-by-default persistent watchlist foundation.
+- PROJECT_CONTEXT.md
+  - recorded Phase 11 progress.
+
+### Important correction
+
+The initial implementation attempt briefly wrapped CompanyIntelligence in another LazyColumn. That was corrected immediately after auditing CompanyIntelligence.kt because CompanyIntelligence already owns its LazyColumn. The final implementation keeps a single company-page scroll container.
+
+### Verification
+
+Latest completed CI before the watchlist UI changes was run 459 and successful. The current Phase 11 commits require a new Android CI verification before being declared green.
+
+### Next step
+
+After CI passes, audit the Companies screen for the cleanest place to expose watchlist state and then add a dedicated Watchlist view only if the existing navigation structure can support it without duplicating data architecture. The view must read the user's persisted symbols and hydrate them from the existing real stock feed; an empty watchlist must remain a valid state.
