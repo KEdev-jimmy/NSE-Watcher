@@ -1,3 +1,4 @@
+const { intelligenceRelevance } = require('./newsRelevance');
 const { loadRssSources, sourceRegistry } = require('./newsSources');
 
 const BASE_URL = process.env.MYSTOCKS_BASE_URL || 'https://mystocks.africa/api/v1/partner';
@@ -178,25 +179,6 @@ function withinWindow(item) {
   const time = Date.parse(item.publishedAt);
   if (!Number.isFinite(time)) return true;
   return time >= Date.now() - HISTORY_DAYS * 24 * 60 * 60 * 1000;
-}
-
-function intelligenceRelevance(item) {
-  const haystack = [item.title, item.summary, item.body].filter(Boolean).join(' ').toLowerCase();
-  const category = String(item.category || '').toLowerCase();
-  const hasCompany = Boolean(item.symbol || item.companyName);
-  const hasMarketSignal = INTELLIGENCE_MARKET_TERMS.some(term => haystack.includes(term));
-  const marketCategory = category.includes('dividend') || category.includes('corporate') ||
-    category.includes('analysis') || category.includes('earnings');
-
-  if (marketCategory || hasMarketSignal) {
-    return { level: 'market', reason: marketCategory
-      ? 'the story is classified as a market or corporate-action category'
-      : 'market-relevant terms or events are present in the story text' };
-  }
-  if (hasCompany) {
-    return { level: 'company', reason: 'a listed company is identified, but no market-relevant signal was established' };
-  }
-  return { level: 'general', reason: 'no listed-company or market-relevant signal was established' };
 }
 
 function isRelevantExternalNews(item) {
