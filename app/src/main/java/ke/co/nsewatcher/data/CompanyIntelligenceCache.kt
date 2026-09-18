@@ -66,6 +66,9 @@ object CompanyIntelligenceCache {
     )
 
     data class Result(
+        val fieldSources: Map<String, List<String>> = emptyMap(),
+        val fieldQuality: Map<String, String> = emptyMap(),
+        val conflicts: Map<String, List<Pair<String, String>>> = emptyMap(),
         val profile: Profile = Profile(),
         val dividends: List<Dividend> = emptyList(),
         val financialHistory: List<FinancialPoint> = emptyList(),
@@ -100,8 +103,14 @@ object CompanyIntelligenceCache {
             ?: data?.optJSONArray("evidence")
             ?: JSONArray()
         val quality = root.optJSONObject("dataQuality")
+        val fieldSources = parseStringListMap(quality?.optJSONObject("fieldSources"))
+        val fieldQuality = parseStringMap(quality?.optJSONObject("fieldQuality"))
+        val conflicts = parseConflicts(quality?.optJSONObject("conflicts"))
 
         Result(
+            fieldSources = fieldSources,
+            fieldQuality = fieldQuality,
+            conflicts = conflicts,
             profile = parseProfile(profileObject),
             dividends = parseDividends(dividendsArray),
             financialHistory = parseFinancialHistory(historyArray),
@@ -113,6 +122,47 @@ object CompanyIntelligenceCache {
                 ?: (historyArray.length() > 0),
             error = null
         )
+    }
+
+    private fun parseStringMap(root: JSONObject?): Map<String, String> {
+        if (root == null) return emptyMap()
+        val out = mutableMapOf<String, String>()
+        val keys = root.keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            val value = root.optString(key).trim()
+            if (value.isNotBlank()) out[key] = value
+        }
+        return out
+    }
+
+    private fun parseStringListMap(root: JSONObject?): Map<String, List<String>> {
+        if (root == null) return emptyMap()
+        val out = mutableMapOf<String, List<String>>()
+        val keys = root.keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            val array = root.optJSONArray(key) ?: continue
+            out[key] = (0 until array.length()).mapNotNull { array.optString(it).trim().takeIf(String::isNotBlank) }
+        }
+        return out
+    }
+
+    private fun parseConflicts(root: JSONObject?): Map<String, List<Pair<String, String>>> {
+        if (root == null) return emptyMap()
+        val out = mutableMapOf<String, List<Pair<String, String>>>()
+        val keys = root.keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            val values = root.optJSONObject(key)?.optJSONArray("values") ?: continue
+            out[key] = (0 until values.length()).mapNotNull { index ->
+                val item = values.optJSONObject(index) ?: return@mapNotNull null
+                val source = item.optString("source").trim()
+                val value = item.optString("value").trim()
+                if (source.isBlank() || value.isBlank()) null else source to value
+            }
+        }
+        return out
     }
 
     private fun parseProfile(root: JSONObject): Profile = Profile(
