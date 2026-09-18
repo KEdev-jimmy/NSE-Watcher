@@ -502,13 +502,40 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
 
         item {
             IntelligenceCard {
-                EvidenceRow("Market price", "MyStocks Africa • NSE exchange-supplied • ~15 min delayed")
-                EvidenceRow("Company profile", if (intelligenceLoading) "Loading source data…" else "MyStocks Africa company profile")
-                EvidenceRow("Dividends", "MyStocks Africa dividend history")
+                EvidenceRow("Market price", "${s.source.ifBlank { "Market source unavailable" }} • ${when (s.freshnessMode) { "STALE" -> "stale observation"; "CURRENT_SESSION" -> "current session"; "END_OF_DAY" -> "end-of-day observation"; else -> "freshness unknown" }}")
+                EvidenceRow("Company profile", if (intelligenceLoading) "Loading source data…" else "Field-level sources shown below")
+                EvidenceRow("Dividends", if (intelligence.dividends.isNotEmpty()) "Source recorded per dividend event" else "Not available")
                 EvidenceRow("News & actions", "MyStocks Africa company intelligence feed")
                 if (intelligence.fetchedAt.isNotBlank()) EvidenceRow("Fetched", intelligence.fetchedAt)
                 Spacer(Modifier.height(6.dp))
                 Text("NSE Watcher separates sourced facts from interpretation. Verify material announcements against the issuer or NSE before acting.", color = IntelligenceMuted, fontSize = 9.sp)
+            }
+        }
+
+        item {
+            IntelligenceCard {
+                Text("Data quality & sources", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = IntelligenceText)
+                Spacer(Modifier.height(6.dp))
+                val materialFields = listOf(
+                    "revenue" to "Revenue", "profit" to "Profit", "eps" to "EPS",
+                    "roe" to "ROE", "margin" to "Net margin", "debtToEquity" to "Debt / equity",
+                    "pe" to "P/E", "pb" to "P/B", "dividendYield" to "Dividend yield",
+                    "marketCap" to "Market capitalization"
+                )
+                materialFields.forEach { (key, label) ->
+                    val quality = intelligence.fieldQuality[key] ?: "UNKNOWN"
+                    val sources = intelligence.fieldSources[key].orEmpty().joinToString(" + ")
+                    EvidenceRow(label, "$quality${if (sources.isNotBlank()) " • $sources" else ""}")
+                }
+                if (intelligence.conflicts.isNotEmpty()) {
+                    Spacer(Modifier.height(6.dp))
+                    Text("Conflicting source values", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = IntelligenceRed)
+                    intelligence.conflicts.entries.forEach { (field, values) ->
+                        val label = materialFields.firstOrNull { it.first == field }?.second ?: field
+                        EvidenceRow(label, values.joinToString(" vs ") { "${it.first}: ${it.second}" })
+                    }
+                }
+                Text("CONFLICT means two available providers returned different values. NSE Watcher does not silently treat one as verified.", color = IntelligenceMuted, fontSize = 9.sp)
             }
         }
 
