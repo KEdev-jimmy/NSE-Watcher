@@ -4,6 +4,11 @@ import ke.co.nsewatcher.NewsItem
 import ke.co.nsewatcher.data.CompanyIntelligenceCache
 import ke.co.nsewatcher.data.MovementIntelligenceCache
 
+data class AdaptedMovementEvidence(
+    val evidence: List<EvidenceRecord>,
+    val relationships: List<EvidenceRelationship>
+)
+
 object EvidenceAdapters {
     fun fromNews(item: NewsItem): EvidenceRecord? {
         if (item.id.isBlank() || item.title.isBlank()) return null
@@ -58,6 +63,32 @@ object EvidenceAdapters {
         )
     }
 
+    fun fromMovementResult(
+        result: MovementIntelligenceCache.Result,
+        relatedEvidence: List<EvidenceRecord> = emptyList()
+    ): AdaptedMovementEvidence {
+        val movementEvidence = result.evidence.mapNotNull {
+            fromMovementEvidence(result.symbol, it)
+        }
+
+        val relationships = result.evidence.mapNotNull { source ->
+            val movementRecord = fromMovementEvidence(result.symbol, source) ?: return@mapNotNull null
+            val target = findRelatedEvidence(result.symbol, source, relatedEvidence)
+                ?: return@mapNotNull null
+
+            relationshipFromMovement(
+                movementEvidenceId = movementRecord.id,
+                targetEvidenceId = target.id,
+                evidence = source
+            )
+        }
+
+        return AdaptedMovementEvidence(
+            evidence = movementEvidence,
+            relationships = relationships
+        )
+    }
+
     fun relationshipFromMovement(
         movementEvidenceId: String,
         targetEvidenceId: String,
@@ -76,6 +107,30 @@ object EvidenceAdapters {
             toEvidenceId = targetEvidenceId,
             type = type
         )
+    }
+
+    private fun findRelatedEvidence(
+        symbol: String,
+        movementEvidence: MovementIntelligenceCache.Evidence,
+        relatedEvidence: List<EvidenceRecord>
+    ): EvidenceRecord? {
+        val url = movementEvidence.sourceUrl.trim()
+        if (url.isNotBlank()) {
+            relatedEvidence.firstOrNull {
+                it.sourceUrl?.trim()?.equals(url, ignoreCase = true) == true
+            }?.let { return it }
+        }
+
+        val normalizedTitle = movementEvidence.title.trim().lowercase()
+        val date = movementEvidence.date.trim()
+        return relatedEvidence.firstOrNull {
+            it.symbol?.equals(symbol, ignoreCase = true) == true &&
+                it.claim.trim().lowercase() == normalizedTitle &&
+                (
+                    date.isBlank() ||
+                        it.publishedAt?.take(10)?.equals(date.take(10), ignoreCase = true) == true
+                )
+        }
     }
 
     private fun evidenceTypeForCompanyClaim(claim: String): EvidenceType {
