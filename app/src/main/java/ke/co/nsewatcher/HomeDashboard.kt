@@ -28,6 +28,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import java.util.Locale
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeParseException
 import ke.co.nsewatcher.data.NewsCache
 import ke.co.nsewatcher.data.MyStocksCache
 
@@ -51,9 +54,11 @@ fun HomeDashboard(
     var newsLoading by remember { mutableStateOf(true) }
     var newsError by remember { mutableStateOf<String?>(null) }
     var marketIndices by remember { mutableStateOf(emptyList<MyStocksCache.MarketIndex>()) }
+    var marketStatus by remember { mutableStateOf(MyStocksCache.MarketStatus()) }
 
     LaunchedEffect(Unit) {
         marketIndices = MyStocksCache.loadMarketIndices()
+        marketStatus = MyStocksCache.loadMarketStatus()
         val result = NewsCache.loadFeedResult()
         news = result.items
         newsError = result.error
@@ -62,7 +67,7 @@ fun HomeDashboard(
 
     val intelligence = remember(currentStocks, news, marketIndices) {
         HomeIntelligenceEngine.build(currentStocks, news, marketIndices.map { index ->
-        HomeMarketIndex(index.symbol, index.name, index.value, index.changePct, index.asOf)
+        HomeMarketIndex(index.symbol, index.name, index.value, index.changePct, index.asOf, indexFreshness(index.asOf, marketStatus.isOpen))
     })
     }
     val breadth = intelligence.breadth
@@ -88,7 +93,7 @@ fun HomeDashboard(
         if (marketIndices.isNotEmpty()) {
             item {
                 Spacer(Modifier.height(10.dp))
-                MarketIndexPulse(marketIndices)
+                MarketIndexPulse(marketIndices, marketStatus)
             }
         }
 
@@ -282,7 +287,7 @@ private fun BreadthLine(label: String, value: Int, color: Color) {
 }
 
 @Composable
-private fun MarketIndexPulse(indices: List<MyStocksCache.MarketIndex>) {
+private fun MarketIndexPulse(indices: List<MyStocksCache.MarketIndex>, marketStatus: MyStocksCache.MarketStatus) {
     val shown = indices.filter { it.symbol in setOf("^NASI", "^N20I", "^N25I") }.take(3)
     if (shown.isEmpty()) return
     Column(Modifier.padding(horizontal = 14.dp)) {
@@ -309,18 +314,39 @@ private fun MarketIndexPulse(indices: List<MyStocksCache.MarketIndex>) {
                         )
                     }
                     if (index.asOf.isNotBlank()) {
-                        Text("As of ${index.asOf.take(10)}", color = HomeMuted, fontSize = 7.sp, maxLines = 1)
+                        Text(freshnessLabel(index.asOf, marketStatus.isOpen), color = HomeMuted, fontSize = 7.sp, maxLines = 1)
                     }
                 }
             }
         }
         Text(
-            "NSE index data • MyStocks Africa • provider timestamp when available",
+            "NSE index data • MyStocks Africa • freshness shown from observation time",
             color = HomeMuted,
             fontSize = 7.sp,
             modifier = Modifier.padding(start = 2.dp, top = 4.dp)
         )
     }
+}
+
+private fun indexFreshness(asOf: String, marketOpen: Boolean): HomeMarketDataMode {
+    if (asOf.isBlank()) return HomeMarketDataMode.UNKNOWN
+    return try {
+        val instant = Instant.parse(asOf)
+        val local = instant.atZone(ZoneId.of("Africa/Nairobi"))
+        val now = Instant.now().atZone(ZoneId.of("Africa/Nairobi"))
+        if (local.toLocalDate() != now.toLocalDate()) HomeMarketDataMode.STALE
+        else if (asOf.contains("T") && marketOpen) HomeMarketDataMode.CURRENT_SESSION
+        else HomeMarketDataMode.END_OF_DAY
+    } catch (_: DateTimeParseException) {
+        if (asOf.length == 10) HomeMarketDataMode.END_OF_DAY else HomeMarketDataMode.UNKNOWN
+    }
+}
+
+private fun freshnessLabel(asOf: String, marketOpen: Boolean): String = when (indexFreshness(asOf, marketOpen)) {
+    HomeMarketDataMode.CURRENT_SESSION -> "Current session • " + asOf.replace("T", " ").take(16)
+    HomeMarketDataMode.END_OF_DAY -> "End of day • " + asOf.take(10)
+    HomeMarketDataMode.STALE -> "Stale • " + asOf.take(10)
+    HomeMarketDataMode.UNKNOWN -> "Observation time unavailable"
 }
 
 private fun indexLabel(symbol: String): String = when (symbol) {
