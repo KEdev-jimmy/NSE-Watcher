@@ -5,6 +5,8 @@ const {
   normalizedComparable,
   buildFieldQuality,
   evidenceFor,
+  normalizeWebsite,
+  normalizeLocation,
 } = require('../lib/companyIntelligence');
 
 test('company field quality marks a single available source as AVAILABLE', () => {
@@ -66,4 +68,13 @@ test('conflicted evidence states both source values instead of silently selectin
   assert.equal(evidence[0].source, 'CONFLICT');
   assert.match(evidence[0].value, /MyStocks Africa: KES 10B/);
   assert.match(evidence[0].value, /StockAnalysis \/ S&P Global Market Intelligence: KES 12B/);
+});
+
+
+test('company website and headquarters fields are normalized defensively', () => {
+  assert.equal(normalizeWebsite('www.example.com/'), 'https://www.example.com');
+  assert.equal(normalizeWebsite('https://example.com/'), 'https://example.com');
+  assert.equal(normalizeWebsite('not a valid website value'), '');
+  assert.equal(normalizeLocation(' HQ: Nairobi, Kenya '), 'Nairobi, Kenya');
+  assert.equal(normalizeLocation('Headquarters - Nairobi, Kenya'), 'Nairobi, Kenya');
 });
