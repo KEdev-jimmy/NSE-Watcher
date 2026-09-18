@@ -1,6 +1,7 @@
 package ke.co.nsewatcher
 
 import java.util.Locale
+import ke.co.nsewatcher.domain.EvidenceAdapters
 
 /**
  * Home-facing domain models. These keep market calculations and provenance out
@@ -90,6 +91,7 @@ object HomeIntelligenceEngine {
                 !it.isCorporateAction() &&
                 it.intelligenceRelevance == "market"
         }
+        val companyNewsEvidence = companyNews.mapNotNull(EvidenceAdapters::fromNews)
 
         val strongest = sectors.maxByOrNull { it.averageChangePct }
         val weakest = sectors.minByOrNull { it.averageChangePct }
@@ -139,34 +141,36 @@ object HomeIntelligenceEngine {
                 )
             }
 
-            companyNews.firstOrNull()?.let { item ->
+            companyNewsEvidence.firstOrNull()?.let { evidence ->
+                val item = companyNews.firstOrNull { it.id == evidence.id.removePrefix("news:") } ?: return@let
                 add(
                     HomeIntelligenceItem(
                         id = "news-${item.id}",
                         type = HomeIntelligenceType.NEWS,
-                        symbol = item.symbol,
-                        company = item.companyName,
-                        fact = item.title,
-                        calculation = if (item.summary.isNotBlank()) item.summary else "",
+                        symbol = evidence.symbol.orEmpty(),
+                        company = evidence.companyName.orEmpty(),
+                        fact = evidence.claim,
+                        calculation = evidence.value.orEmpty(),
                         interpretation = "The story is presented as news; no financial conclusion is inferred from the headline alone.",
                         evidence = listOf(
                             HomeEvidenceReference(
-                                id = "NEWS-${item.id}",
-                                source = item.source.ifBlank { "News feed" },
-                                sourceUrl = item.url,
-                                date = item.publishedAt,
-                                symbol = item.symbol,
+                                id = evidence.id,
+                                source = evidence.source.ifBlank { "News feed" },
+                                sourceUrl = evidence.sourceUrl.orEmpty(),
+                                date = evidence.publishedAt.orEmpty(),
+                                symbol = evidence.symbol.orEmpty(),
                                 category = item.category
                             )
                         ),
-                        source = listOf(item.companyName.ifBlank { item.symbol }, item.source)
+                        source = listOf(evidence.companyName.orEmpty().ifBlank { evidence.symbol.orEmpty() }, evidence.source)
                             .filter { it.isNotBlank() }
                             .joinToString(" • ")
                             .ifBlank { "News feed" },
-                        sourceUrl = item.url
+                        sourceUrl = evidence.sourceUrl.orEmpty()
                     )
                 )
             }
+
         }
 
         val changes = buildList {
