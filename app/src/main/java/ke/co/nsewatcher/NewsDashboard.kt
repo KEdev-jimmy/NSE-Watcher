@@ -188,10 +188,10 @@ fun NewsDashboard(open: (NewsItem) -> Unit) {
                             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.Whatshot, null, tint = NewsGreen, modifier = Modifier.size(22.dp))
                                 Spacer(Modifier.width(6.dp))
-                                Text("Most Trending News", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = NewsText)
+                                Text("More News", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp, color = NewsText)
                             }
                             Surface(shape = RoundedCornerShape(20.dp), color = NewsLight) {
-                                Text("View all trending →", color = NewsGreen, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
+                                Text("More stories", color = NewsGreen, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
                             }
                         }
                     }
@@ -221,7 +221,7 @@ fun NewsDashboard(open: (NewsItem) -> Unit) {
 
             item {
                 Text(
-                    "Pull down to refresh. News and corporate-action information is sourced through the MyStocks market-intelligence feed. Verify important announcements against the issuer or exchange source.",
+                    "Pull down to refresh. News and corporate-action information is assembled from the connected market-intelligence sources. Each article shows its available source and date; verify important announcements against the issuer or exchange source.",
                     color = NewsMuted,
                     fontSize = 8.sp,
                     modifier = Modifier.padding(horizontal = 3.dp)
