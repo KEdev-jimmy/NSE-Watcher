@@ -452,11 +452,11 @@ private fun IntelligenceItem(
             Spacer(Modifier.height(7.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val freshness = primaryEvidence?.freshness?.takeIf { it.isNotBlank() }
-                val provenanceText = listOf(
-                    evidenceSource,
-                    evidenceDate,
+                val provenanceText = listOfNotNull(
+                    evidenceSource.takeIf { it.isNotBlank() },
+                    evidenceDate.takeIf { it.isNotBlank() },
                     freshness?.let(::homeFreshnessLabel)
-                ).filter { it.isNotBlank() }.joinToString(" • ")
+                ).joinToString(" • ")
 
                 Surface(
                     modifier = Modifier.weight(1f),
