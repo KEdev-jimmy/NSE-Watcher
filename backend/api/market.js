@@ -98,41 +98,18 @@ module.exports = async (req, res) => {
       return json(res, 200, { source: 'MyStocks Africa', delayMinutes: 15, fetchedAt: new Date().toISOString(), data });
     }
     if (action === 'indices') {
-      // MyStocks exposes NSE index symbols through the market-quotes surface.
-      // We only return verified provider records; unavailable indices are omitted.
-      const data = await mystocks('/market/quotes?symbols=%5ENASI,%5EN20I,%5EN25I');
-      const raw = Array.isArray(data?.data) ? data.data
-        : data?.data && typeof data.data === 'object' ? Object.values(data.data)
-        : Array.isArray(data?.quotes) ? data.quotes
-        : [];
-      const indices = raw
-        .map((item) => {
-          const symbol = String(item?.symbol || item?.ticker || '').trim();
-          const name = String(item?.name || item?.description || '').trim();
-          const price = Number(item?.price ?? item?.last ?? item?.close);
-          const previousClose = Number(item?.previousClose ?? item?.prevClose);
-          const suppliedChange = Number(item?.changePct ?? item?.changePercent);
-          const changePct = Number.isFinite(suppliedChange)
-            ? suppliedChange
-            : Number.isFinite(price) && Number.isFinite(previousClose) && previousClose > 0
-              ? ((price - previousClose) / previousClose) * 100
-              : null;
-          return {
-            symbol,
-            name,
-            value: Number.isFinite(price) ? price : null,
-            previousClose: Number.isFinite(previousClose) ? previousClose : null,
-            changePct: Number.isFinite(changePct) ? changePct : null,
-            asOf: item?.asOf || item?.timestamp || null,
-          };
-        })
-        .filter((item) => item.symbol && item.value !== null);
+      // MyStocks' documented market-quote surface does not provide a verified
+      // official NSE index contract. Do not send guessed index symbols to the
+      // provider: that produces a misleading provider error instead of an
+      // honest unavailable state.
       return json(res, 200, {
-        source: 'MyStocks Africa',
+        source: null,
         delayMinutes: null,
         fetchedAt: new Date().toISOString(),
-        indices,
-        requested: ['^NASI', '^N20I', '^N25I'],
+        indices: [],
+        requested: ['NASI', 'NSE 20 Share Index', 'NSE 25 Share Index'],
+        availability: 'unavailable',
+        reason: 'No verified official NSE index data source is configured.',
       });
     }
     if (action === 'movers') {
