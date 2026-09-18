@@ -1765,20 +1765,18 @@ The Home news intelligence item now reuses the existing `homeEvidenceReference()
 
 ### Verification
 
-A new Android CI run is required for commit 4484661fc2c1a6194abf8dcce483e8a80d6e93b1.
-
-Do not mark Step 4 complete until that run is green.
+Android CI #497 and #498 subsequently passed, so Step 4 is verified and complete.
 
 ### Next step
 
-After the fix is verified, continue Phase 12 Step 5: field-level company data quality, source attribution and conflict handling.
+Continue Phase 12 Step 5: field-level company data quality, source attribution and conflict handling.
 
 
 # 53. PHASE 12 — STEP 5: COMPANY DATA QUALITY & SOURCE ATTRIBUTION
 
 ## Status
 
-**IMPLEMENTED — REQUIRES CI VERIFICATION**
+**IMPLEMENTED — CI VERIFICATION IN PROGRESS**
 
 ### Verified CI prerequisite
 
@@ -1836,6 +1834,32 @@ The current company backend still distinguishes response `fetchedAt` from financ
 - `d2df4fd0198c4a53397c8b16ada5a079aae8be19` — align company evidence with field sources
 - `abfaaf0e04717986caae9c72f615447b69456448` — fix comparison whitespace normalization
 
+### Focused regression tests added
+
+A small Node test suite now covers the core company-quality invariants:
+
+- single-source field → AVAILABLE
+- missing field → UNAVAILABLE
+- equivalent formatting from two providers → no false conflict
+- differing provider values → CONFLICT with both values preserved
+- conflict evidence → both provider values, never silent selection
+
+The CI workflow now runs:
+
+`node --test backend/test/companyIntelligence.test.js`
+
+Files added/changed for this verification layer:
+
+- `backend/test/companyIntelligence.test.js`
+- `.github/workflows/android.yml`
+- `backend/lib/companyIntelligence.js` (testable helper exports)
+
+Commits:
+
+- `f835307043d5e647a9abadb2ceebcb1d822eb342` — expose company quality helpers for tests
+- `5866f0782e0b1d62f57e62f5a1e7136f26ea672a` — add company quality regression tests
+- `9e72070d6af16384edb2e5072fde2227515a9ccd` — run company quality regression tests in CI
+
 ### Next step
 
-Run Android CI for the current Step 5 changes. If green, add focused tests for field-level provenance/conflict behavior before closing Phase 12.
+Wait for the CI run triggered by commit 9e72070d6af16384edb2e5072fde2227515a9ccd. If green, mark Step 5 complete and proceed to the final Phase 12 evidence-quality closure audit.
