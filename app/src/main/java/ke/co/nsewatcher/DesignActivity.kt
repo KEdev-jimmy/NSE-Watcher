@@ -68,7 +68,7 @@ data class NewsItem(
 private val liveStocks = mutableStateOf(emptyList<Stock>())
 private val stocks: List<Stock> get() = liveStocks.value
 
-private enum class Page { HOME, MARKET, NEWS, COMPANIES, PAPER, MORE, COMPANY, NEWS_DETAIL, PROFILE, SETTINGS, THEME, NOTIFICATIONS, LIVE_DATA, CHARTS, ALERTS, LANGUAGE, SECURITY, PRIVACY, DISPLAY, HELP, ABOUT }
+private enum class Page { HOME, MARKET, NEWS, COMPANIES, PAPER, MORE, COMPANY, WATCHLIST, NEWS_DETAIL, PROFILE, SETTINGS, THEME, NOTIFICATIONS, LIVE_DATA, CHARTS, ALERTS, LANGUAGE, SECURITY, PRIVACY, DISPLAY, HELP, ABOUT }
 
 class DesignActivity : ComponentActivity() {
     private val picker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
@@ -111,8 +111,9 @@ private fun App(pickAvatar:()->Unit) {
     val scheme=if(dark) darkColorScheme(primary=Color(0xFF32D486),background=Color(0xFF0D1712),surface=Color(0xFF132019),onSurface=Color.White,onBackground=Color.White,onSurfaceVariant=Color(0xFFB7C7BE)) else lightColorScheme(primary=Green,background=Color.White,surface=Color.White,onSurface=TextDark,onBackground=TextDark,onSurfaceVariant=Muted)
     MaterialTheme(colorScheme=scheme){Surface(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing),color=scheme.background){
         when(page){
-            Page.HOME,Page.MARKET,Page.NEWS,Page.COMPANIES,Page.PAPER,Page.MORE -> Scaffold(topBar={if(page!=Page.HOME && page!=Page.MARKET) TopBar(name,::go)},bottomBar={BottomNav(tab){tab=it;history=emptyList();page=when(it){0->Page.HOME;1->Page.MARKET;2->Page.NEWS;3->Page.COMPANIES;else->Page.MORE}}}){pad->Box(Modifier.fillMaxSize().padding(pad)){when(page){Page.HOME->HomeDashboard(stocks,{selected=it;go(Page.COMPANY)},{selectedNews=it;go(Page.NEWS_DETAIL)});Page.MARKET->MarketDashboard(stocks);Page.NEWS->NewsDashboard{selectedNews=it;go(Page.NEWS_DETAIL)};Page.COMPANIES->Companies{selected=it;go(Page.COMPANY)};Page.PAPER->Paper();else->More(::go)}}}
+            Page.HOME,Page.MARKET,Page.NEWS,Page.COMPANIES,Page.PAPER,Page.MORE -> Scaffold(topBar={if(page!=Page.HOME && page!=Page.MARKET) TopBar(name,::go)},bottomBar={BottomNav(tab){tab=it;history=emptyList();page=when(it){0->Page.HOME;1->Page.MARKET;2->Page.NEWS;3->Page.COMPANIES;else->Page.MORE}}}){pad->Box(Modifier.fillMaxSize().padding(pad)){when(page){Page.HOME->HomeDashboard(stocks,{selected=it;go(Page.COMPANY)},{selectedNews=it;go(Page.NEWS_DETAIL)});Page.MARKET->MarketDashboard(stocks);Page.NEWS->NewsDashboard{selectedNews=it;go(Page.NEWS_DETAIL)};Page.COMPANIES->Companies({selected=it;go(Page.COMPANY)},{go(Page.WATCHLIST)});Page.PAPER->Paper();else->More(::go)}}}
             Page.COMPANY->Company(selected,::back)
+            Page.WATCHLIST->Watchlist({selected=it;go(Page.COMPANY)},::back)
             Page.NEWS_DETAIL->selectedNews?.let { NewsDetail(it,::back) }
             Page.PROFILE->Profile(name,username,email,description,{name=it;put("profile_name",it)},{username=it;put("username",it)},{email=it;put("email",it)},{description=it;put("description",it)},pickAvatar,::back,::go)
             Page.SETTINGS->Settings(dark,marketAlerts,priceAlerts,newsAlerts,appAlerts,autoRefresh,showVolume,showChanges,{dark=it;put("dark_mode",it)},{marketAlerts=it;put("market_alerts",it)},{priceAlerts=it;put("price_alerts",it)},{newsAlerts=it;put("news_alerts",it)},{appAlerts=it;put("app_alerts",it)},{autoRefresh=it;put("auto_refresh",it)},{showVolume=it;put("show_volume",it)},{showChanges=it;put("show_changes",it)},::back,::go)
@@ -278,7 +279,7 @@ private fun formatShares(value:Long):String = when {
 }}}
 
 @Composable
-private fun Companies(open:(Stock)->Unit){
+private fun Companies(open:(Stock)->Unit, openWatchlist:()->Unit){
     var query by rememberSaveable{mutableStateOf("")}
     val filtered=stocks.filter{it.name.contains(query,true)||it.symbol.contains(query,true)}
     Box(Modifier.fillMaxSize().background(Color(0xFF062A23))){
@@ -291,11 +292,80 @@ private fun Companies(open:(Stock)->Unit){
                 }
             }
             item{OutlinedTextField(value=query,onValueChange={query=it},modifier=Modifier.fillMaxWidth(),singleLine=true,placeholder={Text("Search companies...",color=Muted)},leadingIcon={Icon(Icons.Default.Search,null,tint=Muted)},shape=RoundedCornerShape(24.dp),colors=OutlinedTextFieldDefaults.colors(unfocusedContainerColor=Color.White,focusedContainerColor=Color.White,unfocusedBorderColor=Color.Transparent,focusedBorderColor=Green,unfocusedTextColor=TextDark,focusedTextColor=TextDark))}
-            item{Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text("Companies",color=Color.White,fontWeight=FontWeight.ExtraBold,fontSize=17.sp);Spacer(Modifier.weight(1f));Text("View all",color=Color(0xFF55E0A0),fontSize=11.sp,fontWeight=FontWeight.Bold)}}
+            item{Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text("Companies",color=Color.White,fontWeight=FontWeight.ExtraBold,fontSize=17.sp);Spacer(Modifier.weight(1f));OutlinedButton(onClick=openWatchlist,shape=RoundedCornerShape(18.dp),border=BorderStroke(1.dp,Color(0xFF55E0A0)),contentPadding=PaddingValues(horizontal=11.dp,vertical=4.dp)){Icon(Icons.Default.StarBorder,null,tint=Color(0xFF55E0A0),modifier=Modifier.size(16.dp));Spacer(Modifier.width(4.dp));Text("Watchlist",color=Color(0xFF55E0A0),fontSize=10.sp,fontWeight=FontWeight.Bold)}}}
             item{Card(Modifier.fillMaxWidth(),RoundedCornerShape(17.dp),colors=CardDefaults.cardColors(containerColor=Color.White)){Column(Modifier.padding(horizontal=12.dp)){filtered.forEachIndexed{index,s->Row(Modifier.fillMaxWidth().clickable{open(s)}.padding(vertical=10.dp),verticalAlignment=Alignment.CenterVertically){Logo(s.symbol,40,s.logoUrl);Spacer(Modifier.width(10.dp));Column(Modifier.weight(1f)){Text(s.name,color=TextDark,fontWeight=FontWeight.ExtraBold,fontSize=12.sp);Text(s.symbol,color=Muted,fontSize=10.sp);Text(String.format(Locale.US,"KSh %.2f",s.price),color=Muted,fontSize=10.sp)};Column(horizontalAlignment=Alignment.End){Text(String.format(Locale.US,"KSh %.2f",s.price),color=TextDark,fontWeight=FontWeight.Bold,fontSize=11.sp);Text(String.format(Locale.US,"%+.1f%%",s.change),color=if(s.change>=0)Green else Red,fontWeight=FontWeight.Bold,fontSize=10.sp)}};if(index<filtered.lastIndex)HorizontalDivider(color=Border)}}}}
         }
     }
 }
+@Composable
+private fun Watchlist(open: (Stock) -> Unit, back: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val watchlistStore = remember { WatchlistStore(context) }
+    val watchedSymbols by watchlistStore.symbols.collectAsState(initial = emptyList())
+    val scope = rememberCoroutineScope()
+
+    LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item { Header("Watchlist", "Companies you explicitly chose to follow", back) }
+        if (watchedSymbols.isEmpty()) {
+            item {
+                Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), border = BorderStroke(1.dp, Border)) {
+                    Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Surface(Modifier.size(58.dp), CircleShape, LightGreen) {
+                            Icon(Icons.Default.StarBorder, null, tint = Green, modifier = Modifier.padding(15.dp))
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        Text("Your watchlist is empty", fontWeight = FontWeight.ExtraBold, fontSize = 17.sp)
+                        Spacer(Modifier.height(4.dp))
+                        Text("Open a company and tap Watch to add it here. Nothing is added automatically.", color = Muted, fontSize = 10.sp, textAlign = TextAlign.Center)
+                    }
+                }
+            }
+        } else {
+            item {
+                Text("${watchedSymbols.size} ${if (watchedSymbols.size == 1) "company" else "companies"} watched", color = Muted, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+            }
+            items(watchedSymbols) { symbol ->
+                val stock = stocks.firstOrNull { it.symbol.trim().uppercase() == symbol.trim().uppercase() }
+                if (stock != null) {
+                    Card(Modifier.fillMaxWidth().clickable { open(stock) }, RoundedCornerShape(16.dp), border = BorderStroke(1.dp, Border)) {
+                        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Logo(stock.symbol, 42, stock.logoUrl)
+                            Spacer(Modifier.width(10.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(stock.name, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
+                                Text(stock.symbol, color = Muted, fontSize = 9.sp)
+                                Text(String.format(Locale.US, "KSh %.2f", stock.price), color = TextDark, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(String.format(Locale.US, "%+.2f%%", stock.change), color = if (stock.change >= 0) Green else Red, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                TextButton(onClick = { scope.launch { watchlistStore.remove(stock.symbol) } }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) {
+                                    Text("Remove", color = Muted, fontSize = 9.sp)
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    Card(Modifier.fillMaxWidth(), RoundedCornerShape(16.dp), border = BorderStroke(1.dp, Border)) {
+                        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Surface(Modifier.size(42.dp), CircleShape, LightGreen) {
+                                Icon(Icons.Default.HelpOutline, null, tint = Muted, modifier = Modifier.padding(11.dp))
+                            }
+                            Spacer(Modifier.width(10.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(symbol, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
+                                Text("Current market data unavailable", color = Muted, fontSize = 9.sp)
+                            }
+                            TextButton(onClick = { scope.launch { watchlistStore.remove(symbol) } }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) {
+                                Text("Remove", color = Muted, fontSize = 9.sp)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun Company(s: Stock, back: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -549,3 +619,4 @@ private fun Settings(dark:Boolean,market:Boolean,price:Boolean,news:Boolean,app:
 @Composable private fun HelpPage(back:()->Unit){LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){item{Header("Help & Support","Get help using NSE Watcher",back)};item{SettingsCard("Support",Icons.Default.HelpOutline){RowItem(Icons.Default.MenuBook,"Getting started","Learn how to read the market dashboard");RowItem(Icons.Default.QuestionMark,"Frequently asked questions","Common NSE Watcher questions");RowItem(Icons.Default.ReportProblem,"Report a problem","Tell us about an issue")}}}}
 @Composable private fun AboutPage(back:()->Unit){LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){item{Header("About NSE Watcher","Market intelligence for the NSE",back)};item{SettingsCard("NSE Watcher",Icons.Default.Info){Text("Version 0.1.0",fontWeight=FontWeight.Bold);Text("Trading apps help you buy. NSE Watcher helps you understand what you're buying.",fontSize=12.sp,color=Muted,modifier=Modifier.padding(top=7.dp));Spacer(Modifier.height(9.dp));Text("NSE Watcher does not execute real trades and does not guarantee investment returns.",fontSize=10.sp,color=Muted)}}}}
 @Composable private fun Note(text:String){Card(Modifier.fillMaxWidth(),RoundedCornerShape(14.dp),colors=CardDefaults.cardColors(containerColor=LightGreen)){Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically){Icon(Icons.Default.Info,null,tint=Green);Spacer(Modifier.width(9.dp));Text(text,fontSize=9.sp,color=Muted)}}}
+
