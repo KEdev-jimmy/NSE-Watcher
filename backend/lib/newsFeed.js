@@ -168,7 +168,7 @@ function withinWindow(item) {
 function isRelevantExternalNews(item) {
   const haystack = `${item.title} ${item.summary}`.toLowerCase();
   if (NSE_COMPANIES.some(([symbol, company]) => haystack.includes(company.toLowerCase()) || new RegExp(`\\b${symbol.replace(/[&.]/g, '\\$&')}\\b`, 'i').test(haystack))) return true;
-  return MARKET_RELEVANCE_TERMS.some(term => haystack.includes(term));
+  return INTELLIGENCE_MARKET_TERMS.some(term => haystack.includes(term));
 }
 
 function normalizeExternalNews(items) {
