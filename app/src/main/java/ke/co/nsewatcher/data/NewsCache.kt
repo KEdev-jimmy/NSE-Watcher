@@ -90,7 +90,9 @@ object NewsCache {
             url = item.optString("url").trim(),
             dividendAmount = item.optString("dividendAmount").trim(),
             exDate = item.optString("exDate").trim(),
-            paymentDate = item.optString("paymentDate").trim()
+            paymentDate = item.optString("paymentDate").trim(),
+            intelligenceRelevance = item.optString("intelligenceRelevance", "unknown").trim(),
+            intelligenceRelevanceReason = item.optString("intelligenceRelevanceReason").trim()
         )
     }
 
