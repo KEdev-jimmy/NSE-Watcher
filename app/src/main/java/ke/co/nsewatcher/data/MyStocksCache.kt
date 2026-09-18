@@ -98,7 +98,8 @@ object MyStocksCache {
     }
 
     suspend fun loadStocks(): List<Stock> = withContext(Dispatchers.IO) {
-        val base = loadFromUrl(BACKEND_STOCKS_URL).takeIf { it.isNotEmpty() } ?: loadFromUrl(FALLBACK_URL)
+        val backend = loadFromUrl(BACKEND_STOCKS_URL, "backend")
+        val base = backend.takeIf { it.isNotEmpty() } ?: loadFromUrl(FALLBACK_URL, "fallback")
         if (base.isEmpty()) return@withContext emptyList()
         base.map { stock ->
             if (stock.symbol in chartSymbols) {
@@ -183,7 +184,7 @@ object MyStocksCache {
         }.getOrDefault("UNKNOWN")
     }
 
-    private fun loadFromUrl(url: String): List<Stock> = runCatching {
+    private fun loadFromUrl(url: String, dataOrigin: String): List<Stock> = runCatching {
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"; connectTimeout = 8_000; readTimeout = 8_000
             setRequestProperty("Accept", "application/json")
@@ -216,10 +217,21 @@ object MyStocksCache {
                     val volumeValue = item.optDouble("volume", Double.NaN)
                     val volumeAvailable = volumeValue.isFinite() && volumeValue >= 0.0
                     val volume = if (volumeAvailable) volumeValue.toLong() else 0L
+                    val source = item.optString("source", "").trim().ifBlank { if (dataOrigin == "backend") "MyStocks Africa" else "NSE Watcher fallback catalogue" }
+                    val observedAt = item.optString("lastPriceUpdate", "").trim().ifBlank { item.optString("asOf", "").trim() }
+                    val freshnessMode = stockFreshnessMode(observedAt)
                     val historyStart = if (previousClose.isFinite() && previousClose > 0.0) previousClose else price
-                    add(Stock(symbol, name, price, changePct, listOf(historyStart, price), item.optString("logoUrl").takeIf { it.isNotBlank() }, item.optString("sector", "Other").ifBlank { "Other" }, volume, changeAvailable, volumeAvailable))
+                    add(Stock(symbol, name, price, changePct, listOf(historyStart, price), item.optString("logoUrl").takeIf { it.isNotBlank() }, item.optString("sector", "Other").ifBlank { "Other" }, volume, changeAvailable, volumeAvailable, source, observedAt, freshnessMode, dataOrigin))
                 }
             }
         } finally { connection.disconnect() }
-    }.getOrDefault(emptyList())
+
+    private fun stockFreshnessMode(observedAt: String): String {
+        if (observedAt.isBlank()) return "UNKNOWN"
+        val now = java.time.Instant.now().atZone(java.time.ZoneId.of("Africa/Nairobi"))
+        val instant = runCatching { java.time.Instant.parse(observedAt) }.getOrNull()
+        if (instant != null) return if (instant.atZone(java.time.ZoneId.of("Africa/Nairobi")).toLocalDate().isBefore(now.toLocalDate())) "STALE" else "UNKNOWN"
+        val date = runCatching { java.time.LocalDate.parse(observedAt.take(10)) }.getOrNull() ?: return "UNKNOWN"
+        return if (date.isBefore(now.toLocalDate())) "STALE" else "UNKNOWN"
+    }
 }
