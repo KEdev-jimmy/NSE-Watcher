@@ -45,7 +45,6 @@ import androidx.compose.ui.unit.sp
 import java.util.Locale
 import ke.co.nsewatcher.data.MyStocksCache
 import ke.co.nsewatcher.data.NewsCache
-import ke.co.nsewatcher.data.WatchlistStore
 import kotlinx.coroutines.launch
 import ke.co.nsewatcher.data.WatchlistStore
 
