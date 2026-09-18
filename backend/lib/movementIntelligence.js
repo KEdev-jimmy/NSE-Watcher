@@ -219,7 +219,12 @@ async function handler(req, res) {
     const quote = quoteResult.status === 'fulfilled' ? currentQuote(quoteResult.value) : currentQuote({});
     const candles = historyResult.status === 'fulfilled' ? normalizeCandles(historyResult.value) : [];
     const move = latestMove(candles, 1) || (quote.changePct !== null ? { change: formatPct(quote.changePct), changePct: quote.changePct, from: '', to: '', priceBefore: null, priceAfter: quote.price, periodDays: 1 } : null);
-    const news = newsResult.status === 'fulfilled' ? newsItems(newsResult.value) : [];
+    const news = newsResult.status === 'fulfilled'
+      ? newsItems(newsResult.value).filter(item => {
+          const text = [item.title, item.description].join(' ').toLowerCase();
+          return /nse|nairobi securities exchange|capital markets|stock market|share price|shareholders|dividend|payout|earnings|revenue|financial results|financial statements|eps|rights issue|bonus issue|share split|acquisition|merger|takeover|ipo|bond|treasury|cbk|central bank|cma|investor|trading|broker|reit|etf|interest rate|inflation|forex|shilling|corporate action|agm|profit warning|profit after tax|net income|regulatory approval|regulatory action|fine|penalty|license|licence|suspension/.test(text);
+        })
+      : [];
     const dividends = dividendsResult.status === 'fulfilled' ? dividendItems(dividendsResult.value) : [];
     const moveDate = move?.to || isoDate(new Date());
 
