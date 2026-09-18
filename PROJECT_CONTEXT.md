@@ -1506,3 +1506,45 @@ No new provider, duplicate data architecture, fabricated values, or portfolio as
 Implementation commit: ee9d839824b601f6812a2dbd2486bf763733a570b
 
 Next step: verify the Android CI result. If green, Phase 11 can undergo final closure review; otherwise inspect the actual CI failure before further changes.
+
+# 45. PHASE 11 — FINAL CLOSURE AUDIT
+
+## Status
+
+**COMPLETE**
+
+Phase 11 has passed its final closure review. The user confirmed the latest Android CI for the watchlist hardening change completed successfully.
+
+### Closure checklist
+
+- Watchlist storage is user-owned and empty by default.
+- Companies enter the watchlist only through an explicit Watch action.
+- Watchlist add/remove state is persisted through the existing DataStore-backed WatchlistStore.
+- Company Intelligence exposes Watch / Watching state using the same persisted store.
+- A dedicated Watchlist page is reachable from Companies through existing navigation.
+- Watchlist entries are hydrated from the existing MyStocks real stock feed; no demo repository or fallback market values are used.
+- Available entries show provider-backed price and daily change.
+- Missing provider data is represented as unavailable rather than fabricated.
+- Users can open the existing Company Intelligence page from a watched company.
+- Users can remove a watched company from the Watchlist page.
+- Empty watchlist behavior is explicit and honest.
+- Watchlist is kept separate from portfolio/holdings; no ownership or broker/CDS data is inferred.
+- Watchlist market-data provenance and delay caveat are visible.
+- Existing company evidence/intelligence architecture remains the source for the detailed company view.
+- No parallel market-data or intelligence architecture was introduced.
+- Android CI for the latest Phase 11 hardening was confirmed successful by the user.
+- The repository's existing Home intelligence tests continue to cover evidence graph, index observations, freshness provenance, gainers/losers, sector calculations and evidence-grounded news behavior.
+
+### Known limitation carried forward
+
+There is not yet a dedicated unit-test suite for the Android DataStore-backed WatchlistStore/UI flow. The flow has been structurally audited and CI-verified, but device-level interaction testing remains a future QA improvement rather than a reason to block Phase 11 closure.
+
+### Phase 11 result
+
+The app now has a genuine, user-controlled watchlist foundation and user-facing flow without pretending that watchlist membership equals ownership or inventing market data.
+
+### Next phase
+
+**Phase 12 — Evidence Quality & Data Confidence**
+
+Focus on the quality, completeness, freshness and transparency of evidence across the app. Preserve the existing principle: raw data → calculation → explanation → evidence. Do not jump to AI-generated conclusions until the evidence/data-quality layer is sufficiently trustworthy.
