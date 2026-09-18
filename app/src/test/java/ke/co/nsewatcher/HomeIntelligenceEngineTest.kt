@@ -71,4 +71,19 @@ class HomeIntelligenceEngineTest {
         assertEquals("Issuer", item.evidence.single().source)
         assertEquals("2026-09-17", item.evidence.single().date)
     }
+    @Test
+    fun indexObservationsArePartOfHomeEvidenceGraph() {
+        val snapshot = HomeIntelligenceEngine.build(
+            listOf(stock("ABC", 1.0, "Banking")),
+            emptyList(),
+            listOf(HomeMarketIndex("^NASI", "NSE All-Share Index", 235.26, -0.98, "2026-09-17"))
+        )
+
+        assertEquals(1, snapshot.marketIndices.size)
+        val evidence = snapshot.evidenceGraph.record("index:^nasi")
+        assertTrue(evidence != null)
+        assertEquals("MyStocks Africa", evidence?.source)
+        assertEquals("2026-09-17", evidence?.observedAt)
+    }
+
 }
