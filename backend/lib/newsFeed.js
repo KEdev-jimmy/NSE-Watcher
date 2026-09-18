@@ -1,4 +1,4 @@
-const { intelligenceRelevance } = require('./newsRelevance');
+const { intelligenceRelevance, INTELLIGENCE_MARKET_TERMS } = require('./newsRelevance');
 const { loadRssSources, sourceRegistry } = require('./newsSources');
 
 const BASE_URL = process.env.MYSTOCKS_BASE_URL || 'https://mystocks.africa/api/v1/partner';
