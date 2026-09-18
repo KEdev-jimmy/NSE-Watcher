@@ -474,7 +474,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit) {
             IntelligenceCard {
                 EvidenceRow("Coverage", "${intelligenceView.quality.state} • ${intelligenceView.quality.availableCount}/5 areas")
                 EvidenceRow("Evidence", "${intelligenceView.quality.evidenceCount} sourced claims returned")
-                EvidenceRow("Confidence", intelligenceView.confidence)
+                EvidenceRow("Evidence coverage", intelligenceView.evidenceCoverage)
             }
         }
 
