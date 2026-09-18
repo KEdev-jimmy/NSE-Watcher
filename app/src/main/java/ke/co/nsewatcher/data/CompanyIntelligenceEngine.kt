@@ -4,6 +4,7 @@ import ke.co.nsewatcher.NewsItem
 import ke.co.nsewatcher.Stock
 import ke.co.nsewatcher.domain.EvidenceAdapters
 import ke.co.nsewatcher.domain.EvidenceRecord
+import ke.co.nsewatcher.domain.EvidenceGraph
 import java.util.Locale
 import kotlin.math.abs
 
@@ -47,7 +48,8 @@ object CompanyIntelligenceEngine {
         val unknowns: List<String>,
         val quality: DataQuality,
         val evidenceCoverage: String,
-        val evidenceRecords: List<EvidenceRecord>
+        val evidenceRecords: List<EvidenceRecord>,
+        val evidenceGraph: EvidenceGraph
     )
 
     fun build(
@@ -138,6 +140,7 @@ object CompanyIntelligenceEngine {
         val evidenceRecords = (source.evidence.mapNotNull { EvidenceAdapters.fromCompanyEvidence(it) } +
             news.mapNotNull { EvidenceAdapters.fromNews(it) })
             .distinctBy { it.id }
+        val evidenceGraph = EvidenceGraph.of(evidenceRecords, emptyList())
 
         val quality = DataQuality(
             profile = profile.description.isNotBlank() || profile.sector.isNotBlank() || profile.revenue.isNotBlank(),
@@ -171,7 +174,8 @@ object CompanyIntelligenceEngine {
             unknowns = unknowns.distinct().take(8),
             quality = quality,
             evidenceCoverage = evidenceCoverage,
-            evidenceRecords = evidenceRecords
+            evidenceRecords = evidenceRecords,
+            evidenceGraph = evidenceGraph
         )
     }
 
