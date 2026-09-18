@@ -42,7 +42,8 @@ object EvidenceAdapters {
             value = item.summary.takeIf { it.isNotBlank() },
             source = item.source,
             sourceUrl = item.url.takeIf { it.isNotBlank() },
-            publishedAt = item.publishedAt.takeIf { it.isNotBlank() }
+            publishedAt = item.publishedAt.takeIf { it.isNotBlank() },
+            freshness = item.freshnessMode
         )
     }
 
