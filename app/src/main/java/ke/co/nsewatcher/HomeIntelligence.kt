@@ -234,7 +234,7 @@ object HomeIntelligenceEngine {
                                 homeEvidenceReference(it, "market calculation")
                             }
                         ),
-                        source = "MyStocks Africa • calculated from current stock feed"
+                        source = evidenceGraph.record("calculation:sector-${sector.sector.lowercase(Locale.US)}")?.source.orEmpty()
                     )
                 )
             }
@@ -253,7 +253,7 @@ object HomeIntelligenceEngine {
                                 homeEvidenceReference(it, "market movement")
                             }
                         ),
-                        source = "MyStocks Africa • current stock feed"
+                        source = evidenceGraph.record("market:${stock.symbol.lowercase()}")?.source.orEmpty()
                     )
                 )
             }
