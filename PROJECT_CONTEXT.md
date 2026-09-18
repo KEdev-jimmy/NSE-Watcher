@@ -1772,3 +1772,70 @@ Do not mark Step 4 complete until that run is green.
 ### Next step
 
 After the fix is verified, continue Phase 12 Step 5: field-level company data quality, source attribution and conflict handling.
+
+
+# 53. PHASE 12 — STEP 5: COMPANY DATA QUALITY & SOURCE ATTRIBUTION
+
+## Status
+
+**IMPLEMENTED — REQUIRES CI VERIFICATION**
+
+### Verified CI prerequisite
+
+Android CI **#497** and **#498** are both successful. Run #497 validated the Step 4 freshness propagation fix; run #498 validated the documentation commit.
+
+### Step 5 changes
+
+Company intelligence now exposes field-level provenance for material company fields:
+
+- market capitalization
+- revenue
+- profit
+- EPS
+- ROE
+- debt/equity
+- net margin
+- revenue growth
+- profit growth
+- P/E
+- P/B
+- dividend yield
+
+For each field the backend now reports:
+
+- `fieldSources`
+- `fieldQuality`: AVAILABLE, UNAVAILABLE or CONFLICT
+- `conflicts` with both provider values when MyStocks Africa and StockAnalysis / S&P Global Market Intelligence disagree
+
+The system does not silently hide a disagreement. Conflict evidence is represented explicitly with both values and a `CONFLICT` source label.
+
+Company evidence generation now uses the actual field source:
+- external-only field → StockAnalysis / S&P Global Market Intelligence
+- MyStocks-only field → MyStocks Africa
+- conflicting field → explicit CONFLICT evidence containing both values
+
+Android parses and displays this metadata in the Company Intelligence page.
+
+The Company Intelligence provenance panel also stopped presenting a universal hardcoded market-data source/freshness label. It now uses the stock's actual ingestion source and freshness state.
+
+### Important limitation
+
+The current company backend still distinguishes response `fetchedAt` from financial reporting periods mainly through the existing `financialHistory.period`. A future refinement may add a normalized observation-period field to every material metric, especially valuation ratios. Step 5 does not invent dates that providers do not supply.
+
+### Files changed
+
+- `backend/lib/companyIntelligence.js`
+- `app/src/main/java/ke/co/nsewatcher/data/CompanyIntelligenceCache.kt`
+- `app/src/main/java/ke/co/nsewatcher/CompanyIntelligence.kt`
+
+### Commits
+
+- `dd42d357ce3179094344f69622b90f3ca10f9cc6` — add company field provenance and conflict quality
+- `e131d7234b6b4ed7036448fa070bb2bf3a76cf9e` — parse company field quality metadata
+- `9d5e3d748c01fb25115c87fbf82d77f8f066ad76` — show company data quality and source attribution
+- `d2df4fd0198c4a53397c8b16ada5a079aae8be19` — align company evidence with field sources
+- `abfaaf0e04717986caae9c72f615447b69456448` — fix comparison whitespace normalization
+
+### Next step
+
+Run Android CI for the current Step 5 changes. If green, add focused tests for field-level provenance/conflict behavior before closing Phase 12.
