@@ -143,13 +143,13 @@ object EvidenceAdapters {
     }
 
     private fun companyEvidenceId(evidence: CompanyIntelligenceCache.Evidence): String =
-        "company:" + evidence.symbol + ":" + evidence.source + ":" + evidence.endpoint + ":" +
-            evidence.claim + ":" + evidence.value
+        ("company:" + evidence.symbol + ":" + evidence.source + ":" + evidence.endpoint + ":" +
+            evidence.claim + ":" + evidence.value)
             .lowercase()
             .replace(Regex("[^a-z0-9:.%+/_-]+"), "-")
 
     private fun movementEvidenceId(symbol: String, evidence: MovementIntelligenceCache.Evidence): String =
-        "movement:" + symbol + ":" + evidence.eventType + ":" + evidence.date + ":" + evidence.title
+        ("movement:" + symbol + ":" + evidence.eventType + ":" + evidence.date + ":" + evidence.title)
             .lowercase()
             .replace(Regex("[^a-z0-9:.%+/_-]+"), "-")
 }
