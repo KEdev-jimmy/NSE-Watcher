@@ -47,7 +47,8 @@ class HomeIntelligenceEngineTest {
             id = "n1", title = "Company announcement", summary = "Management update", body = "",
             source = "Issuer", publishedAt = "2026-09-17", category = "Company",
             symbol = "ABC", companyName = "ABC Holdings", imageUrl = "", url = "https://example.com/news",
-            dividendAmount = "", exDate = "", paymentDate = ""
+            dividendAmount = "", exDate = "", paymentDate = "",
+            intelligenceRelevance = "market", intelligenceRelevanceReason = "test market event"
         )
 
         val snapshot = HomeIntelligenceEngine.build(listOf(stock("ABC", 2.0, "Banking")), listOf(news))
