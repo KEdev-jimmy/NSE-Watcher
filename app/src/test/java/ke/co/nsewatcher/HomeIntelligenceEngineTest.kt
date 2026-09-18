@@ -104,4 +104,13 @@ class HomeIntelligenceEngineTest {
         assertTrue(snapshot.evidenceGraph.relatedTo("calculation:market-breadth").isNotEmpty())
     }
 
+    @Test
+    fun indexFreshnessModeIsPreservedInHomeModel() {
+        val current = HomeMarketIndex("^NASI", "NASI", 235.0, 1.0, "2026-09-18T09:30:00Z", HomeMarketDataMode.CURRENT_SESSION)
+        val endOfDay = HomeMarketIndex("^N20I", "NSE 20", 1900.0, -0.5, "2026-09-17", HomeMarketDataMode.END_OF_DAY)
+        val snapshot = HomeIntelligenceEngine.build(emptyList(), emptyList(), listOf(current, endOfDay))
+        assertEquals(HomeMarketDataMode.CURRENT_SESSION, snapshot.marketIndices.first().dataMode)
+        assertEquals(HomeMarketDataMode.END_OF_DAY, snapshot.marketIndices[1].dataMode)
+    }
+
 }
