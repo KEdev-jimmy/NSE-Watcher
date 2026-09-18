@@ -10,6 +10,7 @@ import java.net.URL
 object MyStocksCache {
     private const val BACKEND_STOCKS_URL = "https://nse-watcher.vercel.app/api/market?action=stocks"
     private const val BACKEND_STATUS_URL = "https://nse-watcher.vercel.app/api/market?action=status"
+    private const val BACKEND_INDICES_URL = "https://nse-watcher.vercel.app/api/market?action=indices"
     private const val BACKEND_CHART_URL = "https://nse-watcher.vercel.app/api/market?action=chart"
     private const val FALLBACK_URL = "https://raw.githubusercontent.com/KEdev-jimmy/NSE-Watcher/main/data/mystocks/stocks.json"
 
@@ -33,6 +34,39 @@ object MyStocksCache {
         val sessionOpenAt: String = "",
         val sessionCloseAt: String = ""
     )
+
+    data class MarketIndex(
+        val symbol: String,
+        val name: String,
+        val value: Double,
+        val changePct: Double?,
+        val asOf: String = ""
+    )
+
+    suspend fun loadMarketIndices(): List<MarketIndex> = withContext(Dispatchers.IO) {
+        runCatching {
+            val connection = (URL(BACKEND_INDICES_URL).openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"; connectTimeout = 8_000; readTimeout = 8_000
+                setRequestProperty("Accept", "application/json")
+            }
+            try {
+                if (connection.responseCode !in 200..299) return@runCatching emptyList()
+                val root = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
+                val array = root.optJSONArray("indices") ?: return@runCatching emptyList()
+                buildList {
+                    for (i in 0 until array.length()) {
+                        val item = array.optJSONObject(i) ?: continue
+                        val symbol = item.optString("symbol", "").trim()
+                        val name = item.optString("name", symbol).trim().ifBlank { symbol }
+                        val value = item.optDouble("value", Double.NaN)
+                        if (symbol.isBlank() || !value.isFinite()) continue
+                        val change = item.optDouble("changePct", Double.NaN)
+                        add(MarketIndex(symbol, name, value, change.takeIf { it.isFinite() }, item.optString("asOf", "")))
+                    }
+                }
+            } finally { connection.disconnect() }
+        }.getOrDefault(emptyList())
+    }
 
     data class MarketStatus(
         val isOpen: Boolean = false,
