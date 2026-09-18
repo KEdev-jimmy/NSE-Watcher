@@ -1331,3 +1331,8 @@ Same-day timestamped observations while the market is closed remain **UNKNOWN / 
 ### Next step
 
 Verify the correction with a new Android CI run. Then verify the deployed index endpoint returns actual NASI/N20/N25 observations. If provider data is empty, keep the UI omitted and investigate the supported provider endpoint/symbol format; never add fallback values.
+
+
+## 39.1 POST-CHANGE CI STATUS
+
+After the freshness correction, GitHub Actions run **457** was created for commit `943e9b70bdc115e98fb6cd9865f9c73a4dc7a64a`. At the latest audit check it was **in progress**, so the correction is **not yet declared CI-green**. No further code changes are being made until that verification completes.
