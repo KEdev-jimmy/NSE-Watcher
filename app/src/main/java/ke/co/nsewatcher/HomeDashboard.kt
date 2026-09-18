@@ -98,7 +98,7 @@ fun HomeDashboard(
         }
 
         item {
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(11.dp))
             SectionLabel("Today's Intelligence", "Evidence from the current market and news feed", Icons.Default.Psychology)
         }
 
@@ -115,7 +115,7 @@ fun HomeDashboard(
         }
 
         item {
-            Spacer(Modifier.height(17.dp))
+            Spacer(Modifier.height(12.dp))
             SectionLabel("What Changed?", "Observable changes — no invented causes", Icons.Default.ChangeCircle)
         }
         item {
@@ -129,7 +129,7 @@ fun HomeDashboard(
 
         if (gainers.isNotEmpty() || losers.isNotEmpty()) {
             item {
-                Spacer(Modifier.height(17.dp))
+                Spacer(Modifier.height(12.dp))
                 SectionLabel("Market Movers", "Current session movement", Icons.Default.Whatshot, openMarket)
             }
             item {
@@ -140,7 +140,7 @@ fun HomeDashboard(
 
         if (sectorChanges.isNotEmpty()) {
             item {
-                Spacer(Modifier.height(17.dp))
+                Spacer(Modifier.height(12.dp))
                 SectionLabel("Sector Pulse", "Average movement by sector", Icons.Default.Insights, openMarket)
             }
             item {
@@ -154,35 +154,31 @@ fun HomeDashboard(
             }
         }
 
-        if (corporateActions.isNotEmpty() || newsLoading) {
+        if (corporateActions.isNotEmpty()) {
             item {
-                Spacer(Modifier.height(17.dp))
+                Spacer(Modifier.height(12.dp))
                 SectionLabel("Corporate Actions", "Dividends, rights, bonuses and announcements", Icons.Default.Event, openMarket)
             }
             item {
                 Spacer(Modifier.height(7.dp))
-                if (corporateActions.isNotEmpty()) {
-                    Column(Modifier.padding(horizontal = 14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                        corporateActions.take(2).forEach { action ->
-                            CorporateActionCard(action) { openNews(action) }
-                        }
+                Column(Modifier.padding(horizontal = 14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    corporateActions.take(2).forEach { action ->
+                        CorporateActionCard(action) { openNews(action) }
                     }
-                } else {
-                    LoadingHomeCard("Loading corporate actions…")
                 }
             }
         }
 
         if (companyNews.isNotEmpty() || newsLoading || newsError != null) {
             item {
-                Spacer(Modifier.height(17.dp))
+                Spacer(Modifier.height(12.dp))
                 SectionLabel("Important News", "Company-linked information that may matter", Icons.Default.Lightbulb, openMarket)
             }
             item {
                 Spacer(Modifier.height(7.dp))
                 when {
                     companyNews.isNotEmpty() -> {
-                        Column(Modifier.padding(horizontal = 14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                        Column(Modifier.padding(horizontal = 14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             companyNews.take(3).forEach { story ->
                                 IntelligenceNewsCard(story) { openNews(story) }
                             }
@@ -198,7 +194,7 @@ fun HomeDashboard(
         }
 
         item {
-            Spacer(Modifier.height(17.dp))
+            Spacer(Modifier.height(12.dp))
             QuickActions(openMarket, if (news.isNotEmpty()) { { openNews(news.first()) } } else null)
             Spacer(Modifier.height(11.dp))
             Text(
@@ -357,12 +353,12 @@ private fun indexLabel(symbol: String): String = when (symbol) {
 @Composable
 private fun SectionLabel(title: String, subtitle: String, icon: ImageVector, onViewAll: (() -> Unit)? = null) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(30.dp).clip(RoundedCornerShape(9.dp)).background(HomeLightGreen)) {
-            Icon(icon, null, tint = HomeDarkGreen, modifier = Modifier.padding(6.dp))
+        Box(Modifier.size(27.dp).clip(RoundedCornerShape(8.dp)).background(HomeLightGreen)) {
+            Icon(icon, null, tint = HomeDarkGreen, modifier = Modifier.padding(5.dp))
         }
         Spacer(Modifier.width(8.dp))
         Column(Modifier.weight(1f)) {
-            Text(title, color = HomeTextDark, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
+            Text(title, color = HomeTextDark, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
             if (subtitle.isNotBlank()) Text(subtitle, color = HomeMuted, fontSize = 8.sp)
         }
         if (onViewAll != null) {
@@ -438,19 +434,19 @@ private fun IntelligenceItem(
     val evidenceDate = primaryEvidence?.date?.takeIf { it.isNotBlank() }?.let(::compactEvidenceDate) ?: ""
     val sourceUrl = primaryEvidence?.sourceUrl?.takeIf { it.startsWith("http://") || it.startsWith("https://") }
 
-    Card(Modifier.fillMaxWidth(), RoundedCornerShape(15.dp), colors = CardDefaults.cardColors(containerColor = Color.White), border = BorderStroke(1.dp, HomeBorder)) {
-        Column(Modifier.padding(11.dp)) {
+    Card(Modifier.fillMaxWidth(), RoundedCornerShape(13.dp), colors = CardDefaults.cardColors(containerColor = Color.White), border = BorderStroke(1.dp, HomeBorder)) {
+        Column(Modifier.padding(10.dp)) {
             Row(verticalAlignment = Alignment.Top) {
-                Box(Modifier.size(28.dp).clip(RoundedCornerShape(8.dp)).background(accent.copy(alpha = .11f)), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(26.dp).clip(RoundedCornerShape(7.dp)).background(accent.copy(alpha = .11f)), contentAlignment = Alignment.Center) {
                     Icon(if (type == "NEWS") Icons.Default.Article else Icons.Default.Insights, null, tint = accent, modifier = Modifier.size(16.dp))
                 }
                 Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f)) {
                     Text(type, color = accent, fontSize = 8.sp, fontWeight = FontWeight.ExtraBold)
                     Spacer(Modifier.height(2.dp))
-                    Text(title, color = HomeTextDark, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 15.sp)
+                    Text(title, color = HomeTextDark, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 14.sp)
                     Spacer(Modifier.height(3.dp))
-                    Text(detail.ifBlank { "No additional interpretation is available from the current evidence." }, color = HomeMuted, fontSize = 9.sp, lineHeight = 13.sp, maxLines = 3)
+                    Text(detail.ifBlank { "No additional interpretation is available from the current evidence." }, color = HomeMuted, fontSize = 8.sp, lineHeight = 12.sp, maxLines = 3)
                 }
             }
             Spacer(Modifier.height(7.dp))
