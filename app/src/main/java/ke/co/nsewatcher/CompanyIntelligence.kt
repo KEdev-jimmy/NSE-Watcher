@@ -189,25 +189,33 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(Modifier.height(8.dp))
-                MetricGrid(listOf(
-                    "Revenue" to formatFinancialValue(profile.revenue),
-                    "Profit" to formatFinancialValue(profile.profit),
-                    "EPS" to valueOrMissing(profile.eps),
-                    "ROE" to valueOrMissing(profile.roe),
-                    "Debt / Equity" to valueOrMissing(profile.debtToEquity),
-                    "Net margin" to valueOrMissing(profile.margin)
-                ))
+                MetricGrid(
+                    metrics = listOf(
+                        "Revenue" to formatFinancialValue(profile.revenue),
+                        "Profit" to formatFinancialValue(profile.profit),
+                        "EPS" to valueOrMissing(profile.eps),
+                        "ROE" to valueOrMissing(profile.roe),
+                        "Debt / Equity" to valueOrMissing(profile.debtToEquity),
+                        "Net margin" to valueOrMissing(profile.margin)
+                    ),
+                    fieldSources = intelligence.fieldSources,
+                    fieldQuality = intelligence.fieldQuality
+                )
             }
         }
 
         item { SectionTitle("Growth", "Year-over-year change in the latest reported figures", Icons.Default.TrendingUp) }
         item {
             IntelligenceCard {
-                MetricGrid(listOf(
-                    "Revenue trend" to valueOrMissing(profile.revenueGrowth),
-                    "Profit trend" to valueOrMissing(profile.profitGrowth),
-                    "EPS (latest)" to valueOrMissing(profile.eps)
-                ))
+                MetricGrid(
+                    metrics = listOf(
+                        "Revenue trend" to valueOrMissing(profile.revenueGrowth),
+                        "Profit trend" to valueOrMissing(profile.profitGrowth),
+                        "EPS (latest)" to valueOrMissing(profile.eps)
+                    ),
+                    fieldSources = intelligence.fieldSources,
+                    fieldQuality = intelligence.fieldQuality
+                )
                 Spacer(Modifier.height(8.dp))
                 Text("Growth compares the latest reported annual figures with the previous comparable annual period.", color = IntelligenceMuted, fontSize = 9.sp)
             }
@@ -216,12 +224,16 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
         item { SectionTitle("Valuation", "How the current price relates to reported metrics", Icons.Default.Calculate) }
         item {
             IntelligenceCard {
-                MetricGrid(listOf(
-                    "P/E" to valueOrMissing(profile.pe),
-                    "P/B" to valueOrMissing(profile.pb),
-                    "Dividend yield" to valueOrMissing(profile.dividendYield),
-                    "Market cap" to formatMarketCap(profile.marketCap)
-                ))
+                MetricGrid(
+                    metrics = listOf(
+                        "P/E" to valueOrMissing(profile.pe),
+                        "P/B" to valueOrMissing(profile.pb),
+                        "Dividend yield" to valueOrMissing(profile.dividendYield),
+                        "Market cap" to formatMarketCap(profile.marketCap)
+                    ),
+                    fieldSources = intelligence.fieldSources,
+                    fieldQuality = intelligence.fieldQuality
+                )
                 Spacer(Modifier.height(8.dp))
                 Text("Historical valuation context is not displayed until a sourced valuation history is available.", color = IntelligenceMuted, fontSize = 9.sp)
             }
@@ -581,15 +593,56 @@ private fun SectionTitle(title: String, subtitle: String, icon: androidx.compose
 }
 
 @Composable
-private fun MetricGrid(items: List<Pair<String, String>>) {
+private fun MetricGrid(
+    metrics: List<Pair<String, String>>,
+    fieldSources: Map<String, List<String>> = emptyMap(),
+    fieldQuality: Map<String, String> = emptyMap()
+) {
+    val sourceKeys = mapOf(
+        "Revenue" to "revenue",
+        "Revenue trend" to "revenueGrowth",
+        "Profit" to "profit",
+        "Profit trend" to "profitGrowth",
+        "EPS" to "eps",
+        "EPS (latest)" to "eps",
+        "ROE" to "roe",
+        "Debt / Equity" to "debtToEquity",
+        "Net margin" to "margin",
+        "P/E" to "pe",
+        "P/B" to "pb",
+        "Dividend yield" to "dividendYield",
+        "Market cap" to "marketCap"
+    )
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        items.chunked(2).forEach { row ->
+        metrics.chunked(2).forEach { row ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 row.forEach { (label, value) ->
+                    val key = sourceKeys[label].orEmpty()
+                    val sources = fieldSources[key].orEmpty()
+                    val quality = fieldQuality[key].orEmpty()
+                    val provenance = when {
+                        quality == "CONFLICT" -> "Sources differ"
+                        sources.size > 1 -> "2 sources"
+                        sources.size == 1 -> sources.first().removePrefix("StockAnalysis / ").removeSuffix(" Market Intelligence")
+                        else -> "Source unavailable"
+                    }
                     Surface(Modifier.weight(1f), RoundedCornerShape(13.dp), color = IntelligenceLight) {
                         Column(Modifier.padding(10.dp)) {
                             Text(label, color = IntelligenceMuted, fontSize = 8.sp)
                             Text(value, color = IntelligenceText, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+                            Spacer(Modifier.height(4.dp))
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = IntelligenceLight.copy(alpha = 0.7f)
+                            ) {
+                                Text(
+                                    provenance,
+                                    color = if (quality == "CONFLICT") IntelligenceRed else IntelligenceMuted,
+                                    fontSize = 7.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1
+                                )
+                            }
                         }
                     }
                 }
