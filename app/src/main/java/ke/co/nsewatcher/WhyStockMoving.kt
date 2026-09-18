@@ -1,5 +1,8 @@
 package ke.co.nsewatcher
 
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,6 +23,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ke.co.nsewatcher.data.MovementIntelligenceCache
+import ke.co.nsewatcher.domain.EvidenceAdapters
 import ke.co.nsewatcher.data.MyStocksCache
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -96,6 +101,7 @@ fun WhyStockMovingSection(symbol: String) {
                         Spacer(Modifier.height(12.dp))
 
                         val evidence = result.evidence.take(5)
+                        val normalizedEvidence = EvidenceAdapters.fromMovementResult(result).evidence.take(5)
                         if (evidence.isEmpty()) {
                             Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp), color = MovementLight) {
                                 Text("No dated company event was found close enough to the movement to link it as evidence.", Modifier.padding(11.dp), color = MovementText, fontSize = 10.sp)
@@ -104,7 +110,7 @@ fun WhyStockMovingSection(symbol: String) {
                             Text("What we found", color = MovementText, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
                             Spacer(Modifier.height(5.dp))
                             evidence.forEachIndexed { index, item ->
-                                MovementEvidenceRow(item)
+                                MovementEvidenceRow(item, normalizedEvidence.getOrNull(index)?.sourceUrl)
                                 if (index < evidence.lastIndex) HorizontalDivider(color = MovementBorder)
                             }
                         }
@@ -231,10 +237,14 @@ private fun nextRegularOpenLabel(): String {
 }
 
 @Composable
-private fun MovementEvidenceRow(evidence: MovementIntelligenceCache.Evidence) {
+private fun MovementEvidenceRow(evidence: MovementIntelligenceCache.Evidence, sourceUrl: String?) {
+    val context = LocalContext.current
+    val openSource = sourceUrl?.takeIf { it.startsWith("http://") || it.startsWith("https://") }?.let { url ->
+        { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+    }
     val relationshipLabel = when (evidence.relationship.lowercase()) { "related" -> "RELATED"; "possible" -> "POSSIBLE"; else -> "NOT ESTABLISHED" }
     val relationshipColor = when (evidence.relationship.lowercase()) { "related" -> MovementGreen; "possible" -> MovementAmber; else -> MovementMuted }
-    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.Top) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp).then(if (openSource != null) Modifier.clickable { openSource() } else Modifier), verticalAlignment = Alignment.Top) {
         Surface(Modifier.size(32.dp), RoundedCornerShape(9.dp), MovementLight) {
             Icon(if (evidence.eventType == "financial-results" || evidence.eventType == "dividend") Icons.Default.Insights else Icons.Default.Newspaper, null, tint = MovementGreen, modifier = Modifier.padding(7.dp))
         }
