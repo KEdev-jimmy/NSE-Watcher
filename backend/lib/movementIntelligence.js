@@ -89,15 +89,21 @@ function normalizeCandles(raw) {
 
 function latestMove(candles, days) {
   if (!candles.length) return null;
-  const latest = candles[candles.length - 1];
+  const validCandles = candles.filter(candle => Number.isFinite(candle.close) && candle.close > 0 && dateValue(candle.date));
+  if (!validCandles.length) return null;
+
+  const latest = validCandles[validCandles.length - 1];
   const cutoff = new Date(dateValue(latest.date).getTime() - days * 86400000);
   let previous = null;
-  for (const candle of candles) {
+  for (const candle of validCandles) {
     if (dateValue(candle.date) <= cutoff) previous = candle;
   }
-  if (!previous && candles.length > 1) previous = candles[Math.max(0, candles.length - Math.min(candles.length, days + 1))];
-  if (!previous || previous.close === null) return null;
+  if (!previous && validCandles.length > 1) previous = validCandles[Math.max(0, validCandles.length - Math.min(validCandles.length, days + 1))];
+  if (!previous || previous.close <= 0) return null;
+
   const change = pct(latest.close, previous.close);
+  if (change === null || !Number.isFinite(change)) return null;
+
   return {
     periodDays: days,
     from: isoDate(previous.date),
@@ -219,7 +225,11 @@ async function handler(req, res) {
 
     const quote = quoteResult.status === 'fulfilled' ? currentQuote(quoteResult.value) : currentQuote({});
     const candles = historyResult.status === 'fulfilled' ? normalizeCandles(historyResult.value) : [];
-    const move = latestMove(candles, 1) || (quote.changePct !== null ? { change: formatPct(quote.changePct), changePct: quote.changePct, from: '', to: '', priceBefore: null, priceAfter: quote.price, periodDays: 1 } : null);
+    const safeQuoteChange = Number.isFinite(quote.changePct) && Number.isFinite(quote.price) && quote.price > 0 ? quote.changePct : null;
+    const move = latestMove(candles, 1) || (safeQuoteChange !== null ? {
+      change: formatPct(safeQuoteChange), changePct: safeQuoteChange, from: '', to: '',
+      priceBefore: null, priceAfter: quote.price, periodDays: 1,
+    } : null);
     const news = newsResult.status === 'fulfilled'
       ? newsItems(newsResult.value).filter(item => isMarketRelevantText(item.title, item.description))
       : [];
