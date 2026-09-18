@@ -70,6 +70,7 @@ class HomeIntelligenceEngineTest {
         assertEquals("https://example.com/news", item.sourceUrl)
         assertEquals("Issuer", item.evidence.single().source)
         assertEquals("2026-09-17", item.evidence.single().date)
+        assertEquals("UNKNOWN", item.evidence.single().freshness)
     }
     @Test
     fun indexObservationsArePartOfHomeEvidenceGraph() {
@@ -145,5 +146,19 @@ class HomeIntelligenceEngineTest {
         assertEquals("NSE Watcher fallback catalogue", marketEvidence?.source)
         assertEquals("Calculated from NSE Watcher fallback catalogue stock observations", breadthEvidence?.source)
         assertEquals("Calculated from NSE Watcher fallback catalogue stock observations", sectorEvidence?.source)
+    }
+    @Test
+    fun undatedNewsIsMarkedUnknownFreshness() {
+        val news = NewsItem(
+            id = "n2", title = "Undated market story", summary = "", body = "",
+            source = "Issuer", publishedAt = "", category = "Market",
+            symbol = "ABC", companyName = "ABC Holdings", imageUrl = "", url = "",
+            dividendAmount = "", exDate = "", paymentDate = "",
+            intelligenceRelevance = "market", intelligenceRelevanceReason = "test",
+            freshnessMode = "UNKNOWN"
+        )
+        val snapshot = HomeIntelligenceEngine.build(emptyList(), listOf(news))
+        assertEquals("UNKNOWN", snapshot.evidenceGraph.record("news:n2")?.freshness)
+        assertEquals(null, snapshot.evidenceGraph.record("news:n2")?.publishedAt)
     }
 }
