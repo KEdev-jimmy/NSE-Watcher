@@ -301,11 +301,17 @@ private fun Companies(open:(Stock)->Unit, openWatchlist:()->Unit){
 private fun Watchlist(open: (Stock) -> Unit, back: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val watchlistStore = remember { WatchlistStore(context) }
+    LaunchedEffect(Unit) {
+        MyStocksCache.loadStocks().takeIf { it.isNotEmpty() }?.let { liveStocks.value = it }
+    }
     val watchedSymbols by watchlistStore.symbols.collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
 
     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item { Header("Watchlist", "Companies you explicitly chose to follow", back) }
+        item {
+            Text("Prices and daily changes are from MyStocks Africa and may be delayed. Verify material announcements with the issuer or NSE.", color = Muted, fontSize = 9.sp)
+        }
         if (watchedSymbols.isEmpty()) {
             item {
                 Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), border = BorderStroke(1.dp, Border)) {
