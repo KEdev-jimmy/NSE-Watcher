@@ -44,7 +44,8 @@ data class HomeEvidenceReference(
     val sourceUrl: String = "",
     val date: String = "",
     val symbol: String = "",
-    val category: String = ""
+    val category: String = "",
+    val freshness: String = ""
 )
 
 data class HomeIntelligenceItem(
@@ -125,6 +126,7 @@ object HomeIntelligenceEngine {
                 value = "${String.format(Locale.US, "%.2f", index.value)}${index.changePct?.let { " (${signedPercent(it)})" } ?: ""}",
                 source = "MyStocks Africa",
                 observedAt = index.asOf.ifBlank { null },
+                freshness = index.dataMode.name,
                 period = "current observation"
             )
         }
@@ -384,7 +386,8 @@ object HomeIntelligenceEngine {
             sourceUrl = record.sourceUrl.orEmpty(),
             date = record.publishedAt ?: record.observedAt.orEmpty(),
             symbol = record.symbol.orEmpty(),
-            category = category
+            category = category,
+            freshness = record.freshness.orEmpty()
         )
 
     private fun signedPercent(value: Double): String = String.format(Locale.US, "%+.2f%%", value)
