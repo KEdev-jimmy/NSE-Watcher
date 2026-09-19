@@ -34,7 +34,9 @@ object CompanyIntelligenceCache {
         val epsGrowth: String = "",
         val pe: String = "",
         val pb: String = "",
-        val dividendYield: String = ""
+        val dividendYield: String = "",
+        val ratioBasis: String = "",
+        val ratioPeriod: String = ""
     )
 
     data class FinancialPoint(
@@ -187,7 +189,9 @@ object CompanyIntelligenceCache {
         epsGrowth = findText(root, "epsGrowth"),
         pe = findText(root, "pe", "peRatio", "priceEarnings", "priceToEarnings"),
         pb = findText(root, "pb", "pbRatio", "priceBook", "priceToBook"),
-        dividendYield = findText(root, "dividendYield", "yield")
+        dividendYield = findText(root, "dividendYield", "yield"),
+        ratioBasis = findText(root, "ratioBasis"),
+        ratioPeriod = findText(root, "ratioPeriod")
     )
 
     private fun parseFinancialHistory(array: JSONArray): List<FinancialPoint> = buildList {
