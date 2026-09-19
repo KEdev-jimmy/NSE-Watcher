@@ -2239,3 +2239,50 @@ The existing CI workflow already includes `companyIntelligence.test.js`, so the 
 ## Next logical step
 
 Check for a new Android CI run after this implementation. If unavailable, continue only where another concrete provenance/data-semantic gap is demonstrated. Avoid audit-only commits.
+
+
+# 48. Financial-history CI failure hardening — 19 Sep 2026
+
+**Status: implemented; new Android CI verification pending**
+
+## Fixes made
+
+The recent financial-history/provenance chain was re-audited against the current main branch.
+
+Four concrete issues were corrected:
+
+1. **Historical financial period semantics**
+   - Historical rows previously used only the period-ending label (for example, `Dec '24`) while the latest row used the combined fiscal-year/reporting-period label.
+   - Historical rows now consistently use the available fiscal year and period ending, e.g. `FY 2024 • Dec '24`.
+
+2. **Financial-history regression coverage**
+   - The provenance test now explicitly verifies the preceding historical row has the complete period label.
+
+3. **Financial-history source fallback**
+   - Android `FinancialPoint.source` previously defaulted to `MyStocks Africa`, even though the backend financial history comes from StockAnalysis / S&P Global Market Intelligence.
+   - The fallback now uses the actual external financial source.
+
+4. **Financial-trend provenance label**
+   - `CompanyIntelligenceEngine` previously labelled calculated financial-history signals as `MyStocks Africa financial history`.
+   - It now identifies the actual StockAnalysis / S&P Global Market Intelligence source.
+
+## Implementation commits
+
+- `0c0847161894ef69cfd759b4b4b758d896a686b6` — Fix financial history period semantics
+- `142a8d6b1d8563e17b84fa3cc167ca92ece61b43` — Test complete financial history periods
+- `27cdd7d1c50c2596f0cf6e35e75c70788d76a166` — Correct financial history source fallback
+- `4fdb944c9c36e764a478b1797561cbb7e566379b` — Correct financial trend provenance label
+
+## Verification
+
+- Current backend parser checked after the changes: completed.
+- Current Android financial-history parser checked: completed.
+- Current intelligence engine checked: completed.
+- New regression assertion added: completed.
+- Android CI verification for this new batch: pending.
+
+The repository workflow runs backend tests before the Gradle build, and GitHub Actions workflow runs/logs are the appropriate source for diagnosing CI failures. citeturn0search0turn0search5
+
+## Next action
+
+Use the new commit-triggered Android CI run as the verification point. Do not treat the historical failed runs as still-failing code once their underlying issue has been corrected. If the new run fails, inspect the exact failed job/step before making another change.
