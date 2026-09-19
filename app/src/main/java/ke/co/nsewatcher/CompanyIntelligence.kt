@@ -227,7 +227,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
         item {
             IntelligenceCard {
                 Text(
-                    financialPeriodLabel(latestFinancialPeriod),
+                    financialPeriodLabel(profile.financialPeriod.ifBlank { latestFinancialPeriod }),
                     color = IntelligenceMuted,
                     fontSize = 9.sp,
                     fontWeight = FontWeight.SemiBold
@@ -235,12 +235,12 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
                 Spacer(Modifier.height(8.dp))
                 MetricGrid(
                     metrics = listOf(
-                        "Revenue" to formatFinancialValue(profile.revenue),
-                        "Profit" to formatFinancialValue(profile.profit),
-                        "EPS" to valueOrMissing(profile.eps),
-                        "ROE" to valueOrMissing(profile.roe),
-                        "Debt / Equity" to valueOrMissing(profile.debtToEquity),
-                        "Net margin" to valueOrMissing(profile.margin)
+                        "Revenue" to formatFinancialValue(profile.revenue, profile.financialUnit),
+                        "Profit" to formatFinancialValue(profile.profit, profile.financialUnit),
+                        "EPS (Earnings Per Share)" to formatMetricValue("EPS", profile.eps),
+                        "ROE (Return on Equity)" to formatMetricValue("ROE", profile.roe),
+                        "Debt / Equity" to formatMetricValue("Debt / Equity", profile.debtToEquity),
+                        "Net margin" to formatMetricValue("Net margin", profile.margin)
                     ),
                     fieldSources = intelligence.fieldSources,
                     fieldQuality = intelligence.fieldQuality
@@ -253,9 +253,9 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
             IntelligenceCard {
                 MetricGrid(
                     metrics = listOf(
-                        "Revenue trend" to valueOrMissing(profile.revenueGrowth),
-                        "Profit trend" to valueOrMissing(profile.profitGrowth),
-                        "EPS (latest)" to valueOrMissing(profile.eps)
+                        "Revenue growth (YoY)" to formatMetricValue("Revenue growth", profile.revenueGrowth),
+                        "Profit growth (YoY)" to formatMetricValue("Profit growth", profile.profitGrowth),
+                        "EPS growth (YoY)" to formatMetricValue("EPS growth", profile.epsGrowth)
                     ),
                     fieldSources = intelligence.fieldSources,
                     fieldQuality = intelligence.fieldQuality
@@ -270,9 +270,9 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
             IntelligenceCard {
                 MetricGrid(
                     metrics = listOf(
-                        "P/E" to valueOrMissing(profile.pe),
-                        "P/B" to valueOrMissing(profile.pb),
-                        "Dividend yield" to valueOrMissing(profile.dividendYield),
+                        "P/E (Price-to-Earnings)" to formatMetricValue("P/E", profile.pe),
+                        "P/B (Price-to-Book)" to formatMetricValue("P/B", profile.pb),
+                        "Dividend yield" to formatMetricValue("Dividend yield", profile.dividendYield),
                         "Market cap" to formatMarketCap(profile.marketCap)
                     ),
                     fieldSources = intelligence.fieldSources,
@@ -687,16 +687,16 @@ private fun MetricGrid(
 ) {
     val sourceKeys = mapOf(
         "Revenue" to "revenue",
-        "Revenue trend" to "revenueGrowth",
+        "Revenue growth (YoY)" to "revenueGrowth",
         "Profit" to "profit",
-        "Profit trend" to "profitGrowth",
-        "EPS" to "eps",
-        "EPS (latest)" to "eps",
-        "ROE" to "roe",
+        "Profit growth (YoY)" to "profitGrowth",
+        "EPS (Earnings Per Share)" to "eps",
+        "EPS growth (YoY)" to "epsGrowth",
+        "ROE (Return on Equity)" to "roe",
         "Debt / Equity" to "debtToEquity",
         "Net margin" to "margin",
-        "P/E" to "pe",
-        "P/B" to "pb",
+        "P/E (Price-to-Earnings)" to "pe",
+        "P/B (Price-to-Book)" to "pb",
         "Dividend yield" to "dividendYield",
         "Market cap" to "marketCap"
     )
@@ -1227,14 +1227,30 @@ private fun priceAxis(value: Double): String = String.format(Locale.US, "%.2f", 
 
 private fun valueOrMissing(value: String): String = value.trim().takeIf { it.isNotBlank() } ?: "Not available"
 
-private fun formatFinancialValue(value: String): String {
+private fun formatFinancialValue(value: String, unit: String): String {
     val clean = value.trim()
     if (clean.isBlank()) return "Not available"
+    if (!unit.equals("Millions KES", ignoreCase = true)) {
+        return clean
+    }
     val millions = clean.replace(",", "").toDoubleOrNull() ?: return clean
     return if (millions >= 1000.0) {
         String.format(Locale.US, "KSh %.2fB", millions / 1000.0)
     } else {
-        String.format(Locale.US, "KSh %,.0fM", millions)
+        String.format(Locale.US, "KSh %,.2fM", millions)
+    }
+}
+
+private fun formatMetricValue(label: String, value: String): String {
+    val clean = value.trim()
+    if (clean.isBlank() || clean == "-" || clean.equals("n/a", ignoreCase = true)) return "Not available"
+    val numeric = clean.removeSuffix("%").replace(",", "").toDoubleOrNull() ?: return clean
+    return when (label) {
+        "EPS" -> String.format(Locale.US, "KSh %.2f / share", numeric)
+        "ROE", "Net margin", "Revenue growth", "Profit growth", "EPS growth", "Dividend yield" ->
+            String.format(Locale.US, "%+.2f%%", numeric).replace("+", if (numeric >= 0) "+" else "")
+        "P/E", "P/B", "Debt / Equity" -> String.format(Locale.US, "%.2f×", numeric)
+        else -> clean
     }
 }
 
