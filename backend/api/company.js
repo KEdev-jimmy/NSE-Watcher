@@ -12,26 +12,44 @@ function growth(current, previous) {
   return `${(((a - b) / Math.abs(b)) * 100).toFixed(2)}%`;
 }
 
+function hasGrowth(value) {
+  const text = String(value || '').trim();
+  return Boolean(text && text !== '-' && !/^n\/a$/i.test(text));
+}
+
 function repairAnnualGrowth(result) {
   if (!result || !Array.isArray(result.financialHistory)) return result;
 
+  const sourceProfile = result.profile || {};
   const history = result.financialHistory.map((row, index, all) => {
     const previous = all[index - 1];
+    const calculatedRevenueGrowth = previous ? growth(row.revenue, previous.revenue) : '';
+    const calculatedProfitGrowth = previous ? growth(row.profit, previous.profit) : '';
+    const calculatedEpsGrowth = previous ? growth(row.eps, previous.eps) : '';
+
     return {
       ...row,
-      revenueGrowth: previous ? growth(row.revenue, previous.revenue) : '',
-      profitGrowth: previous ? growth(row.profit, previous.profit) : '',
-      epsGrowth: previous ? growth(row.eps, previous.eps) : '',
+      // Provider-supplied growth is authoritative. Calculated growth is only a
+      // fallback for a row where the provider did not supply a usable value.
+      revenueGrowth: hasGrowth(row.revenueGrowth) ? row.revenueGrowth : calculatedRevenueGrowth,
+      profitGrowth: hasGrowth(row.profitGrowth) ? row.profitGrowth : calculatedProfitGrowth,
+      epsGrowth: hasGrowth(row.epsGrowth) ? row.epsGrowth : calculatedEpsGrowth,
     };
   });
 
   const latest = history[history.length - 1];
   if (latest) {
     result.profile = {
-      ...result.profile,
-      revenueGrowth: latest.revenueGrowth || result.profile?.revenueGrowth || '',
-      profitGrowth: latest.profitGrowth || result.profile?.profitGrowth || '',
-      epsGrowth: latest.epsGrowth || result.profile?.epsGrowth || '',
+      ...sourceProfile,
+      revenueGrowth: hasGrowth(latest.revenueGrowth)
+        ? latest.revenueGrowth
+        : (hasGrowth(sourceProfile.revenueGrowth) ? sourceProfile.revenueGrowth : ''),
+      profitGrowth: hasGrowth(latest.profitGrowth)
+        ? latest.profitGrowth
+        : (hasGrowth(sourceProfile.profitGrowth) ? sourceProfile.profitGrowth : ''),
+      epsGrowth: hasGrowth(latest.epsGrowth)
+        ? latest.epsGrowth
+        : (hasGrowth(sourceProfile.epsGrowth) ? sourceProfile.epsGrowth : ''),
     };
   }
   result.financialHistory = history;
