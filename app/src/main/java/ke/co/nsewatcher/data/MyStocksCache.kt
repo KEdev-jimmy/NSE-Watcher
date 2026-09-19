@@ -88,13 +88,26 @@ object MyStocksCache {
             try {
                 if (connection.responseCode !in 200..299) return@runCatching MarketStatus()
                 val root = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
-                val status = root.optString("status", "").ifBlank { "CLOSED" }
+                val rawStatus = root.optString("status", "").trim()
+                val status = when (rawStatus.uppercase()) {
+                    "OPEN", "TRADING" -> "OPEN"
+                    "CLOSED", "NOT_TRADING" -> "CLOSED"
+                    else -> "UNKNOWN"
+                }
+                val hasExplicitIsOpen = root.has("isOpen") && !root.isNull("isOpen")
+                val explicitIsOpen = if (hasExplicitIsOpen) root.optBoolean("isOpen") else null
+                val isKnown = root.optBoolean("isKnown", false) &&
+                    status != "UNKNOWN"
+
                 MarketStatus(
-                    isOpen = root.optBoolean("isOpen", status.equals("OPEN", ignoreCase = true)),
-                    status = status,
+                    isOpen = when {
+                        isKnown -> explicitIsOpen ?: (status == "OPEN")
+                        else -> false
+                    },
+                    status = if (isKnown) status else "UNKNOWN",
                     nextOpen = root.optString("nextOpen", ""),
                     nextClose = root.optString("nextClose", ""),
-                    isKnown = true
+                    isKnown = isKnown
                 )
             } finally { connection.disconnect() }
         }.getOrDefault(MarketStatus())
