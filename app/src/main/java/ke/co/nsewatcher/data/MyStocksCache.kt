@@ -220,16 +220,18 @@ object MyStocksCache {
                     val name = item.optString("name", symbol)
                     val price = item.optDouble("price", Double.NaN); if (!price.isFinite()) continue
                     val previousClose = item.optDouble("previousClose", Double.NaN)
-                    val suppliedChange = item.optDouble("change", Double.NaN)
                     val suppliedChangePct = item.optDouble("changePct", Double.NaN)
                     val derived = if (previousClose.isFinite() && previousClose > 0.0) ((price - previousClose) / previousClose) * 100.0 else Double.NaN
+                    // Stock.change is a percentage. Prefer the provider's explicit changePct;
+                    // derive it from price/previousClose only when changePct is absent.
+                    // Do not treat a generic "change" field as a percentage because its unit
+                    // is provider-schema dependent and may be an absolute price delta.
                     val changePct = when {
-                        suppliedChange.isFinite() && suppliedChange != 0.0 -> suppliedChange
-                        suppliedChangePct.isFinite() && suppliedChangePct != 0.0 -> suppliedChangePct
+                        suppliedChangePct.isFinite() -> suppliedChangePct
                         derived.isFinite() -> derived
-                        else -> 0.0
+                        else -> Double.NaN
                     }
-                    val changeAvailable = suppliedChange.isFinite() || suppliedChangePct.isFinite() || derived.isFinite()
+                    val changeAvailable = changePct.isFinite()
                     val volumeValue = item.optDouble("volume", Double.NaN)
                     val volumeAvailable = volumeValue.isFinite() && volumeValue >= 0.0
                     val volume = if (volumeAvailable) volumeValue.toLong() else 0L
