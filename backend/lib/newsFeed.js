@@ -190,14 +190,33 @@ function sortNewest(items) {
   return items.sort((a, b) => (Date.parse(b.publishedAt || '') || 0) - (Date.parse(a.publishedAt || '') || 0));
 }
 
+function canonicalUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    const url = new URL(raw);
+    url.hash = '';
+    url.hostname = url.hostname.toLowerCase();
+    url.pathname = url.pathname.replace(/\/+$/, '') || '/';
+    for (const key of [...url.searchParams.keys()]) {
+      if (/^(utm_|fbclid$|gclid$|mc_cid$|mc_eid$)/i.test(key)) url.searchParams.delete(key);
+    }
+    return url.toString();
+  } catch (_) { return raw; }
+}
+
 function dedupe(items) {
   const seen = new Set();
   return items.filter(item => {
     const normalizedTitle = String(item.title || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-    const sourceKey = String(item.sourceId || item.source || '').toLowerCase();
-    const key = item.url ? `${sourceKey}|url|${item.url}` : `${sourceKey}|title|${normalizedTitle}|${item.publishedAt || ''}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
+    const canonical = canonicalUrl(item.url);
+    const publishedDay = item.publishedAt && Number.isFinite(Date.parse(item.publishedAt))
+      ? new Date(item.publishedAt).toISOString().slice(0, 10) : '';
+    const urlKey = canonical ? `url|${canonical}` : '';
+    const titleKey = normalizedTitle ? `title|${normalizedTitle}|${publishedDay}` : '';
+    const keys = [urlKey, titleKey].filter(Boolean);
+    if (!keys.length || keys.some(key => seen.has(key))) return false;
+    keys.forEach(key => seen.add(key));
     return true;
   });
 }
@@ -284,3 +303,4 @@ async function handle(req, res) {
 }
 
 module.exports = handle;
+module.exports._newsTest = { canonicalUrl, dedupe, normalizeItem, withinWindow, newsFreshnessMode };
