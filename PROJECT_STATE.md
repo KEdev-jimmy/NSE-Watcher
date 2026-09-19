@@ -2531,3 +2531,43 @@ After the new commit passes Android CI, Phase 10 freshness/session work should b
 ## Next logical step
 
 Check the new Android CI result. If successful, move to the final evidence/data-confidence closure audit rather than continuing Phase 10 field changes.
+
+
+# 54. Final evidence/data-confidence closure audit — 19 Sep 2026
+
+**Status: one concrete evidence-selection defect fixed; CI verification pending**
+
+## Audit result
+
+The final evidence/data-confidence audit found one real issue in the current backend evidence path:
+
+- `financialHistory` is intentionally ordered oldest → latest.
+- `evidenceFor()` was still using `financialHistory.slice(0, 8)`, which selected the oldest eight rows when more than eight rows were supplied.
+- This could make the evidence graph omit the newest historical financial periods even though the API's financial-history data itself was correctly ordered.
+
+No other speculative field changes were made.
+
+## Fix
+
+Changed evidence generation to use the latest eight financial-history rows with `slice(-8)`.
+
+Added a regression test with ten historical rows proving evidence contains the newest eight periods and excludes the two oldest rows.
+
+Commits:
+- `5f05f215e7dae9808698644e9e6238090c1faabc` — Use latest financial history rows for evidence
+- `0074837cdf5211c6035879b178a915f4996f44ef` — Test latest financial history evidence coverage
+
+## Closure state
+
+The core evidence/data-confidence audit is otherwise clean based on the current repository code:
+- provider provenance is carried through historical financial evidence;
+- FY-vs-TTM and Current-vs-FY semantics are explicit;
+- provider growth values are preserved;
+- financial unit/period metadata survives the merge boundary;
+- ambiguous Company Intelligence `delayMinutes` metadata is removed;
+- unknown market status is not treated as CLOSED;
+- unavailable values are not replaced with fabricated index data.
+
+## Next action
+
+Verify the new commit-triggered Android CI run. If it passes, the evidence/data-confidence foundation should be treated as closed. The remaining live `/api/company` check is a runtime verification task, not a reason for further field-by-field changes unless it exposes a concrete defect.
