@@ -22,6 +22,8 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.input.pointer.detectTransformGestures
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -697,6 +699,7 @@ private fun IntelligenceChart(
 ) {
     val valid = points.filter { it.close.isFinite() && it.close > 0.0 }
     if (valid.size < 2) return
+
     val min = valid.minOf { it.close }
     val max = valid.maxOf { it.close }
     val range = (max - min).takeIf { it > 0.0 } ?: (max * 0.01).coerceAtLeast(1.0)
@@ -704,62 +707,126 @@ private fun IntelligenceChart(
     val bottom = (min - range * 0.08).coerceAtLeast(0.0)
     val chartRange = (top - bottom).coerceAtLeast(0.0001)
     val mid = (top + bottom) / 2.0
-    val labels = chartAxisLabels(valid, period)
 
-    Column(Modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth().height(218.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(
-                Modifier.width(42.dp).fillMaxHeight().padding(vertical = 7.dp),
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(priceAxis(top), color = IntelligenceMuted, fontSize = 8.sp, maxLines = 1)
-                Text(priceAxis(mid), color = IntelligenceMuted, fontSize = 8.sp, maxLines = 1)
-                Text(priceAxis(bottom), color = IntelligenceMuted, fontSize = 8.sp, maxLines = 1)
-            }
-            Canvas(Modifier.weight(1f).fillMaxHeight().padding(vertical = 7.dp)) {
-                val line = Path()
-                val area = Path()
-                valid.forEachIndexed { index, point ->
-                    val x = size.width * index / valid.lastIndex.coerceAtLeast(1)
-                    val y = size.height - (((point.close - bottom) / chartRange).toFloat() * size.height)
-                    if (index == 0) {
-                        line.moveTo(x, y)
-                        area.moveTo(x, size.height)
-                        area.lineTo(x, y)
-                    } else {
-                        line.lineTo(x, y)
-                        area.lineTo(x, y)
-                    }
-                }
-                area.lineTo(size.width, size.height)
-                area.close()
-                drawPath(
-                    area,
-                    Brush.verticalGradient(
-                        listOf(tint.copy(alpha = 0.34f), tint.copy(alpha = 0.03f)),
-                        startY = 0f,
-                        endY = size.height
-                    )
-                )
-                drawPath(line, tint, style = Stroke(width = 3.5f, cap = StrokeCap.Round))
-            }
+    var zoomX by remember(valid, period) { mutableFloatStateOf(1f) }
+    var panX by remember(valid, period) { mutableFloatStateOf(0f) }
+
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val density = androidx.compose.ui.platform.LocalDensity.current
+        val plotWidthPx = with(density) { (maxWidth - 42.dp).coerceAtLeast(0.dp).toPx() }
+
+        LaunchedEffect(zoomX, plotWidthPx) {
+            val maxPan = (plotWidthPx * (zoomX - 1f)).coerceAtLeast(0f)
+            panX = panX.coerceIn(-maxPan, 0f)
         }
 
-        if (labels.isNotEmpty()) {
-            Spacer(Modifier.height(2.dp))
+        val labels = chartAxisLabels(valid, period, zoomX)
+
+        Column(Modifier.fillMaxWidth()) {
             Row(
-                Modifier.fillMaxWidth().padding(start = 42.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
+                Modifier.fillMaxWidth().height(218.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                labels.forEach { label ->
-                    Text(
-                        label,
-                        color = IntelligenceMuted,
-                        fontSize = 8.sp,
-                        maxLines = 1
-                    )
+                Column(
+                    Modifier.width(42.dp).fillMaxHeight().padding(vertical = 7.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(priceAxis(top), color = IntelligenceMuted, fontSize = 8.sp, maxLines = 1)
+                    Text(priceAxis(mid), color = IntelligenceMuted, fontSize = 8.sp, maxLines = 1)
+                    Text(priceAxis(bottom), color = IntelligenceMuted, fontSize = 8.sp, maxLines = 1)
+                }
+
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clipToBounds()
+                        .pointerInput(valid, period) {
+                            detectTransformGestures { centroid, pan, zoom, _ ->
+                                val oldZoom = zoomX
+                                val newZoom = (oldZoom * zoom).coerceIn(1f, 6f)
+                                val scaleRatio = newZoom / oldZoom
+
+                                // Keep the data point under the pinch centre anchored while zooming.
+                                val anchoredPan = centroid.x - (centroid.x - panX) * scaleRatio
+                                val candidatePan = anchoredPan + pan.x
+                                val maxPan = (plotWidthPx * (newZoom - 1f)).coerceAtLeast(0f)
+
+                                zoomX = newZoom
+                                panX = candidatePan.coerceIn(-maxPan, 0f)
+                            }
+                        }
+                ) {
+                    Canvas(Modifier.fillMaxSize()) {
+                        val contentWidth = size.width * zoomX
+
+                        // Keep the chart horizontally interactive while the price axis stays fixed.
+                        clipRect(left = 0f, top = 0f, right = size.width, bottom = size.height) {
+                            val line = Path()
+                            val area = Path()
+
+                            valid.forEachIndexed { index, point ->
+                                val x = panX + contentWidth * index / valid.lastIndex.coerceAtLeast(1)
+                                val y = size.height - (((point.close - bottom) / chartRange).toFloat() * size.height)
+
+                                if (index == 0) {
+                                    line.moveTo(x, y)
+                                    area.moveTo(x, size.height)
+                                    area.lineTo(x, y)
+                                } else {
+                                    line.lineTo(x, y)
+                                    area.lineTo(x, y)
+                                }
+                            }
+
+                            area.lineTo(panX + contentWidth, size.height)
+                            area.close()
+
+                            drawPath(
+                                area,
+                                Brush.verticalGradient(
+                                    listOf(tint.copy(alpha = 0.34f), tint.copy(alpha = 0.03f)),
+                                    startY = 0f,
+                                    endY = size.height
+                                )
+                            )
+                            drawPath(line, tint, style = Stroke(width = 3.5f, cap = StrokeCap.Round))
+                        }
+                    }
                 }
             }
+
+            // The X-axis uses the same transformed positions as the line, so labels stay
+            // attached to their actual observations while the user pans/zooms.
+            Row(Modifier.fillMaxWidth()) {
+                Spacer(Modifier.width(42.dp))
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .height(22.dp)
+                        .clipToBounds()
+                ) {
+                    labels.forEach { label ->
+                        val xPx = panX + plotWidthPx * zoomX * label.index / valid.lastIndex.coerceAtLeast(1)
+                        val labelWidthPx = with(density) {
+                            (label.text.length.coerceAtLeast(3) * 4.5f).dp.toPx()
+                        }
+                        Text(
+                            label.text,
+                            color = IntelligenceMuted,
+                            fontSize = 8.sp,
+                            maxLines = 1,
+                            modifier = Modifier.offset {
+                                androidx.compose.ui.unit.IntOffset(
+                                    (xPx - labelWidthPx / 2f).toInt(),
+                                    0
+                                )
+                            }
+                        )
+                    }
+                }
+            }
+
             Spacer(Modifier.height(4.dp))
             Text(
                 chartAxisDescription(period),
@@ -768,6 +835,17 @@ private fun IntelligenceChart(
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center
             )
+
+            if (zoomX > 1.01f) {
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    "Pinch to zoom • drag horizontally to inspect the timeline",
+                    color = IntelligenceMuted,
+                    fontSize = 7.sp,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
+            }
         }
     }
 }
@@ -776,69 +854,71 @@ private data class ChartLabel(val index: Int, val text: String)
 
 private fun chartAxisLabels(
     points: List<MyStocksCache.HistoryPoint>,
-    period: String
-): List<String> {
+    period: String,
+    zoomX: Float = 1f
+): List<ChartLabel> {
     val dated = points.mapIndexedNotNull { index, point ->
-        parseChartDate(point.date)?.let { ChartLabel(index, it) }
+        parseChartDate(point.date)?.let { ChartLabel(index, formatChartDate(it, period)) }
     }
-    if (dated.size < 2) return fallbackChartLabels(period)
+    if (dated.size < 2) return fallbackChartLabels(period).mapIndexed { index, text -> ChartLabel(index, text) }
 
-    val count = when (period) {
+    // At normal scale keep the chart calm. As the user zooms in, reveal more
+    // real observations rather than fabricating intermediate points.
+    val baseCount = when (period) {
         "1D" -> 5
         "1W" -> 5
         "1M" -> 5
-        "3M" -> 4
-        "6M" -> 6
-        "1Y" -> 5
+        "3M", "6M" -> 4
+        "1Y" -> 6
         "3Y", "5Y" -> 4
         else -> 5
     }
-    val selected = evenlySpacedIndices(dated.size, count)
-    return selected.map { dated[it].text }.distinct()
+
+    val unique = dated.distinctBy { it.text }
+    val targetCount = (baseCount * zoomX).toInt().coerceIn(2, unique.size.coerceAtMost(12))
+    return evenlySpacedLabels(unique, targetCount)
 }
 
-private fun evenlySpacedIndices(size: Int, count: Int): List<Int> {
-    if (size <= 1) return listOf(0)
-    if (count >= size) return (0 until size).toList()
+private fun evenlySpacedLabels(labels: List<ChartLabel>, count: Int): List<ChartLabel> {
+    if (labels.size <= 1) return labels
+    if (count >= labels.size) return labels
     return (0 until count).map { i ->
-        kotlin.math.round(i * (size - 1).toDouble() / (count - 1).coerceAtLeast(1)).toInt()
-    }.distinct()
+        val index = kotlin.math.round(
+            i * (labels.lastIndex.toDouble() / (count - 1).coerceAtLeast(1))
+        ).toInt()
+        labels[index]
+    }.distinctBy { it.text }
 }
 
-private fun parseChartDate(raw: String): String? {
+private fun parseChartDate(raw: String): java.time.LocalDateTime? {
     val value = raw.trim()
     if (value.isBlank()) return null
-    return try {
-        val instant = Instant.parse(value)
-        instant.atZone(ZoneId.of("Africa/Nairobi")).toLocalDateTime()
-            .let { formatChartDateTime(it, value) }
-    } catch (_: DateTimeParseException) {
-        try {
-            formatChartDateTime(LocalDate.parse(value).atStartOfDay(), value)
-        } catch (_: DateTimeParseException) {
-            null
-        }
+
+    return runCatching {
+        Instant.parse(value).atZone(ZoneId.of("Africa/Nairobi")).toLocalDateTime()
+    }.getOrElse {
+        runCatching { LocalDate.parse(value).atStartOfDay() }.getOrNull()
     }
 }
 
-private fun formatChartDateTime(
+private fun formatChartDate(
     dateTime: java.time.LocalDateTime,
-    raw: String
-): String {
-    val hasTime = raw.contains("T") || raw.contains(":")
-    return if (hasTime) {
-        dateTime.format(DateTimeFormatter.ofPattern("HH:mm", Locale.US))
-    } else {
-        dateTime.format(DateTimeFormatter.ofPattern("dd MMM", Locale.US))
-    }
+    period: String
+): String = when (period) {
+    "1D" -> dateTime.format(DateTimeFormatter.ofPattern("HH:mm", Locale.US))
+    "1W" -> dateTime.format(DateTimeFormatter.ofPattern("EEE", Locale.US))
+    "1M" -> dateTime.format(DateTimeFormatter.ofPattern("dd MMM", Locale.US))
+    "3M", "6M", "1Y" -> dateTime.format(DateTimeFormatter.ofPattern("MMM", Locale.US))
+    "3Y", "5Y" -> dateTime.format(DateTimeFormatter.ofPattern("yyyy", Locale.US))
+    else -> dateTime.format(DateTimeFormatter.ofPattern("dd MMM", Locale.US))
 }
 
 private fun chartAxisDescription(period: String): String = when (period) {
     "1D" -> "Time • Nairobi trading session"
-    "1W" -> "Trading dates"
-    "1M" -> "Weeks across the selected month"
+    "1W" -> "Trading days"
+    "1M" -> "Trading dates"
     "3M", "6M" -> "Months across the selected period"
-    "1Y" -> "Selected points across the year"
+    "1Y" -> "Months across the selected year"
     "3Y", "5Y" -> "Years across the selected period"
     else -> "Time"
 }
@@ -846,10 +926,10 @@ private fun chartAxisDescription(period: String): String = when (period) {
 private fun fallbackChartLabels(period: String): List<String> = when (period) {
     "1D" -> listOf("Start", "Mid", "Now")
     "1W" -> listOf("Start", "Mid", "Now")
-    "1M" -> listOf("Wk 1", "Wk 2", "Wk 3", "Wk 4")
+    "1M" -> listOf("Start", "Mid", "Now")
     "3M", "6M" -> listOf("Start", "Mid", "Now")
     "1Y" -> listOf("Start", "Mid", "Now")
-    "3Y", "5Y" -> listOf("Year 1", "Year 2", "Year 3")
+    "3Y", "5Y" -> listOf("Start", "Mid", "Now")
     else -> listOf("Start", "Now")
 }
 
