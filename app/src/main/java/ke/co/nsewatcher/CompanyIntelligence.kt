@@ -15,7 +15,6 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -55,85 +54,33 @@ private val IntelligenceBorder = Color(0xFFE1EAE5)
 private val IntelligenceRed = Color(0xFFE04444)
 
 
-private enum class CompanyIntelligenceTab(val label: String) {
-    OVERVIEW("Overview"),
-    ABOUT("About"),
-    FINANCIALS("Financials"),
-    NEWS("News"),
-    DIVIDENDS("Dividends"),
-    ANALYSIS("Analysis"),
-    TRADES("Trades")
+private enum class CompanyIntelligenceSection(val label: String) {
+    ABOUT("About"), INTELLIGENCE("Intelligence"), PERFORMANCE("Performance"),
+    FINANCIALS("Financials"), VALUATION("Valuation"), DIVIDENDS("Dividends"),
+    NEWS("News"), ANALYSIS("Analysis"), EVIDENCE("Evidence")
 }
 
 @Composable
-private fun CompanyIntelligenceTabNavigation(
-    selected: CompanyIntelligenceTab,
-    onSelected: (CompanyIntelligenceTab) -> Unit
+private fun CompanySectionNavigation(
+    labels: List<CompanyIntelligenceSection>,
+    selected: CompanyIntelligenceSection,
+    onSelected: (CompanyIntelligenceSection) -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(0xFF071B2F))
-            .padding(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            listOf(
-                CompanyIntelligenceTab.OVERVIEW,
-                CompanyIntelligenceTab.ABOUT,
-                CompanyIntelligenceTab.FINANCIALS
-            ).forEach { tab ->
-                CompanyIntelligenceTabItem(tab, selected, onSelected, Modifier.weight(1f))
+    Row(Modifier.fillMaxWidth().background(Color(0xFF071B2F), RoundedCornerShape(12.dp)).padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        labels.forEach { section ->
+            val active = section == selected
+            Surface(
+                onClick = { onSelected(section) },
+                modifier = Modifier.weight(1f).heightIn(min = 44.dp),
+                color = if (active) IntelligenceGreen else Color.Transparent,
+                contentColor = if (active) Color.White else Color(0xFFA9B7C6),
+                shape = RoundedCornerShape(8.dp),
+                border = if (active) null else BorderStroke(1.dp, Color(0xFF294057))
+            ) {
+                Box(Modifier.fillMaxSize().padding(horizontal = 5.dp, vertical = 7.dp), contentAlignment = Alignment.Center) {
+                    Text(section.label, fontSize = 10.sp, lineHeight = 13.sp, fontWeight = if (active) FontWeight.Bold else FontWeight.Medium, textAlign = TextAlign.Center, maxLines = 2)
+                }
             }
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            listOf(
-                CompanyIntelligenceTab.NEWS,
-                CompanyIntelligenceTab.DIVIDENDS,
-                CompanyIntelligenceTab.ANALYSIS,
-                CompanyIntelligenceTab.TRADES
-            ).forEach { tab ->
-                CompanyIntelligenceTabItem(tab, selected, onSelected, Modifier.weight(1f))
-            }
-        }
-    }
-}
-
-@Composable
-private fun CompanyIntelligenceTabItem(
-    tab: CompanyIntelligenceTab,
-    selected: CompanyIntelligenceTab,
-    onSelected: (CompanyIntelligenceTab) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val active = tab == selected
-    Surface(
-        onClick = { onSelected(tab) },
-        modifier = modifier.heightIn(min = 44.dp),
-        color = if (active) IntelligenceGreen else Color.Transparent,
-        contentColor = if (active) Color.White else Color(0xFFA9B7C6),
-        shape = RoundedCornerShape(8.dp),
-        border = if (active) null else BorderStroke(1.dp, Color(0xFF294057))
-    ) {
-        Box(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp, vertical = 7.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = tab.label,
-                fontSize = 10.sp,
-                lineHeight = 13.sp,
-                fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Clip
-            )
         }
     }
 }
@@ -207,7 +154,11 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
     val intelligenceView = CompanyIntelligenceEngine.build(s, intelligence, monthHistory, news)
     val hasSessionNavigationItem = period == "1D" || period == "NOW"
     val listState = rememberLazyListState()
-    var selectedTab by rememberSaveable(s.symbol) { mutableStateOf(CompanyIntelligenceTab.OVERVIEW) }
+    var primarySection by rememberSaveable(s.symbol) { mutableStateOf(CompanyIntelligenceSection.INTELLIGENCE) }
+    var performanceSection by rememberSaveable(s.symbol) { mutableStateOf(CompanyIntelligenceSection.PERFORMANCE) }
+    var valuationSection by rememberSaveable(s.symbol) { mutableStateOf(CompanyIntelligenceSection.VALUATION) }
+    var analysisSection by rememberSaveable(s.symbol) { mutableStateOf(CompanyIntelligenceSection.NEWS) }
+    var evidenceSection by rememberSaveable(s.symbol) { mutableStateOf(CompanyIntelligenceSection.EVIDENCE) }
 
     LazyColumn(
         state = listState,
@@ -282,39 +233,53 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
         }
 
         item {
-            Card(Modifier.fillMaxWidth(), RoundedCornerShape(19.dp), colors = CardDefaults.cardColors(containerColor = IntelligenceDark)) {
-                Column(Modifier.padding(17.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(Modifier.size(38.dp), RoundedCornerShape(12.dp), Color.White.copy(alpha = .12f)) {
-                            Icon(Icons.Default.Psychology, null, tint = Color(0xFF8BE0B3), modifier = Modifier.padding(8.dp))
-                        }
-                        Spacer(Modifier.width(10.dp))
-                        Column {
-                            Text("Intelligence", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
-                            Text("Evidence first • no BUY/SELL instruction", color = Color(0xFFBFE8D0), fontSize = 9.sp)
-                        }
-                    }
-                    Spacer(Modifier.height(11.dp))
-                    if (intelligenceLoading) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Color(0xFF8BE0B3))
-                            Spacer(Modifier.width(9.dp))
-                            Text("Building the company evidence view…", color = Color.White.copy(alpha = .82f), fontSize = 10.sp)
-                        }
-                    } else {
-                        Text(intelligenceView.summary, color = Color.White, fontSize = 11.sp, lineHeight = 17.sp)
+            CompanySectionNavigation(
+                labels = listOf(CompanyIntelligenceSection.ABOUT, CompanyIntelligenceSection.INTELLIGENCE),
+                selected = primarySection,
+                onSelected = { primarySection = it }
+            )
+        }
+
+        if (primarySection == CompanyIntelligenceSection.ABOUT) {
+            item { SectionTitle("Business", "What does this company actually do?", Icons.Default.Business) }
+            item {
+                IntelligenceCard {
+                    if (profile.description.isNotBlank()) Text(profile.description, fontSize = 12.sp, lineHeight = 18.sp, color = IntelligenceText)
+                    else Text("Business description is not available from the current company-data response.", color = IntelligenceMuted, fontSize = 11.sp)
+                    Spacer(Modifier.height(10.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Box(Modifier.weight(1f)) { MiniFact("Sector", profile.sector.ifBlank { "Not available" }) }
+                        Box(Modifier.weight(1f)) { MiniFact("HQ", profile.headquarters.ifBlank { "Not available" }) }
                     }
                 }
             }
-        }
-
-        stickyHeader {
-            CompanyIntelligenceTabNavigation(
-                selected = selectedTab,
-                onSelected = { tab ->
-                    selectedTab = tab
+        } else {
+            item {
+                Card(Modifier.fillMaxWidth(), RoundedCornerShape(19.dp), colors = CardDefaults.cardColors(containerColor = IntelligenceDark)) {
+                    Column(Modifier.padding(17.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Surface(Modifier.size(38.dp), RoundedCornerShape(12.dp), Color.White.copy(alpha = .12f)) {
+                                Icon(Icons.Default.Psychology, null, tint = Color(0xFF8BE0B3), modifier = Modifier.padding(8.dp))
+                            }
+                            Spacer(Modifier.width(10.dp))
+                            Column {
+                                Text("Intelligence", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
+                                Text("Evidence first • no BUY/SELL instruction", color = Color(0xFFBFE8D0), fontSize = 9.sp)
+                            }
+                        }
+                        Spacer(Modifier.height(11.dp))
+                        if (intelligenceLoading) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Color(0xFF8BE0B3))
+                                Spacer(Modifier.width(9.dp))
+                                Text("Building the company evidence view…", color = Color.White.copy(alpha = .82f), fontSize = 10.sp)
+                            }
+                        } else {
+                            Text(intelligenceView.summary, color = Color.White, fontSize = 11.sp, lineHeight = 17.sp)
+                        }
+                    }
                 }
-            )
+            }
         }
 
         item {
@@ -389,19 +354,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
         }
 
 
-        item { SectionTitle("Business", "What does this company actually do?", Icons.Default.Business) }
-        item {
-            IntelligenceCard {
-                if (profile.description.isNotBlank()) Text(profile.description, fontSize = 12.sp, lineHeight = 18.sp, color = IntelligenceText)
-                else Text("Business description is not available from the current company-data response.", color = IntelligenceMuted, fontSize = 11.sp)
-                Spacer(Modifier.height(10.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box(Modifier.weight(1f)) { MiniFact("Sector", profile.sector.ifBlank { "Not available" }) }
-                    Box(Modifier.weight(1f)) { MiniFact("HQ", profile.headquarters.ifBlank { "Not available" }) }
-                }
-            }
-        }
-
+        if (performanceSection == CompanyIntelligenceSection.FINANCIALS) {
         item { SectionTitle("Financial health", "Latest reported annual financial evidence", Icons.Default.Assessment) }
         item {
             IntelligenceCard {
@@ -426,6 +379,17 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
             }
         }
 
+        }
+
+        item {
+            CompanySectionNavigation(
+                labels = listOf(CompanyIntelligenceSection.PERFORMANCE, CompanyIntelligenceSection.FINANCIALS),
+                selected = performanceSection,
+                onSelected = { performanceSection = it }
+            )
+        }
+
+        if (performanceSection == CompanyIntelligenceSection.PERFORMANCE) {
         item { SectionTitle("Growth", "Year-over-year change in the latest reported figures", Icons.Default.TrendingUp) }
         item {
             IntelligenceCard {
@@ -443,6 +407,17 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
             }
         }
 
+        }
+
+        item {
+            CompanySectionNavigation(
+                labels = listOf(CompanyIntelligenceSection.VALUATION, CompanyIntelligenceSection.DIVIDENDS),
+                selected = valuationSection,
+                onSelected = { valuationSection = it }
+            )
+        }
+
+        if (valuationSection == CompanyIntelligenceSection.VALUATION) {
         item { SectionTitle("Current ratios & valuation", "Current market-price and ratio snapshot", Icons.Default.Calculate) }
         item {
             IntelligenceCard {
@@ -473,6 +448,9 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
             }
         }
 
+        }
+
+        if (valuationSection == CompanyIntelligenceSection.DIVIDENDS) {
         item { SectionTitle("Dividends", "Declared and historical distributions", Icons.Default.Payments) }
         item {
             IntelligenceCard {
@@ -495,6 +473,9 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
             }
         }
 
+        }
+
+        if (performanceSection == CompanyIntelligenceSection.PERFORMANCE) {
         item { SectionTitle("Market behaviour", "Price movement across time", Icons.Default.ShowChart) }
         item {
             IntelligenceCard {
@@ -603,6 +584,17 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
 
         item { WhyStockMovingSection(s.symbol) }
 
+        }
+
+        item {
+            CompanySectionNavigation(
+                labels = listOf(CompanyIntelligenceSection.NEWS, CompanyIntelligenceSection.ANALYSIS),
+                selected = analysisSection,
+                onSelected = { analysisSection = it }
+            )
+        }
+
+        if (analysisSection == CompanyIntelligenceSection.NEWS) {
         item { SectionTitle("What changed?", "Recent company events and intelligence", Icons.Default.Newspaper) }
         item {
             IntelligenceCard {
@@ -626,6 +618,17 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
             }
         }
 
+        }
+
+        item {
+            CompanySectionNavigation(
+                labels = listOf(CompanyIntelligenceSection.EVIDENCE, CompanyIntelligenceSection.ANALYSIS),
+                selected = evidenceSection,
+                onSelected = { evidenceSection = it }
+            )
+        }
+
+        if (evidenceSection == CompanyIntelligenceSection.EVIDENCE) {
         item { SectionTitle("Evidence", "Sourced records behind this intelligence view", Icons.Default.Verified) }
         item {
             IntelligenceCard {
@@ -655,6 +658,9 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
             }
         }
 
+        }
+
+        if (analysisSection == CompanyIntelligenceSection.ANALYSIS) {
         item { SectionTitle("Risks to investigate", "Questions raised by the available evidence", Icons.Default.Warning) }
         item {
             IntelligenceCard {
@@ -779,6 +785,8 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
                     "Look at the price chart alongside company events instead of treating price movement as an explanation."
                 ).forEach { Watchpoint(it) }
             }
+        }
+
         }
 
         item {
