@@ -89,10 +89,11 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
         }
     }
 
-    LaunchedEffect(s.symbol, period) {
+    LaunchedEffect(s.symbol, period, s.price) {
         historyLoading = true
         // NOW is a view of the latest available intraday session data.
         // It intentionally reuses the verified 1D endpoint; no live price is fabricated.
+        // The price key also lets the existing 15-minute app refresh pull a newer chart observation.
         val requestedPeriod = if (period == "NOW") "1D" else period
         val live = MyStocksCache.loadHistoryDetails(s.symbol, requestedPeriod)
         historyResult = live
