@@ -116,8 +116,10 @@ object MyStocksCache {
     suspend fun loadStocks(): List<Stock> = withContext(Dispatchers.IO) {
         MarketRefreshController.markStarted()
         try {
-            val backend = loadFromUrl(BACKEND_STOCKS_URL, "backend")
-            val base = backend.takeIf { it.isNotEmpty() } ?: loadFromUrl(FALLBACK_URL, "fallback")
+            val marketStatus = loadMarketStatus()
+            val marketOpen = marketStatus.isOpen.takeIf { marketStatus.isKnown }
+            val backend = loadFromUrl(BACKEND_STOCKS_URL, "backend", marketOpen)
+            val base = backend.takeIf { it.isNotEmpty() } ?: loadFromUrl(FALLBACK_URL, "fallback", marketOpen)
             if (base.isEmpty()) {
                 MarketRefreshController.markFailed()
                 return@withContext emptyList()
@@ -213,7 +215,7 @@ object MyStocksCache {
         }.getOrDefault("UNKNOWN")
     }
 
-    private fun loadFromUrl(url: String, dataOrigin: String): List<Stock> = runCatching {
+    private fun loadFromUrl(url: String, dataOrigin: String, marketOpen: Boolean?): List<Stock> = runCatching {
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"; connectTimeout = 8_000; readTimeout = 8_000
             setRequestProperty("Accept", "application/json")
@@ -250,7 +252,7 @@ object MyStocksCache {
                     val volume = if (volumeAvailable) volumeValue.toLong() else 0L
                     val source = item.optString("source", "").trim().ifBlank { if (dataOrigin == "backend") "MyStocks Africa" else "NSE Watcher fallback catalogue" }
                     val observedAt = item.optString("lastPriceUpdate", "").trim().ifBlank { item.optString("asOf", "").trim() }
-                    val freshnessMode = stockFreshnessMode(observedAt)
+                    val freshnessMode = stockFreshnessMode(observedAt, marketOpen)
                     // Stock.history is reserved for real historical observations.
                     // The quote endpoint does not provide a time series, so never synthesize
                     // a two-point series from previousClose/price. Company Intelligence loads
@@ -261,12 +263,25 @@ object MyStocksCache {
         } finally { connection.disconnect() }
     }.getOrDefault(emptyList())
 
-    private fun stockFreshnessMode(observedAt: String): String {
+    private fun stockFreshnessMode(observedAt: String, marketOpen: Boolean?): String {
         if (observedAt.isBlank()) return "UNKNOWN"
         val now = java.time.Instant.now().atZone(java.time.ZoneId.of("Africa/Nairobi"))
         val instant = runCatching { java.time.Instant.parse(observedAt) }.getOrNull()
-        if (instant != null) return if (instant.atZone(java.time.ZoneId.of("Africa/Nairobi")).toLocalDate().isBefore(now.toLocalDate())) "STALE" else "UNKNOWN"
+        if (instant != null) {
+            val observedDate = instant.atZone(java.time.ZoneId.of("Africa/Nairobi")).toLocalDate()
+            return when {
+                observedDate.isBefore(now.toLocalDate()) -> "STALE"
+                observedDate == now.toLocalDate() && marketOpen == true -> "CURRENT_SESSION"
+                observedDate == now.toLocalDate() && marketOpen == false -> "END_OF_DAY"
+                else -> "UNKNOWN"
+            }
+        }
         val date = runCatching { java.time.LocalDate.parse(observedAt.take(10)) }.getOrNull() ?: return "UNKNOWN"
-        return if (date.isBefore(now.toLocalDate())) "STALE" else "UNKNOWN"
+        return when {
+            date.isBefore(now.toLocalDate()) -> "STALE"
+            date == now.toLocalDate() && marketOpen == true -> "CURRENT_SESSION"
+            date == now.toLocalDate() && marketOpen == false -> "END_OF_DAY"
+            else -> "UNKNOWN"
+        }
     }
 }
