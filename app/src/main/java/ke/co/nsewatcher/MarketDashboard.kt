@@ -69,9 +69,12 @@ fun MarketDashboard(stockFeed: List<Stock>) {
             stocks.map { stock ->
                 async {
                     val history = MyStocksCache.loadHistory(stock.symbol, period.second)
+                    // A performance window needs two real historical observations.
+                    // Do not substitute today's quote when history is incomplete:
+                    // that would turn an unavailable period into a misleading gain.
                     val first = history.firstOrNull()
-                    val latest = history.lastOrNull() ?: stock.price
-                    val gain = if (first != null && first > 0.0 && latest > 0.0) {
+                    val latest = history.lastOrNull()
+                    val gain = if (history.size >= 2 && first != null && first > 0.0 && latest != null && latest > 0.0) {
                         ((latest - first) / first) * 100.0
                     } else null
                     gain?.let { PeriodPerformance(stock, it) }
