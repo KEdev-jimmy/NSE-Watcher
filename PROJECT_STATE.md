@@ -1809,3 +1809,40 @@ Commits:
 ## Next logical audit
 
 Audit financial evidence provenance end-to-end: verify the financial/ratio fetchedAt, source URLs, provider update dates, and UI timestamp wording so users can tell when the numbers were sourced and what date they represent. Do not add a timestamp that is merely the app fetch time and present it as the financial statement date.
+
+# 42. CI failure cluster 595–609 audit — 19 Sep 2026
+
+**Status: audited; no code rollback/fix justified**
+
+The reported 595–609 failures were cross-checked against the actual commit SHAs and current repository state.
+
+Available commit-status data shows:
+- 595 `afe3e4a...`: Vercel success
+- 596 `989aa02...`: Vercel failure
+- 597 `f676fe1...`: Vercel success
+- 598 `91e51d7...`: Vercel success
+- 599 `7404002...`: Vercel success
+- 600 `701dbfe...`: Vercel success
+- 601 `fcf2af8...`: Vercel failure with Vercel build-rate-limit target
+- 602 `1fc9a95...`: Vercel failure with Vercel build-rate-limit target
+- 603 `e8dc6a4...`: Vercel failure with Vercel build-rate-limit target
+- 604 `02cd82a...`: Vercel failure with Vercel build-rate-limit target
+- 605 `a2a5e00...`: Vercel failure with Vercel build-rate-limit target
+- 606 `c4a4b0d...`: Vercel failure with Vercel build-rate-limit target
+- 607 `6c5d86a...`: Vercel failure with Vercel build-rate-limit target
+- 608 `9777c0f...`: Vercel failure with Vercel build-rate-limit target
+- 609 `f328ef5...`: Vercel failure with Vercel build-rate-limit target
+
+The current Android workflow was inspected. It runs backend quality tests for company intelligence and market status, then a Gradle build and APK artifact upload.
+
+The financial and ratio changes represented by these commits remain present in current main, including regression tests and the backend-to-Android EPS/ratio metadata paths.
+
+Conclusion:
+- Do not revert the financial/ratio implementation merely to clear historical red statuses.
+- The 601–609 Vercel failures are consistent with build-rate limiting rather than evidence of nine independent source regressions.
+- Historical failed runs cannot be retroactively made successful. The correct resolution is to fix any genuine root cause and obtain a new successful run.
+- Individual GitHub Actions job logs for push-triggered runs 595–609 were not exposed by the available workflow-run connector, so their exact job-level error text was not claimed as inspected.
+- Future changes should be batched where practical to reduce unnecessary Vercel build-rate pressure.
+
+No source-code change was made in this audit because the available evidence does not justify one.
+
