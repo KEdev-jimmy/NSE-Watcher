@@ -383,8 +383,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
             item {
                 SessionAtGlance(
                     historyResult = historyResult,
-                    marketStatus = marketStatus,
-                    currentChange = selectedPeriodReturn
+                    marketStatus = marketStatus
                 )
             }
         }
@@ -921,8 +920,7 @@ private fun IntelligenceChart(
 @Composable
 private fun SessionAtGlance(
     historyResult: MyStocksCache.HistoryResult,
-    marketStatus: MyStocksCache.MarketStatus,
-    currentChange: Double?
+    marketStatus: MyStocksCache.MarketStatus
 ) {
     val open = historyResult.sessionOpen
     val latest = historyResult.sessionClose
