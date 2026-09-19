@@ -53,7 +53,7 @@ object CompanyIntelligenceCache {
         val debtToEquity: String = "",
         val pe: String = "",
         val pb: String = "",
-        val source: String = "MyStocks Africa",
+        val source: String = "StockAnalysis / S&P Global Market Intelligence",
         val providerUpdatedAt: String = "",
         val pageCheckedAt: String = ""
     )
