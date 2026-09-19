@@ -147,8 +147,17 @@ function normalizeMarketCap(value) {
   return String(Math.round(numeric * 1e6));
 }
 
+function parseProviderDate(html, label) {
+  const match = cleanText(html).match(new RegExp(`\\b${label}\\s*:\\s*([A-Z][a-z]{2} \\d{1,2}, \\d{4})\\b`, 'i'));
+  if (!match) return '';
+  const parsed = new Date(match[1]);
+  return Number.isNaN(parsed.getTime()) ? '' : parsed.toISOString().slice(0, 10);
+}
+
 function parseFinancials(html) {
   const tables = parseTables(html);
+  const providerUpdatedAt = parseProviderDate(html, 'Last updated');
+  const pageCheckedAt = parseProviderDate(html, 'Last checked');
   const revenue = findRow(tables, [/^Revenue(?:\s+Revenue Growth)?$/i, /^Revenue$/i]);
   const revenueGrowth = findRow(tables, [/^Revenue Growth$/i]);
   const netIncome = findRow(tables, [/^Net Income(?:\s+Net Income Growth)?$/i, /^Net Income$/i, /^Net Profit$/i]);
@@ -232,6 +241,8 @@ function parseFinancials(html) {
       revenueGrowth: latest.revenueGrowth,
       profitGrowth: latest.profitGrowth,
       epsGrowth: latest.epsGrowth,
+      financialProviderUpdatedAt: providerUpdatedAt,
+      financialPageCheckedAt: pageCheckedAt,
     },
     financialHistory: [latest, ...history]
       .filter((row, index, all) => row.period && all.findIndex(item => item.period === row.period) === index)
@@ -242,6 +253,8 @@ function parseFinancials(html) {
 
 function parseRatios(html) {
   const tables = parseTables(html);
+  const providerUpdatedAt = parseProviderDate(html, 'Last updated');
+  const pageCheckedAt = parseProviderDate(html, 'Last checked');
   const fiscalYears = findRow(tables, [/^Fiscal Year$/i]);
   const periods = findRow(tables, [/^Period Ending$/i]);
   const currentIndex = (fiscalYears || []).findIndex((value, index) =>
@@ -262,6 +275,8 @@ function parseRatios(html) {
       dividendYield: '',
       ratioBasis: 'UNKNOWN',
       ratioPeriod: '',
+      ratioProviderUpdatedAt: providerUpdatedAt,
+      ratioPageCheckedAt: pageCheckedAt,
     };
   }
 
@@ -280,6 +295,8 @@ function parseRatios(html) {
     dividendYield: valueFromRow(dividendYield, currentIndex),
     ratioBasis: 'Current',
     ratioPeriod: normalizePeriod(valueFromRow(periods, currentIndex)),
+    ratioProviderUpdatedAt: providerUpdatedAt,
+    ratioPageCheckedAt: pageCheckedAt,
   };
 }
 
@@ -467,6 +484,7 @@ function mergeProfile(primary, external) {
   const keys = [
     'marketCap', 'revenue', 'profit', 'eps', 'roe', 'debtToEquity', 'margin',
     'revenueGrowth', 'profitGrowth', 'pe', 'pb', 'dividendYield', 'ratioBasis', 'ratioPeriod',
+    'financialProviderUpdatedAt', 'financialPageCheckedAt', 'ratioProviderUpdatedAt', 'ratioPageCheckedAt',
   ];
   for (const key of keys) {
     if (String(external?.[key] || '').trim()) output[key] = external[key];
@@ -517,8 +535,10 @@ function buildFieldQuality(primary, external) {
 
 function evidenceFor(profile, primaryProfile, externalProfile, financialHistory, dividends, sourceInfo, fetchedAt, symbol) {
   const evidence = [];
-  const add = (claim, value, source, endpoint, url) => {
-    if (String(value || '').trim()) evidence.push({ claim, value: String(value), source, endpoint, url, symbol, fetchedAt });
+  const add = (claim, value, source, endpoint, url, metadata = {}) => {
+    if (String(value || '').trim()) evidence.push({
+      claim, value: String(value), source, endpoint, url, symbol, fetchedAt, ...metadata,
+    });
   };
 
   const fieldEvidence = [
@@ -540,9 +560,16 @@ function evidenceFor(profile, primaryProfile, externalProfile, financialHistory,
     const primaryValue = String(primaryProfile?.[key] || '').trim();
     const externalValue = String(externalProfile?.[key] || '').trim();
     if (primaryValue && externalValue && normalizedComparable(primaryValue) !== normalizedComparable(externalValue)) {
-      add(claim, `MyStocks Africa: ${primaryValue} | ${EXTERNAL_SOURCE}: ${externalValue}`, 'CONFLICT', endpoint, url);
+      add(claim, `MyStocks Africa: ${primaryValue} | ${EXTERNAL_SOURCE}: ${externalValue}`, 'CONFLICT', endpoint, url, {
+        providerUpdatedAt: externalProfile?.[endpoint === 'ratios' ? 'ratioProviderUpdatedAt' : 'financialProviderUpdatedAt'] || '',
+        providerCheckedAt: externalProfile?.[endpoint === 'ratios' ? 'ratioPageCheckedAt' : 'financialPageCheckedAt'] || '',
+      });
     } else if (externalValue) {
-      add(claim, externalValue, EXTERNAL_SOURCE, endpoint, url);
+      add(claim, externalValue, EXTERNAL_SOURCE, endpoint, url, {
+        providerUpdatedAt: externalProfile?.[endpoint === 'ratios' ? 'ratioProviderUpdatedAt' : 'financialProviderUpdatedAt'] || '',
+        providerCheckedAt: externalProfile?.[endpoint === 'ratios' ? 'ratioPageCheckedAt' : 'financialPageCheckedAt'] || '',
+        period: endpoint === 'ratios' ? (externalProfile?.ratioPeriod || '') : (externalProfile?.financialPeriod || ''),
+      });
     } else if (primaryValue) {
       add(claim, primaryValue, 'MyStocks Africa', endpoint, '');
     }
