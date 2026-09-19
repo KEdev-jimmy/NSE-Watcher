@@ -225,11 +225,7 @@ async function handler(req, res) {
 
     const quote = quoteResult.status === 'fulfilled' ? currentQuote(quoteResult.value) : currentQuote({});
     const candles = historyResult.status === 'fulfilled' ? normalizeCandles(historyResult.value) : [];
-    const safeQuoteChange = Number.isFinite(quote.changePct) && Number.isFinite(quote.price) && quote.price > 0 ? quote.changePct : null;
-    const move = latestMove(candles, 1) || (safeQuoteChange !== null ? {
-      change: formatPct(safeQuoteChange), changePct: safeQuoteChange, from: '', to: '',
-      priceBefore: null, priceAfter: quote.price, periodDays: 1,
-    } : null);
+    const move = latestMove(candles, 1);
     const news = newsResult.status === 'fulfilled'
       ? newsItems(newsResult.value).filter(item => isMarketRelevantText(item.title, item.description))
       : [];
@@ -284,3 +280,4 @@ async function handler(req, res) {
 }
 
 module.exports = handler;
+module.exports.latestMove = latestMove;
