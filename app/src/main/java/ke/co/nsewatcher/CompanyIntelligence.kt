@@ -337,6 +337,22 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
                     modifier = Modifier.fillMaxWidth(),
                     textAlign = TextAlign.Center
                 )
+                if (period == "NOW") {
+                    val latestTimestamp = historyResult.sessionCloseAt
+                        .ifBlank { historyResult.lastDate }
+                        .ifBlank { historyResult.observedAt }
+                    Text(
+                        if (latestTimestamp.isNotBlank()) {
+                            "Latest observation • " + formatChartTimestamp(latestTimestamp) + " • 15 min delayed"
+                        } else {
+                            "Latest available intraday observation • 15 min delayed"
+                        },
+                        color = IntelligenceMuted,
+                        fontSize = 8.sp,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
+                }
                 Spacer(Modifier.height(8.dp))
                 if (historyLoading) {
                     IntelligenceLoader("Loading $period market history", "Checking historical NSE data…")
