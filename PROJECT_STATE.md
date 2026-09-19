@@ -1418,3 +1418,64 @@ If the provider does not return a usable observation timestamp, the UI falls bac
 This is display-only and uses existing history/session timestamps. It does not estimate the current time as a market observation.
 
 Verification remains pending Android CI and manual APK testing.
+# 35. Combine duplicate company session summaries and compact header timestamp — 19 Sep 2026
+
+The screenshot review identified two overlapping sections:
+- Last trading session at a glance
+- Today at a glance
+
+They were presenting the same session open/close/change/freshness information in two different cards. Keeping both increased vertical length and made the Company Intelligence page feel repetitive.
+
+## Decision
+
+The two sections are now combined into one adaptive section:
+- Today's trading session while the market is known to be open
+- Trading session at a glance when the market is closed
+- Trading session when status is unavailable
+
+The combined card keeps the useful details from the more informative section:
+- Open
+- Latest/Close
+- session change
+- exact session date
+- latest observation timestamp
+- market state / freshness explanation
+- next regular session when supplied
+
+The duplicate today-vs-last-session presentation is removed.
+
+## Company header refinement
+
+The previous change/timestamp was displayed inline beside the large price at 13sp. On a phone this competed with the price and could become visually heavy.
+
+The header is now vertically structured:
+- large price remains the visual anchor
+- compact change/timestamp line is 9sp
+- exchange/data explanation remains smaller below it
+
+Example:
+
+    KSh 36.45
+    +3.26% • 18 Sep 26 • 6:30 PM EAT • CLOSE
+
+When the market is open, the final state becomes LATEST.
+
+This directly identifies the date/time represented by the percentage without requiring the user to open the session card.
+
+## Product judgment
+
+This change is intentionally conservative:
+- it removes duplicated information rather than adding another card
+- it preserves the detailed session evidence
+- it makes the most important observation timestamp visible near the price
+- it avoids calling delayed data live
+- it does not change the underlying market-data architecture
+
+## Verification
+
+Android CI/runtime verification is still pending for this latest commit. Manual testing should confirm:
+1. only one session-summary section is visible
+2. closed market shows completed session date/time
+3. open market shows latest observation/date/time
+4. compact header fits on narrow phones without crowding
+5. no session values are duplicated with conflicting labels
