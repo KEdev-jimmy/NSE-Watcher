@@ -36,7 +36,11 @@ object CompanyIntelligenceCache {
         val pb: String = "",
         val dividendYield: String = "",
         val ratioBasis: String = "",
-        val ratioPeriod: String = ""
+        val ratioPeriod: String = "",
+        val financialProviderUpdatedAt: String = "",
+        val financialPageCheckedAt: String = "",
+        val ratioProviderUpdatedAt: String = "",
+        val ratioPageCheckedAt: String = ""
     )
 
     data class FinancialPoint(
@@ -49,7 +53,9 @@ object CompanyIntelligenceCache {
         val debtToEquity: String = "",
         val pe: String = "",
         val pb: String = "",
-        val source: String = "MyStocks Africa"
+        val source: String = "MyStocks Africa",
+        val providerUpdatedAt: String = "",
+        val pageCheckedAt: String = ""
     )
 
     data class Evidence(
@@ -58,7 +64,10 @@ object CompanyIntelligenceCache {
         val source: String = "MyStocks Africa",
         val endpoint: String = "",
         val symbol: String = "",
-        val fetchedAt: String = ""
+        val fetchedAt: String = "",
+        val period: String = "",
+        val providerUpdatedAt: String = "",
+        val providerCheckedAt: String = ""
     )
 
     data class Dividend(
@@ -191,7 +200,11 @@ object CompanyIntelligenceCache {
         pb = findText(root, "pb", "pbRatio", "priceBook", "priceToBook"),
         dividendYield = findText(root, "dividendYield", "yield"),
         ratioBasis = findText(root, "ratioBasis"),
-        ratioPeriod = findText(root, "ratioPeriod")
+        ratioPeriod = findText(root, "ratioPeriod"),
+        financialProviderUpdatedAt = findText(root, "financialProviderUpdatedAt"),
+        financialPageCheckedAt = findText(root, "financialPageCheckedAt"),
+        ratioProviderUpdatedAt = findText(root, "ratioProviderUpdatedAt"),
+        ratioPageCheckedAt = findText(root, "ratioPageCheckedAt")
     )
 
     private fun parseFinancialHistory(array: JSONArray): List<FinancialPoint> = buildList {
@@ -208,7 +221,9 @@ object CompanyIntelligenceCache {
                     debtToEquity = findText(item, "debtToEquity"),
                     pe = findText(item, "pe"),
                     pb = findText(item, "pb"),
-                    source = findText(item, "source").ifBlank { "MyStocks Africa" }
+                    source = findText(item, "source").ifBlank { "MyStocks Africa" },
+                    providerUpdatedAt = findText(item, "providerUpdatedAt"),
+                    pageCheckedAt = findText(item, "pageCheckedAt")
                 )
             )
         }
@@ -224,7 +239,10 @@ object CompanyIntelligenceCache {
                     source = findText(item, "source").ifBlank { "MyStocks Africa" },
                     endpoint = findText(item, "url", "sourceUrl", "endpoint"),
                     symbol = findText(item, "symbol"),
-                    fetchedAt = findText(item, "fetchedAt")
+                    fetchedAt = findText(item, "fetchedAt"),
+                    period = findText(item, "period"),
+                    providerUpdatedAt = findText(item, "providerUpdatedAt"),
+                    providerCheckedAt = findText(item, "providerCheckedAt")
                 )
             )
         }
