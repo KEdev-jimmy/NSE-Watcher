@@ -1648,3 +1648,87 @@ Audit the Company Intelligence financial metrics end-to-end before changing thei
 5. only then change labels/formatting.
 
 Do not infer financial units or periods from the displayed number alone.
+
+
+# 40. Company Intelligence financial-period/unit audit — 19 Sep 2026
+
+**Status: implementation added; CI/runtime verification pending**
+
+## Audit before implementation
+
+The current Company Intelligence implementation was re-audited before changing the financial metrics.
+
+A genuine data-semantics issue was found:
+- The backend parser selected the first numeric financial column by position.
+- StockAnalysis financial tables can place TTM before FY columns.
+- The UI section was labelled "Latest reported annual financial evidence", but the parser could therefore select TTM values instead of the latest FY values.
+- For Nairobi Securities Exchange PLC, the current source explicitly shows TTM revenue of KSh 1.76B and TTM net income of KSh 857.54M, while FY 2025 revenue is KSh 1.061B and FY 2025 net income is KSh 272.24M. The source identifies the financial tables as Millions KES and the fiscal year as January–December. This confirms that the old positional parsing could materially change the meaning of the displayed numbers. citeturn4search0turn2search0
+- Growth was being recalculated from rounded displayed financial values before using the provider's supplied annual growth. That can create small discrepancies. The parser now prefers the source's growth value and only calculates growth when the source value is absent.
+- The UI displayed raw EPS, P/E, P/B, ROE, margin and growth numbers without consistently identifying units or meaning.
+- The Growth card displayed "EPS (latest)" rather than EPS growth, despite the backend already calculating EPS growth.
+
+## Implementation
+
+Backend commits:
+- 5577b7d02f9e06f50e370b762c4a41eaa117dca9 — select annual FY column and carry financial unit/period metadata
+- 797897787c78cbe47e23ac426c9046a33c978a9f — correct FY selector regex
+- 989aa02df4ca0e2d3e7f141beb23d5b2a2691dde — prefer provider-supplied annual growth values
+- afe3e4a17cbaa6f1dfa952daff201684dbc60e7f — add parser regression test
+
+Android commits:
+- f676fe195f060d26fe9f94b38ed0add4d16e3966 — carry financial unit and reporting-period metadata
+- 91e51d75fd1461304b2b495240d3e008e4744aa5 — clarify financial metric units/periods
+- 74040024af1d4a28bb4b22590869ff26f14d2c13 — refine metric formatting and period labels
+- 701dbfea0d505782a52a8331fd6cd313747b5993 — format EPS with its full meaning
+
+## New semantics
+
+The annual financial parser now:
+- finds the first column explicitly labelled FY YYYY;
+- uses the corresponding Period Ending value;
+- excludes a preceding TTM column from the annual Company Intelligence summary;
+- identifies the financial values as Millions KES when coming from the StockAnalysis financial source;
+- prefers the provider's reported annual growth percentages over recalculating from rounded values.
+
+The UI now makes the displayed meaning explicit:
+- Revenue/Profit: KSh with M/B formatting based on the sourced Millions KES unit.
+- Financial period: explicit FY and year-end information.
+- EPS: KSh X.XX / share and the label includes "Earnings Per Share".
+- ROE: explicit percentage.
+- Net margin: explicit percentage.
+- Revenue growth / Profit growth / EPS growth: explicitly labelled YoY and shown as percentages.
+- P/E: shown as a multiple and expanded as Price-to-Earnings.
+- P/B: shown as a multiple and expanded as Price-to-Book.
+- Dividend yield: explicit percentage.
+- Growth now shows EPS growth instead of repeating the latest EPS value.
+
+## Important example
+
+For NASE:NSE, the source currently distinguishes:
+- TTM revenue: 1,760 million KES = KSh 1.76B
+- FY 2025 revenue: 1,061 million KES = KSh 1.061B
+- TTM net income: 857.54 million KES
+- FY 2025 net income: 272.24 million KES
+- FY 2025 EPS: 1.04
+- FY 2025 revenue growth: 30.17%
+- FY 2025 EPS growth: 133.91%
+
+The Company Intelligence annual section should use the FY values, not the TTM values. citeturn4search0
+
+## Verification
+
+- Current repository audit: completed before implementation.
+- Provider/source semantics checked against current StockAnalysis pages: completed. citeturn4search0turn3search0
+- Backend regression test added for TTM-vs-FY selection.
+- Android CI/build: not independently verified yet.
+- APK/manual UI verification: pending.
+
+## Next logical step
+
+After CI/build verification, continue the same Company Intelligence audit with:
+1. verify P/E, P/B, ROE, Debt/Equity and Dividend Yield are sourced with the correct current/annual basis;
+2. verify the displayed valuation metrics are not being mixed between current ratios and FY ratios without labels;
+3. verify evidence/source presentation clearly distinguishes current market ratios from annual financial results;
+4. then audit timestamp/fetch provenance on the financial evidence.
+
+Do not add assumptions for missing units or periods.
