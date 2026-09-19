@@ -1283,3 +1283,15 @@ The company screen no longer infers "last session" from a failed status request.
 The backend 1D cleanup also removed the now-unused previous-close fetch/baseline variables after the chart stopped injecting a synthetic previous-close observation.
 
 Verification remains pending Android CI and runtime testing.
+
+# 32. 1D chart session-filter correction — 19 Sep 2026
+
+A post-implementation diff audit caught an important issue before CI/runtime verification: after removing the synthetic previous-close candle, the 1D backend still needed to explicitly replace the returned candle array with the latest actual trading session. That filter is now retained without synthetic data.
+
+This keeps 1D history:
+- actual intraday observations only
+- latest Nairobi session only
+- no previous-close fake candle
+- session open/close metadata preserved
+
+This was corrected before treating the implementation as verified.

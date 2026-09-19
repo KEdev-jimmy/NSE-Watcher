@@ -143,9 +143,10 @@ module.exports = async (req, res) => {
                 sessionOpenAt = firstTimestamp?.toISOString() || null;
                 sessionCloseAt = candleTimestamp(actualLast)?.toISOString() || null;
 
-                // Keep the chart timeline strictly observational.
-                // The previous close is used as a session baseline when available,
-                // but it is not inserted as a synthetic candle/observation.
+                // Keep the chart timeline strictly observational: return only
+                // the actual candles belonging to the latest Nairobi trading session.
+                if (data?.candles) data.candles = currentSession;
+                else if (data?.data?.candles) data.data.candles = currentSession;
               }
             }
           }
