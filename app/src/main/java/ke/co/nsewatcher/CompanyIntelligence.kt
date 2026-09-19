@@ -39,7 +39,6 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.time.format.DateTimeParseException
 import java.util.Locale
 
 private val IntelligenceGreen = Color(0xFF00A859)
@@ -99,16 +98,16 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
         val requestedPeriod = if (period == "NOW") "1D" else period
         val live = MyStocksCache.loadHistoryDetails(s.symbol, requestedPeriod)
         historyResult = live
-        if (live.points.size >= 2) history = live.points
+        history = live.points
         historyLoading = false
     }
 
     val profile = intelligence.profile
-    val monthlyReturn = percentReturn(monthHistory)
     val selectedPeriodReturn = if (period == "1D" || period == "NOW") {
-        historyResult.sessionChangePct ?: percentReturn(history.map { it.close })
+        historyResult.sessionChangePct
+            ?: historyResult.points.takeIf { it.size >= 2 }?.let { percentReturn(it.map { point -> point.close }) }
     } else {
-        percentReturn(history.map { it.close })
+        history.takeIf { it.size >= 2 }?.let { percentReturn(it.map { point -> point.close }) }
     }
     val latestFinancialPeriod = intelligence.financialHistory.lastOrNull()?.period.orEmpty()
     val intelligenceView = CompanyIntelligenceEngine.build(s, intelligence, monthHistory, news)
@@ -160,8 +159,16 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
-                        formatHeaderChange(s.change, marketStatus, historyResult),
-                        color = if (s.change >= 0) IntelligenceGreen else IntelligenceRed,
+                        if (s.changeAvailable && s.change.isFinite()) {
+                            formatHeaderChange(s.change, marketStatus, historyResult)
+                        } else {
+                            formatHeaderUnavailable(marketStatus, historyResult)
+                        },
+                        color = if (s.changeAvailable && s.change.isFinite()) {
+                            if (s.change >= 0) IntelligenceGreen else IntelligenceRed
+                        } else {
+                            IntelligenceMuted
+                        },
                         fontWeight = FontWeight.Bold,
                         fontSize = 9.sp,
                         maxLines = 1
@@ -1029,6 +1036,34 @@ private fun SessionAtGlance(
         }
     }
 }
+private fun formatHeaderUnavailable(
+    marketStatus: MyStocksCache.MarketStatus,
+    historyResult: MyStocksCache.HistoryResult
+): String {
+    val timestamp = historyResult.sessionCloseAt
+        .ifBlank { historyResult.lastDate }
+        .ifBlank { historyResult.observedAt }
+        .takeIf { it.isNotBlank() }
+        ?.let(::formatCompactChartTimestamp)
+
+    val state = when {
+        !marketStatus.isKnown -> "LATEST"
+        marketStatus.isOpen -> "LATEST"
+        else -> "CLOSE"
+    }
+
+    return buildString {
+        append("Change unavailable")
+        timestamp?.let {
+            append(" • ")
+            append(it)
+            append(" EAT")
+        }
+        append(" • ")
+        append(state)
+    }
+}
+
 private fun formatHeaderChange(
     change: Double,
     marketStatus: MyStocksCache.MarketStatus,
