@@ -41,7 +41,6 @@ import ke.co.nsewatcher.domain.EvidenceAdapters
 import ke.co.nsewatcher.domain.EvidenceGraph
 import ke.co.nsewatcher.data.MyStocksCache
 import java.text.SimpleDateFormat
-import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
@@ -162,17 +161,34 @@ fun WhyStockMovingSection(symbol: String) {
 
 @Composable
 private fun DailyCompanyOverview(symbol: String, day: MyStocksCache.HistoryResult, market: MyStocksCache.MarketStatus, loading: Boolean) {
-    val statusLabel = if (market.isOpen) "NSE OPEN" else "NSE CLOSED"
-    val statusColor = if (market.isOpen) MovementGreen else MovementMuted
-    val regularNextOpen = nextRegularOpenLabel()
+    val statusLabel = when {
+        !market.isKnown -> "NSE STATUS UNKNOWN"
+        market.isOpen -> "NSE OPEN"
+        else -> "NSE CLOSED"
+    }
+    val statusColor = when {
+        !market.isKnown -> MovementAmber
+        market.isOpen -> MovementGreen
+        else -> MovementMuted
+    }
+    val sessionTitle = when {
+        !market.isKnown -> "Trading session at a glance"
+        market.isOpen -> "Today’s trading session"
+        else -> "Last trading session"
+    }
+    val sessionSubtitle = when {
+        !market.isKnown -> "Session data from the current market feed"
+        market.isOpen -> "A simple summary of this company’s current trading session"
+        else -> "A simple summary of the most recent completed trading session"
+    }
     val sessionChange = day.sessionChangePct
     val hasSession = day.sessionOpen != null && day.sessionClose != null
 
     Column(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("Today at a glance", color = MovementText, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
-                Text("A simple summary of this company's trading day", color = MovementMuted, fontSize = 9.sp)
+                Text(sessionTitle, color = MovementText, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
+                Text(sessionSubtitle, color = MovementMuted, fontSize = 9.sp)
             }
             Surface(shape = RoundedCornerShape(50), color = if (market.isOpen) MovementLight else Color(0xFFF1F3F2)) {
                 Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -202,14 +218,14 @@ private fun DailyCompanyOverview(symbol: String, day: MyStocksCache.HistoryResul
                         Column(Modifier.padding(10.dp)) {
                             Text(
                                 if (sessionChange != null) {
-                                    "${if (sessionChange >= 0) "Up" else "Down"} ${signedPercent(sessionChange)} from today's open"
+                                    "${if (sessionChange >= 0) "Up" else "Down"} ${signedPercent(sessionChange)} from the session open"
                                 } else "Today's open-to-close change is unavailable",
                                 color = if ((sessionChange ?: 0.0) >= 0) MovementGreen else MovementRed,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.ExtraBold
                             )
                             Text(
-                                "This is different from the daily change vs yesterday's close shown above.",
+                                "This is the session open-to-latest/close change, not the daily change vs the previous close.",
                                 color = MovementMuted,
                                 fontSize = 8.sp
                             )
@@ -220,7 +236,11 @@ private fun DailyCompanyOverview(symbol: String, day: MyStocksCache.HistoryResul
                         Icon(Icons.Default.AccessTime, null, tint = MovementMuted, modifier = Modifier.size(14.dp))
                         Spacer(Modifier.size(5.dp))
                         Text(
-                            if (market.isOpen) "Market is trading • prices are 15 min delayed" else "Market closed • last available observation is shown",
+                            when {
+                                !market.isKnown -> "Market status unavailable • session state is not assumed"
+                                market.isOpen -> "Market is trading • prices are 15 min delayed"
+                                else -> "Market closed • last available observation is shown"
+                            },
                             color = MovementMuted,
                             fontSize = 8.sp
                         )
@@ -229,7 +249,12 @@ private fun DailyCompanyOverview(symbol: String, day: MyStocksCache.HistoryResul
                         Text("Observed ${formatEAT(day.observedAt)}", color = MovementMuted, fontSize = 8.sp, modifier = Modifier.padding(start = 19.dp, top = 2.dp))
                     }
                     Text(
-                        if (market.isOpen) "Regular session: Mon–Fri • closes around 3:00 PM EAT" else "Next regular session: $regularNextOpen",
+                        when {
+                            !market.isKnown -> "Next regular session: unavailable"
+                            market.isOpen -> "Regular session: Mon–Fri • closes around 3:00 PM EAT"
+                            market.nextOpen.isNotBlank() -> "Next regular session: ${formatEAT(market.nextOpen)}"
+                            else -> "Next regular session: unavailable"
+                        },
                         color = MovementMuted,
                         fontSize = 8.sp,
                         modifier = Modifier.padding(start = 19.dp, top = 2.dp)
@@ -262,16 +287,6 @@ private fun formatEAT(iso: String): String = runCatching {
     output.format(input.parse(iso) ?: Date()) + " EAT"
 }.getOrElse { iso.take(16).replace('T', ' ') + " EAT" }
 
-private fun nextRegularOpenLabel(): String {
-    val cal = Calendar.getInstance(TimeZone.getTimeZone("Africa/Nairobi"))
-    when (cal.get(Calendar.DAY_OF_WEEK)) {
-        Calendar.FRIDAY -> cal.add(Calendar.DAY_OF_MONTH, 3)
-        Calendar.SATURDAY -> cal.add(Calendar.DAY_OF_MONTH, 2)
-        Calendar.SUNDAY -> cal.add(Calendar.DAY_OF_MONTH, 1)
-        else -> cal.add(Calendar.DAY_OF_MONTH, 1)
-    }
-    return SimpleDateFormat("EEE, d MMM • h:mm a", Locale.US).format(cal.time) + " EAT"
-}
 
 @Composable
 private fun MovementEvidenceRow(evidence: MovementIntelligenceCache.Evidence, sourceUrl: String?) {
