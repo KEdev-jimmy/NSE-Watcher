@@ -52,7 +52,7 @@ private val IntelligenceRed = Color(0xFFE04444)
 
 @Composable
 fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, onWatchToggle: (() -> Unit)? = null) {
-    val periods = listOf("1D", "1W", "1M", "3M", "6M", "1Y", "3Y", "5Y")
+    val periods = listOf("1D", "1W", "1M", "3M", "6M", "1Y", "3Y", "5Y", "NOW")
     var period by rememberSaveable(s.symbol) { mutableStateOf("1D") }
     var history by remember(s.symbol) {
         mutableStateOf(s.history.map { MyStocksCache.HistoryPoint(it) })
@@ -91,7 +91,10 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
 
     LaunchedEffect(s.symbol, period) {
         historyLoading = true
-        val live = MyStocksCache.loadHistoryDetails(s.symbol, period)
+        // NOW is a view of the latest available intraday session data.
+        // It intentionally reuses the verified 1D endpoint; no live price is fabricated.
+        val requestedPeriod = if (period == "NOW") "1D" else period
+        val live = MyStocksCache.loadHistoryDetails(s.symbol, requestedPeriod)
         historyResult = live
         if (live.points.size >= 2) history = live.points
         historyLoading = false
@@ -99,7 +102,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
 
     val profile = intelligence.profile
     val monthlyReturn = percentReturn(monthHistory)
-    val selectedPeriodReturn = if (period == "1D") {
+    val selectedPeriodReturn = if (period == "1D" || period == "NOW") {
         historyResult.sessionChangePct ?: percentReturn(history.map { it.close })
     } else {
         percentReturn(history.map { it.close })
@@ -150,7 +153,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
                         Text(String.format(Locale.US, "KSh %.2f", s.price), fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, color = IntelligenceText)
                         Spacer(Modifier.width(9.dp))
                         Text(
-                            formatHeaderChange(s.change, marketStatus),
+                            formatHeaderChange(s.change, marketStatus, historyResult),
                             color = if (s.change >= 0) IntelligenceGreen else IntelligenceRed,
                             fontWeight = FontWeight.ExtraBold,
                             fontSize = 13.sp,
@@ -337,7 +340,11 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
                 if (historyLoading) {
                     IntelligenceLoader("Loading $period market history", "Checking historical NSE data…")
                 } else if (history.size >= 2) {
-                    IntelligenceChart(history, period, if ((selectedPeriodReturn ?: s.change) >= 0) IntelligenceGreen else IntelligenceRed)
+                    IntelligenceChart(
+                        history,
+                        if (period == "NOW") "1D" else period,
+                        if ((selectedPeriodReturn ?: s.change) >= 0) IntelligenceGreen else IntelligenceRed
+                    )
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("${history.size} data points", color = IntelligenceMuted, fontSize = 8.sp)
                         selectedPeriodReturn?.let { Text(formatPeriodReturn(period, it), color = if (it >= 0) IntelligenceGreen else IntelligenceRed, fontWeight = FontWeight.Bold, fontSize = 8.sp) }
@@ -348,7 +355,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
             }
         }
 
-        if (period == "1D") {
+        if (period == "1D" || period == "NOW") {
             item {
                 TodayAtGlance(
                     historyResult = historyResult,
@@ -975,24 +982,44 @@ private fun TodayAtGlance(
     }
 }
 
-private fun formatHeaderChange(change: Double, marketStatus: MyStocksCache.MarketStatus): String =
-    String.format(
-        Locale.US,
-        "%+.2f%% %s",
-        change,
-        when {
-            !marketStatus.isKnown -> "latest"
-            marketStatus.isOpen -> "this session"
-            else -> "last session"
+private fun formatHeaderChange(
+    change: Double,
+    marketStatus: MyStocksCache.MarketStatus,
+    historyResult: MyStocksCache.HistoryResult
+): String {
+    val timestamp = historyResult.sessionCloseAt
+        .ifBlank { historyResult.lastDate }
+        .ifBlank { historyResult.observedAt }
+        .takeIf { it.isNotBlank() }
+        ?.let(::formatCompactChartTimestamp)
+
+    val state = when {
+        !marketStatus.isKnown -> "LATEST"
+        marketStatus.isOpen -> "LATEST"
+        else -> "CLOSE"
+    }
+
+    return buildString {
+        append(String.format(Locale.US, "%+.2f%%", change))
+        timestamp?.let {
+            append(" • ")
+            append(it)
         }
-    )
+        append(" • ")
+        append(state)
+    }
+}
 
 private fun formatChartTimestamp(raw: String): String = runCatching {
-    Instant.parse(raw).atZone(ZoneId.of("Africa/Nairobi")).format(DateTimeFormatter.ofPattern("dd MMM • HH:mm", Locale.US)) + " EAT"
+    Instant.parse(raw).atZone(ZoneId.of("Africa/Nairobi")).format(DateTimeFormatter.ofPattern("dd MMM yy • h:mm a", Locale.US)) + " EAT"
+}.getOrElse { raw.take(19) }
+
+private fun formatCompactChartTimestamp(raw: String): String = runCatching {
+    Instant.parse(raw).atZone(ZoneId.of("Africa/Nairobi")).format(DateTimeFormatter.ofPattern("dd MMM yy • h:mm a", Locale.US))
 }.getOrElse { raw.take(19) }
 
 private fun formatChartTimestampDate(raw: String): String = runCatching {
-    Instant.parse(raw).atZone(ZoneId.of("Africa/Nairobi")).format(DateTimeFormatter.ofPattern("EEE, dd MMM", Locale.US))
+    Instant.parse(raw).atZone(ZoneId.of("Africa/Nairobi")).format(DateTimeFormatter.ofPattern("EEE, dd MMM yy", Locale.US))
 }.getOrElse { raw.take(10) }
 
 private data class ChartLabel(val index: Int, val text: String)
@@ -1133,7 +1160,7 @@ private fun financialPeriodLabel(period: String): String {
 }
 
 private fun periodDescription(period: String): String = when (period) {
-    "1D" -> "Today"
+    "1D" -> "Current trading session"
     "1W" -> "Past 1 week"
     "1M" -> "Past 1 month"
     "3M" -> "Past 3 months"
@@ -1141,12 +1168,13 @@ private fun periodDescription(period: String): String = when (period) {
     "1Y" -> "Past 1 year"
     "3Y" -> "Past 3 years"
     "5Y" -> "Past 5 years"
+    "NOW" -> "Latest available intraday data • 15 min delayed"
     else -> period
 }
 
 private fun formatPeriodReturn(period: String, value: Double): String {
     val label = when (period) {
-        "1D" -> "today"
+        "1D" -> "session"
         "1W" -> "1 week"
         "1M" -> "1 month"
         "3M" -> "3 months"
@@ -1154,6 +1182,7 @@ private fun formatPeriodReturn(period: String, value: Double): String {
         "1Y" -> "1 year"
         "3Y" -> "3 years"
         "5Y" -> "5 years"
+        "NOW" -> "latest session"
         else -> period
     }
     return String.format(Locale.US, "%+.2f%% $label", value)
