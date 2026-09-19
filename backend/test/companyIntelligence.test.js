@@ -138,6 +138,39 @@ test('ratio parser selects the explicit Current column and exposes its basis', (
   assert.equal(result.ratioPeriod, "Sep '26");
 });
 
+test('financial history rows and evidence retain provider provenance', () => {
+  const html = `
+    <table>
+      <tr><th>Fiscal Year</th><td>FY 2025</td><td>FY 2024</td></tr>
+      <tr><th>Period Ending</th><td>Dec '25</td><td>Dec '24</td></tr>
+      <tr><th>Revenue</th><td>1,061</td><td>815.23</td></tr>
+      <tr><th>Net Income</th><td>272.24</td><td>116.27</td></tr>
+      <tr><th>EPS</th><td>1.04</td><td>0.45</td></tr>
+    </table>
+    <p>Data Source: S&amp;P Global Market Intelligence Last updated: Jul 9, 2026</p>
+    <p>Last checked: Sep 17, 2026</p>`;
+  const parsed = parseFinancials(html);
+
+  assert.ok(parsed.financialHistory.length >= 1);
+  assert.equal(parsed.financialHistory.at(-1).providerUpdatedAt, '2026-07-09');
+  assert.equal(parsed.financialHistory.at(-1).pageCheckedAt, '2026-09-17');
+
+  const evidence = evidenceFor(
+    parsed.profile,
+    {},
+    parsed.profile,
+    parsed.financialHistory,
+    [],
+    { financialsUrl: 'https://example.com/financials', ratiosUrl: '' },
+    '2026-09-19T00:00:00.000Z',
+    'SCOM.KE'
+  );
+  const revenueEvidence = evidence.find(item => item.claim === "Revenue FY 2025 • Dec '25");
+  assert.equal(revenueEvidence.providerUpdatedAt, '2026-07-09');
+  assert.equal(revenueEvidence.providerCheckedAt, '2026-09-17');
+  assert.equal(revenueEvidence.period, "FY 2025 • Dec '25");
+});
+
 test('financial parser carries provider update/check dates separately from statement period', () => {
   const html = `
     <table>
