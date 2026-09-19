@@ -9,6 +9,7 @@ const {
   normalizeLocation,
   parseFinancials,
   parseRatios,
+  mergeProfile,
 } = require('../lib/companyIntelligence');
 
 test('company field quality marks a single available source as AVAILABLE', () => {
@@ -216,4 +217,20 @@ test('ratio parser does not guess a ratio basis when Current is missing', () => 
   assert.equal(result.pe, '');
   assert.equal(result.ratioBasis, 'UNKNOWN');
   assert.equal(result.ratioPeriod, '');
+});
+
+
+test('merged company profile preserves external financial unit and reporting period', () => {
+  const merged = mergeProfile(
+    { revenue: 'MyStocks value' },
+    {
+      revenue: '1,061',
+      financialUnit: 'Millions KES',
+      financialPeriod: "FY 2025 • Dec '25",
+    }
+  );
+
+  assert.equal(merged.revenue, '1,061');
+  assert.equal(merged.financialUnit, 'Millions KES');
+  assert.equal(merged.financialPeriod, "FY 2025 • Dec '25");
 });
