@@ -89,11 +89,13 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
         }
     }
 
-    LaunchedEffect(s.symbol, period, s.price) {
+    val lastMarketRefreshMs = MarketRefreshController.state.value.lastSuccessfulRefreshMs
+    LaunchedEffect(s.symbol, period, lastMarketRefreshMs) {
         historyLoading = true
         // NOW is a view of the latest available intraday session data.
         // It intentionally reuses the verified 1D endpoint; no live price is fabricated.
-        // The price key also lets the existing 15-minute app refresh pull a newer chart observation.
+        // The existing 15-minute refresh timestamp also forces a reload when a newer
+        // observation arrives, even if the price itself has not changed.
         val requestedPeriod = if (period == "NOW") "1D" else period
         val live = MyStocksCache.loadHistoryDetails(s.symbol, requestedPeriod)
         historyResult = live
