@@ -238,8 +238,6 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
                         "Revenue" to formatFinancialValue(profile.revenue, profile.financialUnit),
                         "Profit" to formatFinancialValue(profile.profit, profile.financialUnit),
                         "EPS (Earnings Per Share)" to formatMetricValue("EPS", profile.eps),
-                        "ROE (Return on Equity)" to formatMetricValue("ROE", profile.roe),
-                        "Debt / Equity" to formatMetricValue("Debt / Equity", profile.debtToEquity),
                         "Net margin" to formatMetricValue("Net margin", profile.margin)
                     ),
                     fieldSources = intelligence.fieldSources,
@@ -265,13 +263,24 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
             }
         }
 
-        item { SectionTitle("Valuation", "How the current price relates to reported metrics", Icons.Default.Calculate) }
+        item { SectionTitle("Current ratios & valuation", "Current market-price and ratio snapshot", Icons.Default.Calculate) }
         item {
             IntelligenceCard {
+                if (profile.ratioBasis.equals("Current", ignoreCase = true)) {
+                    val basis = profile.ratioPeriod.takeIf { it.isNotBlank() }?.let { "Current ratios • period ending $it" }
+                        ?: "Current ratios"
+                    Text(basis, color = IntelligenceMuted, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(8.dp))
+                } else {
+                    Text("Current ratio data is unavailable from the structured ratio response.", color = IntelligenceMuted, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(8.dp))
+                }
                 MetricGrid(
                     metrics = listOf(
                         "P/E (Price-to-Earnings)" to formatMetricValue("P/E", profile.pe),
                         "P/B (Price-to-Book)" to formatMetricValue("P/B", profile.pb),
+                        "ROE (Return on Equity)" to formatMetricValue("ROE", profile.roe),
+                        "Debt / Equity" to formatMetricValue("Debt / Equity", profile.debtToEquity),
                         "Dividend yield" to formatMetricValue("Dividend yield", profile.dividendYield),
                         "Market cap" to formatMarketCap(profile.marketCap)
                     ),
@@ -279,7 +288,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
                     fieldQuality = intelligence.fieldQuality
                 )
                 Spacer(Modifier.height(8.dp))
-                Text("Historical valuation context is not displayed until a sourced valuation history is available.", color = IntelligenceMuted, fontSize = 9.sp)
+                Text("These ratios are the source's current snapshot; they are not FY 2025 historical ratio values.", color = IntelligenceMuted, fontSize = 9.sp)
             }
         }
 
