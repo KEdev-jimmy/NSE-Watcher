@@ -105,6 +105,8 @@ test('financial parser selects the annual FY column instead of TTM when both are
   assert.equal(result.profile.revenueGrowth, '30.17%');
   assert.equal(result.profile.profitGrowth, '133.91%');
   assert.equal(result.profile.epsGrowth, '133.91%');
+  assert.equal(result.profile.financialProviderUpdatedAt, '');
+  assert.equal(result.profile.financialPageCheckedAt, '');
 });
 
 
@@ -130,6 +132,37 @@ test('ratio parser selects the explicit Current column and exposes its basis', (
   assert.equal(result.roe, '34.80%');
   assert.equal(result.dividendYield, '2.64%');
   assert.equal(result.ratioBasis, 'Current');
+  assert.equal(result.ratioPeriod, "Sep '26");
+});
+
+test('financial parser carries provider update/check dates separately from statement period', () => {
+  const html = `
+    <table>
+      <tr><th>Fiscal Year</th><td>TTM</td><td>FY 2025</td></tr>
+      <tr><th>Period Ending</th><td>Jun '26</td><td>Dec '25</td></tr>
+      <tr><th>Revenue</th><td>1,760</td><td>1,061</td></tr>
+    </table>
+    <p>Data Source: S&amp;P Global Market Intelligence Last updated: Jul 9, 2026</p>
+    <p>Last checked: Sep 17, 2026</p>`;
+  const result = parseFinancials(html);
+  assert.equal(result.profile.financialProviderUpdatedAt, '2026-07-09');
+  assert.equal(result.profile.financialPageCheckedAt, '2026-09-17');
+  assert.match(result.profile.financialPeriod, /FY 2025/);
+  assert.match(result.profile.financialPeriod, /Dec '25/);
+});
+
+test('ratio parser carries provider update/check dates separately from current ratio period', () => {
+  const html = `
+    <table>
+      <tr><th>Fiscal Year</th><td>Current</td><td>FY 2025</td></tr>
+      <tr><th>Period Ending</th><td>Sep '26</td><td>Dec '25</td></tr>
+      <tr><th>PE Ratio</th><td>8.00</td><td>19.39</td></tr>
+    </table>
+    <p>Data Source: S&amp;P Global Market Intelligence Last updated: Jul 9, 2026</p>
+    <p>Last checked: Sep 17, 2026</p>`;
+  const result = parseRatios(html);
+  assert.equal(result.ratioProviderUpdatedAt, '2026-07-09');
+  assert.equal(result.ratioPageCheckedAt, '2026-09-17');
   assert.equal(result.ratioPeriod, "Sep '26");
 });
 
