@@ -250,6 +250,9 @@ object MyStocksCache {
                     val volumeValue = item.optDouble("volume", Double.NaN)
                     val volumeAvailable = volumeValue.isFinite() && volumeValue >= 0.0
                     val volume = if (volumeAvailable) volumeValue.toLong() else 0L
+                    val averageVolumeValue = item.optDouble("averageVolume", Double.NaN).let { if (it.isFinite()) it else item.optDouble("avgVolume", Double.NaN) }
+                    val averageVolumeAvailable = averageVolumeValue.isFinite() && averageVolumeValue > 0.0
+                    val averageVolume = if (averageVolumeAvailable) averageVolumeValue.toLong() else 0L
                     val source = item.optString("source", "").trim().ifBlank { if (dataOrigin == "backend") "MyStocks Africa" else "NSE Watcher fallback catalogue" }
                     val observedAt = item.optString("lastPriceUpdate", "").trim().ifBlank { item.optString("asOf", "").trim() }
                     val freshnessMode = stockFreshnessMode(observedAt, marketOpen)
@@ -257,7 +260,7 @@ object MyStocksCache {
                     // The quote endpoint does not provide a time series, so never synthesize
                     // a two-point series from previousClose/price. Company Intelligence loads
                     // sourced history through loadHistoryDetails() instead.
-                    add(Stock(symbol, name, price, changePct, emptyList(), item.optString("logoUrl").takeIf { it.isNotBlank() }, item.optString("sector", "Other").ifBlank { "Other" }, volume, changeAvailable, volumeAvailable, source, observedAt, freshnessMode, dataOrigin))
+                    add(Stock(symbol, name, price, changePct, emptyList(), item.optString("logoUrl").takeIf { it.isNotBlank() }, item.optString("sector", "Other").ifBlank { "Other" }, volume, changeAvailable, volumeAvailable, source, observedAt, freshnessMode, dataOrigin, averageVolume, averageVolumeAvailable))
                 }
             }
         } finally { connection.disconnect() }
