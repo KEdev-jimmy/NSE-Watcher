@@ -48,7 +48,8 @@ fun HomeDashboard(
     currentStocks: List<Stock>,
     openCompany: (Stock) -> Unit,
     openNews: (NewsItem) -> Unit,
-    openMarket: () -> Unit = {}
+    openMarket: () -> Unit = {},
+    openWatchlist: () -> Unit = {}
 ) {
     var news by remember { mutableStateOf(emptyList<NewsItem>()) }
     var newsLoading by remember { mutableStateOf(true) }
@@ -99,6 +100,11 @@ fun HomeDashboard(
 
         item {
             MarketFreshnessStrip(currentStocks, marketStatus)
+        }
+
+        item {
+            Spacer(Modifier.height(10.dp))
+            WatchlistQuickAccess(openWatchlist)
         }
 
         item {
@@ -736,6 +742,33 @@ private fun IntelligenceNewsCard(item: NewsItem, onClick: () -> Unit) {
                 Text(listOf(item.companyName.ifBlank { item.symbol }, timeAgo(item.publishedAt)).filter { it.isNotBlank() }.joinToString("  •  "), color = HomeMuted, fontSize = 7.sp)
             }
             Icon(Icons.Default.ChevronRight, null, tint = HomeMuted, modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+@Composable
+private fun WatchlistQuickAccess(openWatchlist: () -> Unit) {
+    Column(Modifier.padding(horizontal = 14.dp)) {
+        Text("Quick Access", color = HomeTextDark, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
+        Spacer(Modifier.height(6.dp))
+        Card(
+            Modifier.fillMaxWidth().clickable(onClick = openWatchlist),
+            RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = HomeLightGreen),
+            border = BorderStroke(1.dp, HomeBorder)
+        ) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 11.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.StarBorder, null, tint = HomeDarkGreen, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("My Watchlist", color = HomeTextDark, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Text("Your selected companies", color = HomeMuted, fontSize = 8.sp)
+                }
+                Text("View →", color = HomeDarkGreen, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
