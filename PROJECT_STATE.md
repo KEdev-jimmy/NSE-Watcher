@@ -2479,3 +2479,55 @@ The response continues to expose the more specific provenance fields already har
 Use the new commit-triggered Android CI run as the verification point.
 
 If it passes, treat this Company Intelligence hardening batch as closed unless a new production verification exposes a real defect. Do not continue changing individual fields without evidence of a problem.
+
+# 53. Phase 10 combined freshness closure — 19 Sep 2026
+
+**Status: implementation complete; CI verification pending**
+
+## Combined audit
+
+With the Company Intelligence hardening batch closed, the next Phase 10 freshness/session audit was performed across the existing market-status and Home freshness path.
+
+The audit confirmed:
+- verified NSE index endpoint behavior remains intentionally unavailable until a verified source contract exists;
+- Home does not invent NASI/NSE 20/NSE 25 values;
+- index freshness labeling is observation-time based when real index observations exist;
+- market refresh countdown correctly represents a feed check, not a guarantee that provider data changed;
+- Company Intelligence uses explicit session/provider timestamps rather than the generic market refresh interval.
+
+## Concrete issue found
+
+HomeDashboard.kt treated any isOpen == false state as "Market closed" inside the market freshness strip.
+
+The backend and Android status model already distinguish:
+- OPEN
+- CLOSED
+- UNKNOWN
+
+Therefore an unavailable or conflicting market-status response could incorrectly be displayed as **Market closed**.
+
+## Fix
+
+The Home freshness strip now:
+- displays **Market status unavailable** when isKnown == false;
+- does not infer OPEN/CLOSED from the default boolean in the unknown state;
+- keeps the closed-market wording only for a known CLOSED status;
+- avoids a misleading open-session countdown when status is unknown.
+
+No market data, index values, or provider behavior was changed.
+
+## Verification
+
+- Static Phase 10 audit: completed.
+- Concrete status-semantics defect: fixed.
+- Code commit: a79f0487ac36b47644e7b2a32a8657723f3978cc
+- Android CI: pending for this new commit.
+- Index data source: intentionally still unavailable until verified.
+
+## Closure rule
+
+After the new commit passes Android CI, Phase 10 freshness/session work should be considered closed unless runtime verification exposes a concrete defect. Do not reopen individual fields without evidence.
+
+## Next logical step
+
+Check the new Android CI result. If successful, move to the final evidence/data-confidence closure audit rather than continuing Phase 10 field changes.
