@@ -26,6 +26,8 @@ class AlertWorker(appContext: Context, workerParams: WorkerParameters) : Corouti
         val store = AlertStore(applicationContext)
         val alerts = store.alerts.first()
         if (alerts.none { it.enabled }) return Result.success()
+        val marketStatus = MyStocksCache.loadMarketStatus()
+        if (!marketStatus.isKnown || !marketStatus.isOpen) return Result.success()
         val stocks = MyStocksCache.loadStocks()
         if (stocks.isEmpty()) return Result.retry()
 
