@@ -118,6 +118,17 @@ function normalizedId(item, prefix = 'news') {
   return String(first(item, ['id', 'articleId', 'documentId', 'slug', 'url']) || `${prefix}-${dateOf(item)}-${symbolOf(item)}-${String(first(item, ['title', 'headline']) || '').slice(0, 60)}`);
 }
 
+function secureHttpsUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    const url = new URL(raw);
+    return url.protocol === 'https:' ? url.toString() : '';
+  } catch (_) {
+    return '';
+  }
+}
+
 function normalizeItem(item, forcedCategory) {
   if (!item || typeof item !== 'object') return null;
   const title = String(first(item, ['title', 'headline', 'name']) || '').trim();
@@ -131,7 +142,7 @@ function normalizeItem(item, forcedCategory) {
   const body = String(first(item, ['body', 'content', 'articleBody', 'text']) || '').trim();
   const source = String(first(item, ['source', 'publisher', 'publication']) || 'MyStocks Africa').trim();
   const publishedAt = dateOf(item);
-  const url = String(first(item, ['url', 'link', 'sourceUrl', 'articleUrl']) || '').trim();
+  const url = secureHttpsUrl(first(item, ['url', 'link', 'sourceUrl', 'articleUrl']));
   const imageUrl = String(first(item, ['imageUrl', 'image', 'thumbnail', 'coverImage']) || '').trim();
   const dividendAmount = String(first(item, ['dividendAmount', 'amountPerShare', 'amount', 'dividend']) || '').trim();
   const exDate = String(first(item, ['exDate', 'ex_date', 'bookClosureDate']) || '').trim();
