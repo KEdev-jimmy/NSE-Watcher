@@ -569,7 +569,7 @@ private fun AlertPage(back:()->Unit){
     var symbolMenu by remember{mutableStateOf(false)}
     var typeMenu by remember{mutableStateOf(false)}
     val selectedType=runCatching{AlertType.valueOf(selectedTypeName)}.getOrDefault(AlertType.PRICE_ABOVE)
-    val supportedTypes=listOf(AlertType.PRICE_ABOVE,AlertType.PRICE_BELOW,AlertType.DAILY_GAIN,AlertType.DAILY_LOSS)
+    val supportedTypes=listOf(AlertType.PRICE_ABOVE,AlertType.PRICE_BELOW,AlertType.DAILY_GAIN,AlertType.DAILY_LOSS,AlertType.NEWS,AlertType.CORPORATE_ACTION)
 
     fun resetForm(){
         editingId=null
@@ -609,21 +609,22 @@ private fun AlertPage(back:()->Unit){
                         onValueChange={thresholdText=it.filter{ch->ch.isDigit()||ch=='.'}},
                         modifier=Modifier.fillMaxWidth(),
                         singleLine=true,
-                        label={Text(if(selectedType==AlertType.PRICE_ABOVE||selectedType==AlertType.PRICE_BELOW)"Threshold (KSh)" else "Threshold (%)")},
+                        label={Text(if(selectedType==AlertType.PRICE_ABOVE||selectedType==AlertType.PRICE_BELOW)"Threshold (KSh)" else if(selectedType==AlertType.DAILY_GAIN||selectedType==AlertType.DAILY_LOSS)"Threshold (%)" else "No threshold needed")},
                         placeholder={Text(if(selectedType==AlertType.DAILY_LOSS)"Example: 5" else "Example: 30 or 5")}
                     )
                     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End){
                         if(editingId!=null)TextButton({resetForm()}){Text("Cancel")}
                         Button(onClick={
                             val threshold=thresholdText.toDoubleOrNull()
-                            if(selectedSymbol.isNotBlank()&&threshold!=null&&threshold>0.0){
+                            val noThreshold=selectedType==AlertType.NEWS||selectedType==AlertType.CORPORATE_ACTION
+                            if(selectedSymbol.isNotBlank()&&(noThreshold||(threshold!=null&&threshold>0.0))){
                                 if(Build.VERSION.SDK_INT>=33) notificationPermissionLauncher.launch("android.permission.POST_NOTIFICATIONS")
                                 scope.launch{
                                     store.save(PriceAlert(editingId?:java.util.UUID.randomUUID().toString(),selectedSymbol,selectedType,threshold,true))
                                     resetForm()
                                 }
                             }
-                        },enabled=selectedSymbol.isNotBlank()&&thresholdText.toDoubleOrNull()?.let{it>0.0}==true,colors=ButtonDefaults.buttonColors(containerColor=Green)){
+                        },enabled=selectedSymbol.isNotBlank()&&(selectedType==AlertType.NEWS||selectedType==AlertType.CORPORATE_ACTION||thresholdText.toDoubleOrNull()?.let{it>0.0}==true),colors=ButtonDefaults.buttonColors(containerColor=Green)){
                             Icon(if(editingId==null)Icons.Default.Add else Icons.Default.Save,null)
                             Spacer(Modifier.width(6.dp));Text(if(editingId==null)"Add alert" else "Save changes")
                         }
