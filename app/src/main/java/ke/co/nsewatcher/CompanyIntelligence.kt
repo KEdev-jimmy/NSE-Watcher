@@ -150,7 +150,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
                         Text(String.format(Locale.US, "KSh %.2f", s.price), fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, color = IntelligenceText)
                         Spacer(Modifier.width(9.dp))
                         Text(
-                            formatHeaderChange(s.change, marketStatus.isOpen),
+                            formatHeaderChange(s.change, marketStatus),
                             color = if (s.change >= 0) IntelligenceGreen else IntelligenceRed,
                             fontWeight = FontWeight.ExtraBold,
                             fontSize = 13.sp,
@@ -901,9 +901,18 @@ private fun TodayAtGlance(
     val nextOpen = marketStatus.nextOpen.takeIf { it.isNotBlank() }?.let(::formatChartTimestamp)
     val change = historyResult.sessionChangePct ?: currentChange
 
+    val known = marketStatus.isKnown
     SectionTitle(
-        if (marketStatus.isOpen) "Today's at a glance" else "Last trading session at a glance",
-        if (marketStatus.isOpen) "Latest observed session data" else "The latest completed NSE session",
+        when {
+            known && marketStatus.isOpen -> "Today's at a glance"
+            known -> "Last trading session at a glance"
+            else -> "Session at a glance"
+        },
+        when {
+            known && marketStatus.isOpen -> "Latest observed session data"
+            known -> "The latest completed NSE session"
+            else -> "Market session status is currently unavailable"
+        },
         Icons.Default.Schedule
     )
     IntelligenceCard {
@@ -919,7 +928,14 @@ private fun TodayAtGlance(
                     MiniFact("OPEN", String.format(Locale.US, "KSh %.2f", open))
                 }
                 Box(Modifier.weight(1f)) {
-                    MiniFact(if (marketStatus.isOpen) "LATEST" else "CLOSE", String.format(Locale.US, "KSh %.2f", latest))
+                    MiniFact(
+                        when {
+                            known && marketStatus.isOpen -> "LATEST"
+                            known -> "CLOSE"
+                            else -> "LATEST"
+                        },
+                        String.format(Locale.US, "KSh %.2f", latest)
+                    )
                 }
             }
             Spacer(Modifier.height(8.dp))
@@ -927,19 +943,29 @@ private fun TodayAtGlance(
                 val verb = if (it >= 0) "Up" else "Down"
                 Text(
                     verb + " " + String.format(Locale.US, "%+.2f%%", it) +
-                        if (marketStatus.isOpen) " since today's open" else " during the last trading session",
+                        when {
+                            known && marketStatus.isOpen -> " since today's open"
+                            known -> " during the last trading session"
+                            else -> " across the latest returned session data"
+                        },
                     color = if (it >= 0) IntelligenceGreen else IntelligenceRed,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
             }
-            sessionDate?.let { Text(if (marketStatus.isOpen) "Session date: " + it else "Last session: " + it, color = IntelligenceMuted, fontSize = 8.sp) }
+            sessionDate?.let {
+                Text(
+                    if (known && marketStatus.isOpen) "Session date: " + it else "Last session: " + it,
+                    color = IntelligenceMuted,
+                    fontSize = 8.sp
+                )
+            }
             observed?.let { Text("Observed " + it, color = IntelligenceMuted, fontSize = 8.sp) }
             Text(
-                if (marketStatus.isOpen) {
-                    "Market open • values use the latest returned observation, not an estimated live price."
-                } else {
-                    "Market closed • the completed session is shown; no current-session movement is being estimated."
+                when {
+                    known && marketStatus.isOpen -> "Market open • values use the latest returned observation, not an estimated live price."
+                    known -> "Market closed • the completed session is shown; no current-session movement is being estimated."
+                    else -> "Market status unavailable • no current-session state is being inferred."
                 },
                 color = IntelligenceMuted,
                 fontSize = 8.sp
@@ -949,8 +975,17 @@ private fun TodayAtGlance(
     }
 }
 
-private fun formatHeaderChange(change: Double, marketOpen: Boolean): String =
-    String.format(Locale.US, "%+.2f%% %s", change, if (marketOpen) "this session" else "last session")
+private fun formatHeaderChange(change: Double, marketStatus: MyStocksCache.MarketStatus): String =
+    String.format(
+        Locale.US,
+        "%+.2f%% %s",
+        change,
+        when {
+            !marketStatus.isKnown -> "latest"
+            marketStatus.isOpen -> "this session"
+            else -> "last session"
+        }
+    )
 
 private fun formatChartTimestamp(raw: String): String = runCatching {
     Instant.parse(raw).atZone(ZoneId.of("Africa/Nairobi")).format(DateTimeFormatter.ofPattern("dd MMM • HH:mm", Locale.US)) + " EAT"

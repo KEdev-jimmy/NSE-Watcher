@@ -73,9 +73,10 @@ object MyStocksCache {
 
     data class MarketStatus(
         val isOpen: Boolean = false,
-        val status: String = "CLOSED",
+        val status: String = "UNKNOWN",
         val nextOpen: String = "",
-        val nextClose: String = ""
+        val nextClose: String = "",
+        val isKnown: Boolean = false
     )
 
     suspend fun loadMarketStatus(): MarketStatus = withContext(Dispatchers.IO) {
@@ -92,7 +93,8 @@ object MyStocksCache {
                     isOpen = root.optBoolean("isOpen", status.equals("OPEN", ignoreCase = true)),
                     status = status,
                     nextOpen = root.optString("nextOpen", ""),
-                    nextClose = root.optString("nextClose", "")
+                    nextClose = root.optString("nextClose", ""),
+                    isKnown = true
                 )
             } finally { connection.disconnect() }
         }.getOrDefault(MarketStatus())

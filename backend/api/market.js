@@ -43,12 +43,6 @@ function periodConfig(period) {
   return { interval, from: start.toISOString().slice(0, 10), to: end.toISOString().slice(0, 10) };
 }
 
-function previousCloseFromStock(raw) {
-  const data = raw?.data && !Array.isArray(raw.data) ? raw.data : raw;
-  const value = Number(String(data?.previousClose ?? '').replace(/,/g, ''));
-  return Number.isFinite(value) && value > 0 ? value : null;
-}
-
 function candleArray(raw) {
   if (Array.isArray(raw?.candles)) return raw.candles;
   if (Array.isArray(raw?.data?.candles)) return raw.data.candles;
@@ -131,8 +125,6 @@ module.exports = async (req, res) => {
 
       if (period === '1d') {
         try {
-          const stock = await mystocks(`/stocks/${encodeURIComponent(symbol)}`);
-          const previousClose = previousCloseFromStock(stock);
           const candles = candleArray(data).filter((candle) => Number.isFinite(Number(candle?.close)) && Number(candle.close) > 0);
           if (candles.length) {
             const latestTimestamp = candleTimestamp(candles[candles.length - 1]);
@@ -144,8 +136,6 @@ module.exports = async (req, res) => {
               });
               if (currentSession.length) {
                 const firstTimestamp = candleTimestamp(currentSession[0]);
-                const baselineTimestamp = firstTimestamp ? new Date(firstTimestamp.getTime() - 1) : latestTimestamp;
-                const sessionCandles = [...currentSession];
                 const actualFirst = currentSession[0];
                 const actualLast = currentSession[currentSession.length - 1];
                 sessionOpen = Number(actualFirst?.open ?? actualFirst?.close);

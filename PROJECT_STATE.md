@@ -1268,3 +1268,18 @@ Combined into one surgical commit:
 3. Verify closed-session wording on a non-trading day and live-session wording during NSE trading.
 4. Verify actual 1D candle timestamps and ensure no provider retrieval timestamp is being plotted as a price observation.
 5. Only after those checks, consider a sourced "last 2 hours" movement line.
+
+# 31. Market-status unknown-state hardening — 19 Sep 2026
+
+A follow-up audit found that the existing `MarketStatus()` default treated a failed/unavailable status request as `CLOSED`. That could incorrectly tell the user the market was closed.
+
+The status model now distinguishes:
+- known OPEN
+- known CLOSED
+- UNKNOWN / unavailable
+
+The company screen no longer infers "last session" from a failed status request.
+
+The backend 1D cleanup also removed the now-unused previous-close fetch/baseline variables after the chart stopped injecting a synthetic previous-close observation.
+
+Verification remains pending Android CI and runtime testing.
