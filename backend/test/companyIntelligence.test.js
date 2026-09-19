@@ -169,6 +169,7 @@ test('financial history rows and evidence retain provider provenance', () => {
   assert.equal(revenueEvidence.providerUpdatedAt, '2026-07-09');
   assert.equal(revenueEvidence.providerCheckedAt, '2026-09-17');
   assert.equal(revenueEvidence.period, "FY 2025 • Dec '25");
+  assert.equal(parsed.financialHistory.at(-2).period, "FY 2024 • Dec '24");
 });
 
 test('financial parser carries provider update/check dates separately from statement period', () => {
