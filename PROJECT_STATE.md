@@ -2432,3 +2432,50 @@ No new data source or UI redesign was introduced.
 ## Next logical step
 
 Check the new Android CI run for the latest commit. If it passes, continue the next evidence/data hardening audit; if it fails, fix only the exact root cause.
+
+
+# 52. Company intelligence delay metadata cleanup — 19 Sep 2026
+
+**Status: implemented; Android CI verification pending**
+
+## Combined closure audit
+
+The current Company Intelligence pipeline was re-audited end-to-end after the financial unit/period merge hardening.
+
+The financial parser, merge path, evidence generation, Android cache model, and growth-repair path were checked together. No additional financial-field defect was found.
+
+One concrete provenance issue remained:
+
+- `backend/lib/companyIntelligence.js` returned a generic top-level `delayMinutes: 15`.
+- The Company Intelligence response combines market data with financials, ratios, dividends and historical fundamentals.
+- The 15-minute value was therefore ambiguous: it could be read as a freshness/delay guarantee for the entire company-intelligence response, including financial data.
+- The existing project rules explicitly distinguish the market-feed refresh/check interval from provider-specific observation/update dates.
+
+## Implementation
+
+Removed the ambiguous top-level `delayMinutes` field from the Company Intelligence response.
+
+No data source, financial calculation, Android UI, or existing intelligence behavior was changed.
+
+The response continues to expose the more specific provenance fields already hardened:
+
+- financial provider update date
+- financial page checked date
+- ratio provider update date
+- ratio page checked date
+- historical financial row provider update/check dates
+- reporting period and financial unit
+
+## Verification state
+
+- Combined source audit: completed.
+- Concrete issue: identified and fixed.
+- Code commit: `f7d8b428d6e8861d1626e17a4d28e7375b8610f8`
+- Android CI verification: pending.
+- Live production `/api/company` verification: still pending because the production endpoint cannot be reached from the current tool environment.
+
+## Next action
+
+Use the new commit-triggered Android CI run as the verification point.
+
+If it passes, treat this Company Intelligence hardening batch as closed unless a new production verification exposes a real defect. Do not continue changing individual fields without evidence of a problem.
