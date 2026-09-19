@@ -488,7 +488,7 @@ function sourceUrls(symbol) {
 function mergeProfile(primary, external) {
   const output = { ...(primary || {}) };
   const keys = [
-    'marketCap', 'revenue', 'profit', 'eps', 'roe', 'debtToEquity', 'margin',
+    'marketCap', 'revenue', 'profit', 'eps', 'financialUnit', 'financialPeriod', 'roe', 'debtToEquity', 'margin',
     'revenueGrowth', 'profitGrowth', 'pe', 'pb', 'dividendYield', 'ratioBasis', 'ratioPeriod',
     'financialProviderUpdatedAt', 'financialPageCheckedAt', 'ratioProviderUpdatedAt', 'ratioPageCheckedAt',
   ];
@@ -705,6 +705,7 @@ module.exports = handle;
 module.exports.normalizedComparable = normalizedComparable;
 module.exports.buildFieldQuality = buildFieldQuality;
 module.exports.evidenceFor = evidenceFor;
+module.exports.mergeProfile = mergeProfile;
 module.exports.normalizeWebsite = normalizeWebsite;
 module.exports.normalizeLocation = normalizeLocation;
 module.exports.parseFinancials = parseFinancials;
