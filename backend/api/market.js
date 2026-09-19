@@ -63,9 +63,53 @@ function providerMeta(raw) {
   return raw?.meta || raw?.data?.meta || null;
 }
 
+function normalizeMarketStatus(providerData) {
+  const rawStatus = String(
+    providerData?.status ??
+    providerData?.marketStatus ??
+    providerData?.state ??
+    ''
+  ).trim();
+  const normalizedStatus = rawStatus.toLowerCase();
+  const statusOpen = normalizedStatus === 'open' || normalizedStatus === 'trading';
+  const statusClosed = normalizedStatus === 'closed' || normalizedStatus === 'not_trading';
+
+  const hasExplicitIsOpen = typeof providerData?.isOpen === 'boolean';
+  const explicitIsOpen = hasExplicitIsOpen ? providerData.isOpen : null;
+
+  // A provider must not be treated as CLOSED merely because it omitted status.
+  // If explicit boolean and status disagree, preserve the uncertainty instead
+  // of silently choosing one source of truth.
+  if (hasExplicitIsOpen && (statusOpen || statusClosed)) {
+    if ((explicitIsOpen && statusClosed) || (!explicitIsOpen && statusOpen)) {
+      return { isOpen: false, status: 'UNKNOWN', isKnown: false };
+    }
+    return {
+      isOpen: explicitIsOpen,
+      status: explicitIsOpen ? 'OPEN' : 'CLOSED',
+      isKnown: true,
+    };
+  }
+
+  if (hasExplicitIsOpen) {
+    return {
+      isOpen: explicitIsOpen,
+      status: explicitIsOpen ? 'OPEN' : 'CLOSED',
+      isKnown: true,
+    };
+  }
+
+  if (statusOpen) return { isOpen: true, status: 'OPEN', isKnown: true };
+  if (statusClosed) return { isOpen: false, status: 'CLOSED', isKnown: true };
+
+  return { isOpen: false, status: 'UNKNOWN', isKnown: false };
+}
+
 function unwrapProviderData(raw) {
   return raw?.data && !Array.isArray(raw.data) ? raw.data : raw;
 }
+
+module.exports.normalizeMarketStatus = normalizeMarketStatus;
 
 module.exports = async (req, res) => {
   if (req.method !== 'GET') return json(res, 405, { error: 'GET only' });
@@ -74,14 +118,12 @@ module.exports = async (req, res) => {
     if (action === 'status') {
       const data = await mystocks('/market/status?exchange=NSE');
       const providerData = unwrapProviderData(data);
-      const statusValue = String(providerData?.status ?? providerData?.marketStatus ?? providerData?.state ?? '').trim();
-      const normalizedStatus = statusValue.toLowerCase();
-      const isOpen = typeof providerData?.isOpen === 'boolean'
-        ? providerData.isOpen
-        : normalizedStatus === 'open' || normalizedStatus === 'trading';
+      const normalized = normalizeMarketStatus(providerData);
       return json(res, 200, {
         source: 'MyStocks Africa', delayMinutes: 15, fetchedAt: new Date().toISOString(),
-        isOpen, status: statusValue || (isOpen ? 'OPEN' : 'CLOSED'),
+        isOpen: normalized.isOpen,
+        status: normalized.status,
+        isKnown: normalized.isKnown,
         nextOpen: providerData?.nextOpen || providerData?.nextSessionOpen || null,
         nextClose: providerData?.nextClose || providerData?.nextSessionClose || null,
         data,
