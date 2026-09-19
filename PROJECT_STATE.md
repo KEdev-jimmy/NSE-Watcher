@@ -2144,3 +2144,47 @@ Implementation commits:
 ## Next action
 
 Obtain a new Android CI verification for this implementation batch. If CI passes, continue to the next real evidence/data hardening gap. Do not create additional audit-only commits without a demonstrated defect.
+
+
+# 46. CI coverage for growth-provenance regression tests — 19 Sep 2026
+
+**Status: implemented; new CI verification pending**
+
+## Audit before implementation
+
+The current `main` branch was checked after the growth-provenance fix.
+
+A genuine verification gap was found:
+
+- `backend/test/company.test.js` contained the new regression tests for provider-growth precedence.
+- The Android CI workflow `.github/workflows/android.yml` was running `companyIntelligence.test.js` and `marketStatus.test.js`, but **not** `company.test.js`.
+- Therefore the newly added regression tests were not part of the repository's automated CI gate.
+
+This was a real CI coverage gap, not an audit-only observation.
+
+## Implementation
+
+Updated `.github/workflows/android.yml` so the existing backend quality-test step now runs:
+
+- `backend/test/companyIntelligence.test.js`
+- `backend/test/marketStatus.test.js`
+- `backend/test/company.test.js`
+
+No build architecture, app behavior, data source, or UI was changed.
+
+Implementation commit:
+
+- `ee5281780100230fae599eb84a49157ce8233bce` — Run company API regression tests in CI
+
+## Verification
+
+- Workflow file updated successfully: completed.
+- New CI run after this commit: pending/not yet verified.
+- No CI success is claimed until the new run is checked.
+- This change intentionally makes the growth-provenance regression tests part of the normal CI gate.
+
+## Next logical step
+
+Check the new GitHub Actions run for commit `ee5281780100230fae599eb84a49157ce8233bce`.
+
+If it passes, continue with the next real evidence/data hardening item. If it fails, inspect the exact failure and make the smallest root-cause fix.
