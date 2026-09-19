@@ -2338,3 +2338,40 @@ So #631 is **not a financial-history parser failure**. It is a test-export regre
 ## Next action
 
 Wait for the new commit-triggered Android CI run. The backend test step should now get past these three failures. If another failure appears, inspect that exact failure rather than changing unrelated code.
+
+
+# 50. Android CI #634 — growth/provenance hardening verified — 19 Sep 2026
+
+**Status: verified successful**
+
+## Verification
+
+A new Android CI run was checked against the actual fixed commit:
+
+- Commit: `0367a9971bcd8f7786952d18a59355d20c9276d1`
+- Run: **#634**
+- Run ID: `35444335567`
+- Job ID: `105900566018`
+- Result: **SUCCESS**
+
+All relevant stages passed:
+- backend quality tests
+- Gradle Android build
+- debug APK upload
+- workflow cleanup
+
+The backend quality-test gate passed the annual-growth/provenance regressions, including the previously failing growth-source precedence path.
+
+## Interpretation
+
+The annual-growth CI blocker is cleared. The successful run verifies the current commit's backend regression suite and Android build path; no success is inferred from the older failed runs.
+
+The old manual rerun of #631 is intentionally not treated as verification because it tested the pre-fix commit.
+
+## Current checkpoint
+
+The repository is now at a verified green CI point after the annual-growth profile fallback precedence fix.
+
+## Next logical step
+
+Continue with the next **real** Company Intelligence evidence/data hardening audit. Do not redesign the app or add AI yet. Verify the current repository before changing anything.
