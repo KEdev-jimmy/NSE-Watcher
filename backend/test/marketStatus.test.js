@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
-const { normalizeMarketStatus } = require('../api/market');
+const { normalizeMarketStatus, latestTradingSession } = require('../api/market');
 
 test('missing provider status is UNKNOWN, never CLOSED', () => {
   assert.deepEqual(
@@ -50,4 +50,34 @@ test('unrecognized provider state remains UNKNOWN', () => {
     normalizeMarketStatus({ state: 'halted_pending' }),
     { isOpen: false, status: 'UNKNOWN', isKnown: false }
   );
+});
+
+
+test('latestTradingSession chooses the latest Nairobi day even when provider candles are unordered', () => {
+  const session = latestTradingSession([
+    { timestamp: '2026-09-18T12:00:00.000Z', open: 101, close: 103 },
+    { timestamp: '2026-09-18T09:00:00.000Z', open: 100, close: 101 },
+    { timestamp: '2026-09-17T12:00:00.000Z', open: 98, close: 99 },
+    { timestamp: '2026-09-18T10:00:00.000Z', open: 101, close: 102 },
+  ]);
+
+  assert.deepEqual(session.candles.map((c) => c.timestamp), [
+    '2026-09-18T09:00:00.000Z',
+    '2026-09-18T10:00:00.000Z',
+    '2026-09-18T12:00:00.000Z',
+  ]);
+  assert.equal(session.open, 100);
+  assert.equal(session.close, 103);
+});
+
+test('latestTradingSession does not use close as a synthetic session open', () => {
+  const session = latestTradingSession([
+    { timestamp: '2026-09-18T09:00:00.000Z', close: 100 },
+    { timestamp: '2026-09-18T10:00:00.000Z', close: 102 },
+  ]);
+
+  assert.equal(session.open, null);
+  assert.equal(session.close, 102);
+  assert.equal(session.openAt, '2026-09-18T09:00:00.000Z');
+  assert.equal(session.closeAt, '2026-09-18T10:00:00.000Z');
 });
