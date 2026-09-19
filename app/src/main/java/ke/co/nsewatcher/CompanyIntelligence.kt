@@ -1247,8 +1247,10 @@ private fun formatMetricValue(label: String, value: String): String {
     val numeric = clean.removeSuffix("%").replace(",", "").toDoubleOrNull() ?: return clean
     return when (label) {
         "EPS" -> String.format(Locale.US, "KSh %.2f / share", numeric)
-        "ROE", "Net margin", "Revenue growth", "Profit growth", "EPS growth", "Dividend yield" ->
-            String.format(Locale.US, "%+.2f%%", numeric).replace("+", if (numeric >= 0) "+" else "")
+        "Revenue growth", "Profit growth", "EPS growth" ->
+            String.format(Locale.US, "%+.2f%%", numeric)
+        "ROE", "Net margin", "Dividend yield" ->
+            String.format(Locale.US, "%.2f%%", numeric)
         "P/E", "P/B", "Debt / Equity" -> String.format(Locale.US, "%.2f×", numeric)
         else -> clean
     }
@@ -1269,8 +1271,15 @@ private fun formatMarketCap(value: String): String {
 private fun financialPeriodLabel(period: String): String {
     val clean = period.trim()
     if (clean.isBlank()) return "Annual figures • Latest reported period"
-    val date = Regex("([A-Z][a-z]{2} \\d{1,2}, \\d{4})$").find(clean)?.groupValues?.getOrNull(1)
-    return if (date != null) "Annual figures • FY ended $date" else "Annual figures • Latest reported period"
+    if (clean.contains("FY ", ignoreCase = true)) {
+        val parts = clean.split(" • ", limit = 2)
+        return if (parts.size == 2) {
+            "Annual figures • ${parts[0]} • year ended ${parts[1]}"
+        } else {
+            "Annual figures • ${parts[0]}"
+        }
+    }
+    return "Annual figures • $clean"
 }
 
 private fun periodDescription(period: String): String = when (period) {
