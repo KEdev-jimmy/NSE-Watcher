@@ -1732,3 +1732,17 @@ After CI/build verification, continue the same Company Intelligence audit with:
 4. then audit timestamp/fetch provenance on the financial evidence.
 
 Do not add assumptions for missing units or periods.
+
+
+## Follow-up correction to Step 40
+
+A post-change static cross-file audit caught one integration issue before verification: the backend already returned EPS growth, but Android's CompanyIntelligenceCache.Profile did not yet carry an epsGrowth field. The UI change therefore needed a matching model/parser field.
+
+Corrected in commit:
+- 1fc9a952e3c3cd19fed1c6de05fe1e82c856b8f5
+
+The Android profile model/parser now carries epsGrowth from the backend, completing the backend → Android → UI path.
+
+This was caught by the current-code cross-file audit; no assumption was made that the UI change was complete just because the backend field existed.
+
+Android CI/runtime verification remains pending.
