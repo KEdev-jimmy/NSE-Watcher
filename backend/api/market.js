@@ -109,8 +109,6 @@ function unwrapProviderData(raw) {
   return raw?.data && !Array.isArray(raw.data) ? raw.data : raw;
 }
 
-module.exports.normalizeMarketStatus = normalizeMarketStatus;
-
 module.exports = async (req, res) => {
   if (req.method !== 'GET') return json(res, 405, { error: 'GET only' });
   const action = String(req.query.action || 'snapshot');
@@ -241,3 +239,6 @@ module.exports = async (req, res) => {
     });
   }
 };
+
+
+module.exports.normalizeMarketStatus = normalizeMarketStatus;
