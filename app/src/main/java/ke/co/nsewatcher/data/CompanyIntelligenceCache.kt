@@ -31,6 +31,7 @@ object CompanyIntelligenceCache {
         val margin: String = "",
         val revenueGrowth: String = "",
         val profitGrowth: String = "",
+        val epsGrowth: String = "",
         val pe: String = "",
         val pb: String = "",
         val dividendYield: String = ""
@@ -183,6 +184,7 @@ object CompanyIntelligenceCache {
         margin = findText(root, "netMargin", "profitMargin", "margin"),
         revenueGrowth = findText(root, "revenueGrowth", "revenueGrowthRate"),
         profitGrowth = findText(root, "profitGrowth", "netIncomeGrowth", "profitGrowthRate"),
+        epsGrowth = findText(root, "epsGrowth"),
         pe = findText(root, "pe", "peRatio", "priceEarnings", "priceToEarnings"),
         pb = findText(root, "pb", "pbRatio", "priceBook", "priceToBook"),
         dividendYield = findText(root, "dividendYield", "yield")
