@@ -2375,3 +2375,60 @@ The repository is now at a verified green CI point after the annual-growth profi
 ## Next logical step
 
 Continue with the next **real** Company Intelligence evidence/data hardening audit. Do not redesign the app or add AI yet. Verify the current repository before changing anything.
+
+
+# 51. Financial unit/period merge-path hardening — 19 Sep 2026
+
+**Status: implemented; Android CI verification pending**
+
+## Audit before implementation
+
+The current Company Intelligence pipeline was re-audited after Android CI #634 passed.
+
+A concrete end-to-end gap was found in backend/lib/companyIntelligence.js:
+
+- parseFinancials() correctly produced the external financial metadata:
+  - financialUnit
+  - financialPeriod
+- Android's CompanyIntelligenceCache.Profile already supports both fields.
+- However, mergeProfile() did not copy those two fields from the external StockAnalysis/S&P Global financial profile into the final API profile.
+- This meant the metadata could be present in the parser but disappear at the backend response boundary, weakening the backend → Android path and forcing the UI to rely on other history data for the period label.
+
+## Implementation
+
+Updated mergeProfile() to preserve:
+- financialUnit
+- financialPeriod
+
+Also exported mergeProfile() for direct regression testing.
+
+Added a regression test proving that the merged profile retains:
+- Millions KES
+- FY 2025 • Dec '25
+
+Commits:
+- 8190045bfbe02ea79d3e870de0aba2971f8daaac — Preserve financial unit and period in merged profile
+- f492b4ade5890ee09116c55a6c45f6eb5485c8a8 — Test merged financial unit and period provenance
+
+## What is preserved
+
+- FY-vs-TTM parsing
+- provider growth precedence
+- current-ratio basis
+- financial provider update/check dates
+- historical financial provenance
+- existing Android profile model/parser
+- existing UI formatting and labels
+
+No new data source or UI redesign was introduced.
+
+## Verification
+
+- Static cross-file audit: completed.
+- Regression test added: completed.
+- New Android CI run: pending for the latest commit.
+- No CI success is claimed yet for this new change.
+
+## Next logical step
+
+Check the new Android CI run for the latest commit. If it passes, continue the next evidence/data hardening audit; if it fails, fix only the exact root cause.
