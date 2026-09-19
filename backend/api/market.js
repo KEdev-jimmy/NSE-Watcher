@@ -55,6 +55,39 @@ function candleTimestamp(candle) {
   return value && Number.isFinite(value.getTime()) ? value : null;
 }
 
+function latestTradingSession(candles) {
+  const valid = candles
+    .filter((candle) => Number.isFinite(Number(candle?.close)) && Number(candle.close) > 0)
+    .map((candle, index) => ({ candle, index, timestamp: candleTimestamp(candle) }))
+    .filter((entry) => entry.timestamp);
+
+  if (!valid.length) return null;
+
+  const latestDay = valid.reduce(
+    (latest, entry) => entry.timestamp > latest ? entry.timestamp : latest,
+    valid[0].timestamp
+  ).toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' });
+
+  const session = valid
+    .filter((entry) => entry.timestamp.toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' }) === latestDay)
+    .sort((a, b) => a.timestamp - b.timestamp)
+    .map((entry) => entry.candle);
+
+  if (!session.length) return null;
+
+  return {
+    candles: session,
+    open: Number.isFinite(Number(session[0]?.open)) && Number(session[0].open) > 0
+      ? Number(session[0].open)
+      : null,
+    close: Number.isFinite(Number(session[session.length - 1]?.close)) && Number(session[session.length - 1].close) > 0
+      ? Number(session[session.length - 1].close)
+      : null,
+    openAt: candleTimestamp(session[0])?.toISOString() || null,
+    closeAt: candleTimestamp(session[session.length - 1])?.toISOString() || null,
+  };
+}
+
 function providerAsOf(raw) {
   return raw?.asOf || raw?.meta?.asOf || raw?.data?.asOf || raw?.data?.meta?.asOf || null;
 }
@@ -165,34 +198,21 @@ module.exports = async (req, res) => {
 
       if (period === '1d') {
         try {
-          const candles = candleArray(data).filter((candle) => Number.isFinite(Number(candle?.close)) && Number(candle.close) > 0);
-          if (candles.length) {
-            const latestTimestamp = candleTimestamp(candles[candles.length - 1]);
-            if (latestTimestamp) {
-              const latestDay = latestTimestamp.toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' });
-              const currentSession = candles.filter((candle) => {
-                const timestamp = candleTimestamp(candle);
-                return timestamp?.toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' }) === latestDay;
-              });
-              if (currentSession.length) {
-                const firstTimestamp = candleTimestamp(currentSession[0]);
-                const actualFirst = currentSession[0];
-                const actualLast = currentSession[currentSession.length - 1];
-                sessionOpen = Number(actualFirst?.open ?? actualFirst?.close);
-                sessionClose = Number(actualLast?.close);
-                sessionOpenAt = firstTimestamp?.toISOString() || null;
-                sessionCloseAt = candleTimestamp(actualLast)?.toISOString() || null;
+          const session = latestTradingSession(candleArray(data));
+          if (session) {
+            sessionOpen = session.open;
+            sessionClose = session.close;
+            sessionOpenAt = session.openAt;
+            sessionCloseAt = session.closeAt;
 
-                // Keep the chart timeline strictly observational: return only
-                // the actual candles belonging to the latest Nairobi trading session.
-                if (data?.candles) data.candles = currentSession;
-                else if (data?.data?.candles) data.data.candles = currentSession;
-              }
-            }
+            // Keep the chart timeline strictly observational and chronological:
+            // return only actual candles from the latest Nairobi trading session.
+            if (data?.candles) data.candles = session.candles;
+            else if (data?.data?.candles) data.data.candles = session.candles;
           }
           chartAsOf = providerAsOf(data) || chartAsOf;
         } catch (_) {
-          // Keep provider candles if optional previous-close/session shaping fails.
+          // Keep provider candles if optional session shaping fails.
         }
       }
 
