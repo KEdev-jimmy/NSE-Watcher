@@ -107,7 +107,13 @@ private fun App(pickAvatar:()->Unit) {
         if (!autoRefresh) return@LaunchedEffect
         while (isActive) {
             delay(15 * 60 * 1000L)
-            MyStocksCache.loadStocks().takeIf { it.isNotEmpty() }?.let { liveStocks.value = it }
+            MyStocksCache.loadStocks().takeIf { it.isNotEmpty() }?.let { refreshed ->
+                liveStocks.value = refreshed
+                // Keep an already-open company screen tied to the refreshed market snapshot.
+                if (selected.symbol.isNotBlank()) {
+                    refreshed.firstOrNull { it.symbol == selected.symbol }?.let { selected = it }
+                }
+            }
         }
     }
     var showVolume by rememberSaveable { mutableStateOf(prefs.getBoolean("show_volume", true)) }
