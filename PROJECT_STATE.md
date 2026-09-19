@@ -2188,3 +2188,54 @@ Implementation commit:
 Check the new GitHub Actions run for commit `ee5281780100230fae599eb84a49157ce8233bce`.
 
 If it passes, continue with the next real evidence/data hardening item. If it fails, inspect the exact failure and make the smallest root-cause fix.
+
+
+# 47. Financial-history evidence provenance hardening — 19 Sep 2026
+
+**Status: implemented; CI verification pending**
+
+## Audit before implementation
+
+The Company Intelligence provenance chain was re-audited end-to-end.
+
+A genuine gap remained:
+
+- Android `CompanyIntelligenceCache.FinancialPoint` already supported `providerUpdatedAt` and `pageCheckedAt`.
+- The backend financial parser already knew the provider's `Last updated` and `Last checked` dates.
+- However, those dates were only attached to the top-level financial profile.
+- Historical `financialHistory` rows did not carry the same provenance metadata.
+- Consequently, evidence generated for historical Revenue/Profit/EPS claims did not consistently carry provider update/check dates.
+
+This weakened the evidence graph specifically for historical financial claims.
+
+## Implementation
+
+Updated `backend/lib/companyIntelligence.js`:
+
+- Financial-history rows now carry:
+  - `providerUpdatedAt`
+  - `pageCheckedAt`
+- Historical financial evidence now propagates those row-level dates.
+- Evidence also carries the historical row's reporting `period`.
+- Existing top-level financial provenance remains unchanged.
+
+Added regression coverage in `backend/test/companyIntelligence.test.js` proving that a historical financial row and its generated evidence retain the provider update/check dates and reporting period.
+
+Implementation commits:
+
+- `837e4c2d516bbd3d77d27596409f6698d249919b` — Carry financial history provenance into evidence
+- `7263e638e63ced8d744e091f03a08fe627544d95` — Test financial history provenance in evidence
+
+The existing CI workflow already includes `companyIntelligence.test.js`, so the new regression is inside the backend quality-test gate.
+
+## Verification
+
+- Source audit: completed.
+- Implementation: completed.
+- Regression test added: completed.
+- New CI run: not yet available/verified.
+- Vercel remains a separate build-rate-limit signal and is not treated as proof of source correctness.
+
+## Next logical step
+
+Check for a new Android CI run after this implementation. If unavailable, continue only where another concrete provenance/data-semantic gap is demonstrated. Avoid audit-only commits.
