@@ -38,18 +38,21 @@ function repairAnnualGrowth(result) {
   });
 
   const latest = history[history.length - 1];
+  const sourceLatest = result.financialHistory[result.financialHistory.length - 1];
   if (latest) {
     result.profile = {
       ...sourceProfile,
-      revenueGrowth: hasGrowth(latest.revenueGrowth)
-        ? latest.revenueGrowth
-        : (hasGrowth(sourceProfile.revenueGrowth) ? sourceProfile.revenueGrowth : ''),
-      profitGrowth: hasGrowth(latest.profitGrowth)
-        ? latest.profitGrowth
-        : (hasGrowth(sourceProfile.profitGrowth) ? sourceProfile.profitGrowth : ''),
-      epsGrowth: hasGrowth(latest.epsGrowth)
-        ? latest.epsGrowth
-        : (hasGrowth(sourceProfile.epsGrowth) ? sourceProfile.epsGrowth : ''),
+      // A provider profile value is the authoritative fallback when the
+      // latest history row did not itself contain provider growth.
+      revenueGrowth: hasGrowth(sourceLatest?.revenueGrowth)
+        ? sourceLatest.revenueGrowth
+        : (hasGrowth(sourceProfile.revenueGrowth) ? sourceProfile.revenueGrowth : latest.revenueGrowth),
+      profitGrowth: hasGrowth(sourceLatest?.profitGrowth)
+        ? sourceLatest.profitGrowth
+        : (hasGrowth(sourceProfile.profitGrowth) ? sourceProfile.profitGrowth : latest.profitGrowth),
+      epsGrowth: hasGrowth(sourceLatest?.epsGrowth)
+        ? sourceLatest.epsGrowth
+        : (hasGrowth(sourceProfile.epsGrowth) ? sourceProfile.epsGrowth : latest.epsGrowth),
     };
   }
   result.financialHistory = history;
