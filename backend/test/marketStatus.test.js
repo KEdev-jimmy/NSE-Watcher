@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
-const { normalizeMarketStatus, latestTradingSession } = require('../api/market');
+const { normalizeMarketStatus, latestTradingSession, chronologicallyOrderedCandles } = require('../api/market');
 
 test('missing provider status is UNKNOWN, never CLOSED', () => {
   assert.deepEqual(
@@ -80,4 +80,31 @@ test('latestTradingSession does not use close as a synthetic session open', () =
   assert.equal(session.close, 102);
   assert.equal(session.openAt, '2026-09-18T09:00:00.000Z');
   assert.equal(session.closeAt, '2026-09-18T10:00:00.000Z');
+});
+
+
+test('historical candles are ordered chronologically when all timestamps are valid', () => {
+  const candles = [
+    { timestamp: '2026-09-18T12:00:00.000Z', close: 103 },
+    { timestamp: '2026-09-18T09:00:00.000Z', close: 100 },
+    { timestamp: '2026-09-18T10:00:00.000Z', close: 102 },
+  ];
+
+  assert.deepEqual(
+    chronologicallyOrderedCandles(candles).map((c) => c.timestamp),
+    [
+      '2026-09-18T09:00:00.000Z',
+      '2026-09-18T10:00:00.000Z',
+      '2026-09-18T12:00:00.000Z',
+    ]
+  );
+});
+
+test('historical candle order is preserved when a timestamp is missing', () => {
+  const candles = [
+    { timestamp: '2026-09-18T12:00:00.000Z', close: 103 },
+    { close: 100 },
+  ];
+
+  assert.deepEqual(chronologicallyOrderedCandles(candles), candles);
 });
