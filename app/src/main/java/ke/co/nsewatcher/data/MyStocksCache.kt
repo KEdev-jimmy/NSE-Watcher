@@ -251,8 +251,11 @@ object MyStocksCache {
                     val source = item.optString("source", "").trim().ifBlank { if (dataOrigin == "backend") "MyStocks Africa" else "NSE Watcher fallback catalogue" }
                     val observedAt = item.optString("lastPriceUpdate", "").trim().ifBlank { item.optString("asOf", "").trim() }
                     val freshnessMode = stockFreshnessMode(observedAt)
-                    val historyStart = if (previousClose.isFinite() && previousClose > 0.0) previousClose else price
-                    add(Stock(symbol, name, price, changePct, listOf(historyStart, price), item.optString("logoUrl").takeIf { it.isNotBlank() }, item.optString("sector", "Other").ifBlank { "Other" }, volume, changeAvailable, volumeAvailable, source, observedAt, freshnessMode, dataOrigin))
+                    // Stock.history is reserved for real historical observations.
+                    // The quote endpoint does not provide a time series, so never synthesize
+                    // a two-point series from previousClose/price. Company Intelligence loads
+                    // sourced history through loadHistoryDetails() instead.
+                    add(Stock(symbol, name, price, changePct, emptyList(), item.optString("logoUrl").takeIf { it.isNotBlank() }, item.optString("sector", "Other").ifBlank { "Other" }, volume, changeAvailable, volumeAvailable, source, observedAt, freshnessMode, dataOrigin))
                 }
             }
         } finally { connection.disconnect() }
