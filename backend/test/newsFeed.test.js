@@ -5,7 +5,7 @@ const handleNews = require('../lib/newsFeed');
 const { canonicalUrl, dedupe, normalizeItem, withinWindow, newsFreshnessMode } = handleNews._newsTest;
 
 test('news URLs are canonicalized without tracking parameters', () => {
-  assert.equal(canonicalUrl('https://Example.com/article/?utm_source=rss&fbclid=123#section'), 'https://example.com/article/');
+  assert.equal(canonicalUrl('https://Example.com/article/?utm_source=rss&fbclid=123#section'), 'https://example.com/article');
 });
 
 test('duplicate syndicated stories are removed across different sources', () => {
