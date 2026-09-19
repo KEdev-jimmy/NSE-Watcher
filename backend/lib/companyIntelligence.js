@@ -159,16 +159,21 @@ function parseFinancials(html) {
   const periods = findRow(tables, [/^Period Ending$/i]);
   const fiscalYears = findRow(tables, [/^Fiscal Year$/i]);
 
-  const periodRow = periods || fiscalYears || [];
-  const hasTtm = String(periodRow[1] || '').trim().toUpperCase() === 'TTM';
-  const annualIndex = hasTtm ? 2 : 1;
-
-  const latestPeriod = normalizePeriod(
-    valueFromRow(periods, annualIndex) ||
-    valueFromRow(fiscalYears, annualIndex) ||
-    valueFromRow(periods) ||
-    valueFromRow(fiscalYears)
+  // StockAnalysis puts TTM before FY columns on some pages. The Company Intelligence
+  // screen is explicitly an annual/FY view, so select the first column labelled FY
+  // instead of assuming column 1 or 2.
+  const fiscalYearIndex = (fiscalYears || []).findIndex((value, index) =>
+    index > 0 && /^FY\\s+\\d{4}$/i.test(String(value || '').trim())
   );
+  const annualIndex = fiscalYearIndex > 0
+    ? fiscalYearIndex
+    : Math.max(1, (periods || []).length > 1 ? 1 : 0);
+
+  const fiscalYearLabel = normalizePeriod(valueFromRow(fiscalYears, annualIndex));
+  const periodEndingLabel = normalizePeriod(valueFromRow(periods, annualIndex));
+  const latestPeriod = [fiscalYearLabel, periodEndingLabel]
+    .filter(Boolean)
+    .join(' • ') || 'Latest reported annual period';
   const latestRevenue = valueFromRow(revenue, annualIndex) || valueFromRow(revenue);
   const latestProfit = valueFromRow(netIncome, annualIndex) || valueFromRow(netIncome);
   const latestEps = valueFromRow(eps, annualIndex) || valueFromRow(eps);
@@ -222,6 +227,8 @@ function parseFinancials(html) {
       profit: latest.profit,
       eps: latest.eps,
       margin: latest.margin,
+      financialUnit: 'Millions KES',
+      financialPeriod: latest.period,
       revenueGrowth: latest.revenueGrowth,
       profitGrowth: latest.profitGrowth,
       epsGrowth: latest.epsGrowth,
@@ -635,3 +642,4 @@ module.exports.buildFieldQuality = buildFieldQuality;
 module.exports.evidenceFor = evidenceFor;
 module.exports.normalizeWebsite = normalizeWebsite;
 module.exports.normalizeLocation = normalizeLocation;
+module.exports.parseFinancials = parseFinancials;
