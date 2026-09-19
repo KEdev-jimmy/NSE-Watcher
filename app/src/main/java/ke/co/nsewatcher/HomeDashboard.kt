@@ -383,6 +383,7 @@ private fun MarketFreshnessStrip(stocks: List<Stock>, marketStatus: MyStocksCach
         controllerState.refreshInProgress -> "Refreshing market data…"
         controllerState.lastRefreshFailed -> "Last refresh failed"
         controllerState.lastSuccessfulRefreshMs == null -> "Waiting for first refresh"
+        !marketStatus.isKnown -> controllerState.lastSuccessfulRefreshMs?.let { "Market status unavailable • Last checked " + formatLocalTime(it) } ?: "Market status unavailable"
         !marketStatus.isOpen -> controllerState.lastSuccessfulRefreshMs?.let { closedMarketStatus(marketStatus, it) } ?: "Market closed"
         else -> "Next data check " + MarketRefreshController.formatCountdown(MarketRefreshController.secondsUntilNextCheck(nowMs))
     }
@@ -406,6 +407,8 @@ private fun MarketFreshnessStrip(stocks: List<Stock>, marketStatus: MyStocksCach
             Text(
                 if (marketStatus.isOpen) {
                     "Source: $source • Next check means the app will check the feed; the provider may return unchanged data."
+                } else if (!marketStatus.isKnown) {
+                    "Source: $source • Market status is unavailable, so no open/closed state is inferred."
                 } else {
                     "Source: $source • Market is closed, so no countdown is shown."
                 },
