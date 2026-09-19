@@ -15,6 +15,7 @@ import org.json.JSONObject
 private val Context.alertDataStore by preferencesDataStore("nse_watcher_alerts")
 private val alertsKey = stringPreferencesKey("alert_rules")
 private val previousPricesKey = stringPreferencesKey("previous_prices")
+private val lastDailyTriggerDatesKey = stringPreferencesKey("last_daily_trigger_dates")
 
 class AlertStore(private val context: Context) {
     val alerts: Flow<List<PriceAlert>> = context.alertDataStore.data.map { prefs -> decodeAlerts(prefs[alertsKey].orEmpty()) }
@@ -38,6 +39,18 @@ class AlertStore(private val context: Context) {
     }
 
     suspend fun previousPrices(): Map<String, Double> = context.alertDataStore.data.map { decodePrices(it[previousPricesKey].orEmpty()) }.first()
+
+    suspend fun lastDailyTriggerDates(): Map<String, String> =
+        context.alertDataStore.data.map { decodeStringMap(it[lastDailyTriggerDatesKey].orEmpty()) }.first()
+
+    suspend fun recordDailyTriggers(triggeredIds: Set<String>, date: String) {
+        if (triggeredIds.isEmpty()) return
+        context.alertDataStore.edit { prefs ->
+            val current = decodeStringMap(prefs[lastDailyTriggerDatesKey].orEmpty()).toMutableMap()
+            triggeredIds.forEach { current[it] = date }
+            prefs[lastDailyTriggerDatesKey] = encodeStringMap(current)
+        }
+    }
 
     suspend fun recordPrices(prices: Map<String, Double>) {
         if (prices.isEmpty()) return
@@ -71,6 +84,22 @@ class AlertStore(private val context: Context) {
                 }
             }
         }.getOrDefault(emptyList())
+    }
+
+    private fun encodeStringMap(values: Map<String, String>): String {
+        val obj = JSONObject()
+        values.forEach { (key, value) -> obj.put(key, value) }
+        return obj.toString()
+    }
+
+    private fun decodeStringMap(raw: String): Map<String, String> {
+        if (raw.isBlank()) return emptyMap()
+        return runCatching {
+            val obj = JSONObject(raw)
+            buildMap {
+                obj.keys().forEach { key -> put(key, obj.optString(key)) }
+            }
+        }.getOrDefault(emptyMap())
     }
 
     private fun encodePrices(prices: Map<String, Double>): String {
