@@ -1295,3 +1295,112 @@ This keeps 1D history:
 - session open/close metadata preserved
 
 This was corrected before treating the implementation as verified.
+
+# 33. Company latest-session clarity and NOW view — 19 Sep 2026
+
+**Status: implementation added; CI/runtime verification pending**
+
+## User-facing refinement
+
+The previous company header wording used:
+- % this session
+- % last session
+- % latest
+
+This was technically correct but too ambiguous at first glance when the market was closed. The user should be able to identify exactly which observation the displayed change refers to without opening At a glance.
+
+The company header now prefers a compact observation stamp:
+
+    +X.XX% • 18 Sep 26 • 4:45 PM • CLOSE
+
+During an open session the state becomes:
+
+    +X.XX% • 19 Sep 26 • 11:45 AM • LATEST
+
+If no usable timestamp is returned, the numeric change is still shown with the state label but no fabricated timestamp.
+
+The timestamp is derived from the existing history/session evidence in this order:
+1. sessionCloseAt
+2. lastDate
+3. observedAt
+
+It is converted to Africa/Nairobi before display.
+
+## NOW view
+
+Added a new NOW selector alongside the existing:
+- 1D
+- 1W
+- 1M
+- 3M
+- 6M
+- 1Y
+- 3Y
+- 5Y
+
+Important architecture rule:
+
+**NOW is not a new market-data endpoint and does not mean real-time.**
+
+It is a presentation view of the existing verified 1D intraday session data. It reuses the 1D backend request, so:
+- no second market-data architecture is introduced
+- no live/tick data is fabricated
+- no intermediate observations are invented
+- the latest actual returned observation remains the end of the line
+
+The NOW description explicitly says:
+
+    Latest available intraday data • 15 min delayed
+
+The provider documentation states that African equity prices are exchange-supplied on a 15-minute-delayed basis, the API targets a 15-minute refresh cadence, and asOf is the actual observation timestamp. It also states that missing intraday observations are not interpolated.
+
+## Refresh behavior
+
+The existing 15-minute application refresh remains the source of refresh cadence.
+
+A small connection was added so that when the existing auto-refresh obtains a newer stock snapshot:
+- liveStocks is updated as before
+- an already-selected company is also updated from the refreshed stock list
+- Company Intelligence history observes the refreshed price and reloads the selected period
+- therefore the graph can move to a newer actual observation after a successful refresh
+
+This does not add a second polling system.
+
+## Files changed
+
+- app/src/main/java/ke/co/nsewatcher/CompanyIntelligence.kt
+  - added NOW view
+  - added exact observation date/time to the company header
+  - changed 1D wording from generic Today to Current trading session
+  - changed session return wording from today to session
+  - kept timestamp/date semantics in Africa/Nairobi
+  - reloads history when the existing refreshed stock price changes
+
+- app/src/main/java/ke/co/nsewatcher/DesignActivity.kt
+  - keeps selected company synchronized with the existing 15-minute auto-refresh snapshot
+
+## Evidence / freshness rule
+
+The UI must never call delayed data live or real time.
+
+Provider evidence:
+- MyStocks Partner API contract guarantees: exchange-supplied African equity prices are 15-minute delayed; asOf is the actual observation timestamp.
+- MyStocks API reference: intraday observations may be sparse and missing observations are not interpolated.
+
+## Verification
+
+- Static code audit: completed before implementation.
+- Android CI for the new commits: **not yet checked**.
+- Manual runtime testing still required:
+  1. closed-session header shows date + time + CLOSE
+  2. open-session header shows latest observation + LATEST
+  3. NOW loads without a separate endpoint
+  4. NOW remains clearly delayed rather than live
+  5. 1D → 1W → 1M → 3M → 6M → 1Y → 3Y → 5Y → NOW all remain stable
+  6. pinch zoom and horizontal drag remain functional
+  7. successful 15-minute refresh updates an already-open company when a newer provider observation exists
+  8. no synthetic or interpolated graph points appear
+
+## Next logical step
+
+Check Android CI for the latest commit chain. If CI passes, install the APK and perform the full period/refresh test before adding any further intraday metric such as last 2 hours.
