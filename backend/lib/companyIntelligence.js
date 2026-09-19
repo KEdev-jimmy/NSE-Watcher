@@ -189,9 +189,9 @@ function parseFinancials(html) {
     profit: latestProfit,
     eps: latestEps,
     margin: valueFromRow(margin, annualIndex) || valueFromRow(margin),
-    revenueGrowth: pctGrowth(latestRevenue, previousRevenue) || valueFromRow(revenueGrowth, annualIndex),
-    profitGrowth: pctGrowth(latestProfit, previousProfit) || valueFromRow(netIncomeGrowth, annualIndex),
-    epsGrowth: pctGrowth(latestEps, previousEps) || valueFromRow(epsGrowth, annualIndex),
+    revenueGrowth: valueFromRow(revenueGrowth, annualIndex) || pctGrowth(latestRevenue, previousRevenue),
+    profitGrowth: valueFromRow(netIncomeGrowth, annualIndex) || pctGrowth(latestProfit, previousProfit),
+    epsGrowth: valueFromRow(epsGrowth, annualIndex) || pctGrowth(latestEps, previousEps),
     source: EXTERNAL_SOURCE,
   };
 
