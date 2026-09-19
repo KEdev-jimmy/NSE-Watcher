@@ -285,6 +285,9 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
                 }
             }
 
+        }
+
+
         item { SectionTitle("Business", "What does this company actually do?", Icons.Default.Business) }
         item {
             IntelligenceCard {
