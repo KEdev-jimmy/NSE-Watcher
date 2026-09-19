@@ -8,6 +8,7 @@ const {
   normalizeWebsite,
   normalizeLocation,
   parseFinancials,
+  parseRatios,
 } = require('../lib/companyIntelligence');
 
 test('company field quality marks a single available source as AVAILABLE', () => {
@@ -104,4 +105,45 @@ test('financial parser selects the annual FY column instead of TTM when both are
   assert.equal(result.profile.revenueGrowth, '30.17%');
   assert.equal(result.profile.profitGrowth, '133.91%');
   assert.equal(result.profile.epsGrowth, '133.91%');
+});
+
+
+test('ratio parser selects the explicit Current column and exposes its basis', () => {
+  const html = `
+    <table>
+      <tr><th>Fiscal Year</th><td>Current</td><td>FY 2025</td><td>FY 2024</td></tr>
+      <tr><th>Period Ending</th><td>Sep '26</td><td>Dec '25</td><td>Dec '24</td></tr>
+      <tr><th>Market Capitalization</th><td>6,869</td><td>5,278</td><td>1,563</td></tr>
+      <tr><th>PE Ratio</th><td>8.00</td><td>19.39</td><td>13.44</td></tr>
+      <tr><th>PB Ratio</th><td>2.39</td><td>2.15</td><td>0.79</td></tr>
+      <tr><th>Debt / Equity Ratio</th><td>0.32</td><td>0.34</td><td>0.34</td></tr>
+      <tr><th>Return on Equity (ROE)</th><td>34.80%</td><td>12.30%</td><td>6.05%</td></tr>
+      <tr><th>Dividend Yield</th><td>2.64%</td><td>3.80%</td><td>5.88%</td></tr>
+    </table>`;
+
+  const result = parseRatios(html);
+
+  assert.equal(result.marketCap, '6869000000');
+  assert.equal(result.pe, '8.00');
+  assert.equal(result.pb, '2.39');
+  assert.equal(result.debtToEquity, '0.32');
+  assert.equal(result.roe, '34.80%');
+  assert.equal(result.dividendYield, '2.64%');
+  assert.equal(result.ratioBasis, 'Current');
+  assert.equal(result.ratioPeriod, "Sep '26");
+});
+
+test('ratio parser does not guess a ratio basis when Current is missing', () => {
+  const html = `
+    <table>
+      <tr><th>Fiscal Year</th><td>FY 2025</td><td>FY 2024</td></tr>
+      <tr><th>Period Ending</th><td>Dec '25</td><td>Dec '24</td></tr>
+      <tr><th>PE Ratio</th><td>19.39</td><td>13.44</td></tr>
+    </table>`;
+
+  const result = parseRatios(html);
+
+  assert.equal(result.pe, '');
+  assert.equal(result.ratioBasis, 'UNKNOWN');
+  assert.equal(result.ratioPeriod, '');
 });
