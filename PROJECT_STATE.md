@@ -1846,3 +1846,75 @@ Conclusion:
 
 No source-code change was made in this audit because the available evidence does not justify one.
 
+
+
+# 43. Financial evidence provenance audit — 19 Sep 2026
+
+**Status: implementation added; automated CI verification pending**
+
+## Audit before implementation
+
+The current `main` branch was re-audited after the CI failure-cluster review. The annual financial and current-ratio semantics from the previous audits are present.
+
+A remaining provenance gap was confirmed:
+
+- `fetchedAt` was the app/backend request time.
+- Evidence source URLs were already present.
+- Annual financial `financialPeriod` represented the reported fiscal/period-ending basis.
+- Current ratios already carried `ratioBasis` and `ratioPeriod`.
+- However, the backend did not preserve StockAnalysis/S&P Global's separate **Last updated** and **Last checked** dates.
+- The UI therefore had no way to distinguish provider data update date from the app fetch time.
+
+This distinction matters because a provider update date is not the same thing as the financial statement period, and the app fetch time is not a reporting date.
+
+Current StockAnalysis pages explicitly expose this distinction. For example, its Safaricom financials page identifies S&P Global Market Intelligence as the data source, gives a Last updated date, and separately gives a Last checked date. It also states that financial data updates after earnings releases. citeturn0search0turn0search3
+
+## Implementation
+
+Backend `backend/lib/companyIntelligence.js` now:
+
+- parses the source page's **Last updated** date when present;
+- parses the source page's **Last checked** date when present;
+- keeps those dates separate from `fetchedAt`;
+- carries financial provenance as:
+  - `financialProviderUpdatedAt`
+  - `financialPageCheckedAt`
+- carries ratio provenance as:
+  - `ratioProviderUpdatedAt`
+  - `ratioPageCheckedAt`
+- adds provider update/check metadata to normalized evidence records;
+- adds the relevant financial/ration period to external evidence records;
+- keeps the existing source URLs unchanged.
+
+Android `CompanyIntelligenceCache.Profile` and evidence models now carry the same provenance metadata.
+
+Company Intelligence UI now:
+- shows **Provider data updated** under annual financials;
+- shows **Provider data updated** under current ratios;
+- optionally shows **Source page checked** when supplied;
+- relabels the existing backend `fetchedAt` display from **Fetched** to **App fetch time**.
+
+The UI therefore does not present an app fetch timestamp as a financial reporting date.
+
+Implementation commits:
+- `7eefb446c8835cc808a0a6f13d5e5d11854677e8` — backend provenance metadata
+- `b670b1b336386decd73483a65fb948007312c9ee` — backend provenance tests
+- `36b990ad9dbbf83a0a04ae3d4aba6bbfb7b11de4` — Android provenance model/parser
+- `7f6697109b3a24451323dfe01c1c0f888727aa7c` — Company Intelligence provenance wording
+
+## Verification
+
+- Current main branch was re-audited before implementation: completed.
+- StockAnalysis source semantics were checked: completed. citeturn0search0turn0search3
+- New backend regression tests were added: completed.
+- Local test execution could not be performed because the execution environment could not resolve GitHub, so no local test pass is claimed.
+- Vercel status for all four implementation commits currently reports the same **build-rate-limit** target, consistent with the previously identified Vercel account/build-rate limitation.
+- GitHub Actions push-run job logs are still not exposed through the available workflow-run connector, so Android CI is not claimed as passed.
+
+## Next logical step
+
+Do not revert this provenance implementation because of the Vercel red status.
+
+The next verification target is a new Android CI run after the provenance batch is complete. If that run is unavailable or blocked, continue auditing only where a real code/data-semantic gap is confirmed; do not create repeated commits solely to turn the historical Vercel statuses green.
+
+The financial provenance layer should remain the basis for any later AI explanation work. AI remains intentionally gated until the evidence/data pipeline is stable.
