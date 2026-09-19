@@ -1546,3 +1546,13 @@ Android CI and APK runtime testing still need to be checked after this cleanup c
 - pinch zoom and horizontal pan remain intact
 - unavailable values remain unavailable rather than becoming 0%
 - percentage calculations use percentage units, not absolute price deltas
+# 37. Additional UI/data cleanup — 19 Sep 2026
+
+Additional low-risk cleanup completed:
+- Removed the pre-filled hardcoded Paper Portfolio balance and SCOM/KCB positions. Paper mode now starts empty rather than presenting fabricated holdings or values.
+- Removed the duplicate stock price from each Companies list row; price and daily change remain in the right-side summary.
+- Changed Companies discovery copy from recommendation-like wording to neutral research wording: 'Research. Analyze. Understand. Explore sourced NSE company information.'
+
+These changes do not alter the market-data pipeline or calculations.
+
+Android CI/runtime verification remains required after the cleanup chain.
