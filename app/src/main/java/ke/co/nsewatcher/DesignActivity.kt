@@ -103,15 +103,17 @@ private fun App(pickAvatar:()->Unit) {
     var newsAlerts by rememberSaveable { mutableStateOf(prefs.getBoolean("news_alerts", true)) }
     var appAlerts by rememberSaveable { mutableStateOf(prefs.getBoolean("app_alerts", true)) }
     var autoRefresh by rememberSaveable { mutableStateOf(prefs.getBoolean("auto_refresh", true)) }
+    val latestSelected by rememberUpdatedState(selected)
     LaunchedEffect(autoRefresh) {
         if (!autoRefresh) return@LaunchedEffect
         while (isActive) {
-            delay(15 * 60 * 1000L)
+            delay(MarketRefreshController.REFRESH_INTERVAL_MS)
             MyStocksCache.loadStocks().takeIf { it.isNotEmpty() }?.let { refreshed ->
                 liveStocks.value = refreshed
-                // Keep an already-open company screen tied to the refreshed market snapshot.
-                if (selected.symbol.isNotBlank()) {
-                    refreshed.firstOrNull { it.symbol == selected.symbol }?.let { selected = it }
+                // Use the latest selected company without restarting the 15-minute timer
+                // when navigation changes the selection.
+                if (latestSelected.symbol.isNotBlank()) {
+                    refreshed.firstOrNull { it.symbol == latestSelected.symbol }?.let { selected = it }
                 }
             }
         }
