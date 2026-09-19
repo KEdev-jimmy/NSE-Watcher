@@ -16,6 +16,9 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import ke.co.nsewatcher.data.AlertStore
 import kotlinx.coroutines.flow.first
+import ke.co.nsewatcher.domain.AlertType
+import java.time.LocalDate
+import java.time.ZoneId
 import java.util.concurrent.TimeUnit
 
 class AlertWorker(appContext: Context, workerParams: WorkerParameters) : CoroutineWorker(appContext, workerParams) {
@@ -27,7 +30,17 @@ class AlertWorker(appContext: Context, workerParams: WorkerParameters) : Corouti
         if (stocks.isEmpty()) return Result.retry()
 
         val previous = store.previousPrices()
-        val triggered = AlertEvaluator.evaluate(alerts, stocks, previous)
+        val evaluated = AlertEvaluator.evaluate(alerts, stocks, previous)
+        val today = LocalDate.now(ZoneId.of("Africa/Nairobi")).toString()
+        val lastDaily = store.lastDailyTriggerDates()
+        val triggered = evaluated.filter { item ->
+            val source = alerts.firstOrNull { it.id == item.alertId }
+            source?.type !in setOf(AlertType.DAILY_GAIN, AlertType.DAILY_LOSS) || lastDaily[item.alertId] != today
+        }
+        store.recordDailyTriggers(
+            triggered.filter { item -> alerts.firstOrNull { it.id == item.alertId }?.type in setOf(AlertType.DAILY_GAIN, AlertType.DAILY_LOSS) }
+                .map { it.alertId }.toSet(), today
+        )
         store.recordPrices(stocks.filter { it.price.isFinite() && it.price > 0.0 }.associate { it.symbol.uppercase() to it.price })
 
         if (triggered.isNotEmpty()) {
