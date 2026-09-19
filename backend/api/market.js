@@ -55,6 +55,18 @@ function candleTimestamp(candle) {
   return value && Number.isFinite(value.getTime()) ? value : null;
 }
 
+function chronologicallyOrderedCandles(candles) {
+  const entries = candles.map((candle, index) => ({
+    candle,
+    index,
+    timestamp: candleTimestamp(candle),
+  }));
+  if (entries.length < 2 || entries.some((entry) => !entry.timestamp)) return candles;
+  return entries
+    .sort((a, b) => a.timestamp - b.timestamp || a.index - b.index)
+    .map((entry) => entry.candle);
+}
+
 function latestTradingSession(candles) {
   const valid = candles
     .filter((candle) => Number.isFinite(Number(candle?.close)) && Number(candle.close) > 0)
@@ -190,6 +202,12 @@ module.exports = async (req, res) => {
       const period = String(req.query.period || '1y').toLowerCase();
       const cfg = periodConfig(period);
       const data = await mystocks(`/stocks/${encodeURIComponent(symbol)}/candles?interval=${encodeURIComponent(cfg.interval)}&from=${cfg.from}&to=${cfg.to}`);
+      // Historical calculations and chart rendering require chronological observations.
+      // If the provider omits timestamps, preserve its original order rather than guessing.
+      const orderedCandles = chronologicallyOrderedCandles(candleArray(data));
+      if (data?.candles) data.candles = orderedCandles;
+      else if (data?.data?.candles) data.data.candles = orderedCandles;
+
       let chartAsOf = providerAsOf(data);
       let sessionOpen = null;
       let sessionClose = null;
@@ -263,3 +281,4 @@ module.exports = async (req, res) => {
 
 module.exports.normalizeMarketStatus = normalizeMarketStatus;
 module.exports.latestTradingSession = latestTradingSession;
+module.exports.chronologicallyOrderedCandles = chronologicallyOrderedCandles;
