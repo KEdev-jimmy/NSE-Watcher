@@ -42,7 +42,7 @@ jobs:
           echo "$GITHUB_WORKSPACE/gradle-8.14.4/bin" >> "$GITHUB_PATH"
 
       - name: Run backend quality tests
-        run: node --test backend/test/companyIntelligence.test.js backend/test/marketStatus.test.js backend/test/company.test.js backend/test/movementIntelligence.test.js backend/test/newsRelevance.test.js
+        run: node --test backend/test/companyIntelligence.test.js backend/test/marketStatus.test.js backend/test/company.test.js backend/test/movementIntelligence.test.js backend/test/newsRelevance.test.js backend/test/newsFeed.test.js
 
       - name: Build with Gradle
         run: gradle --no-daemon build
