@@ -216,7 +216,9 @@ function parseFinancials(html) {
   );
 
   for (let i = annualIndex; i < max; i += 1) {
-    const period = normalizePeriod(valueFromRow(periods, i) || valueFromRow(fiscalYears, i));
+    const fiscalYear = normalizePeriod(valueFromRow(fiscalYears, i));
+    const periodEnding = normalizePeriod(valueFromRow(periods, i));
+    const period = [fiscalYear, periodEnding].filter(Boolean).join(' • ');
     if (!period) continue;
     const previous = i + 1;
     history.push({
