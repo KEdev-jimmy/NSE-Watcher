@@ -65,7 +65,7 @@ private val Border = Color(0xFFE1EAE5)
 private val Red = Color(0xFFE04444)
 private const val PREFS = "nse_watcher_preferences"
 
-data class Stock(val symbol:String,val name:String,val price:Double,val change:Double,val history:List<Double>,val logoUrl:String?=null,val sector:String="Other",val volume:Long=0L,val changeAvailable:Boolean=true,val volumeAvailable:Boolean=true,val source:String="",val observedAt:String="",val freshnessMode:String="UNKNOWN",val dataOrigin:String="unknown")
+data class Stock(val symbol:String,val name:String,val price:Double,val change:Double,val history:List<Double>,val logoUrl:String?=null,val sector:String="Other",val volume:Long=0L,val changeAvailable:Boolean=true,val volumeAvailable:Boolean=true,val source:String="",val observedAt:String="",val freshnessMode:String="UNKNOWN",val dataOrigin:String="unknown",val averageVolume:Long=0L,val averageVolumeAvailable:Boolean=false)
 
 data class NewsItem(
     val id:String, val title:String, val summary:String, val body:String, val source:String,
@@ -569,7 +569,7 @@ private fun AlertPage(back:()->Unit){
     var symbolMenu by remember{mutableStateOf(false)}
     var typeMenu by remember{mutableStateOf(false)}
     val selectedType=runCatching{AlertType.valueOf(selectedTypeName)}.getOrDefault(AlertType.PRICE_ABOVE)
-    val supportedTypes=listOf(AlertType.PRICE_ABOVE,AlertType.PRICE_BELOW,AlertType.DAILY_GAIN,AlertType.DAILY_LOSS,AlertType.NEWS,AlertType.CORPORATE_ACTION)
+    val supportedTypes=listOf(AlertType.PRICE_ABOVE,AlertType.PRICE_BELOW,AlertType.DAILY_GAIN,AlertType.DAILY_LOSS,AlertType.HIGH_VOLUME,AlertType.NEWS,AlertType.CORPORATE_ACTION)
 
     fun resetForm(){
         editingId=null
@@ -585,7 +585,7 @@ private fun AlertPage(back:()->Unit){
             else Card(Modifier.fillMaxWidth(),RoundedCornerShape(18.dp),border=BorderStroke(1.dp,Border)){
                 Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
                     Text(if(editingId==null)"Create alert" else "Edit alert",fontWeight=FontWeight.ExtraBold,fontSize=16.sp)
-                    Text("Supported rules use provider-supplied price and daily change data. Background checks run no more often than every 15 minutes.",fontSize=9.sp,color=Muted)
+                    Text("Supported rules use provider-supplied price, daily change, and volume data. Background checks run no more often than every 15 minutes.",fontSize=9.sp,color=Muted)
                     Box(Modifier.fillMaxWidth()){
                         OutlinedButton(onClick={symbolMenu=true},modifier=Modifier.fillMaxWidth()){
                             Text(if(selectedSymbol.isBlank())"Select company" else selectedSymbol,Modifier.weight(1f))
@@ -609,8 +609,8 @@ private fun AlertPage(back:()->Unit){
                         onValueChange={thresholdText=it.filter{ch->ch.isDigit()||ch=='.'}},
                         modifier=Modifier.fillMaxWidth(),
                         singleLine=true,
-                        label={Text(if(selectedType==AlertType.PRICE_ABOVE||selectedType==AlertType.PRICE_BELOW)"Threshold (KSh)" else if(selectedType==AlertType.DAILY_GAIN||selectedType==AlertType.DAILY_LOSS)"Threshold (%)" else "No threshold needed")},
-                        placeholder={Text(if(selectedType==AlertType.DAILY_LOSS)"Example: 5" else "Example: 30 or 5")}
+                        label={Text(if(selectedType==AlertType.PRICE_ABOVE||selectedType==AlertType.PRICE_BELOW)"Threshold (KSh)" else if(selectedType==AlertType.DAILY_GAIN||selectedType==AlertType.DAILY_LOSS)"Threshold (%)" else if(selectedType==AlertType.HIGH_VOLUME)"Volume above average (%)" else "No threshold needed")},
+                        placeholder={Text(if(selectedType==AlertType.DAILY_LOSS||selectedType==AlertType.HIGH_VOLUME)"Example: 50" else "Example: 30 or 5")}
                     )
                     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End){
                         if(editingId!=null)TextButton({resetForm()}){Text("Cancel")}
@@ -660,6 +660,9 @@ private fun selectedTypeLabel(type:AlertType):String=when(type){
     AlertType.PRICE_BELOW->"Price falls below"
     AlertType.DAILY_GAIN->"Daily gain reaches"
     AlertType.DAILY_LOSS->"Daily loss reaches"
+    AlertType.HIGH_VOLUME->"Volume exceeds average by"
+    AlertType.NEWS->"New company news"
+    AlertType.CORPORATE_ACTION->"Corporate action"
     else->type.name.replace('_',' ')
 }
 
