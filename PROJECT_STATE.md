@@ -1479,3 +1479,70 @@ Android CI/runtime verification is still pending for this latest commit. Manual 
 3. open market shows latest observation/date/time
 4. compact header fits on narrow phones without crowding
 5. no session values are duplicated with conflicting labels
+
+# 36. Cleanup audit: session math, refresh propagation, and quote percentage units — 19 Sep 2026
+
+## Duplicate UI cleanup
+
+The Company Intelligence screen no longer contains separate 'Last trading session at a glance' and 'Today at a glance' cards. They are combined into the adaptive `SessionAtGlance` section. The current source contains one session-summary section for 1D/NOW.
+
+## Math correction
+
+During the cleanup audit, the stock percentage parser was tightened.
+
+The provider contract uses `changePct` for percentage change and documents that `changePct` can be derived from `price` and `previousClose` when omitted. A generic `change` field was previously accepted before `changePct`; that was unsafe because its unit was not explicitly established in the app boundary.
+
+New rule:
+1. use explicit provider `changePct` when finite
+2. otherwise derive `(price - previousClose) / previousClose * 100` when previousClose is valid
+3. otherwise keep the change unavailable rather than inventing 0%
+
+This prevents an absolute price delta from accidentally being displayed as a percentage.
+
+## Session-baseline correction
+
+The combined session card previously fell back from `sessionChangePct` to the stock's daily change. Those two values have different baselines:
+- session change = session close/latest minus session open
+- daily change = latest price versus previous close
+
+The fallback was removed. If the provider does not return a valid session change, the session card does not relabel a daily change as a session change.
+
+## Refresh propagation correction
+
+The existing 15-minute auto-refresh loop used a captured selected-company value, which could become stale after navigation. The loop now uses `rememberUpdatedState` so it can update the currently selected company without restarting the 15-minute timer.
+
+Company Intelligence now also observes `MarketRefreshController.state.lastSuccessfulRefreshMs`. A successful market refresh therefore reloads the selected history even when the numeric price itself is unchanged. This is important for NOW because a new timestamp can arrive at the same price.
+
+No second price polling loop was introduced.
+
+## Observation timestamp cleanup
+
+The session summary now prefers the actual session close candle timestamp for its 'Latest observation' line, with the provider observation timestamp as fallback. This keeps the displayed time tied to the chart observation whenever that evidence exists.
+
+## Provider freshness basis
+
+MyStocks currently documents African equity prices as exchange-supplied and 15-minute delayed, with a 900-second refresh target and `asOf` representing the actual observation timestamp. Intraday candles may be sparse and missing observations are not interpolated.
+
+## Verification state
+
+Latest implementation commits:
+- `6a8f11a8f233ab57cb2280575d42c4fbcbd6c1d1` — percentage-unit math correction
+- `875b74178d6524adba29a71017d6d87433f91b62c` — exact session baseline
+- `40d890493d3aadc203bfaf5fd8645d077fd594a3` — remove obsolete fallback parameter
+- `2b57c3ef19599f0f7461e390d0ac461605778f71` — stable auto-refresh selected-company propagation
+- `af93f9f859c136e0df3c7dc0ade4da11d4abf5a1` — reload history on successful refresh
+
+Android CI and APK runtime testing still need to be checked after this cleanup chain. No build/runtime success is assumed until the actual workflow result is available.
+
+## Manual regression checklist
+
+- Company Intelligence has one session-summary section, not two
+- closed session shows date/time and CLOSE
+- open session shows latest observation and LATEST
+- session percentage is never substituted with daily percentage
+- NOW reloads after a successful 15-minute refresh even if price is unchanged
+- 1D and NOW contain only actual provider observations
+- 1W, 1M, 3M, 6M, 1Y, 3Y, 5Y remain available
+- pinch zoom and horizontal pan remain intact
+- unavailable values remain unavailable rather than becoming 0%
+- percentage calculations use percentage units, not absolute price deltas
