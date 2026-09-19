@@ -8,8 +8,8 @@
 **Product:** NSE Watcher Android app  
 **Primary goal:** Evidence-grounded NSE market intelligence for beginner investors.  
 **Current roadmap phase:** **Phase 10 — Real Market & Index Context**  
-**Latest verified implementation area:** Market freshness/session awareness and shared refresh state.  
-**Latest known commit:** `a525237d8b5cb20141157cf796c1861c34349ada` — Fix market freshness nullable refresh timestamp.
+**Latest verified implementation area:** Company Intelligence financial evidence provenance + Android CI verification.  
+**Latest implementation commit before this state update:** `19459fc4aaa2cb607dd9fea07d7045daed357738` — Align financial growth fixture with provider values.
 
 ---
 
@@ -1918,3 +1918,183 @@ Do not revert this provenance implementation because of the Vercel red status.
 The next verification target is a new Android CI run after the provenance batch is complete. If that run is unavailable or blocked, continue auditing only where a real code/data-semantic gap is confirmed; do not create repeated commits solely to turn the historical Vercel statuses green.
 
 The financial provenance layer should remain the basis for any later AI explanation work. AI remains intentionally gated until the evidence/data pipeline is stable.
+
+
+# 44. Cross-chat handoff — 19 Sep 2026
+
+**Purpose:** This section is the authoritative handoff for the next ChatGPT coding conversation. Read this before making any NSE Watcher change.
+
+## Current product
+
+NSE Watcher is an Android NSE intelligence app for beginner investors. It is **not** just a quote viewer. The product goal is evidence-grounded, understandable NSE market intelligence.
+
+Core pipeline:
+
+```
+RAW DATA
+   ↓
+NORMALIZATION
+   ↓
+EVIDENCE
+   ↓
+RELATIONSHIPS
+   ↓
+CALCULATIONS
+   ↓
+INTELLIGENCE
+   ↓
+AI EXPLANATION (later)
+```
+
+AI explanation is intentionally **gated** until the underlying data, evidence, provenance, freshness and semantics are stable.
+
+## Current implementation state
+
+The app already has substantial working functionality and must not be rebuilt from scratch.
+
+### Home
+- Active Home: `app/src/main/java/ke/co/nsewatcher/HomeDashboard.kt`
+- Structured intelligence engine: `HomeIntelligence.kt`
+- Gainers **and** Losers already exist.
+- Market breadth, sector pulse, corporate actions, company news, What Changed?, evidence/provenance and market index context already exist.
+- Existing green visual identity is intentional.
+- Keep Home compact; avoid oversized icons/cards and unnecessary whitespace.
+
+### Market/session/freshness
+- Market status semantics were hardened so missing/unknown/conflicting status remains `UNKNOWN`, not CLOSED.
+- Freshness distinguishes current session, end of day and unknown.
+- Shared refresh controller exists; 15 minutes is a refresh/check interval, **not** proof that every provider observation is exactly 15 minutes delayed.
+- Closed-market Company Intelligence semantics were fixed: known CLOSED must be shown as MARKET CLOSED, not as a fake 0.00% movement or current-looking percentage.
+- Synthetic chart/history observations were removed.
+- 1D session selection now uses the latest real Nairobi trading session and actual open/close data.
+- Longer-period candles are chronologically ordered when timestamps are valid.
+
+### Company Intelligence
+The following audits/fixes are already implemented and must be preserved:
+
+1. **Annual financial period/unit semantics**
+   - Annual parser explicitly selects the FY YYYY column rather than positional first-column/TTM data.
+   - StockAnalysis financial source values are carried with unit/period metadata.
+   - Provider-supplied annual growth values are preferred over recalculation from rounded values.
+   - Android carries EPS growth and financial metadata.
+
+2. **Current vs FY ratio basis**
+   - Ratio parser explicitly locates the provider's Current column.
+   - Missing recognizable Current column => unavailable; do not guess from FY.
+   - Current ratios carry `ratioBasis` and `ratioPeriod`.
+   - Annual Financial health contains annual Revenue/Profit/EPS/Net margin.
+   - ROE/Debt-Equity and valuation metrics are presented as current-ratio information with explicit basis.
+   - Do not mix current ratios with FY financials without labeling.
+
+3. **Financial evidence provenance**
+   - Backend preserves provider **Last updated** and **Last checked** dates separately from app/backend `fetchedAt`.
+   - Fields include:
+     - `financialProviderUpdatedAt`
+     - `financialPageCheckedAt`
+     - `ratioProviderUpdatedAt`
+     - `ratioPageCheckedAt`
+   - Android models/parsers carry the same provenance.
+   - UI uses:
+     - **Provider data updated**
+     - **Source page checked** when available
+     - **App fetch time** for the actual app fetch timestamp.
+   - Never label app fetch time as the financial statement/reporting date.
+
+## CI status that must be understood
+
+The recent Vercel failures are **not** a reason to undo correct implementation.
+
+Historical runs 601–609 were checked and the Vercel failures consistently showed the same build-rate-limit target. They should be treated as infrastructure/account build-rate limitation evidence, not nine separate source-code regressions.
+
+A real Android CI issue was nevertheless found during this audit:
+- Run **616** failed in the backend financial parser regression test because the fixture did not explicitly contain the provider growth rows; the expected 30.17% was being compared with 30.15%.
+- This was corrected by commit:
+  `19459fc4aaa2cb607dd9fea07d7045daed357738`
+  — **Align financial growth fixture with provider values**.
+- Android CI **run 617 completed SUCCESSFULLY** on that commit.
+- Therefore the backend quality tests and Android build path represented by run 617 passed. Do not reopen the already-fixed 30.15%/30.17% issue unless a new current failure proves it has returned.
+
+## What to do next
+
+Do **not** start another broad redesign.
+
+The next conversation should:
+
+1. Treat `PROJECT_STATE.md` and the actual current `main` branch as the starting point.
+2. Re-audit the current code before every implementation step.
+3. Verify the financial provenance implementation is actually present end-to-end.
+4. Check current Android CI evidence before making any new fix.
+5. Continue the remaining hardening audits only where a real gap is demonstrated.
+6. After every meaningful implementation, update `PROJECT_STATE.md`.
+7. Once the evidence/data pipeline is genuinely stable, close/harden the current phase rather than inventing work.
+8. Do not jump to Phase 13 AI merely because the app is feature-rich.
+
+## Non-negotiable development rules
+
+These rules come from the user and must be followed in the next chat:
+
+- **Deep audit first.** Every section requires an end-to-end audit before implementation.
+- **Verify against the actual current repository.** Do not assume an old audit note means an issue still exists.
+- **Do not make changes just because an issue is listed in PROJECT_STATE.md.** Confirm it still exists in current code.
+- **Correctness over speed.**
+- If a genuine issue is found, fix it immediately when safe.
+- Group related safe fixes when they share one root cause.
+- Do not create repeated commits merely to turn CI/Vercel history green.
+- Historical failed workflow runs cannot be retroactively fixed; obtain a new verification run after real fixes.
+- **Never fabricate data.** If unavailable, show unavailable/unknown/empty state.
+- Never invent prices, financials, revenue, profit, EPS, dividends, corporate actions, volume, index values, news, evidence, URLs, dates, timestamps, portfolio holdings, watchlist companies, causal explanations, confidence scores or AI conclusions.
+- Never invent NASI/NSE20/NSE25 values.
+- Do not present calculated sector averages as official NSE sector indices.
+- Do not use BUY/SELL/HOLD recommendations or predictive market claims.
+- Do not treat correlation as proof of causation; use explicit evidence relationships such as related/possible/not-established where appropriate.
+- Do not infer financial units, reporting periods or growth basis from displayed numbers.
+- Preserve source/provenance and make source links/timestamps truthful.
+- Distinguish provider reporting/update dates from app fetch time.
+- Preserve existing working features instead of rebuilding them.
+- Do not invent portfolio/watchlist state from demo or legacy stores.
+- Keep the UI compact, useful and beginner-readable.
+- Avoid fluffy text, excessive whitespace, giant rounded cards and oversized icons.
+- Preserve the existing green branding unless the user specifically requests a visual change.
+- Do not add speculative features simply because they appear on an old feature list.
+- Keep AI explanation gated until the evidence/data foundation is stable.
+- When the user says **continue**, first inspect/re-audit the actual current `main` branch, then proceed.
+
+## Important "already exists — do not rebuild" reminders
+
+- HomeIntelligenceEngine
+- Home Gainers and Losers
+- EvidenceGraph
+- Movement intelligence / Why Stock Moving
+- News relevance filtering
+- Home provenance
+- Market index context
+- Shared market refresh state
+- Market freshness/session semantics
+- Closed-market Company Intelligence semantics
+- FY-vs-TTM financial parsing
+- Current-vs-FY ratio basis
+- Financial provider update/check provenance
+
+The next chat should improve or harden these only if the current code audit proves a real defect.
+
+## User working preference
+
+The user is not asking for unnecessary complexity. He wants the app to become **correct, trustworthy, differentiated and genuinely useful**, not simply larger.
+
+When explaining findings, use simple, direct English:
+- what was checked
+- what was found
+- whether it is a real issue
+- what will be changed
+- how it will be verified
+
+Do not overwhelm the user with speculative problems.
+
+## Current checkpoint
+
+**Latest verified Android CI:** run 617 — SUCCESS.  
+**Latest implementation commit before this state update:** `19459fc4aaa2cb607dd9fea07d7045daed357738`.  
+**Current active concern:** finish verification/hardening of Company Intelligence financial provenance and then continue only with real, evidence-backed gaps.  
+**AI:** intentionally deferred until the evidence/data pipeline is stable.
+
+This handoff is intended to prevent the next conversation from repeating old audits, undoing correct fixes, mistaking Vercel rate-limit failures for source regressions, or implementing features that already exist.
