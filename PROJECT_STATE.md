@@ -1556,3 +1556,30 @@ Additional low-risk cleanup completed:
 These changes do not alter the market-data pipeline or calculations.
 
 Android CI/runtime verification remains required after the cleanup chain.
+# 38. Cleanup pass: stale chart state and unavailable change handling — 19 Sep 2026
+
+## Company Intelligence cleanup
+
+Removed two subtle stale-data paths:
+- When a history request returned fewer than two points, the old chart history could remain in memory. The screen now replaces the history state with the returned list, so an unavailable/insufficient response cannot leave an older chart visible after refresh.
+- 1D/NOW percentage fallback previously used the general chart state. It now uses the current `HistoryResult` points only when a session return is not supplied, preventing a stale earlier period from becoming the displayed current-session return.
+
+## Header data-quality cleanup
+
+If the provider does not supply a usable percentage change, the company header no longer formats an invalid/placeholder numeric value as a percentage. It shows `Change unavailable` with the latest evidence timestamp/state instead.
+
+## Verification
+
+Latest code commit: `9f89ccdaa61a85c2d68679ea3755c9f1cf2057ed`.
+Vercel status for the code commit should be checked after deployment. Android CI is triggered by pushes to `main`, but the GitHub connector's workflow-run lookup currently returns no run for this commit, so Android build success is not claimed.
+
+## Provider-data basis reviewed
+
+MyStocks' current partner documentation confirms exchange-supplied African equity prices are 15-minute delayed, `asOf` is the actual observation timestamp, intraday candles may be sparse, and missing observations are not interpolated. The app continues to label the feed as delayed and does not create missing observations.
+
+## Remaining low-risk review items
+
+- Keep the static fallback catalogue visibly distinguishable from live backend data through existing freshness/source metadata.
+- Do not introduce a faster price polling loop than the provider's documented refresh cadence.
+- Do not add an intraday metric such as a 2-hour return until the returned observation density is sufficient to calculate it from actual timestamps.
+- Manual APK verification remains the final check for the duplicate-card removal because an APK downloaded before the latest commits can still contain the older UI.
