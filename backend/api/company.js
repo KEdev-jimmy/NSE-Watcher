@@ -276,3 +276,5 @@ async function handleWithRepair(req, res) {
 }
 
 module.exports = handleWithRepair;
+// Keep the pure growth-repair helper available to the regression suite.
+module.exports.repairAnnualGrowth = repairAnnualGrowth;
