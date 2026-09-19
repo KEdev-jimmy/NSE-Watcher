@@ -88,8 +88,11 @@ test('financial parser selects the annual FY column instead of TTM when both are
       <tr><th>Fiscal Year</th><td>TTM</td><td>FY 2025</td><td>FY 2024</td></tr>
       <tr><th>Period Ending</th><td>Jun '26</td><td>Dec '25</td><td>Dec '24</td></tr>
       <tr><th>Revenue Revenue Growth</th><td>1,760</td><td>1,061</td><td>815.23</td></tr>
+      <tr><th>Revenue Growth</th><td>6.50%</td><td>30.17%</td><td>35.00%</td></tr>
       <tr><th>Net Income Net Income Growth</th><td>857.54</td><td>272.24</td><td>116.27</td></tr>
+      <tr><th>Net Income Growth</th><td>215.00%</td><td>133.91%</td><td>10.00%</td></tr>
       <tr><th>Earnings Per Share EPS Growth</th><td>3.28</td><td>1.04</td><td>0.45</td></tr>
+      <tr><th>EPS Growth</th><td>150.00%</td><td>133.91%</td><td>10.00%</td></tr>
       <tr><th>Profit Margin</th><td>48.73%</td><td>25.66%</td><td>14.26%</td></tr>
     </table>`;
 
