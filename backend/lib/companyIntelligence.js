@@ -581,7 +581,8 @@ function evidenceFor(profile, primaryProfile, externalProfile, financialHistory,
     }
   });
 
-  financialHistory.slice(0, 8).forEach(row => {
+  // Financial history is stored oldest -> latest. Keep the latest eight rows in evidence.
+  financialHistory.slice(-8).forEach(row => {
     const metadata = {
       providerUpdatedAt: row.providerUpdatedAt || externalProfile?.financialProviderUpdatedAt || '',
       providerCheckedAt: row.pageCheckedAt || externalProfile?.financialPageCheckedAt || '',
