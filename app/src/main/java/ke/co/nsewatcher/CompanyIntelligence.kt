@@ -1047,7 +1047,7 @@ private fun formatHeaderUnavailable(
         ?.let(::formatCompactChartTimestamp)
 
     val state = when {
-        !marketStatus.isKnown -> "LATEST"
+        !marketStatus.isKnown -> "STATUS UNKNOWN"
         marketStatus.isOpen -> "LATEST"
         else -> "CLOSE"
     }
