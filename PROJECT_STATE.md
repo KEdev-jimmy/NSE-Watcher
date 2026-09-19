@@ -1746,3 +1746,66 @@ The Android profile model/parser now carries epsGrowth from the backend, complet
 This was caught by the current-code cross-file audit; no assumption was made that the UI change was complete just because the backend field existed.
 
 Android CI/runtime verification remains pending.
+
+
+# 41. Company Intelligence ratio-basis audit — 19 Sep 2026
+
+**Status: implementation added; CI/runtime verification pending**
+
+## Audit before implementation
+
+The current main code was re-audited after the annual financial fix. The ratio parser was found to read the first data column of the StockAnalysis ratio tables without explicitly verifying its basis. The current StockAnalysis tables have a dedicated **Current** column followed by FY columns, so the values being parsed were in practice current ratios, but the app did not carry that basis into the UI.
+
+This mattered because the Financial health card was labelled as latest annual financial evidence while including ROE and Debt/Equity values that come from the current ratio snapshot. The Valuation card also used current P/E/P/B/dividend yield/market cap values without explicitly saying they were current rather than FY historical ratios.
+
+The current source distinguishes, for NASE:NSE, for example:
+- Current P/E 8.00 vs FY 2025 P/E 19.39
+- Current P/B 2.39 vs FY 2025 P/B 2.15
+- Current ROE 34.80% vs FY 2025 ROE 12.30%
+- Current dividend yield 2.64% vs FY 2025 dividend yield 3.80%
+- Current period ending Sep '26 vs FY 2025 period ending Dec '25
+
+These are source distinctions, not app-derived estimates. citeturn0search0turn0search1
+
+## Implementation
+
+Backend:
+- parseRatios() now locates the explicit Current column instead of assuming the first numeric column.
+- If the source does not expose a recognizable Current column, ratio values are left unavailable rather than guessed from an FY column.
+- The response now carries ratioBasis: "Current" and the corresponding ratioPeriod.
+- ratioBasis and ratioPeriod are carried through the merged profile.
+- Added regression tests for Current-vs-FY selection and the missing-Current safety case.
+
+Android:
+- CompanyIntelligenceCache.Profile now carries ratioBasis and ratioPeriod.
+- The annual Financial health card now contains only annual financial evidence: Revenue, Profit, EPS and Net margin.
+- ROE and Debt/Equity were moved to the current-ratio section so they are no longer presented as annual FY metrics.
+- The valuation area is now labelled **Current ratios & valuation** and displays the current ratio period when supplied.
+- The UI explicitly states that these are the source's current snapshot, not FY 2025 historical ratio values.
+
+Commits:
+- 02cd82a27f8c3205680781e4d0c33f4566e20736 — make company ratios explicitly current-basis
+- a2a5e00f53139cf82fae6d5c990bc10550f5d0e2 — carry ratio basis metadata through company intelligence
+- c4a4b0d5411f1e11fce9a7ef96d1313f3608bc74 — carry current ratio basis into Android
+- 6c5d86a97d8839b246e65744032380cf62503e25 — separate annual financials from current ratios
+- 9777c0f255d7e5483012ba6b58fdc7b4e94a2821 — test current-basis company ratios
+
+## Verification
+
+- Current-code audit before implementation: completed.
+- Source semantics: checked against current StockAnalysis ratio/statistics pages. citeturn0search0turn0search1
+- Backend regression tests: added, but not executed locally in this environment.
+- Android CI/build: not independently verified yet.
+- APK/manual runtime verification: pending.
+
+## Already fixed and intentionally not changed
+
+- Annual financial parsing already selects explicit FY columns rather than TTM.
+- Provider-supplied annual growth values are already preferred.
+- EPS growth is already carried through the Android model/parser.
+- Closed-market Company Intelligence semantics remain unchanged.
+- The single combined session-status card remains unchanged.
+
+## Next logical audit
+
+Audit financial evidence provenance end-to-end: verify the financial/ratio fetchedAt, source URLs, provider update dates, and UI timestamp wording so users can tell when the numbers were sourced and what date they represent. Do not add a timestamp that is merely the app fetch time and present it as the financial statement date.
