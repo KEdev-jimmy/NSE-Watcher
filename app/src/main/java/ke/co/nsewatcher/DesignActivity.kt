@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
+import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -46,6 +47,9 @@ import androidx.compose.ui.unit.sp
 import java.util.Locale
 import ke.co.nsewatcher.data.MyStocksCache
 import ke.co.nsewatcher.data.NewsCache
+import ke.co.nsewatcher.data.AlertStore
+import ke.co.nsewatcher.domain.AlertType
+import ke.co.nsewatcher.domain.PriceAlert
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -79,7 +83,7 @@ class DesignActivity : ComponentActivity() {
         try { contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
         getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString("avatar_uri", uri.toString()).apply()
     }
-    override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); setContent { App { picker.launch(arrayOf("image/*")) } } }
+    override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); AlertWorker.schedule(this); setContent { App { picker.launch(arrayOf("image/*")) } } }
 }
 
 @Composable
@@ -139,7 +143,7 @@ private fun App(pickAvatar:()->Unit) {
             Page.NOTIFICATIONS->NotificationsPage(marketAlerts,priceAlerts,newsAlerts,appAlerts,{marketAlerts=it;put("market_alerts",it)},{priceAlerts=it;put("price_alerts",it)},{newsAlerts=it;put("news_alerts",it)},{appAlerts=it;put("app_alerts",it)},::back)
             Page.LIVE_DATA->LiveData(autoRefresh,showVolume,showChanges,{autoRefresh=it;put("auto_refresh",it)},{showVolume=it;put("show_volume",it)},{showChanges=it;put("show_changes",it)},::back)
             Page.CHARTS->SimplePage("Chart Settings",Icons.Default.ShowChart,listOf("Default timeframe" to "1D","Chart style" to "Line","Show grid" to "On","Indicators" to "On"),::back)
-            Page.ALERTS->SimplePage("Price Alerts",Icons.Default.Notifications,listOf("Price alerts" to if(priceAlerts) "Enabled" else "Disabled","Daily gain / loss" to "Enabled","High volume" to "Enabled","Corporate actions" to "Enabled"),::back)
+            Page.ALERTS->AlertPage(::back)
             Page.LANGUAGE->SimplePage("Language",Icons.Default.Language,listOf("App language" to "English","Currency" to "KSh (Kenyan Shillings)","Region" to "Kenya"),::back)
             Page.SECURITY->SimplePage("Account Security",Icons.Default.Lock,listOf("Password" to "Protected","Biometric unlock" to "Off","Active sessions" to "This device","Data permissions" to "Review"),::back)
             Page.PRIVACY->SimplePage("Privacy",Icons.Default.PrivacyTip,listOf("Personalisation" to "On device","Analytics" to "Optional","Data sharing" to "Not shared for trading"),::back)
@@ -544,6 +548,108 @@ private fun Settings(dark:Boolean,market:Boolean,price:Boolean,news:Boolean,app:
 @Composable private fun ThemeChoice(title:String,sub:String,selected:Boolean,onClick:()->Unit){Card(Modifier.fillMaxWidth().clickable(onClick=onClick),RoundedCornerShape(16.dp),border=BorderStroke(if(selected)2.dp else 1.dp,if(selected)Green else Border),colors=CardDefaults.cardColors(containerColor=if(selected)LightGreen else MaterialTheme.colorScheme.surface)){Row(Modifier.padding(15.dp),verticalAlignment=Alignment.CenterVertically){Icon(if(title=="Light")Icons.Default.LightMode else if(title=="Dark")Icons.Default.DarkMode else Icons.Default.SettingsSystemDaydream,null,tint=Green);Spacer(Modifier.width(12.dp));Column(Modifier.weight(1f)){Text(title,fontWeight=FontWeight.Bold);Text(sub,fontSize=10.sp,color=Muted)};if(selected)Icon(Icons.Default.CheckCircle,null,tint=Green)}}}
 @Composable private fun NotificationsPage(m:Boolean,p:Boolean,n:Boolean,a:Boolean,sm:(Boolean)->Unit,sp:(Boolean)->Unit,sn:(Boolean)->Unit,sa:(Boolean)->Unit,back:()->Unit){LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){item{Header("Notifications","Choose what you want to hear about",back)};item{SettingsCard("Notification Types",Icons.Default.Notifications){ToggleRow(Icons.Default.ShowChart,"Market updates","NSE-wide movements and daily briefs",m,sm);ToggleRow(Icons.Default.PriceChange,"Price alerts","Your watchlist thresholds",p,sp);ToggleRow(Icons.Default.Article,"News alerts","Company and market news",n,sn);ToggleRow(Icons.Default.Apps,"App notifications","Product updates",a,sa)}};item{Note("Notifications will use real market events when live data and alert services are connected.")}}}
 @Composable private fun LiveData(refresh:Boolean,volume:Boolean,changes:Boolean,sr:(Boolean)->Unit,sv:(Boolean)->Unit,sc:(Boolean)->Unit,back:()->Unit){LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){item{Header("Live Data","Market-data display preferences",back)};item{SettingsCard("Data Display",Icons.Default.ShowChart){ToggleRow(Icons.Default.Sync,"Auto refresh","Keep market information current",refresh,sr);ToggleRow(Icons.Default.BarChart,"Show volume","Display trading activity",volume,sv);ToggleRow(Icons.Default.TrendingUp,"Show price changes","Display daily percentage moves",changes,sc)}}}}
+@Composable
+private fun AlertPage(back:()->Unit){
+    val context=androidx.compose.ui.platform.LocalContext.current
+    val store=remember{AlertStore(context)}
+    val watchlistStore=remember{WatchlistStore(context)}
+    val alerts by store.alerts.collectAsState(initial=emptyList())
+    val watchedSymbols by watchlistStore.symbols.collectAsState(initial=emptyList())
+    val watched=stocks.filter{it.symbol.uppercase() in watchedSymbols.map(String::uppercase)}
+    val scope=rememberCoroutineScope()
+    var selectedSymbol by rememberSaveable{mutableStateOf(watched.firstOrNull()?.symbol?:"")}
+    var selectedTypeName by rememberSaveable{mutableStateOf(AlertType.PRICE_ABOVE.name)}
+    var thresholdText by rememberSaveable{mutableStateOf("")}
+    var editingId by rememberSaveable{mutableStateOf<String?>(null)}
+    var symbolMenu by remember{mutableStateOf(false)}
+    var typeMenu by remember{mutableStateOf(false)}
+    val selectedType=runCatching{AlertType.valueOf(selectedTypeName)}.getOrDefault(AlertType.PRICE_ABOVE)
+    val supportedTypes=listOf(AlertType.PRICE_ABOVE,AlertType.PRICE_BELOW,AlertType.DAILY_GAIN,AlertType.DAILY_LOSS)
+
+    fun resetForm(){
+        editingId=null
+        selectedSymbol=watched.firstOrNull()?.symbol?:""
+        selectedTypeName=AlertType.PRICE_ABOVE.name
+        thresholdText=""
+    }
+
+    LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
+        item{Header("Price Alerts","Real threshold monitoring for companies you follow",back)}
+        item{
+            if(watched.isEmpty()) Note("Add a company to your Watchlist first. Alert rules are user-owned and are not created for demo symbols.")
+            else Card(Modifier.fillMaxWidth(),RoundedCornerShape(18.dp),border=BorderStroke(1.dp,Border)){
+                Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
+                    Text(if(editingId==null)"Create alert" else "Edit alert",fontWeight=FontWeight.ExtraBold,fontSize=16.sp)
+                    Text("Supported rules use provider-supplied price and daily change data. Background checks run no more often than every 15 minutes.",fontSize=9.sp,color=Muted)
+                    Box{
+                        OutlinedTextField(selectedSymbol,{},{Modifier.fillMaxWidth().clickable{symbolMenu=true}},readOnly=true,label={Text("Company")})
+                        DropdownMenu(symbolMenu,{symbolMenu=false}){
+                            watched.forEach{s->DropdownMenuItem(text={Text(s.symbol+" • "+s.name)},onClick={selectedSymbol=s.symbol;symbolMenu=false})}
+                        }
+                    }
+                    Box{
+                        OutlinedTextField(selectedTypeLabel(selectedType),{},{Modifier.fillMaxWidth().clickable{typeMenu=true}},readOnly=true,label={Text("Rule")})
+                        DropdownMenu(typeMenu,{typeMenu=false}){
+                            supportedTypes.forEach{type->DropdownMenuItem(text={Text(selectedTypeLabel(type))},onClick={selectedTypeName=type.name;typeMenu=false})}
+                        }
+                    }
+                    OutlinedTextField(
+                        value=thresholdText,
+                        onValueChange={thresholdText=it.filter{ch->ch.isDigit()||ch=='.'}},
+                        modifier=Modifier.fillMaxWidth(),
+                        singleLine=true,
+                        label={Text(if(selectedType==AlertType.PRICE_ABOVE||selectedType==AlertType.PRICE_BELOW)"Threshold (KSh)" else "Threshold (%)")},
+                        placeholder={Text(if(selectedType==AlertType.DAILY_LOSS)"Example: 5" else "Example: 30 or 5")}
+                    )
+                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End){
+                        if(editingId!=null)TextButton({resetForm()}){Text("Cancel")}
+                        Button(onClick={
+                            val threshold=thresholdText.toDoubleOrNull()
+                            if(selectedSymbol.isNotBlank()&&threshold!=null&&threshold>0.0){
+                                scope.launch{
+                                    store.save(PriceAlert(editingId?:java.util.UUID.randomUUID().toString(),selectedSymbol,selectedType,threshold,true))
+                                    resetForm()
+                                }
+                            }
+                        },enabled=selectedSymbol.isNotBlank()&&thresholdText.toDoubleOrNull()?.let{it>0.0}==true,colors=ButtonDefaults.buttonColors(containerColor=Green)){
+                            Icon(if(editingId==null)Icons.Default.Add else Icons.Default.Save,null)
+                            Spacer(Modifier.width(6.dp));Text(if(editingId==null)"Add alert" else "Save changes")
+                        }
+                    }
+                }
+            }
+        }
+        item{Text("Your alert rules",fontWeight=FontWeight.ExtraBold,fontSize=16.sp)}
+        if(alerts.isEmpty()) item{Note("No alert rules yet. The app will not invent or pre-fill alerts.")}
+        items(alerts,key={it.id}){alert->
+            Card(Modifier.fillMaxWidth(),RoundedCornerShape(16.dp),border=BorderStroke(1.dp,Border)){
+                Column(Modifier.padding(13.dp)){
+                    Row(verticalAlignment=Alignment.CenterVertically){
+                        Column(Modifier.weight(1f)){
+                            Text(alert.symbol+" • "+selectedTypeLabel(alert.type),fontWeight=FontWeight.Bold,fontSize=12.sp)
+                            Text(alert.threshold?.let{if(alert.type==AlertType.PRICE_ABOVE||alert.type==AlertType.PRICE_BELOW)"Threshold KSh %.2f".format(Locale.US,it) else "Threshold %.2f%%".format(Locale.US,it)}?:"No threshold",fontSize=10.sp,color=Muted)
+                        }
+                        Switch(checked=alert.enabled,onCheckedChange={enabled->scope.launch{store.setEnabled(alert.id,enabled)}})
+                    }
+                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End){
+                        TextButton({selectedSymbol=alert.symbol;selectedTypeName=alert.type.name;thresholdText=alert.threshold?.toString()?:"";editingId=alert.id}){Text("Edit")}
+                        TextButton({scope.launch{store.remove(alert.id);if(editingId==alert.id)resetForm()}}){Text("Delete",color=Red)}
+                    }
+                }
+            }
+        }
+        item{Note("Price alerts trigger on a real threshold crossing. Daily gain/loss alerts use the provider's reported daily percentage and are limited to one notification per alert per Nairobi calendar day. Notifications require Android notification permission.") }
+    }
+}
+
+private fun selectedTypeLabel(type:AlertType):String=when(type){
+    AlertType.PRICE_ABOVE->"Price rises above"
+    AlertType.PRICE_BELOW->"Price falls below"
+    AlertType.DAILY_GAIN->"Daily gain reaches"
+    AlertType.DAILY_LOSS->"Daily loss reaches"
+    else->type.name.replace('_',' ')
+}
+
 @Composable private fun SimplePage(title:String,icon:ImageVector,rows:List<Pair<String,String>>,back:()->Unit){LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){item{Header(title,null,back)};item{SettingsCard(title,icon){rows.forEach{RowItem(icon,it.first,it.second)}}}}}
 @Composable private fun HelpPage(back:()->Unit){LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){item{Header("Help & Support","Get help using NSE Watcher",back)};item{SettingsCard("Support",Icons.Default.HelpOutline){RowItem(Icons.Default.MenuBook,"Getting started","Learn how to read the market dashboard");RowItem(Icons.Default.QuestionMark,"Frequently asked questions","Common NSE Watcher questions");RowItem(Icons.Default.ReportProblem,"Report a problem","Tell us about an issue")}}}}
 @Composable private fun AboutPage(back:()->Unit){LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){item{Header("About NSE Watcher","Market intelligence for the NSE",back)};item{SettingsCard("NSE Watcher",Icons.Default.Info){Text("Version 0.1.0",fontWeight=FontWeight.Bold);Text("Trading apps help you buy. NSE Watcher helps you understand what you're buying.",fontSize=12.sp,color=Muted,modifier=Modifier.padding(top=7.dp));Spacer(Modifier.height(9.dp));Text("NSE Watcher does not execute real trades and does not guarantee investment returns.",fontSize=10.sp,color=Muted)}}}}
