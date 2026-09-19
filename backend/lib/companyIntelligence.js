@@ -402,6 +402,8 @@ async function loadMyStocks(symbol) {
       pe: pick(profileRaw, ['pe', 'peRatio', 'priceEarnings', 'priceToEarnings']),
       pb: pick(profileRaw, ['pb', 'pbRatio', 'priceBook', 'priceToBook']),
       dividendYield: pick(profileRaw, ['dividendYield', 'yield']),
+      ratioBasis: pick(profileRaw, ['ratioBasis']),
+      ratioPeriod: pick(profileRaw, ['ratioPeriod']),
     },
     dividends: Array.isArray(dividendsRaw.history)
       ? dividendsRaw.history
@@ -464,7 +466,7 @@ function mergeProfile(primary, external) {
   const output = { ...(primary || {}) };
   const keys = [
     'marketCap', 'revenue', 'profit', 'eps', 'roe', 'debtToEquity', 'margin',
-    'revenueGrowth', 'profitGrowth', 'pe', 'pb', 'dividendYield',
+    'revenueGrowth', 'profitGrowth', 'pe', 'pb', 'dividendYield', 'ratioBasis', 'ratioPeriod',
   ];
   for (const key of keys) {
     if (String(external?.[key] || '').trim()) output[key] = external[key];
