@@ -381,7 +381,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
 
         if (period == "1D" || period == "NOW") {
             item {
-                TodayAtGlance(
+                SessionAtGlance(
                     historyResult = historyResult,
                     marketStatus = marketStatus,
                     currentChange = selectedPeriodReturn
@@ -919,7 +919,7 @@ private fun IntelligenceChart(
 }
 
 @Composable
-private fun TodayAtGlance(
+private fun SessionAtGlance(
     historyResult: MyStocksCache.HistoryResult,
     marketStatus: MyStocksCache.MarketStatus,
     currentChange: Double?
@@ -928,9 +928,14 @@ private fun TodayAtGlance(
     val latest = historyResult.sessionClose
     val hasSession = open != null && latest != null && open > 0.0 && latest > 0.0
     val sessionDate = historyResult.sessionCloseAt.takeIf { it.isNotBlank() }?.let(::formatChartTimestampDate)
-    val observed = historyResult.observedAt.takeIf { it.isNotBlank() }?.let(::formatChartTimestamp)
+    val observed = historyResult.sessionCloseAt
+        .takeIf { it.isNotBlank() }
+        ?.let(::formatChartTimestamp)
+        ?: historyResult.observedAt.takeIf { it.isNotBlank() }?.let(::formatChartTimestamp)
     val nextOpen = marketStatus.nextOpen.takeIf { it.isNotBlank() }?.let(::formatChartTimestamp)
-    val change = historyResult.sessionChangePct ?: currentChange
+    // Never fall back from session return to the provider's daily change here:
+    // those are different baselines (session open vs previous close).
+    val change = historyResult.sessionChangePct
     val known = marketStatus.isKnown
     val openSession = known && marketStatus.isOpen
 
