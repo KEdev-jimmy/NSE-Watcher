@@ -202,6 +202,8 @@ function parseFinancials(html) {
     profitGrowth: valueFromRow(netIncomeGrowth, annualIndex) || pctGrowth(latestProfit, previousProfit),
     epsGrowth: valueFromRow(epsGrowth, annualIndex) || pctGrowth(latestEps, previousEps),
     source: EXTERNAL_SOURCE,
+    providerUpdatedAt,
+    pageCheckedAt,
   };
 
   const history = [];
@@ -227,6 +229,8 @@ function parseFinancials(html) {
       profitGrowth: pctGrowth(valueFromRow(netIncome, i), valueFromRow(netIncome, previous)),
       epsGrowth: pctGrowth(valueFromRow(eps, i), valueFromRow(eps, previous)),
       source: EXTERNAL_SOURCE,
+      providerUpdatedAt,
+      pageCheckedAt,
     });
   }
 
@@ -576,9 +580,14 @@ function evidenceFor(profile, primaryProfile, externalProfile, financialHistory,
   });
 
   financialHistory.slice(0, 8).forEach(row => {
-    add(`Revenue ${row.period}`, row.revenue, EXTERNAL_SOURCE, 'financials', sourceInfo.financialsUrl);
-    add(`Profit ${row.period}`, row.profit, EXTERNAL_SOURCE, 'financials', sourceInfo.financialsUrl);
-    add(`EPS ${row.period}`, row.eps, EXTERNAL_SOURCE, 'financials', sourceInfo.financialsUrl);
+    const metadata = {
+      providerUpdatedAt: row.providerUpdatedAt || externalProfile?.financialProviderUpdatedAt || '',
+      providerCheckedAt: row.pageCheckedAt || externalProfile?.financialPageCheckedAt || '',
+      period: row.period || '',
+    };
+    add(`Revenue ${row.period}`, row.revenue, EXTERNAL_SOURCE, 'financials', sourceInfo.financialsUrl, metadata);
+    add(`Profit ${row.period}`, row.profit, EXTERNAL_SOURCE, 'financials', sourceInfo.financialsUrl, metadata);
+    add(`EPS ${row.period}`, row.eps, EXTERNAL_SOURCE, 'financials', sourceInfo.financialsUrl, metadata);
   });
 
   dividends.slice(0, 12).forEach((dividend, index) => {
