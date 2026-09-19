@@ -1215,3 +1215,56 @@ When the data does not support a conclusion:
 Say that the evidence is unavailable, stale, incomplete, or not established.
 
 That principle takes priority over making the UI look complete.
+
+# 30. Session-aware chart and "today" semantics audit — 19 Sep 2026
+
+**Status: implementation added; CI/runtime verification pending**
+
+## Audit before implementation
+
+The current repository was re-audited before changing code.
+
+Existing pieces confirmed:
+- `MyStocksCache.loadMarketStatus()` already consumes the backend `/api/market?action=status` endpoint.
+- The backend already returns provider market status plus `nextOpen` / `nextClose` when supplied.
+- `Africa/Nairobi` is already used for timestamp interpretation.
+- `MarketRefreshController` already provides shared refresh state and was preserved rather than duplicated.
+- `HistoryResult` already carries `sessionOpen`, `sessionClose`, `sessionChangePct`, `sessionOpenAt`, `sessionCloseAt`, and `observedAt`.
+- The interactive chart already uses actual candle timestamps for its X-axis.
+- The chart period selector already supports 1D / 1W / 1M / 3M / 6M / 1Y / 3Y / 5Y.
+- The current backend 1D chart path was injecting a synthetic previous-close candle. That made the chart mix a previous-session baseline with actual intraday observations and could make the first X-axis time misleading.
+- The current Android 1D change calculation used the first chart point as a baseline. That was coupled to the synthetic previous-close candle and would become incorrect if the chart became observation-only.
+- The installed screenshot showed a "Today at a glance" concept, but that section was not present in the current default-branch `CompanyIntelligence.kt`. This was treated as a repository/UI mismatch rather than assuming unseen code existed.
+
+## Implementation
+
+Combined into one surgical commit:
+- Removed the synthetic previous-close candle from the backend 1D chart response. Previous close remains a session baseline where available, but is not presented as an intraday observation.
+- Changed Android stock refresh logic so the chart no longer derives the stock's daily change from its first 1D chart point. The stock quote feed remains the source of the daily change.
+- Added session-aware company-screen state using the existing market-status endpoint; status is refreshed while the company screen is open.
+- Made 1D selected-period return use the backend's `sessionChangePct` when available.
+- Added a truthful "Today's at a glance" / "Last trading session at a glance" section using actual session open/close/observation timestamps.
+- Changed the company header from ambiguous "% today" wording to "% this session" when open and "% last session" when closed.
+- Improved 1W labels to include weekday + date rather than weekday alone.
+- Prevented first/last X-axis labels from being clipped at the chart edges.
+- Preserved all existing periods, pinch zoom, horizontal pan, evidence rules, and the shared refresh controller.
+- No 2-hour movement metric was added yet; it will only be added after verifying that the provider returns sufficient timestamped 1D observations and that the metric can be calculated without estimation.
+
+## Files changed
+- `backend/api/market.js`
+- `app/src/main/java/ke/co/nsewatcher/data/MyStocksCache.kt`
+- `app/src/main/java/ke/co/nsewatcher/CompanyIntelligence.kt`
+- `PROJECT_STATE.md`
+
+## Verification
+- Static repository audit completed before implementation.
+- Android CI for the combined change has **not yet been verified**.
+- The prior chart-crash fix commit remains separate and should be checked together with this implementation.
+- Do not treat this change as production-safe until Android CI/build and manual period testing pass.
+
+## Next logical step
+1. Check CI for the combined commit.
+2. If CI passes, install/test 1D → 1W → 1M → 3M → 6M → 1Y → 3Y → 5Y.
+3. Verify closed-session wording on a non-trading day and live-session wording during NSE trading.
+4. Verify actual 1D candle timestamps and ensure no provider retrieval timestamp is being plotted as a price observation.
+5. Only after those checks, consider a sourced "last 2 hours" movement line.

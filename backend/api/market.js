@@ -153,16 +153,9 @@ module.exports = async (req, res) => {
                 sessionOpenAt = firstTimestamp?.toISOString() || null;
                 sessionCloseAt = candleTimestamp(actualLast)?.toISOString() || null;
 
-                if (previousClose !== null) {
-                  sessionCandles.unshift({
-                    timestamp: baselineTimestamp.toISOString(), date: baselineTimestamp.toISOString(),
-                    open: previousClose, high: previousClose, low: previousClose, close: previousClose,
-                    volume: 0, ohlcAvailable: true, volumeAvailable: false,
-                    synthetic: true, label: 'Previous close',
-                  });
-                }
-                if (data?.candles) data.candles = sessionCandles;
-                else if (data?.data?.candles) data.data.candles = sessionCandles;
+                // Keep the chart timeline strictly observational.
+                // The previous close is used as a session baseline when available,
+                // but it is not inserted as a synthetic candle/observation.
               }
             }
           }

@@ -111,10 +111,12 @@ object MyStocksCache {
                 if (stock.symbol in chartSymbols) {
                     val history = loadHistoryDetails(stock.symbol, "1D")
                     if (history.prices.size >= 2) {
-                        val latest = history.prices.last()
-                        val previousClose = history.prices.first()
-                        val dayChange = if (previousClose > 0.0) ((latest - previousClose) / previousClose) * 100.0 else stock.change
-                        stock.copy(price = latest, change = dayChange, history = history.prices)
+                        val latest = history.sessionClose?.takeIf { it.isFinite() && it > 0.0 }
+                            ?: history.prices.last()
+                        // The stock quote feed remains the source of the daily change.
+                        // Do not derive "today" change from the first chart observation:
+                        // the 1D chart now contains only actual intraday observations.
+                        stock.copy(price = latest, history = history.prices)
                     } else stock
                 } else stock
             }

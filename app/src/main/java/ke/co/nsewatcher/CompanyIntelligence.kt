@@ -57,6 +57,8 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
     var history by remember(s.symbol) {
         mutableStateOf(s.history.map { MyStocksCache.HistoryPoint(it) })
     }
+    var historyResult by remember(s.symbol) { mutableStateOf(MyStocksCache.HistoryResult()) }
+    var marketStatus by remember(s.symbol) { mutableStateOf(MyStocksCache.MarketStatus()) }
     var historyLoading by remember(s.symbol) { mutableStateOf(false) }
     var monthHistory by remember(s.symbol) { mutableStateOf(emptyList<Double>()) }
     var intelligence by remember(s.symbol) { mutableStateOf(CompanyIntelligenceCache.Result()) }
@@ -80,16 +82,28 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
         monthHistory = MyStocksCache.loadHistory(s.symbol, "1m")
     }
 
+    LaunchedEffect(s.symbol) {
+        while (true) {
+            marketStatus = MyStocksCache.loadMarketStatus()
+            kotlinx.coroutines.delay(60_000L)
+        }
+    }
+
     LaunchedEffect(s.symbol, period) {
         historyLoading = true
         val live = MyStocksCache.loadHistoryDetails(s.symbol, period)
+        historyResult = live
         if (live.points.size >= 2) history = live.points
         historyLoading = false
     }
 
     val profile = intelligence.profile
     val monthlyReturn = percentReturn(monthHistory)
-    val selectedPeriodReturn = percentReturn(history.map { it.close })
+    val selectedPeriodReturn = if (period == "1D") {
+        historyResult.sessionChangePct ?: percentReturn(history.map { it.close })
+    } else {
+        percentReturn(history.map { it.close })
+    }
     val latestFinancialPeriod = intelligence.financialHistory.lastOrNull()?.period.orEmpty()
     val intelligenceView = CompanyIntelligenceEngine.build(s, intelligence, monthHistory, news)
 
@@ -135,7 +149,13 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
                     Row(verticalAlignment = Alignment.Bottom) {
                         Text(String.format(Locale.US, "KSh %.2f", s.price), fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, color = IntelligenceText)
                         Spacer(Modifier.width(9.dp))
-                        Text(String.format(Locale.US, "%+.2f%% today", s.change), color = if (s.change >= 0) IntelligenceGreen else IntelligenceRed, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp, modifier = Modifier.padding(bottom = 4.dp))
+                        Text(
+                            formatHeaderChange(s.change, marketStatus.isOpen),
+                            color = if (s.change >= 0) IntelligenceGreen else IntelligenceRed,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 13.sp,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
                     }
                     Spacer(Modifier.height(6.dp))
                     Text("Exchange-supplied NSE data • analysis only • no real trading", color = IntelligenceMuted, fontSize = 9.sp)
@@ -325,6 +345,16 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
                 } else {
                     Text("Historical market data is not available for this period.", color = IntelligenceMuted, fontSize = 10.sp)
                 }
+            }
+        }
+
+        if (period == "1D") {
+            item {
+                TodayAtGlance(
+                    historyResult = historyResult,
+                    marketStatus = marketStatus,
+                    currentChange = selectedPeriodReturn
+                )
             }
         }
 
@@ -813,6 +843,11 @@ private fun IntelligenceChart(
                         val labelWidthPx = with(density) {
                             (label.text.length.coerceAtLeast(3) * 4.5f).dp.toPx()
                         }
+                        val clampedX = when {
+                            label.index == 0 -> xPx.coerceAtLeast(labelWidthPx / 2f)
+                            label.index == valid.lastIndex -> xPx.coerceAtMost(plotWidthPx - labelWidthPx / 2f)
+                            else -> xPx
+                        }
                         Text(
                             label.text,
                             color = IntelligenceMuted,
@@ -820,7 +855,7 @@ private fun IntelligenceChart(
                             maxLines = 1,
                             modifier = Modifier.offset {
                                 androidx.compose.ui.unit.IntOffset(
-                                    (xPx - labelWidthPx / 2f).toInt(),
+                                    (clampedX - labelWidthPx / 2f).toInt(),
                                     0
                                 )
                             }
@@ -851,6 +886,79 @@ private fun IntelligenceChart(
         }
     }
 }
+
+@Composable
+private fun TodayAtGlance(
+    historyResult: MyStocksCache.HistoryResult,
+    marketStatus: MyStocksCache.MarketStatus,
+    currentChange: Double?
+) {
+    val open = historyResult.sessionOpen
+    val latest = historyResult.sessionClose
+    val hasSession = open != null && latest != null && open > 0.0 && latest > 0.0
+    val sessionDate = historyResult.sessionCloseAt.takeIf { it.isNotBlank() }?.let(::formatChartTimestampDate)
+    val observed = historyResult.observedAt.takeIf { it.isNotBlank() }?.let(::formatChartTimestamp)
+    val nextOpen = marketStatus.nextOpen.takeIf { it.isNotBlank() }?.let(::formatChartTimestamp)
+    val change = historyResult.sessionChangePct ?: currentChange
+
+    SectionTitle(
+        if (marketStatus.isOpen) "Today's at a glance" else "Last trading session at a glance",
+        if (marketStatus.isOpen) "Latest observed session data" else "The latest completed NSE session",
+        Icons.Default.Schedule
+    )
+    IntelligenceCard {
+        if (!hasSession) {
+            Text(
+                "Session open/close data is not available from the current market response.",
+                color = IntelligenceMuted,
+                fontSize = 10.sp
+            )
+        } else {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(Modifier.weight(1f)) {
+                    MiniFact("OPEN", String.format(Locale.US, "KSh %.2f", open))
+                }
+                Box(Modifier.weight(1f)) {
+                    MiniFact(if (marketStatus.isOpen) "LATEST" else "CLOSE", String.format(Locale.US, "KSh %.2f", latest))
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            change?.let {
+                val verb = if (it >= 0) "Up" else "Down"
+                Text(
+                    verb + " " + String.format(Locale.US, "%+.2f%%", it) +
+                        if (marketStatus.isOpen) " since today's open" else " during the last trading session",
+                    color = if (it >= 0) IntelligenceGreen else IntelligenceRed,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            }
+            sessionDate?.let { Text(if (marketStatus.isOpen) "Session date: " + it else "Last session: " + it, color = IntelligenceMuted, fontSize = 8.sp) }
+            observed?.let { Text("Observed " + it, color = IntelligenceMuted, fontSize = 8.sp) }
+            Text(
+                if (marketStatus.isOpen) {
+                    "Market open • values use the latest returned observation, not an estimated live price."
+                } else {
+                    "Market closed • the completed session is shown; no current-session movement is being estimated."
+                },
+                color = IntelligenceMuted,
+                fontSize = 8.sp
+            )
+            nextOpen?.let { Text("Next regular session: " + it, color = IntelligenceMuted, fontSize = 8.sp) }
+        }
+    }
+}
+
+private fun formatHeaderChange(change: Double, marketOpen: Boolean): String =
+    String.format(Locale.US, "%+.2f%% %s", change, if (marketOpen) "this session" else "last session")
+
+private fun formatChartTimestamp(raw: String): String = runCatching {
+    Instant.parse(raw).atZone(ZoneId.of("Africa/Nairobi")).format(DateTimeFormatter.ofPattern("dd MMM • HH:mm", Locale.US)) + " EAT"
+}.getOrElse { raw.take(19) }
+
+private fun formatChartTimestampDate(raw: String): String = runCatching {
+    Instant.parse(raw).atZone(ZoneId.of("Africa/Nairobi")).format(DateTimeFormatter.ofPattern("EEE, dd MMM", Locale.US))
+}.getOrElse { raw.take(10) }
 
 private data class ChartLabel(val index: Int, val text: String)
 
@@ -915,7 +1023,7 @@ private fun formatChartDate(
     period: String
 ): String = when (period) {
     "1D" -> dateTime.format(DateTimeFormatter.ofPattern("HH:mm", Locale.US))
-    "1W" -> dateTime.format(DateTimeFormatter.ofPattern("EEE", Locale.US))
+    "1W" -> dateTime.format(DateTimeFormatter.ofPattern("EEE dd", Locale.US))
     "1M" -> dateTime.format(DateTimeFormatter.ofPattern("dd MMM", Locale.US))
     "3M", "6M", "1Y" -> dateTime.format(DateTimeFormatter.ofPattern("MMM", Locale.US))
     "3Y", "5Y" -> dateTime.format(DateTimeFormatter.ofPattern("yyyy", Locale.US))
