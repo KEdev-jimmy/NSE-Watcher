@@ -55,7 +55,109 @@ private val IntelligenceBorder = Color(0xFFE1EAE5)
 private val IntelligenceRed = Color(0xFFE04444)
 
 
-private enum class CompanyIntelligenceSection(val label: String) {\n    OVERVIEW("Overview"),\n    PERFORMANCE("Performance"),\n    FINANCIALS("Financials"),\n    VALUATION("Valuation"),\n    DIVIDENDS("Dividends"),\n    NEWS("News"),\n    EVIDENCE("Evidence"),\n    MORE("More")\n}\n\nprivate fun companyIntelligenceSectionForIndex(index: Int): CompanyIntelligenceSection = when (index) {\n    in 0..4 -> CompanyIntelligenceSection.OVERVIEW\n    in 5..6 -> CompanyIntelligenceSection.OVERVIEW\n    in 7..10 -> CompanyIntelligenceSection.PERFORMANCE\n    in 11..12 -> CompanyIntelligenceSection.VALUATION\n    in 13..14 -> CompanyIntelligenceSection.DIVIDENDS\n    in 15..18 -> CompanyIntelligenceSection.PERFORMANCE\n    in 19..20 -> CompanyIntelligenceSection.NEWS\n    in 21..22 -> CompanyIntelligenceSection.EVIDENCE\n    in 23..28 -> CompanyIntelligenceSection.MORE\n    in 29..30 -> CompanyIntelligenceSection.NEWS\n    else -> CompanyIntelligenceSection.MORE\n}\n\nprivate fun companyIntelligenceSectionIndex(section: CompanyIntelligenceSection): Int = when (section) {\n    CompanyIntelligenceSection.OVERVIEW -> 5\n    CompanyIntelligenceSection.PERFORMANCE -> 9\n    CompanyIntelligenceSection.FINANCIALS -> 7\n    CompanyIntelligenceSection.VALUATION -> 11\n    CompanyIntelligenceSection.DIVIDENDS -> 13\n    CompanyIntelligenceSection.NEWS -> 19\n    CompanyIntelligenceSection.EVIDENCE -> 21\n    CompanyIntelligenceSection.MORE -> 23\n}\n\n@Composable\nprivate fun CompanyIntelligenceSectionNavigation(\n    selected: CompanyIntelligenceSection,\n    onSelected: (CompanyIntelligenceSection) -> Unit\n) {\n    val scrollState = rememberScrollState()\n    Box(\n        Modifier\n            .fillMaxWidth()\n            .background(MaterialTheme.colorScheme.surface)\n    ) {\n        Row(\n            Modifier\n                .fillMaxWidth()\n                .horizontalScroll(scrollState)\n                .padding(horizontal = 2.dp, vertical = 3.dp),\n            horizontalArrangement = Arrangement.spacedBy(18.dp)\n        ) {\n            CompanyIntelligenceSection.entries.forEach { section ->\n                val selectedSection = section == selected\n                Surface(\n                    onClick = { onSelected(section) },\n                    color = Color.Transparent,\n                    contentColor = if (selectedSection) IntelligenceGreen else IntelligenceMuted,\n                    shape = RoundedCornerShape(0.dp)\n                ) {\n                    Column(\n                        modifier = Modifier.padding(horizontal = 1.dp, vertical = 5.dp),\n                        horizontalAlignment = Alignment.CenterHorizontally\n                    ) {\n                        Text(\n                            section.label,\n                            fontSize = 10.sp,\n                            fontWeight = if (selectedSection) FontWeight.Bold else FontWeight.Medium,\n                            maxLines = 1\n                        )\n                        Spacer(Modifier.height(4.dp))\n                        Box(\n                            Modifier\n                                .width(if (selectedSection) 22.dp else 0.dp)\n                                .height(2.dp)\n                                .background(\n                                    if (selectedSection) IntelligenceGreen else Color.Transparent,\n                                    RoundedCornerShape(2.dp)\n                                )\n                        )\n                    }\n                }\n            }\n        }\n        if (scrollState.canScrollForward) {\n            Box(\n                Modifier\n                    .align(Alignment.CenterEnd)\n                    .width(24.dp)\n                    .height(36.dp)\n                    .background(\n                        Brush.horizontalGradient(\n                            listOf(Color.Transparent, MaterialTheme.colorScheme.surface)\n                        )\n                    )\n            )\n        }\n    }\n}\n\n@OptIn(ExperimentalFoundationApi::class)
+private enum class CompanyIntelligenceSection(val label: String) {
+    OVERVIEW("Overview"),
+    PERFORMANCE("Performance"),
+    FINANCIALS("Financials"),
+    VALUATION("Valuation"),
+    DIVIDENDS("Dividends"),
+    NEWS("News"),
+    EVIDENCE("Evidence"),
+    MORE("More")
+}
+
+private fun companyIntelligenceSectionForIndex(index: Int): CompanyIntelligenceSection = when (index) {
+    in 0..4 -> CompanyIntelligenceSection.OVERVIEW
+    in 5..6 -> CompanyIntelligenceSection.OVERVIEW
+    in 7..10 -> CompanyIntelligenceSection.PERFORMANCE
+    in 11..12 -> CompanyIntelligenceSection.VALUATION
+    in 13..14 -> CompanyIntelligenceSection.DIVIDENDS
+    in 15..18 -> CompanyIntelligenceSection.PERFORMANCE
+    in 19..20 -> CompanyIntelligenceSection.NEWS
+    in 21..22 -> CompanyIntelligenceSection.EVIDENCE
+    in 23..28 -> CompanyIntelligenceSection.MORE
+    in 29..30 -> CompanyIntelligenceSection.NEWS
+    else -> CompanyIntelligenceSection.MORE
+}
+
+private fun companyIntelligenceSectionIndex(section: CompanyIntelligenceSection): Int = when (section) {
+    CompanyIntelligenceSection.OVERVIEW -> 5
+    CompanyIntelligenceSection.PERFORMANCE -> 9
+    CompanyIntelligenceSection.FINANCIALS -> 7
+    CompanyIntelligenceSection.VALUATION -> 11
+    CompanyIntelligenceSection.DIVIDENDS -> 13
+    CompanyIntelligenceSection.NEWS -> 19
+    CompanyIntelligenceSection.EVIDENCE -> 21
+    CompanyIntelligenceSection.MORE -> 23
+}
+
+@Composable
+private fun CompanyIntelligenceSectionNavigation(
+    selected: CompanyIntelligenceSection,
+    onSelected: (CompanyIntelligenceSection) -> Unit
+) {
+    val scrollState = rememberScrollState()
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(scrollState)
+                .padding(horizontal = 2.dp, vertical = 3.dp),
+            horizontalArrangement = Arrangement.spacedBy(18.dp)
+        ) {
+            CompanyIntelligenceSection.entries.forEach { section ->
+                val selectedSection = section == selected
+                Surface(
+                    onClick = { onSelected(section) },
+                    color = Color.Transparent,
+                    contentColor = if (selectedSection) IntelligenceGreen else IntelligenceMuted,
+                    shape = RoundedCornerShape(0.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 1.dp, vertical = 5.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            section.label,
+                            fontSize = 10.sp,
+                            fontWeight = if (selectedSection) FontWeight.Bold else FontWeight.Medium,
+                            maxLines = 1
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Box(
+                            Modifier
+                                .width(if (selectedSection) 22.dp else 0.dp)
+                                .height(2.dp)
+                                .background(
+                                    if (selectedSection) IntelligenceGreen else Color.Transparent,
+                                    RoundedCornerShape(2.dp)
+                                )
+                        )
+                    }
+                }
+            }
+        }
+        if (scrollState.canScrollForward) {
+            Box(
+                Modifier
+                    .align(Alignment.CenterEnd)
+                    .width(24.dp)
+                    .height(36.dp)
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(Color.Transparent, MaterialTheme.colorScheme.surface)
+                        )
+                    )
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, onWatchToggle: (() -> Unit)? = null) {
     val periods = listOf("1D", "1W", "1M", "3M", "6M", "1Y", "3Y", "5Y", "NOW")
@@ -126,10 +228,10 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
     val listState = rememberLazyListState()
     var selectedSection by rememberSaveable(s.symbol) { mutableStateOf(CompanyIntelligenceSection.OVERVIEW) }
 
-    LaunchedEffect(listState, hasSessionNavigationItem) {
+    LaunchedEffect(listState) {
         snapshotFlow { listState.firstVisibleItemIndex }
             .collect { index ->
-                selectedSection = companyIntelligenceSectionForIndex(index, hasSessionNavigationItem)
+                selectedSection = companyIntelligenceSectionForIndex(index)
             }
     }
 
