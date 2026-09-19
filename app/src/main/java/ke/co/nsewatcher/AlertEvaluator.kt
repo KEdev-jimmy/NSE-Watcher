@@ -18,13 +18,13 @@ object AlertEvaluator {
             when (alert.type) {
                 AlertType.PRICE_ABOVE -> {
                     val thresholdValue = threshold ?: return@mapNotNull null
-                    val thresholdValue = threshold ?: return@mapNotNull null
                     val previous = previousPrices[stock.symbol.uppercase()] ?: return@mapNotNull null
                     if (previous < thresholdValue && stock.price >= thresholdValue)
                         TriggeredAlert(alert.id, stock.symbol, "Price alert", stock.name + " crossed above KSh " + "%.2f".format(Locale.US, thresholdValue) + ". Current price: KSh " + "%.2f".format(Locale.US, stock.price) + ".")
                     else null
                 }
                 AlertType.PRICE_BELOW -> {
+                    val thresholdValue = threshold ?: return@mapNotNull null
                     val previous = previousPrices[stock.symbol.uppercase()] ?: return@mapNotNull null
                     if (previous > thresholdValue && stock.price <= thresholdValue)
                         TriggeredAlert(alert.id, stock.symbol, "Price alert", stock.name + " crossed below KSh " + "%.2f".format(Locale.US, thresholdValue) + ". Current price: KSh " + "%.2f".format(Locale.US, stock.price) + ".")
