@@ -16,6 +16,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import ke.co.nsewatcher.data.AlertStore
+import ke.co.nsewatcher.data.NewsCache
 import kotlinx.coroutines.flow.first
 import ke.co.nsewatcher.domain.AlertType
 import java.time.LocalDate
@@ -33,13 +34,21 @@ class AlertWorker(appContext: Context, workerParams: WorkerParameters) : Corouti
         if (stocks.isEmpty()) return Result.retry()
 
         val previous = store.previousPrices()
-        val evaluated = AlertEvaluator.evaluate(alerts, stocks, previous)
+        val newsAlertsEnabled = alerts.any { it.enabled && it.type in setOf(AlertType.NEWS, AlertType.CORPORATE_ACTION) }
+        val news = if (newsAlertsEnabled) NewsCache.loadFeed() else emptyList()
+        val lastNews = store.lastNewsTriggerIds()
+        val evaluated = AlertEvaluator.evaluate(alerts, stocks, previous, news, lastNews)
         val today = LocalDate.now(ZoneId.of("Africa/Nairobi")).toString()
         val lastDaily = store.lastDailyTriggerDates()
         val triggered = evaluated.filter { item ->
             val source = alerts.firstOrNull { it.id == item.alertId }
             source?.type !in setOf(AlertType.DAILY_GAIN, AlertType.DAILY_LOSS) || lastDaily[item.alertId] != today
         }
+        store.recordNewsTriggers(
+            triggered.filter { item -> alerts.firstOrNull { it.id == item.alertId }?.type in setOf(AlertType.NEWS, AlertType.CORPORATE_ACTION) }
+                .associate { it.alertId to (news.firstOrNull { n -> n.symbol.equals(it.symbol, true) && n.freshnessMode == "CURRENT_DAY" && (it.message.endsWith(n.title) || it.message.contains(n.title)) }?.id ?: "") }
+                .filterValues { it.isNotBlank() }
+        )
         store.recordDailyTriggers(
             triggered.filter { item -> alerts.firstOrNull { it.id == item.alertId }?.type in setOf(AlertType.DAILY_GAIN, AlertType.DAILY_LOSS) }
                 .map { it.alertId }.toSet(), today
