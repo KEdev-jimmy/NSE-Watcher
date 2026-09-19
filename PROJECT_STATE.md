@@ -1583,3 +1583,68 @@ MyStocks' current partner documentation confirms exchange-supplied African equit
 - Do not introduce a faster price polling loop than the provider's documented refresh cadence.
 - Do not add an intraday metric such as a 2-hour return until the returned observation density is sufficient to calculate it from actual timestamps.
 - Manual APK verification remains the final check for the duplicate-card removal because an APK downloaded before the latest commits can still contain the older UI.
+
+# 39. Closed-market Company Intelligence clarification — 19 Sep 2026
+
+**Status: implementation added; CI/runtime verification pending**
+
+## Audit before implementation
+
+The current main source was re-audited before changing the Company Intelligence screen.
+
+Confirmed already fixed and therefore not rebuilt:
+- The two separate "Today at a glance" / "Last trading session at a glance" cards are already combined into one SessionAtGlance section.
+- Market-status unknown state already exists and does not default to CLOSED.
+- 1D session data already uses actual latest Nairobi-session candles.
+- Synthetic previous-close chart observations are already removed.
+- Session percentage no longer falls back to the quote's daily percentage.
+
+A genuine remaining UX/data-semantics issue was found:
+- On a known closed market, the company header could still display the numeric percentage as though it were current context.
+- The Market behaviour card could still show a 1D/NOW session percentage on Saturday/Sunday without making the closed state the primary message.
+- The combined session card still emphasized OPEN/CLOSE/session movement rather than the simple closed-market state the user needs on non-trading days.
+
+## Implementation
+
+Commit:
+- 7201e4138ec6dadacdcc7fcba286ae7f94a920b4
+
+Changes:
+- When the market is known CLOSED, the company header now prioritizes:
+  - MARKET CLOSED
+  - the actual close observation date/time when available
+- The combined session section remains a single section and now becomes a clear Market status card.
+- When closed, the card shows:
+  - MARKET CLOSED
+  - the actual completed-session date
+  - the close observation time
+  - the actual closing price
+  - the next regular session when supplied
+- The closed-state card does not present the session percentage as current movement.
+- The 1D/NOW Market behaviour summary now shows MARKET CLOSED instead of a current-looking session percentage when the market is known closed.
+- No 0.00% was fabricated. Closed is a market state, not a zero movement measurement.
+- Open-market behavior remains unchanged: actual latest observation/session information continues to be shown.
+- Unknown market status remains explicitly unknown.
+
+## Files changed
+
+- app/src/main/java/ke/co/nsewatcher/CompanyIntelligence.kt
+- PROJECT_STATE.md
+
+## Verification
+
+- Static current-code audit: completed before implementation.
+- GitHub code update: completed.
+- Android CI: not yet verified for this commit.
+- APK/manual runtime verification: pending.
+
+## Next priority
+
+Audit the Company Intelligence financial metrics end-to-end before changing their display:
+1. trace Revenue/Profit/EPS/ROE/Margin/Debt-Equity/P-E/P-B/Dividend Yield/Market Cap from provider response through normalization to UI;
+2. verify units (KSh, millions, billions, etc.) rather than assuming them;
+3. verify reporting period (FY/annual/quarterly/TTM/etc.);
+4. verify growth metric basis (YoY/QoQ/etc.);
+5. only then change labels/formatting.
+
+Do not infer financial units or periods from the displayed number alone.
