@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.platform.LocalUriHandler
 import coil3.compose.AsyncImage
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -509,7 +510,7 @@ private fun newsDisplayMeta(item:NewsItem):NewsDisplayMeta{
         if(detail.summary.isNotBlank()) item{Text(detail.summary,fontWeight=FontWeight.SemiBold,fontSize=13.sp,color=TextDark)}
         if(detail.body.isNotBlank()) item{Card(Modifier.fillMaxWidth(),RoundedCornerShape(17.dp),border=BorderStroke(1.dp,Border)){Text(detail.body,Modifier.padding(15.dp),fontSize=12.sp,lineHeight=18.sp)}}
         if(detail.dividendAmount.isNotBlank()||detail.exDate.isNotBlank()||detail.paymentDate.isNotBlank()) item{Card(Modifier.fillMaxWidth(),RoundedCornerShape(17.dp),colors=CardDefaults.cardColors(containerColor=LightGreen)){Column(Modifier.padding(14.dp)){Text("Dividend details",fontWeight=FontWeight.ExtraBold,fontSize=16.sp);if(detail.dividendAmount.isNotBlank())InfoRow(Icons.Default.Payments,"Dividend amount",detail.dividendAmount);if(detail.exDate.isNotBlank())InfoRow(Icons.Default.Event,"Book closure / ex-date",detail.exDate);if(detail.paymentDate.isNotBlank())InfoRow(Icons.Default.CalendarMonth,"Payment date",detail.paymentDate)}}}
-        if(detail.url.isNotBlank()) item{Button({/* source URL will be wired to an external browser in the next link pass */},Modifier.fillMaxWidth(),colors=ButtonDefaults.buttonColors(containerColor=Green)){Icon(Icons.Default.Link,null);Spacer(Modifier.width(7.dp));Text("Source / Related Link")}}
+        if(detail.url.isNotBlank()) item{val uriHandler=LocalUriHandler.current;Button({if(detail.url.startsWith("https://")||detail.url.startsWith("http://")) uriHandler.openUri(detail.url)},Modifier.fillMaxWidth(),enabled=detail.url.startsWith("https://")||detail.url.startsWith("http://"),colors=ButtonDefaults.buttonColors(containerColor=Green)){Icon(Icons.Default.Link,null);Spacer(Modifier.width(7.dp));Text("Source / Related Link")}}
         item{Text("NSE Watcher presents sourced information for analysis. News is not a recommendation to buy or sell a security. For material corporate actions, confirm the issuer's official announcement or exchange filing.",color=Muted,fontSize=9.sp)}
     }
 }
