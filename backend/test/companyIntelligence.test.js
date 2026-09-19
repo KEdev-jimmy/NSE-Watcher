@@ -139,6 +139,38 @@ test('ratio parser selects the explicit Current column and exposes its basis', (
   assert.equal(result.ratioPeriod, "Sep '26");
 });
 
+test('evidence uses the latest financial history rows', () => {
+  const history = Array.from({ length: 10 }, (_, index) => ({
+    period: `FY ${2016 + index}`,
+    revenue: String(100 + index),
+    profit: String(50 + index),
+    eps: String(1 + index),
+    providerUpdatedAt: '2026-09-01',
+    pageCheckedAt: '2026-09-02',
+  }));
+
+  const evidence = evidenceFor(
+    {},
+    {},
+    {},
+    history,
+    [],
+    { financialsUrl: 'https://example.com/financials', ratiosUrl: '' },
+    '2026-09-19T00:00:00.000Z',
+    'SCOM.KE'
+  );
+
+  const periods = evidence
+    .filter(item => /^Revenue FY/.test(item.claim))
+    .map(item => item.period);
+
+  assert.deepEqual(periods, [
+    'FY 2018', 'FY 2019', 'FY 2020', 'FY 2021',
+    'FY 2022', 'FY 2023', 'FY 2024', 'FY 2025',
+  ]);
+});
+
+
 test('financial history rows and evidence retain provider provenance', () => {
   const html = `
     <table>
