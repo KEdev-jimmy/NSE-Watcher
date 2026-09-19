@@ -583,15 +583,21 @@ private fun AlertPage(back:()->Unit){
                 Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(8.dp)){
                     Text(if(editingId==null)"Create alert" else "Edit alert",fontWeight=FontWeight.ExtraBold,fontSize=16.sp)
                     Text("Supported rules use provider-supplied price and daily change data. Background checks run no more often than every 15 minutes.",fontSize=9.sp,color=Muted)
-                    Box{
-                        OutlinedTextField(selectedSymbol,{},{Modifier.fillMaxWidth().clickable{symbolMenu=true}},readOnly=true,label={Text("Company")})
-                        DropdownMenu(symbolMenu,{symbolMenu=false}){
+                    Box(Modifier.fillMaxWidth()){
+                        OutlinedButton(onClick={symbolMenu=true},modifier=Modifier.fillMaxWidth()){
+                            Text(if(selectedSymbol.isBlank())"Select company" else selectedSymbol,Modifier.weight(1f))
+                            Icon(Icons.Default.ArrowDropDown,null)
+                        }
+                        DropdownMenu(expanded=symbolMenu,onDismissRequest={symbolMenu=false}){
                             watched.forEach{s->DropdownMenuItem(text={Text(s.symbol+" • "+s.name)},onClick={selectedSymbol=s.symbol;symbolMenu=false})}
                         }
                     }
-                    Box{
-                        OutlinedTextField(selectedTypeLabel(selectedType),{},{Modifier.fillMaxWidth().clickable{typeMenu=true}},readOnly=true,label={Text("Rule")})
-                        DropdownMenu(typeMenu,{typeMenu=false}){
+                    Box(Modifier.fillMaxWidth()){
+                        OutlinedButton(onClick={typeMenu=true},modifier=Modifier.fillMaxWidth()){
+                            Text(selectedTypeLabel(selectedType),Modifier.weight(1f))
+                            Icon(Icons.Default.ArrowDropDown,null)
+                        }
+                        DropdownMenu(expanded=typeMenu,onDismissRequest={typeMenu=false}){
                             supportedTypes.forEach{type->DropdownMenuItem(text={Text(selectedTypeLabel(type))},onClick={selectedTypeName=type.name;typeMenu=false})}
                         }
                     }
