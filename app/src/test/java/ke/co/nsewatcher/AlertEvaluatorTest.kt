@@ -7,7 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AlertEvaluatorTest {
-    private fun stock(price: Double, change: Double = 0.0) = Stock("SCOM", "Safaricom", price, change, emptyList())
+    private fun stock(price: Double, change: Double = 0.0, volume: Long = 0L, averageVolume: Long = 0L, averageVolumeAvailable: Boolean = false) = Stock("SCOM", "Safaricom", price, change, emptyList(), volume = volume, averageVolume = averageVolume, averageVolumeAvailable = averageVolumeAvailable)
 
     @Test fun priceAboveTriggersOnlyOnCrossing() {
         val alert = PriceAlert("a1", "SCOM", AlertType.PRICE_ABOVE, 30.0, true)
@@ -37,6 +37,13 @@ class AlertEvaluatorTest {
         val alert = PriceAlert("ca1", "SCOM", AlertType.CORPORATE_ACTION, null, true)
         val item = NewsItem("n2","Safaricom dividend declaration","","","MyStocks","2026-09-19T10:00:00Z","Dividends","SCOM","Safaricom","","","","","","","","CURRENT_DAY")
         assertEquals(1, AlertEvaluator.evaluate(listOf(alert), listOf(stock(30.0)), emptyMap(), listOf(item)).size)
+    }
+
+    @Test fun highVolumeUsesProviderAverageAndThreshold() {
+        val alert = PriceAlert("a5", "SCOM", AlertType.HIGH_VOLUME, 50.0, true)
+        assertTrue(AlertEvaluator.evaluate(listOf(alert), listOf(stock(30.0, volume = 1500L, averageVolume = 1000L, averageVolumeAvailable = true)), emptyMap()).isNotEmpty())
+        assertEquals(0, AlertEvaluator.evaluate(listOf(alert), listOf(stock(30.0, volume = 1499L, averageVolume = 1000L, averageVolumeAvailable = true)), emptyMap()).size)
+        assertEquals(0, AlertEvaluator.evaluate(listOf(alert), listOf(stock(30.0, volume = 2000L, averageVolume = 0L)), emptyMap()).size)
     }
 
     @Test fun unsupportedAlertTypesDoNotFabricateSignals() {
