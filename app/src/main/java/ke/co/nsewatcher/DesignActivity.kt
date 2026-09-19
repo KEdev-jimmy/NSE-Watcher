@@ -556,6 +556,9 @@ private fun AlertPage(back:()->Unit){
     val watchlistStore=remember{WatchlistStore(context)}
     val alerts by store.alerts.collectAsState(initial=emptyList())
     val watchedSymbols by watchlistStore.symbols.collectAsState(initial=emptyList())
+    LaunchedEffect(Unit) {
+        MyStocksCache.loadStocks().takeIf { it.isNotEmpty() }?.let { liveStocks.value = it }
+    }
     val watched=stocks.filter{it.symbol.uppercase() in watchedSymbols.map(String::uppercase)}
     val scope=rememberCoroutineScope()
     val notificationPermissionLauncher=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){}
