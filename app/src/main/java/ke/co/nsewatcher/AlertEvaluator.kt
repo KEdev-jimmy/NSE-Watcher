@@ -36,7 +36,20 @@ object AlertEvaluator {
                 AlertType.DAILY_LOSS -> if (threshold != null && stock.changeAvailable && stock.change <= -abs(threshold))
                     TriggeredAlert(alert.id, stock.symbol, "Daily loss alert", stock.name + " is down " + "%.2f".format(Locale.US, abs(stock.change)) + "% today.")
                 else null
-                AlertType.HIGH_VOLUME, AlertType.BREAKOUT -> null
+                AlertType.HIGH_VOLUME -> {
+                    val thresholdValue = threshold ?: return@mapNotNull null
+                    if (thresholdValue < 0.0 || !stock.volumeAvailable || !stock.averageVolumeAvailable || stock.averageVolume <= 0L) {
+                        null
+                    } else if (stock.volume.toDouble() >= stock.averageVolume.toDouble() * (1.0 + thresholdValue / 100.0)) {
+                        TriggeredAlert(
+                            alert.id,
+                            stock.symbol,
+                            "High volume alert",
+                            stock.name + " volume is " + "%.0f".format(Locale.US, thresholdValue) + "% above the provider-supplied average. Current volume: " + stock.volume + ". Average volume: " + stock.averageVolume + "."
+                        )
+                    } else null
+                }
+                AlertType.BREAKOUT -> null
                 AlertType.NEWS, AlertType.CORPORATE_ACTION -> {
                     val alreadySent = lastNewsTriggerIds[alert.id]
                     news.asSequence()
