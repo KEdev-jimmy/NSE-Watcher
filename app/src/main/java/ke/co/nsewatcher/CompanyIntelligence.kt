@@ -313,14 +313,24 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
                         Text("${currencyLabel(s.price)}", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = IntelligenceText)
                         Text("NSE • 15 min delayed", color = IntelligenceMuted, fontSize = 9.sp)
                     }
-                    selectedPeriodReturn?.let { periodReturn ->
+                    if ((period == "1D" || period == "NOW") && marketStatus.isKnown && !marketStatus.isOpen) {
                         Text(
-                            formatPeriodReturn(period, periodReturn),
-                            color = if (periodReturn >= 0) IntelligenceGreen else IntelligenceRed,
+                            "MARKET CLOSED",
+                            color = IntelligenceMuted,
                             fontWeight = FontWeight.ExtraBold,
-                            fontSize = 13.sp,
+                            fontSize = 11.sp,
                             textAlign = TextAlign.End
                         )
+                    } else {
+                        selectedPeriodReturn?.let { periodReturn ->
+                            Text(
+                                formatPeriodReturn(period, periodReturn),
+                                color = if (periodReturn >= 0) IntelligenceGreen else IntelligenceRed,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 13.sp,
+                                textAlign = TextAlign.End
+                            )
+                        }
                     }
                 }
                 Spacer(Modifier.height(14.dp))
@@ -380,7 +390,11 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
                     )
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("${history.size} data points", color = IntelligenceMuted, fontSize = 8.sp)
-                        selectedPeriodReturn?.let { Text(formatPeriodReturn(period, it), color = if (it >= 0) IntelligenceGreen else IntelligenceRed, fontWeight = FontWeight.Bold, fontSize = 8.sp) }
+                        if ((period == "1D" || period == "NOW") && marketStatus.isKnown && !marketStatus.isOpen) {
+                            Text("Market closed", color = IntelligenceMuted, fontWeight = FontWeight.Bold, fontSize = 8.sp)
+                        } else {
+                            selectedPeriodReturn?.let { Text(formatPeriodReturn(period, it), color = if (it >= 0) IntelligenceGreen else IntelligenceRed, fontWeight = FontWeight.Bold, fontSize = 8.sp) }
+                        }
                     }
                 } else {
                     Text("Historical market data is not available for this period.", color = IntelligenceMuted, fontSize = 10.sp)
@@ -933,105 +947,97 @@ private fun SessionAtGlance(
 ) {
     val open = historyResult.sessionOpen
     val latest = historyResult.sessionClose
-    val hasSession = open != null && latest != null && open > 0.0 && latest > 0.0
+    val hasSession = latest != null && latest > 0.0
     val sessionDate = historyResult.sessionCloseAt.takeIf { it.isNotBlank() }?.let(::formatChartTimestampDate)
     val observed = historyResult.sessionCloseAt
         .takeIf { it.isNotBlank() }
         ?.let(::formatChartTimestamp)
         ?: historyResult.observedAt.takeIf { it.isNotBlank() }?.let(::formatChartTimestamp)
     val nextOpen = marketStatus.nextOpen.takeIf { it.isNotBlank() }?.let(::formatChartTimestamp)
-    // Never fall back from session return to the provider's daily change here:
-    // those are different baselines (session open vs previous close).
-    val change = historyResult.sessionChangePct
     val known = marketStatus.isKnown
     val openSession = known && marketStatus.isOpen
 
     SectionTitle(
+        "Market status",
         when {
-            openSession -> "Today's trading session"
-            known -> "Trading session at a glance"
-            else -> "Trading session"
-        },
-        when {
-            openSession -> "Latest available NSE session data"
-            known -> "Latest completed NSE session"
+            openSession -> "NSE session • 15 min delayed"
+            known -> "Market is closed"
             else -> "Session status is currently unavailable"
         },
         Icons.Default.Schedule
     )
 
     IntelligenceCard {
-        if (!hasSession) {
-            Text(
-                "Session open/close data is not available from the current market response.",
-                color = IntelligenceMuted,
-                fontSize = 10.sp
-            )
-        } else {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Box(Modifier.weight(1f)) {
-                    MiniFact("OPEN", String.format(Locale.US, "KSh %.2f", open))
-                }
-                Box(Modifier.weight(1f)) {
-                    MiniFact(
-                        if (openSession) "LATEST" else "CLOSE",
-                        String.format(Locale.US, "KSh %.2f", latest)
-                    )
+        when {
+            !known -> {
+                Text(
+                    "Market status is currently unavailable. No current-session state is inferred.",
+                    color = IntelligenceMuted,
+                    fontSize = 10.sp
+                )
+            }
+            !hasSession -> {
+                Text(
+                    if (openSession) {
+                        "The latest NSE session observation is not available."
+                    } else {
+                        "The last completed NSE session close is not available."
+                    },
+                    color = IntelligenceMuted,
+                    fontSize = 10.sp
+                )
+                nextOpen?.let {
+                    Spacer(Modifier.height(6.dp))
+                    Text("Next regular session: $it", color = IntelligenceMuted, fontSize = 8.sp)
                 }
             }
-
-            Spacer(Modifier.height(9.dp))
-
-            change?.let {
-                val verb = if (it >= 0) "Up" else "Down"
+            openSession -> {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    open?.takeIf { it > 0.0 }?.let {
+                        Box(Modifier.weight(1f)) {
+                            MiniFact("OPEN", String.format(Locale.US, "KSh %.2f", it))
+                        }
+                    }
+                    Box(Modifier.weight(1f)) {
+                        MiniFact("LATEST", String.format(Locale.US, "KSh %.2f", latest))
+                    }
+                }
+                Spacer(Modifier.height(9.dp))
+                observed?.let {
+                    Text("Latest observation: $it", color = IntelligenceMuted, fontSize = 8.sp)
+                }
                 Text(
-                    verb + " " + String.format(Locale.US, "%+.2f%%", it) +
-                        when {
-                            openSession -> " since session open"
-                            known -> " during the completed session"
-                            else -> " across the latest returned session data"
-                        },
-                    color = if (it >= 0) IntelligenceGreen else IntelligenceRed,
+                    "Market open • price data is exchange-supplied and 15 min delayed.",
+                    color = IntelligenceMuted,
+                    fontSize = 8.sp
+                )
+            }
+            else -> {
+                Text(
+                    "MARKET CLOSED",
+                    color = IntelligenceText,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                sessionDate?.let {
+                    Text("Closed: $it", color = IntelligenceMuted, fontSize = 9.sp)
+                }
+                observed?.let {
+                    Text("Close observation: $it", color = IntelligenceMuted, fontSize = 8.sp)
+                }
+                Text(
+                    "Closed at ${String.format(Locale.US, "KSh %.2f", latest)}",
+                    color = IntelligenceText,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
-            }
-
-            sessionDate?.let {
-                Text(
-                    if (openSession) "Session: $it" else "Completed session: $it",
-                    color = IntelligenceMuted,
-                    fontSize = 8.sp
-                )
-            }
-
-            observed?.let {
-                Text(
-                    "Latest observation: $it",
-                    color = IntelligenceMuted,
-                    fontSize = 8.sp
-                )
-            }
-
-            Text(
-                when {
-                    openSession -> "Market open • latest returned observation shown; price data is exchange-supplied and delayed."
-                    known -> "Market closed • completed session shown; no current-session movement is estimated."
-                    else -> "Market status unavailable • no current-session state is inferred."
-                },
-                color = IntelligenceMuted,
-                fontSize = 8.sp
-            )
-
-            nextOpen?.let {
-                Text(
-                    "Next regular session: $it",
-                    color = IntelligenceMuted,
-                    fontSize = 8.sp
-                )
+                nextOpen?.let {
+                    Spacer(Modifier.height(6.dp))
+                    Text("Next regular session: $it", color = IntelligenceMuted, fontSize = 8.sp)
+                }
             }
         }
     }
@@ -1069,17 +1075,26 @@ private fun formatHeaderChange(
     marketStatus: MyStocksCache.MarketStatus,
     historyResult: MyStocksCache.HistoryResult
 ): String {
+    if (marketStatus.isKnown && !marketStatus.isOpen) {
+        val closedAt = historyResult.sessionCloseAt
+            .ifBlank { historyResult.lastDate }
+            .ifBlank { historyResult.observedAt }
+            .takeIf { it.isNotBlank() }
+            ?.let(::formatCompactChartTimestamp)
+        return if (closedAt != null) {
+            "MARKET CLOSED • Closed ${closedAt} EAT"
+        } else {
+            "MARKET CLOSED"
+        }
+    }
+
     val timestamp = historyResult.sessionCloseAt
         .ifBlank { historyResult.lastDate }
         .ifBlank { historyResult.observedAt }
         .takeIf { it.isNotBlank() }
         ?.let(::formatCompactChartTimestamp)
 
-    val state = when {
-        !marketStatus.isKnown -> "LATEST"
-        marketStatus.isOpen -> "LATEST"
-        else -> "CLOSE"
-    }
+    val state = if (!marketStatus.isKnown) "STATUS UNKNOWN" else "LATEST"
 
     return buildString {
         append(String.format(Locale.US, "%+.2f%%", change))
