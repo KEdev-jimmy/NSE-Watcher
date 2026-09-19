@@ -16,6 +16,7 @@ private val Context.alertDataStore by preferencesDataStore("nse_watcher_alerts")
 private val alertsKey = stringPreferencesKey("alert_rules")
 private val previousPricesKey = stringPreferencesKey("previous_prices")
 private val lastDailyTriggerDatesKey = stringPreferencesKey("last_daily_trigger_dates")
+private val lastNewsTriggerIdsKey = stringPreferencesKey("last_news_trigger_ids")
 
 class AlertStore(private val context: Context) {
     val alerts: Flow<List<PriceAlert>> = context.alertDataStore.data.map { prefs -> decodeAlerts(prefs[alertsKey].orEmpty()) }
@@ -49,6 +50,18 @@ class AlertStore(private val context: Context) {
             val current = decodeStringMap(prefs[lastDailyTriggerDatesKey].orEmpty()).toMutableMap()
             triggeredIds.forEach { current[it] = date }
             prefs[lastDailyTriggerDatesKey] = encodeStringMap(current)
+        }
+    }
+
+    suspend fun lastNewsTriggerIds(): Map<String, String> =
+        context.alertDataStore.data.map { decodeStringMap(it[lastNewsTriggerIdsKey].orEmpty()) }.first()
+
+    suspend fun recordNewsTriggers(triggered: Map<String, String>) {
+        if (triggered.isEmpty()) return
+        context.alertDataStore.edit { prefs ->
+            val current = decodeStringMap(prefs[lastNewsTriggerIdsKey].orEmpty()).toMutableMap()
+            triggered.forEach { (alertId, newsId) -> current[alertId] = newsId }
+            prefs[lastNewsTriggerIdsKey] = encodeStringMap(current)
         }
     }
 
