@@ -557,6 +557,7 @@ private fun AlertPage(back:()->Unit){
     val watchedSymbols by watchlistStore.symbols.collectAsState(initial=emptyList())
     val watched=stocks.filter{it.symbol.uppercase() in watchedSymbols.map(String::uppercase)}
     val scope=rememberCoroutineScope()
+    val notificationPermissionLauncher=rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()){}
     var selectedSymbol by rememberSaveable{mutableStateOf(watched.firstOrNull()?.symbol?:"")}
     var selectedTypeName by rememberSaveable{mutableStateOf(AlertType.PRICE_ABOVE.name)}
     var thresholdText by rememberSaveable{mutableStateOf("")}
@@ -606,6 +607,7 @@ private fun AlertPage(back:()->Unit){
                         Button(onClick={
                             val threshold=thresholdText.toDoubleOrNull()
                             if(selectedSymbol.isNotBlank()&&threshold!=null&&threshold>0.0){
+                                if(Build.VERSION.SDK_INT>=33) notificationPermissionLauncher.launch("android.permission.POST_NOTIFICATIONS")
                                 scope.launch{
                                     store.save(PriceAlert(editingId?:java.util.UUID.randomUUID().toString(),selectedSymbol,selectedType,threshold,true))
                                     resetForm()
