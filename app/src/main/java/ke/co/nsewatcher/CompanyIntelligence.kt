@@ -55,103 +55,84 @@ private val IntelligenceBorder = Color(0xFFE1EAE5)
 private val IntelligenceRed = Color(0xFFE04444)
 
 
-private enum class CompanyIntelligenceSection(val label: String) {
+private enum class CompanyIntelligenceTab(val label: String) {
     OVERVIEW("Overview"),
-    PERFORMANCE("Performance"),
+    ABOUT("About"),
     FINANCIALS("Financials"),
-    VALUATION("Valuation"),
-    DIVIDENDS("Dividends"),
     NEWS("News"),
-    EVIDENCE("Evidence"),
-    MORE("More")
-}
-
-private fun companyIntelligenceSectionForIndex(index: Int): CompanyIntelligenceSection = when (index) {
-    in 0..4 -> CompanyIntelligenceSection.OVERVIEW
-    in 5..6 -> CompanyIntelligenceSection.OVERVIEW
-    in 7..10 -> CompanyIntelligenceSection.PERFORMANCE
-    in 11..12 -> CompanyIntelligenceSection.VALUATION
-    in 13..14 -> CompanyIntelligenceSection.DIVIDENDS
-    in 15..18 -> CompanyIntelligenceSection.PERFORMANCE
-    in 19..20 -> CompanyIntelligenceSection.NEWS
-    in 21..22 -> CompanyIntelligenceSection.EVIDENCE
-    in 23..28 -> CompanyIntelligenceSection.MORE
-    in 29..30 -> CompanyIntelligenceSection.NEWS
-    else -> CompanyIntelligenceSection.MORE
-}
-
-private fun companyIntelligenceSectionIndex(section: CompanyIntelligenceSection): Int = when (section) {
-    CompanyIntelligenceSection.OVERVIEW -> 5
-    CompanyIntelligenceSection.PERFORMANCE -> 9
-    CompanyIntelligenceSection.FINANCIALS -> 7
-    CompanyIntelligenceSection.VALUATION -> 11
-    CompanyIntelligenceSection.DIVIDENDS -> 13
-    CompanyIntelligenceSection.NEWS -> 19
-    CompanyIntelligenceSection.EVIDENCE -> 21
-    CompanyIntelligenceSection.MORE -> 23
+    DIVIDENDS("Dividends"),
+    ANALYSIS("Analysis"),
+    TRADES("Trades")
 }
 
 @Composable
-private fun CompanyIntelligenceSectionNavigation(
-    selected: CompanyIntelligenceSection,
-    onSelected: (CompanyIntelligenceSection) -> Unit
+private fun CompanyIntelligenceTabNavigation(
+    selected: CompanyIntelligenceTab,
+    onSelected: (CompanyIntelligenceTab) -> Unit
 ) {
-    val scrollState = rememberScrollState()
-    Box(
-        Modifier
+    Column(
+        modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface)
+            .background(Color(0xFF071B2F))
+            .padding(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Row(
-            Modifier
-                .fillMaxWidth()
-                .horizontalScroll(scrollState)
-                .padding(horizontal = 2.dp, vertical = 3.dp),
-            horizontalArrangement = Arrangement.spacedBy(18.dp)
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            CompanyIntelligenceSection.entries.forEach { section ->
-                val selectedSection = section == selected
-                Surface(
-                    onClick = { onSelected(section) },
-                    color = Color.Transparent,
-                    contentColor = if (selectedSection) IntelligenceGreen else IntelligenceMuted,
-                    shape = RoundedCornerShape(0.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(horizontal = 1.dp, vertical = 5.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            section.label,
-                            fontSize = 10.sp,
-                            fontWeight = if (selectedSection) FontWeight.Bold else FontWeight.Medium,
-                            maxLines = 1
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Box(
-                            Modifier
-                                .width(if (selectedSection) 22.dp else 0.dp)
-                                .height(2.dp)
-                                .background(
-                                    if (selectedSection) IntelligenceGreen else Color.Transparent,
-                                    RoundedCornerShape(2.dp)
-                                )
-                        )
-                    }
-                }
+            listOf(
+                CompanyIntelligenceTab.OVERVIEW,
+                CompanyIntelligenceTab.ABOUT,
+                CompanyIntelligenceTab.FINANCIALS
+            ).forEach { tab ->
+                CompanyIntelligenceTabItem(tab, selected, onSelected, Modifier.weight(1f))
             }
         }
-        if (scrollState.canScrollForward) {
-            Box(
-                Modifier
-                    .align(Alignment.CenterEnd)
-                    .width(24.dp)
-                    .height(36.dp)
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(Color.Transparent, MaterialTheme.colorScheme.surface)
-                        )
-                    )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            listOf(
+                CompanyIntelligenceTab.NEWS,
+                CompanyIntelligenceTab.DIVIDENDS,
+                CompanyIntelligenceTab.ANALYSIS,
+                CompanyIntelligenceTab.TRADES
+            ).forEach { tab ->
+                CompanyIntelligenceTabItem(tab, selected, onSelected, Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompanyIntelligenceTabItem(
+    tab: CompanyIntelligenceTab,
+    selected: CompanyIntelligenceTab,
+    onSelected: (CompanyIntelligenceTab) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val active = tab == selected
+    Surface(
+        onClick = { onSelected(tab) },
+        modifier = modifier.heightIn(min = 44.dp),
+        color = if (active) IntelligenceGreen else Color.Transparent,
+        contentColor = if (active) Color.White else Color(0xFFA9B7C6),
+        shape = RoundedCornerShape(8.dp),
+        border = if (active) null else BorderStroke(1.dp, Color(0xFF294057))
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp, vertical = 7.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = tab.label,
+                fontSize = 10.sp,
+                lineHeight = 13.sp,
+                fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Clip
             )
         }
     }
@@ -226,14 +207,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
     val intelligenceView = CompanyIntelligenceEngine.build(s, intelligence, monthHistory, news)
     val hasSessionNavigationItem = period == "1D" || period == "NOW"
     val listState = rememberLazyListState()
-    var selectedSection by rememberSaveable(s.symbol) { mutableStateOf(CompanyIntelligenceSection.OVERVIEW) }
-
-    LaunchedEffect(listState) {
-        snapshotFlow { listState.firstVisibleItemIndex }
-            .collect { index ->
-                selectedSection = companyIntelligenceSectionForIndex(index)
-            }
-    }
+    var selectedTab by rememberSaveable(s.symbol) { mutableStateOf(CompanyIntelligenceTab.OVERVIEW) }
 
     LazyColumn(
         state = listState,
@@ -335,15 +309,10 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
         }
 
         stickyHeader {
-            CompanyIntelligenceSectionNavigation(
-                selected = selectedSection,
-                onSelected = { section ->
-                    selectedSection = section
-                    analystScope.launch {
-                        listState.animateScrollToItem(
-                            companyIntelligenceSectionIndex(section)
-                        )
-                    }
+            CompanyIntelligenceTabNavigation(
+                selected = selectedTab,
+                onSelected = { tab ->
+                    selectedTab = tab
                 }
             )
         }
