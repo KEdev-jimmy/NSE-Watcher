@@ -2098,3 +2098,49 @@ Do not overwhelm the user with speculative problems.
 **AI:** intentionally deferred until the evidence/data pipeline is stable.
 
 This handoff is intended to prevent the next conversation from repeating old audits, undoing correct fixes, mistaking Vercel rate-limit failures for source regressions, or implementing features that already exist.
+
+
+# 45. Growth provenance repair — 19 Sep 2026
+
+**Status: implemented; new CI verification pending**
+
+## Deep audit result
+
+The financial provenance audit confirmed one real end-to-end defect in the API repair layer.
+
+backend/lib/companyIntelligence.js already preferred provider-supplied annual growth in the StockAnalysis financial parser. However, backend/api/company.js subsequently ran repairAnnualGrowth() and unconditionally recalculated Revenue growth, Profit growth and EPS growth from the rounded financial-history values. That could overwrite an authoritative provider value before the API response reached Android.
+
+This was the concrete remaining gap; no broad redesign was needed.
+
+## Implementation
+
+Updated backend/api/company.js so:
+- provider-supplied row growth is preserved when present;
+- calculated growth is used only when the provider value is missing/unusable;
+- the latest profile value follows the preserved provider row value;
+- the existing provider profile growth remains available as a fallback if the latest row lacks growth.
+
+Added regression coverage in:
+- backend/test/company.test.js
+
+Tests cover:
+- provider 30.17% remains 30.17% even when rounded financial figures would produce a different calculation;
+- missing provider growth is calculated correctly;
+- provider profile growth remains authoritative when the latest history row lacks growth.
+
+Implementation commits:
+- fbe656d4e2cd89ae277d58d0962e492b2965542a — Preserve provider-supplied annual growth values
+- 25443b1556985a0b23f6906f1aa052a5c78ac1cb — Add regression tests for growth source precedence
+
+## Verification
+
+- Current source was audited before implementation: completed.
+- Android model already carries financial provider update/check metadata: confirmed.
+- Backend parser already carries financial and ratio provider update/check metadata: confirmed.
+- Evidence generation already attaches provider update/check metadata for external financial/ratio fields: confirmed.
+- Android UI already distinguishes Provider data updated, Source page checked and App fetch time: confirmed.
+- Latest implementation commit has no reported failing check; Vercel status is not yet a success. No deployment success is claimed.
+
+## Next action
+
+Obtain a new Android CI verification for this implementation batch. If CI passes, continue to the next real evidence/data hardening gap. Do not create additional audit-only commits without a demonstrated defect.
