@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import ke.co.nsewatcher.data.CompanyIntelligenceCache
 import ke.co.nsewatcher.data.CompanyIntelligenceEngine
+import ke.co.nsewatcher.data.AnalystCache
 import ke.co.nsewatcher.data.MyStocksCache
 import ke.co.nsewatcher.data.NewsCache
 import java.time.Instant
@@ -40,6 +41,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 private val IntelligenceGreen = Color(0xFF00A859)
 private val IntelligenceLight = Color(0xFFE9F8F0)
@@ -64,6 +66,10 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
     var intelligenceLoading by remember(s.symbol) { mutableStateOf(true) }
     var news by remember(s.symbol) { mutableStateOf(emptyList<NewsItem>()) }
     var newsLoading by remember(s.symbol) { mutableStateOf(true) }
+    val analystScope = rememberCoroutineScope()
+    var analystQuestion by rememberSaveable(s.symbol) { mutableStateOf("Explain the latest company performance using only the available evidence.") }
+    var analystResult by remember(s.symbol) { mutableStateOf(AnalystCache.Result()) }
+    var analystLoading by remember(s.symbol) { mutableStateOf(false) }
 
     LaunchedEffect(s.symbol) {
         intelligenceLoading = true
@@ -208,6 +214,76 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
                     }
                 }
             }
+        item {
+            Card(Modifier.fillMaxWidth(), RoundedCornerShape(19.dp), colors = CardDefaults.cardColors(containerColor = IntelligenceDark)) {
+                Column(Modifier.padding(17.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(Modifier.size(34.dp), RoundedCornerShape(11.dp), Color.White.copy(alpha = .12f)) {
+                            Icon(Icons.Default.Psychology, contentDescription = null, tint = Color(0xFF8BE0B3), modifier = Modifier.padding(7.dp))
+                        }
+                        Spacer(Modifier.width(9.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("NSE WATCHER ANALYST", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+                            Text("Ask the evidence, not the market", color = Color(0xFFBFE8D0), fontSize = 9.sp)
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text("Uses the company evidence available to NSE Watcher. It explains the data; it does not give BUY/SELL instructions.", color = Color.White.copy(alpha = .78f), fontSize = 8.sp, lineHeight = 12.sp)
+                    Spacer(Modifier.height(9.dp))
+                    OutlinedTextField(
+                        value = analystQuestion,
+                        onValueChange = { analystQuestion = it.take(1200) },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2,
+                        maxLines = 4,
+                        textStyle = LocalTextStyle.current.copy(fontSize = 10.sp),
+                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = Color(0xFF8BE0B3), unfocusedBorderColor = Color.White.copy(alpha = .25f), cursorColor = Color(0xFF8BE0B3)),
+                        placeholder = { Text("Ask about performance, growth, valuation or evidence…", color = Color.White.copy(alpha = .45f), fontSize = 9.sp) }
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Button(
+                        onClick = {
+                            analystScope.launch {
+                                analystLoading = true
+                                analystResult = AnalystCache.ask(s.symbol, analystQuestion)
+                                analystLoading = false
+                            }
+                        },
+                        enabled = !analystLoading && analystQuestion.isNotBlank(),
+                        colors = ButtonDefaults.buttonColors(containerColor = IntelligenceGreen),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 7.dp)
+                    ) {
+                        if (analystLoading) {
+                            CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp, color = Color.White)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Analysing…", fontSize = 10.sp)
+                        } else {
+                            Icon(Icons.Default.Psychology, null, Modifier.size(14.dp))
+                            Spacer(Modifier.width(5.dp))
+                            Text("Ask Analyst", fontSize = 10.sp)
+                        }
+                    }
+                    if (analystResult.message.isNotBlank() || analystResult.answer.isNotBlank() || analystResult.error.isNotBlank()) {
+                        Spacer(Modifier.height(10.dp))
+                        when {
+                            analystResult.error.isNotBlank() -> Text("Analyst unavailable: " + analystResult.error, color = Color(0xFFFFC4C4), fontSize = 9.sp)
+                            analystResult.message.isNotBlank() && analystResult.answer.isBlank() -> Text(analystResult.message, color = Color.White.copy(alpha = .82f), fontSize = 9.sp, lineHeight = 14.sp)
+                            else -> {
+                                Text(analystResult.answer, color = Color.White, fontSize = 10.sp, lineHeight = 15.sp)
+                                if (analystResult.evidence.isNotEmpty()) {
+                                    Spacer(Modifier.height(7.dp))
+                                    Text("Evidence used", color = Color(0xFFBFE8D0), fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                    analystResult.evidence.take(6).forEach { evidence ->
+                                        Text(evidence.id + ": " + evidence.claim, color = Color.White.copy(alpha = .75f), fontSize = 8.sp, lineHeight = 12.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         }
 
         item { SectionTitle("Business", "What does this company actually do?", Icons.Default.Business) }

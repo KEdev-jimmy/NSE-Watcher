@@ -23,6 +23,14 @@ async function loadCompany(symbol) {
 }
 
 function buildEvidencePacket(data) {
+  const evidence = (data.evidence || []).map((item, index) => ({
+    id: item.id || `E${index + 1}`,
+    claim: item.claim || '',
+    value: item.value ?? '',
+    source: item.source || '',
+    url: item.url || '',
+    period: item.period || '',
+  }));
   return {
     symbol: data.symbol,
     source: data.source,
@@ -30,7 +38,7 @@ function buildEvidencePacket(data) {
     profile: data.profile || null,
     financialHistory: data.financialHistory || [],
     dividends: data.dividends || [],
-    evidence: data.evidence || [],
+    evidence,
     dataQuality: data.dataQuality || {},
   };
 }
@@ -51,22 +59,13 @@ function systemInstructions() {
 
 async function askOpenAI(question, packet) {
   if (!OPENAI_API_KEY) return null;
-
   const evidenceText = JSON.stringify(packet, null, 2);
   const input = `${systemInstructions()}\n\nUser question: ${question}\n\nEvidence packet:\n${evidenceText}`;
-
   const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: OPENAI_MODEL,
-      input,
-    }),
+    headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: OPENAI_MODEL, input }),
   });
-
   const text = await response.text();
   let data;
   try { data = JSON.parse(text); } catch { data = { error: text }; }
@@ -75,35 +74,25 @@ async function askOpenAI(question, packet) {
     error.status = response.status;
     throw error;
   }
-
   const answer = typeof data.output_text === 'string'
     ? data.output_text.trim()
     : Array.isArray(data.output)
       ? data.output.flatMap(item => item.content || []).map(item => item.text || '').filter(Boolean).join('\n').trim()
       : '';
-
-  return {
-    answer,
-    model: OPENAI_MODEL,
-    responseId: data.id || null,
-  };
+  return { answer, model: OPENAI_MODEL, responseId: data.id || null };
 }
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return json(res, 405, { error: 'POST only' });
-
   const body = req.body || {};
   const symbol = String(body.symbol || '').trim().toUpperCase();
   const question = String(body.question || '').trim();
-
   if (!symbol) return json(res, 400, { error: 'symbol is required' });
   if (!question) return json(res, 400, { error: 'question is required' });
   if (question.length > 1200) return json(res, 400, { error: 'question is too long' });
-
   try {
     const company = await loadCompany(symbol);
     const packet = buildEvidencePacket(company);
-
     if (!OPENAI_API_KEY) {
       return json(res, 200, {
         aiAvailable: false,
@@ -111,19 +100,16 @@ module.exports = async (req, res) => {
         evidencePacket: packet,
       });
     }
-
     const result = await askOpenAI(question, packet);
     return json(res, 200, {
       aiAvailable: true,
       symbol: company.symbol || symbol,
       fetchedAt: company.fetchedAt,
       evidenceCount: packet.evidence.length,
+      evidence: packet.evidence,
       ...result,
     });
   } catch (error) {
-    return json(res, error.status || 502, {
-      error: 'AI Analyst unavailable',
-      detail: error.message,
-    });
+    return json(res, error.status || 502, { error: 'AI Analyst unavailable', detail: error.message });
   }
 };
