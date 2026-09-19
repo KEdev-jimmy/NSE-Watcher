@@ -41,8 +41,8 @@ jobs:
           unzip -q gradle.zip
           echo "$GITHUB_WORKSPACE/gradle-8.14.4/bin" >> "$GITHUB_PATH"
 
-      - name: Run backend company quality tests
-        run: node --test backend/test/companyIntelligence.test.js
+      - name: Run backend quality tests
+        run: node --test backend/test/companyIntelligence.test.js backend/test/marketStatus.test.js
 
       - name: Build with Gradle
         run: gradle --no-daemon build
