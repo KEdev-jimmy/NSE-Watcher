@@ -183,6 +183,7 @@ private fun CompanyIntelligenceSectionNavigation(
 }
 
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, onWatchToggle: (() -> Unit)? = null) {
     val periods = listOf("1D", "1W", "1M", "3M", "6M", "1Y", "3Y", "5Y", "NOW")
