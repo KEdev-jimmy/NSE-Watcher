@@ -1404,3 +1404,17 @@ Provider evidence:
 ## Next logical step
 
 Check Android CI for the latest commit chain. If CI passes, install the APK and perform the full period/refresh test before adding any further intraday metric such as last 2 hours.
+
+# 34. NOW chart freshness label — 19 Sep 2026
+
+The NOW chart now shows the latest actual observation timestamp directly beneath the period description when available:
+
+    Latest observation • 18 Sep 26 • 4:45 PM EAT • 15 min delayed
+
+If the provider does not return a usable observation timestamp, the UI falls back to:
+
+    Latest available intraday observation • 15 min delayed
+
+This is display-only and uses existing history/session timestamps. It does not estimate the current time as a market observation.
+
+Verification remains pending Android CI and manual APK testing.
