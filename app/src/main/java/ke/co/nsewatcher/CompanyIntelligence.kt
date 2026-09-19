@@ -1246,7 +1246,7 @@ private fun formatMetricValue(label: String, value: String): String {
     if (clean.isBlank() || clean == "-" || clean.equals("n/a", ignoreCase = true)) return "Not available"
     val numeric = clean.removeSuffix("%").replace(",", "").toDoubleOrNull() ?: return clean
     return when (label) {
-        "EPS" -> String.format(Locale.US, "KSh %.2f / share", numeric)
+        "EPS", "EPS (Earnings Per Share)" -> String.format(Locale.US, "KSh %.2f / share", numeric)
         "Revenue growth", "Profit growth", "EPS growth" ->
             String.format(Locale.US, "%+.2f%%", numeric)
         "ROE", "Net margin", "Dividend yield" ->
