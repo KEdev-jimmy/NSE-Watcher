@@ -207,7 +207,7 @@ object CompanyIntelligenceEngine {
                 signals += Signal(
                     if (change >= 0) SignalType.SUPPORTING else SignalType.CAUTION,
                     "Reported revenue is ${formatPercent(change)} versus the preceding returned period.",
-                    "MyStocks Africa financial history"
+                    "StockAnalysis / S&P Global Market Intelligence financial history"
                 )
             }
             else -> unknowns += "Revenue trend cannot be calculated because comparable numeric values were not returned for the latest two periods."
