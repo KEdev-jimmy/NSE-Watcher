@@ -172,7 +172,7 @@ function parseFinancials(html) {
   // screen is explicitly an annual/FY view, so select the first column labelled FY
   // instead of assuming column 1 or 2.
   const fiscalYearIndex = (fiscalYears || []).findIndex((value, index) =>
-    index > 0 && /^FY\\s+\\d{4}$/i.test(String(value || '').trim())
+    index > 0 && /^FY\s+\d{4}$/i.test(String(value || '').trim())
   );
   const annualIndex = fiscalYearIndex > 0
     ? fiscalYearIndex
