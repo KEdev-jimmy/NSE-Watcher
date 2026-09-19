@@ -232,6 +232,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
                     fontSize = 9.sp,
                     fontWeight = FontWeight.SemiBold
                 )
+                SourceDateLine("Provider data updated", profile.financialProviderUpdatedAt, profile.financialPageCheckedAt)
                 Spacer(Modifier.height(8.dp))
                 MetricGrid(
                     metrics = listOf(
@@ -270,6 +271,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
                     val basis = profile.ratioPeriod.takeIf { it.isNotBlank() }?.let { "Current ratios • period ending $it" }
                         ?: "Current ratios"
                     Text(basis, color = IntelligenceMuted, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
+                    SourceDateLine("Provider data updated", profile.ratioProviderUpdatedAt, profile.ratioPageCheckedAt)
                     Spacer(Modifier.height(8.dp))
                 } else {
                     Text("Current ratio data is unavailable from the structured ratio response.", color = IntelligenceMuted, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
@@ -614,7 +616,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
                 EvidenceRow("Company profile", if (intelligenceLoading) "Loading source data…" else "Field-level sources shown below")
                 EvidenceRow("Dividends", if (intelligence.dividends.isNotEmpty()) "Source recorded per dividend event" else "Not available")
                 EvidenceRow("News & actions", "MyStocks Africa company intelligence feed")
-                if (intelligence.fetchedAt.isNotBlank()) EvidenceRow("Fetched", intelligence.fetchedAt)
+                if (intelligence.fetchedAt.isNotBlank()) EvidenceRow("App fetch time", intelligence.fetchedAt)
                 Spacer(Modifier.height(6.dp))
                 Text("NSE Watcher separates sourced facts from interpretation. Verify material announcements against the issuer or NSE before acting.", color = IntelligenceMuted, fontSize = 9.sp)
             }
@@ -1276,6 +1278,23 @@ private fun formatMarketCap(value: String): String {
         else -> String.format(Locale.US, "KSh %,.0f", absoluteKsh)
     }
 }
+
+@Composable
+private fun SourceDateLine(label: String, providerUpdatedAt: String, pageCheckedAt: String) {
+    if (providerUpdatedAt.isBlank() && pageCheckedAt.isBlank()) return
+    Column(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+        providerUpdatedAt.takeIf { it.isNotBlank() }?.let {
+            Text("$label: ${formatSourceDate(it)}", color = IntelligenceMuted, fontSize = 8.sp)
+        }
+        pageCheckedAt.takeIf { it.isNotBlank() }?.let {
+            Text("Source page checked: ${formatSourceDate(it)}", color = IntelligenceMuted, fontSize = 8.sp)
+        }
+    }
+}
+
+private fun formatSourceDate(raw: String): String = runCatching {
+    LocalDate.parse(raw).format(DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.US))
+}.getOrElse { raw }
 
 private fun financialPeriodLabel(period: String): String {
     val clean = period.trim()
