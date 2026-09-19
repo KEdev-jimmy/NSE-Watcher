@@ -633,7 +633,6 @@ async function buildIntelligence(rawSymbol) {
   return {
     source: 'NSE Watcher multi-source company intelligence',
     symbol,
-    delayMinutes: 15,
     fetchedAt,
     profile: mergedProfile,
     dividends,
