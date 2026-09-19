@@ -242,6 +242,29 @@ function parseFinancials(html) {
 
 function parseRatios(html) {
   const tables = parseTables(html);
+  const fiscalYears = findRow(tables, [/^Fiscal Year$/i]);
+  const periods = findRow(tables, [/^Period Ending$/i]);
+  const currentIndex = (fiscalYears || []).findIndex((value, index) =>
+    index > 0 && /^Current$/i.test(String(value || '').trim())
+  );
+
+  // StockAnalysis ratio tables explicitly separate the Current snapshot from
+  // historical FY columns. These ratios are used as current market/ratio
+  // metrics in Company Intelligence, so never select a historical FY column
+  // merely because it happens to be first.
+  if (currentIndex <= 0) {
+    return {
+      marketCap: '',
+      pe: '',
+      pb: '',
+      debtToEquity: '',
+      roe: '',
+      dividendYield: '',
+      ratioBasis: 'UNKNOWN',
+      ratioPeriod: '',
+    };
+  }
+
   const marketCap = findRow(tables, [/^Market Capitalization$/i]);
   const pe = findRow(tables, [/^PE Ratio$/i]);
   const pb = findRow(tables, [/^PB Ratio$/i]);
@@ -249,12 +272,14 @@ function parseRatios(html) {
   const roe = findRow(tables, [/^Return on Equity \(ROE\)$/i, /^ROE$/i]);
   const dividendYield = findRow(tables, [/^Dividend Yield$/i]);
   return {
-    marketCap: normalizeMarketCap(valueFromRow(marketCap)),
-    pe: valueFromRow(pe),
-    pb: valueFromRow(pb),
-    debtToEquity: valueFromRow(debt),
-    roe: valueFromRow(roe),
-    dividendYield: valueFromRow(dividendYield),
+    marketCap: normalizeMarketCap(valueFromRow(marketCap, currentIndex)),
+    pe: valueFromRow(pe, currentIndex),
+    pb: valueFromRow(pb, currentIndex),
+    debtToEquity: valueFromRow(debt, currentIndex),
+    roe: valueFromRow(roe, currentIndex),
+    dividendYield: valueFromRow(dividendYield, currentIndex),
+    ratioBasis: 'Current',
+    ratioPeriod: normalizePeriod(valueFromRow(periods, currentIndex)),
   };
 }
 
@@ -643,3 +668,4 @@ module.exports.evidenceFor = evidenceFor;
 module.exports.normalizeWebsite = normalizeWebsite;
 module.exports.normalizeLocation = normalizeLocation;
 module.exports.parseFinancials = parseFinancials;
+module.exports.parseRatios = parseRatios;
