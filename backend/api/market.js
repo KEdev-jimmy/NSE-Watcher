@@ -262,3 +262,4 @@ module.exports = async (req, res) => {
 
 
 module.exports.normalizeMarketStatus = normalizeMarketStatus;
+module.exports.latestTradingSession = latestTradingSession;
