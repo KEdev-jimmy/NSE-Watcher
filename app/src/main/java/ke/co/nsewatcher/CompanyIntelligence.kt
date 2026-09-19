@@ -1,10 +1,12 @@
 package ke.co.nsewatcher
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -13,6 +15,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,6 +53,135 @@ private val IntelligenceText = Color(0xFF12231B)
 private val IntelligenceMuted = Color(0xFF6C7A72)
 private val IntelligenceBorder = Color(0xFFE1EAE5)
 private val IntelligenceRed = Color(0xFFE04444)
+
+
+private enum class CompanyIntelligenceSection(val label: String) {
+    OVERVIEW("Overview"),
+    ANALYST("Analyst"),
+    FINANCIALS("Financials"),
+    GROWTH("Growth"),
+    RATIOS("Ratios"),
+    DIVIDENDS("Dividends"),
+    MARKET("Market"),
+    MOVING("Moving"),
+    NEWS("News"),
+    EVIDENCE("Evidence"),
+    RISKS("Risks"),
+    SIGNALS("Signals"),
+    BALANCE("Balance"),
+    TIMELINE("Timeline"),
+    GUIDE("Guide"),
+    CHECKLIST("Checklist")
+}
+
+private fun companyIntelligenceSectionForIndex(index: Int, hasSession: Boolean): CompanyIntelligenceSection = when {
+    index <= 3 -> CompanyIntelligenceSection.OVERVIEW
+    index == 4 -> CompanyIntelligenceSection.ANALYST
+    index <= 8 -> CompanyIntelligenceSection.FINANCIALS
+    index <= 10 -> CompanyIntelligenceSection.GROWTH
+    index <= 12 -> CompanyIntelligenceSection.RATIOS
+    index <= 14 -> CompanyIntelligenceSection.DIVIDENDS
+    index <= 16 -> CompanyIntelligenceSection.MARKET
+    index == 17 && hasSession -> CompanyIntelligenceSection.MARKET
+    index == 17 || (index == 18 && hasSession) -> CompanyIntelligenceSection.MOVING
+    index == 19 || (index == 20 && hasSession) -> CompanyIntelligenceSection.NEWS
+    index == 20 || (index == 21 && hasSession) -> CompanyIntelligenceSection.NEWS
+    index == 21 || (index == 22 && hasSession) -> CompanyIntelligenceSection.EVIDENCE
+    index == 22 || (index == 23 && hasSession) -> CompanyIntelligenceSection.EVIDENCE
+    index == 23 || (index == 24 && hasSession) -> CompanyIntelligenceSection.RISKS
+    index == 24 || (index == 25 && hasSession) -> CompanyIntelligenceSection.RISKS
+    index == 25 || (index == 26 && hasSession) -> CompanyIntelligenceSection.SIGNALS
+    index == 26 || (index == 27 && hasSession) -> CompanyIntelligenceSection.SIGNALS
+    index == 27 || (index == 28 && hasSession) -> CompanyIntelligenceSection.BALANCE
+    index == 28 || (index == 29 && hasSession) -> CompanyIntelligenceSection.BALANCE
+    index == 29 || (index == 30 && hasSession) -> CompanyIntelligenceSection.TIMELINE
+    index == 30 || (index == 31 && hasSession) -> CompanyIntelligenceSection.TIMELINE
+    index == 31 || (index == 32 && hasSession) -> CompanyIntelligenceSection.ANALYST
+    index == 32 || (index == 33 && hasSession) -> CompanyIntelligenceSection.ANALYST
+    index == 33 || (index == 34 && hasSession) -> CompanyIntelligenceSection.GUIDE
+    index == 34 || (index == 35 && hasSession) -> CompanyIntelligenceSection.GUIDE
+    else -> CompanyIntelligenceSection.CHECKLIST
+}
+
+private fun companyIntelligenceSectionIndex(section: CompanyIntelligenceSection, hasSession: Boolean): Int = when (section) {
+    CompanyIntelligenceSection.OVERVIEW -> 3
+    CompanyIntelligenceSection.ANALYST -> 4
+    CompanyIntelligenceSection.FINANCIALS -> 7
+    CompanyIntelligenceSection.GROWTH -> 9
+    CompanyIntelligenceSection.RATIOS -> 11
+    CompanyIntelligenceSection.DIVIDENDS -> 13
+    CompanyIntelligenceSection.MARKET -> 15
+    CompanyIntelligenceSection.MOVING -> if (hasSession) 18 else 17
+    CompanyIntelligenceSection.NEWS -> if (hasSession) 20 else 19
+    CompanyIntelligenceSection.EVIDENCE -> if (hasSession) 22 else 21
+    CompanyIntelligenceSection.RISKS -> if (hasSession) 24 else 23
+    CompanyIntelligenceSection.SIGNALS -> if (hasSession) 26 else 25
+    CompanyIntelligenceSection.BALANCE -> if (hasSession) 28 else 27
+    CompanyIntelligenceSection.TIMELINE -> if (hasSession) 30 else 29
+    CompanyIntelligenceSection.GUIDE -> if (hasSession) 34 else 33
+    CompanyIntelligenceSection.CHECKLIST -> if (hasSession) 36 else 35
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun CompanyIntelligenceSectionNavigation(
+    selected: CompanyIntelligenceSection,
+    onSelected: (CompanyIntelligenceSection) -> Unit
+) {
+    val scrollState = rememberScrollState()
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(scrollState)
+                .padding(horizontal = 2.dp, vertical = 7.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            CompanyIntelligenceSection.entries.forEach { section ->
+                Surface(
+                    onClick = { onSelected(section) },
+                    shape = RoundedCornerShape(18.dp),
+                    color = if (section == selected) IntelligenceGreen else IntelligenceLight,
+                    contentColor = if (section == selected) Color.White else IntelligenceText,
+                    border = if (section == selected) null else BorderStroke(1.dp, IntelligenceBorder)
+                ) {
+                    Text(
+                        section.label,
+                        modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
+                        fontSize = 9.sp,
+                        fontWeight = if (section == selected) FontWeight.Bold else FontWeight.SemiBold,
+                        maxLines = 1
+                    )
+                }
+            }
+        }
+        if (scrollState.canScrollForward) {
+            Box(
+                Modifier
+                    .align(Alignment.CenterEnd)
+                    .width(30.dp)
+                    .height(42.dp)
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(Color.Transparent, MaterialTheme.colorScheme.surface)
+                        )
+                    )
+            ) {
+                Icon(
+                    Icons.Default.ChevronRight,
+                    contentDescription = "More sections",
+                    tint = IntelligenceMuted,
+                    modifier = Modifier.align(Alignment.CenterEnd).size(18.dp)
+                )
+            }
+        }
+    }
+}
+
 
 @Composable
 fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, onWatchToggle: (() -> Unit)? = null) {
@@ -117,9 +249,20 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
     }
     val latestFinancialPeriod = intelligence.financialHistory.lastOrNull()?.period.orEmpty()
     val intelligenceView = CompanyIntelligenceEngine.build(s, intelligence, monthHistory, news)
+    val hasSessionNavigationItem = period == "1D" || period == "NOW"
+    val listState = rememberLazyListState()
+    var selectedSection by rememberSaveable(s.symbol) { mutableStateOf(CompanyIntelligenceSection.OVERVIEW) }
+
+    LaunchedEffect(listState, hasSessionNavigationItem) {
+        snapshotFlow { listState.firstVisibleItemIndex }
+            .collect { index ->
+                selectedSection = companyIntelligenceSectionForIndex(index, hasSessionNavigationItem)
+            }
+    }
 
     LazyColumn(
-        contentPadding = PaddingValues(16.dp),
+        state = listState,
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
@@ -214,6 +357,20 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
                     }
                 }
             }
+        }
+
+        stickyHeader {
+            CompanyIntelligenceSectionNavigation(
+                selected = selectedSection,
+                onSelected = { section ->
+                    selectedSection = section
+                    analystScope.launch {
+                        listState.animateScrollToItem(
+                            companyIntelligenceSectionIndex(section, hasSessionNavigationItem)
+                        )
+                    }
+                }
+            )
         }
 
         item {
