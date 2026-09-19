@@ -877,7 +877,14 @@ private fun chartAxisLabels(
     }
 
     val unique = dated.distinctBy { it.text }
-    val targetCount = (baseCount * zoomX).toInt().coerceIn(2, unique.size.coerceAtMost(12))
+    if (unique.size < 2) {
+        return listOf(
+            dated.firstOrNull() ?: ChartLabel(0, fallbackChartLabels(period).first()),
+            dated.lastOrNull() ?: ChartLabel(points.lastIndex, fallbackChartLabels(period).last())
+        ).distinctBy { it.index }
+    }
+    val maxLabelCount = unique.size.coerceAtMost(12)
+    val targetCount = (baseCount * zoomX).toInt().coerceIn(2, maxLabelCount)
     return evenlySpacedLabels(unique, targetCount)
 }
 
