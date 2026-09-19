@@ -2286,3 +2286,55 @@ The repository workflow runs backend tests before the Gradle build, and GitHub A
 ## Next action
 
 Use the new commit-triggered Android CI run as the verification point. Do not treat the historical failed runs as still-failing code once their underlying issue has been corrected. If the new run fails, inspect the exact failed job/step before making another change.
+
+
+# 49. Android CI #631 failure — annual growth test export — 19 Sep 2026
+
+**Status: fixed; waiting for next CI run**
+
+## Verified failure
+
+Android CI run `35442540886`, build job `105895761342`, failed during **Run backend quality tests** before Gradle.
+
+All three failures were the same root cause:
+
+```
+TypeError: repairAnnualGrowth is not a function
+```
+
+The failing tests were:
+- `repairAnnualGrowth preserves provider-supplied growth values`
+- `repairAnnualGrowth calculates growth only when provider growth is missing`
+- `repairAnnualGrowth can use the provider profile growth when the latest row is missing it`
+
+The implementation of `repairAnnualGrowth` still existed in `backend/api/company.js`, but it was not exported. The regression test imports it directly with:
+
+```js
+const { repairAnnualGrowth } = require('../api/company');
+```
+
+## Fix
+
+`backend/api/company.js` now exports the existing pure helper while preserving the Vercel handler as the default export:
+
+```js
+module.exports = handleWithRepair;
+module.exports.repairAnnualGrowth = repairAnnualGrowth;
+```
+
+No production growth logic was changed.
+
+## CI interpretation
+
+The financial-history tests themselves passed in #631, including:
+- annual FY vs TTM selection
+- financial history + evidence provenance
+- provider update/check timestamps
+- ratio basis handling
+- market status tests
+
+So #631 is **not a financial-history parser failure**. It is a test-export regression introduced/left in the CI coverage path.
+
+## Next action
+
+Wait for the new commit-triggered Android CI run. The backend test step should now get past these three failures. If another failure appears, inspect that exact failure rather than changing unrelated code.
