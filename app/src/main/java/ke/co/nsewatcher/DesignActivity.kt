@@ -704,6 +704,7 @@ private fun Paper() {
     var selectedStock by remember { mutableStateOf<Stock?>(null) }
     var side by remember { mutableStateOf("BUY") }
     var resetConfirm by remember { mutableStateOf(false) }
+    var pendingTradeSuccess by remember { mutableStateOf<PaperTradeSuccess?>(null) }
     var tradeSuccess by remember { mutableStateOf<PaperTradeSuccess?>(null) }
 
     val enabled = remember(refresh) { PaperPortfolioStore.isEnabled(context) }
@@ -894,10 +895,21 @@ stocks.filter { companyQuery.isBlank() || it.symbol.contains(companyQuery, true)
     selectedStock?.let { stock ->
         PaperOrderDialog(context, stock, side, cash, holdings.firstOrNull { it.symbol == stock.symbol }?.shares ?: 0L,
             { selectedStock = null }, { success ->
+                // Close the order dialog first. The success dialog is opened on the
+                // next composition pass so Android never has to replace two Dialog
+                // windows in the same frame.
                 selectedStock = null
                 refresh++
-                tradeSuccess = success
+                pendingTradeSuccess = success
             })
+    }
+
+    LaunchedEffect(selectedStock, pendingTradeSuccess) {
+        if (selectedStock == null && pendingTradeSuccess != null) {
+            kotlinx.coroutines.delay(150)
+            tradeSuccess = pendingTradeSuccess
+            pendingTradeSuccess = null
+        }
     }
 
     tradeSuccess?.let { success ->
