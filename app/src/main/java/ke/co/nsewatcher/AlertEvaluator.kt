@@ -2,6 +2,9 @@ package ke.co.nsewatcher
 
 import ke.co.nsewatcher.domain.AlertType
 import ke.co.nsewatcher.domain.PriceAlert
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 import java.util.Locale
 import kotlin.math.abs
 
@@ -10,6 +13,12 @@ data class TriggeredAlert(val alertId: String, val symbol: String, val title: St
 object AlertEvaluator {
     fun evaluate(alerts: List<PriceAlert>, stocks: List<Stock>, previousPrices: Map<String, Double>, news: List<NewsItem> = emptyList(), lastNewsTriggerIds: Map<String, String> = emptyMap()): List<TriggeredAlert> {
         val bySymbol = stocks.associateBy { it.symbol.uppercase() }
+        val today = LocalDate.now(ZoneId.of("Africa/Nairobi"))
+        fun isCurrentDay(item: NewsItem): Boolean = runCatching {
+            Instant.parse(item.publishedAt).atZone(ZoneId.of("Africa/Nairobi")).toLocalDate() == today
+        }.getOrElse {
+            runCatching { LocalDate.parse(item.publishedAt.take(10)) == today }.getOrDefault(false)
+        }
         return alerts.asSequence().filter { it.enabled }.mapNotNull { alert ->
             val stock = bySymbol[alert.symbol.uppercase()] ?: return@mapNotNull null
             if (!stock.price.isFinite() || stock.price <= 0.0) return@mapNotNull null
@@ -54,7 +63,7 @@ object AlertEvaluator {
                     val alreadySent = lastNewsTriggerIds[alert.id]
                     news.asSequence()
                         .filter { it.symbol.trim().uppercase() == stock.symbol.uppercase() }
-                        .filter { it.freshnessMode == "CURRENT_DAY" }
+                        .filter(::isCurrentDay)
                         .filter { item -> alert.type == AlertType.NEWS || item.category.equals("Corporate Actions", true) || item.category.equals("Dividends", true) }
                         .filter { it.id.isNotBlank() && it.id != alreadySent }
                         .sortedByDescending { it.publishedAt }
