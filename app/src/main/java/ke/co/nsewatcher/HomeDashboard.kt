@@ -49,14 +49,19 @@ fun HomeDashboard(
     openCompany: (Stock) -> Unit,
     openNews: (NewsItem) -> Unit,
     openMarket: () -> Unit = {},
-    openWatchlist: () -> Unit = {}
+    openWatchlist: () -> Unit = {},
+    initialNews: List<NewsItem> = emptyList(),
+    initialMarketStatus: MyStocksCache.MarketStatus = MyStocksCache.MarketStatus(),
+    startupDataLoaded: Boolean = false
 ) {
-    var news by remember { mutableStateOf(emptyList<NewsItem>()) }
-    var newsLoading by remember { mutableStateOf(true) }
+    var news by remember(initialNews) { mutableStateOf(initialNews) }
+    var newsLoading by remember(startupDataLoaded) { mutableStateOf(!startupDataLoaded) }
     var newsError by remember { mutableStateOf<String?>(null) }
-    var marketStatus by remember { mutableStateOf(MyStocksCache.MarketStatus()) }
+    var marketStatus by remember(initialMarketStatus) { mutableStateOf(initialMarketStatus) }
 
-    LaunchedEffect(currentStocks) {
+    LaunchedEffect(currentStocks, startupDataLoaded) {
+        if (startupDataLoaded) return@LaunchedEffect
+
         marketStatus = MyStocksCache.loadMarketStatus()
         val result = NewsCache.loadFeedResult()
         news = result.items
