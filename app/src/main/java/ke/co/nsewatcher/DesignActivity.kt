@@ -46,6 +46,8 @@ import coil3.compose.AsyncImage
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
+import org.json.JSONArray
+import org.json.JSONObject
 import ke.co.nsewatcher.data.MyStocksCache
 import ke.co.nsewatcher.data.NewsCache
 import ke.co.nsewatcher.data.AlertStore
@@ -550,7 +552,432 @@ private fun newsDisplayMeta(item:NewsItem):NewsDisplayMeta{
 
 private fun newsDate(value:String):String=when{value.isBlank()->"Latest";value.length>=10->value.take(10);else->value}
 
-@Composable private fun Paper(){LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(11.dp)){item{Card(Modifier.fillMaxWidth(),RoundedCornerShape(18.dp),colors=CardDefaults.cardColors(containerColor=DarkGreen)){Column(Modifier.padding(17.dp)){Text("PAPER PORTFOLIO",color=Color.White,fontWeight=FontWeight.Bold);Text("Practice mode",color=Color.White,fontSize=24.sp,fontWeight=FontWeight.ExtraBold);Text("No simulated balance or holdings are pre-filled.",color=Color.White,fontSize=10.sp)}}};item{Section("Holdings","Your practice portfolio is not connected to a broker.")};item{Card(Modifier.fillMaxWidth(),RoundedCornerShape(18.dp),border=BorderStroke(1.dp,Border)){Column(Modifier.padding(16.dp)){Icon(Icons.Default.AccountBalanceWallet,null,tint=Green,modifier=Modifier.size(32.dp));Spacer(Modifier.height(7.dp));Text("No paper positions yet",fontWeight=FontWeight.ExtraBold,fontSize=14.sp);Text("NSE Watcher will not invent shares, balances or portfolio values. Add a paper position only when a real paper-trading workflow is implemented.",color=Muted,fontSize=10.sp,lineHeight=15.sp)}}};item{Note("Paper Investing is educational and does not place trades with a broker.")}}}
+
+private data class PaperHolding(val symbol: String, val shares: Long, val averageCost: Double)
+
+private object PaperPortfolioStore {
+    private const val PREFS = "nse_watcher_paper_portfolio"
+    private const val ENABLED = "enabled"
+    private const val INITIAL = "initial"
+    private const val CASH = "cash"
+    private const val HOLDINGS = "holdings"
+    private const val HISTORY = "history"
+    private const val TRADES = "trades"
+    const val PRACTICE_COST_RATE = 0.02
+
+    private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    fun isEnabled(context: Context) = prefs(context).getBoolean(ENABLED, false)
+    fun initial(context: Context) = prefs(context).getFloat(INITIAL, 0f).toDouble()
+    fun cash(context: Context) = prefs(context).getFloat(CASH, 0f).toDouble()
+
+    fun holdings(context: Context): List<PaperHolding> {
+        return try {
+            val a = JSONArray(prefs(context).getString(HOLDINGS, "[]") ?: "[]")
+            buildList {
+                for (i in 0 until a.length()) {
+                    val o = a.getJSONObject(i)
+                    add(PaperHolding(o.getString("symbol"), o.getLong("shares"), o.getDouble("averageCost")))
+                }
+            }
+        } catch (_: Exception) { emptyList() }
+    }
+
+    fun history(context: Context): List<Pair<Long, Double>> {
+        return try {
+            val a = JSONArray(prefs(context).getString(HISTORY, "[]") ?: "[]")
+            buildList {
+                for (i in 0 until a.length()) {
+                    val o = a.getJSONObject(i)
+                    add(o.getLong("time") to o.getDouble("value"))
+                }
+            }
+        } catch (_: Exception) { emptyList() }
+    }
+
+    fun trades(context: Context): List<String> {
+        return try {
+            val a = JSONArray(prefs(context).getString(TRADES, "[]") ?: "[]")
+            buildList { for (i in 0 until a.length()) add(a.getString(i)) }
+        } catch (_: Exception) { emptyList() }
+    }
+
+    fun create(context: Context, amount: Double) {
+        val safe = amount.coerceAtLeast(1000.0)
+        val history = JSONArray().put(JSONObject().put("time", System.currentTimeMillis()).put("value", safe))
+        prefs(context).edit().putBoolean(ENABLED, true).putFloat(INITIAL, safe.toFloat())
+            .putFloat(CASH, safe.toFloat()).putString(HOLDINGS, "[]")
+            .putString(HISTORY, history.toString()).putString(TRADES, "[]").apply()
+    }
+
+    fun reset(context: Context) { prefs(context).edit().clear().apply() }
+
+    fun recordSnapshot(context: Context, value: Double) {
+        if (!isEnabled(context) || !value.isFinite()) return
+        val entries = history(context).toMutableList()
+        val now = System.currentTimeMillis()
+        if (entries.isEmpty() || now - entries.last().first >= 15 * 60 * 1000L) entries.add(now to value)
+        else entries[entries.lastIndex] = now to value
+        val a = JSONArray()
+        entries.takeLast(180).forEach { a.put(JSONObject().put("time", it.first).put("value", it.second)) }
+        prefs(context).edit().putString(HISTORY, a.toString()).apply()
+    }
+
+    fun buy(context: Context, stock: Stock, shares: Long, price: Double): Result<String> {
+        val error = validate(stock.price, shares, price)
+        if (error != null) return Result.failure(IllegalArgumentException(error))
+        val tradeValue = shares * price
+        val fee = tradeValue * PRACTICE_COST_RATE
+        val cash = cash(context)
+        if (tradeValue + fee > cash + 0.0001) return Result.failure(IllegalArgumentException("Not enough practice cash."))
+        val map = holdings(context).associateBy { it.symbol }.toMutableMap()
+        val old = map[stock.symbol]
+        val totalShares = (old?.shares ?: 0L) + shares
+        val average = if (old == null) price else ((old.shares * old.averageCost) + tradeValue) / totalShares
+        map[stock.symbol] = PaperHolding(stock.symbol, totalShares, average)
+        saveHoldings(context, map.values.toList())
+        prefs(context).edit().putFloat(CASH, (cash - tradeValue - fee).toFloat()).apply()
+        addTrade(context, "BUY " + stock.symbol + " • " + formatShares(shares) + " @ " + formatPrice(price))
+        return Result.success("Practice buy approved")
+    }
+
+    fun sell(context: Context, stock: Stock, shares: Long, price: Double): Result<String> {
+        val error = validate(stock.price, shares, price)
+        if (error != null) return Result.failure(IllegalArgumentException(error))
+        val map = holdings(context).associateBy { it.symbol }.toMutableMap()
+        val old = map[stock.symbol] ?: return Result.failure(IllegalArgumentException("You do not hold " + stock.symbol + "."))
+        if (shares > old.shares) return Result.failure(IllegalArgumentException("You do not have enough " + stock.symbol + " shares."))
+        val tradeValue = shares * price
+        val fee = tradeValue * PRACTICE_COST_RATE
+        if (shares == old.shares) map.remove(stock.symbol) else map[stock.symbol] = old.copy(shares = old.shares - shares)
+        saveHoldings(context, map.values.toList())
+        prefs(context).edit().putFloat(CASH, (cash(context) + tradeValue - fee).toFloat()).apply()
+        addTrade(context, "SELL " + stock.symbol + " • " + formatShares(shares) + " @ " + formatPrice(price))
+        return Result.success("Practice sell approved")
+    }
+
+    private fun validate(marketPrice: Double, shares: Long, price: Double): String? {
+        if (!marketPrice.isFinite() || marketPrice <= 0.0) return "Current market price is unavailable."
+        if (shares <= 0) return "Enter a positive share quantity."
+        if (shares % 100L != 0L) return "Normal-board practice orders use 100-share lots."
+        if (!price.isFinite() || price <= 0.0) return "Enter a valid limit price."
+        val tick = paperTickSize(price)
+        val steps = price / tick
+        if (kotlin.math.abs(steps - kotlin.math.round(steps)) > 0.000001) return "Price does not follow the modeled NSE tick size of " + formatPrice(tick) + "."
+        return null
+    }
+
+    private fun saveHoldings(context: Context, holdings: List<PaperHolding>) {
+        val a = JSONArray()
+        holdings.sortedBy { it.symbol }.forEach { h ->
+            a.put(JSONObject().put("symbol", h.symbol).put("shares", h.shares).put("averageCost", h.averageCost))
+        }
+        prefs(context).edit().putString(HOLDINGS, a.toString()).apply()
+    }
+
+    private fun addTrade(context: Context, text: String) {
+        val list = trades(context).toMutableList()
+        list.add(0, java.time.LocalDate.now().toString() + " • " + text)
+        val a = JSONArray()
+        list.take(50).forEach(a::put)
+        prefs(context).edit().putString(TRADES, a.toString()).apply()
+    }
+}
+
+private fun paperTickSize(price: Double): Double = when {
+    price < 5.0 -> 0.01
+    price < 10.0 -> 0.02
+    price < 50.0 -> 0.05
+    price < 500.0 -> 0.25
+    price < 1000.0 -> 1.00
+    else -> 5.00
+}
+
+@Composable
+private fun Paper() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var refresh by remember { mutableIntStateOf(0) }
+    var showCreate by remember { mutableStateOf(!PaperPortfolioStore.isEnabled(context)) }
+    var startingAmount by rememberSaveable { mutableStateOf("100000") }
+    var selectedStock by remember { mutableStateOf<Stock?>(null) }
+    var side by remember { mutableStateOf("BUY") }
+    var resetConfirm by remember { mutableStateOf(false) }
+
+    val enabled = remember(refresh) { PaperPortfolioStore.isEnabled(context) }
+    val holdings = remember(refresh, stocks) { PaperPortfolioStore.holdings(context) }
+    val cash = remember(refresh) { PaperPortfolioStore.cash(context) }
+    val initial = remember(refresh) { PaperPortfolioStore.initial(context) }
+    val value = cash + holdings.sumOf { h ->
+        val stock = stocks.firstOrNull { it.symbol == h.symbol }
+        (stock?.price ?: h.averageCost) * h.shares
+    }
+    val gain = value - initial
+    val returnPct = if (initial > 0) gain / initial * 100.0 else 0.0
+    val history = remember(refresh, stocks) { PaperPortfolioStore.history(context) }
+
+    LaunchedEffect(refresh, stocks) {
+        if (enabled) PaperPortfolioStore.recordSnapshot(context, value)
+    }
+
+    LazyColumn(contentPadding = PaddingValues(14.dp, 10.dp, 14.dp, 30.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Practice Portfolio", color = TextDark, fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
+                    Text("Learn by testing decisions with virtual money.", color = Muted, fontSize = 10.sp)
+                }
+                Surface(shape = RoundedCornerShape(14.dp), color = LightGreen) {
+                    Icon(Icons.Default.School, "Practice", tint = Green, modifier = Modifier.padding(9.dp).size(20.dp))
+                }
+            }
+        }
+
+        item {
+            Card(Modifier.fillMaxWidth(), RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = DarkGreen)) {
+                Column(Modifier.padding(18.dp)) {
+                    Text("YOUR PRACTICE ACCOUNT", color = Color(0xFFA9DEC5), fontSize = 8.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
+                    Text(if (enabled) formatPrice(value) else "Not started", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
+                    if (enabled) {
+                        Text((if (gain >= 0) "+" else "") + formatPrice(gain) + "  •  " + (if (returnPct >= 0) "+" else "") + String.format(Locale.US, "%.2f%%", returnPct),
+                            color = if (gain >= 0) Color(0xFF7CE6B3) else Color(0xFFFF9B9B), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(12.dp))
+                        PaperHistoryChart(history)
+                        Spacer(Modifier.height(10.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            PaperMetric("Available", formatPrice(cash), Modifier.weight(1f))
+                            PaperMetric("Invested", formatPrice(value - cash), Modifier.weight(1f))
+                        }
+                    } else {
+                        Spacer(Modifier.height(4.dp))
+                        Text("Start with virtual money. No broker, CDS account or real trade is involved.", color = Color(0xFFD5E9DF), fontSize = 10.sp, lineHeight = 14.sp)
+                        Spacer(Modifier.height(14.dp))
+                        Button({ showCreate = true }, Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Green), shape = RoundedCornerShape(14.dp)) {
+                            Text("Create practice portfolio", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+
+        if (enabled) {
+            item {
+                Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), border = BorderStroke(1.dp, Border)) {
+                    Column(Modifier.padding(14.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text("Your holdings", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
+                                Text(holdings.size.toString() + " companies • latest available quote used for valuation", color = Muted, fontSize = 9.sp)
+                            }
+                            IconButton({ refresh++ }) { Icon(Icons.Default.Refresh, "Refresh", tint = Green) }
+                        }
+                        if (holdings.isEmpty()) {
+                            Text("No positions yet", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text("Choose a company below to test a practice purchase.", color = Muted, fontSize = 9.sp)
+                        } else {
+                            holdings.forEach { h ->
+                                val stock = stocks.firstOrNull { it.symbol == h.symbol }
+                                if (stock != null) {
+                                    val marketValue = h.shares * stock.price
+                                    val pnl = marketValue - h.shares * h.averageCost
+                                    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        HomeLogo(stock.symbol, stock.logoUrl, 38)
+                                        Spacer(Modifier.width(8.dp))
+                                        Column(Modifier.weight(1f)) {
+                                            Text(stock.symbol, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp)
+                                            Text(formatShares(h.shares) + " shares • avg " + formatPrice(h.averageCost), color = Muted, fontSize = 8.sp)
+                                        }
+                                        Column(horizontalAlignment = Alignment.End) {
+                                            Text(formatPrice(marketValue), fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                                            Text((if (pnl >= 0) "+" else "") + formatPrice(pnl), color = if (pnl >= 0) Green else Red, fontWeight = FontWeight.Bold, fontSize = 9.sp)
+                                        }
+                                        IconButton({ selectedStock = stock; side = "SELL" }) { Icon(Icons.Default.RemoveCircleOutline, "Sell", tint = Red) }
+                                    }
+                                    HorizontalDivider(color = Border)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            item {
+                Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = LightGreen)) {
+                    Column(Modifier.padding(14.dp)) {
+                        Text("Test a trade", fontWeight = FontWeight.ExtraBold, fontSize = 15.sp, color = DarkGreen)
+                        Text("Choose a company, enter a limit price and quantity. The simulator validates the order and fills it immediately when the rules pass.", color = TextDark, fontSize = 9.sp, lineHeight = 13.sp)
+                        Spacer(Modifier.height(8.dp))
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                            items(stocks.take(8)) { stock ->
+                                AssistChip({ selectedStock = stock; side = "BUY" }, label = { Text(stock.symbol, fontSize = 9.sp) },
+                                    leadingIcon = { Icon(Icons.Default.Add, null, Modifier.size(14.dp)) })
+                            }
+                        }
+                    }
+                }
+            }
+
+            item {
+                Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), border = BorderStroke(1.dp, Border)) {
+                    Column(Modifier.padding(14.dp)) {
+                        Text("Practice rules", fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
+                        Text("• Simulated locally — nothing is sent to a broker or the NSE ATS.", color = Muted, fontSize = 9.sp)
+                        Text("• Normal-board practice orders use 100-share lots.", color = Muted, fontSize = 9.sp)
+                        Text("• Limit prices must follow the modeled NSE tick-size schedule.", color = Muted, fontSize = 9.sp)
+                        Text("• A 2.0% practice transaction-cost assumption is applied to buys and sells; it is not a live brokerage quote.", color = Muted, fontSize = 9.sp)
+                        Text("• Portfolio value uses the latest available quote in NSE Watcher.", color = Muted, fontSize = 9.sp)
+                    }
+                }
+            }
+
+            item {
+                OutlinedButton({ resetConfirm = true }, Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, Color(0xFFD8A3A3))) {
+                    Icon(Icons.Default.RestartAlt, null, tint = Red)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Reset practice portfolio", color = Red, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            val recent = PaperPortfolioStore.trades(context).take(5)
+            if (recent.isNotEmpty()) {
+                item {
+                    Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), border = BorderStroke(1.dp, Border)) {
+                        Column(Modifier.padding(14.dp)) {
+                            Text("Recent practice activity", fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
+                            recent.forEach { Text(it, color = Muted, fontSize = 8.sp, modifier = Modifier.padding(vertical = 3.dp)) }
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            Text("Practice investing is educational only. It does not execute trades, guarantee returns or represent a brokerage account.",
+                color = Muted, fontSize = 8.sp, lineHeight = 11.sp, modifier = Modifier.padding(horizontal = 4.dp))
+        }
+    }
+
+    if (showCreate) {
+        AlertDialog(
+            onDismissRequest = { if (enabled) showCreate = false },
+            title = { Text("Create practice portfolio", fontWeight = FontWeight.ExtraBold) },
+            text = {
+                Column {
+                    Text("Choose the virtual starting balance you want to test.", color = Muted, fontSize = 10.sp)
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(startingAmount, { startingAmount = it.filter(Char::isDigit) }, label = { Text("Starting balance (KSh)") }, singleLine = true)
+                    Spacer(Modifier.height(5.dp))
+                    Text("No real money is involved.", color = Green, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                }
+            },
+            confirmButton = {
+                Button({
+                    val amount = startingAmount.toDoubleOrNull()
+                    if (amount != null && amount >= 1000.0) {
+                        PaperPortfolioStore.create(context, amount)
+                        showCreate = false
+                        refresh++
+                    }
+                }, colors = ButtonDefaults.buttonColors(containerColor = Green)) { Text("Start") }
+            },
+            dismissButton = { if (enabled) TextButton({ showCreate = false }) { Text("Cancel") } }
+        )
+    }
+
+    selectedStock?.let { stock ->
+        PaperOrderDialog(context, stock, side, cash, holdings.firstOrNull { it.symbol == stock.symbol }?.shares ?: 0L,
+            { selectedStock = null }, { selectedStock = null; refresh++ })
+    }
+
+    if (resetConfirm) {
+        AlertDialog(
+            onDismissRequest = { resetConfirm = false },
+            title = { Text("Reset practice portfolio?") },
+            text = { Text("This clears the simulated cash, holdings, history and practice activity stored on this device.") },
+            confirmButton = { TextButton({ PaperPortfolioStore.reset(context); resetConfirm = false; refresh++ }) { Text("Reset", color = Red) } },
+            dismissButton = { TextButton({ resetConfirm = false }) { Text("Cancel") } }
+        )
+    }
+}
+
+@Composable
+private fun PaperMetric(label: String, value: String, modifier: Modifier) {
+    Surface(modifier, RoundedCornerShape(14.dp), color = Color(0x331A5A45)) {
+        Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+            Text(label, color = Color(0xFFB8D5C9), fontSize = 7.sp)
+            Text(value, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+        }
+    }
+}
+
+@Composable
+private fun PaperHistoryChart(history: List<Pair<Long, Double>>) {
+    val points = history.takeLast(60)
+    Canvas(Modifier.fillMaxWidth().height(90.dp)) {
+        if (points.size >= 2) {
+            val min = points.minOf { it.second }
+            val max = points.maxOf { it.second }
+            val range = (max - min).takeIf { it > 0.0 } ?: 1.0
+            val path = Path()
+            points.forEachIndexed { i, p ->
+                val x = size.width * i / points.lastIndex
+                val y = size.height - (((p.second - min) / range).toFloat() * (size.height - 8f) + 4f)
+                if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+            }
+            drawPath(path, Color(0xFF7CE6B3), style = Stroke(width = 4f, cap = StrokeCap.Round))
+        }
+    }
+}
+
+@Composable
+private fun PaperOrderDialog(
+    context: Context,
+    stock: Stock,
+    side: String,
+    cash: Double,
+    ownedShares: Long,
+    onDismiss: () -> Unit,
+    onComplete: () -> Unit
+) {
+    var sharesText by rememberSaveable(stock.symbol, side) { mutableStateOf("100") }
+    var priceText by rememberSaveable(stock.symbol, side) { mutableStateOf(String.format(Locale.US, "%.2f", stock.price)) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val shares = sharesText.toLongOrNull() ?: 0L
+    val price = priceText.toDoubleOrNull() ?: 0.0
+    val gross = shares * price
+    val fee = gross * PaperPortfolioStore.PRACTICE_COST_RATE
+    val amount = if (side == "BUY") gross + fee else gross - fee
+    val tick = paperTickSize(price.coerceAtLeast(0.01))
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Column {
+            Text(if (side == "BUY") "Practice Buy" else "Practice Sell", fontWeight = FontWeight.ExtraBold)
+            Text(stock.symbol + " • " + stock.name, color = Muted, fontSize = 9.sp)
+        }},
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                Text("Latest observed price: " + formatPrice(stock.price), color = Muted, fontSize = 9.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(sharesText, { sharesText = it.filter(Char::isDigit) }, Modifier.weight(1f), label = { Text("Shares") }, singleLine = true)
+                    OutlinedTextField(priceText, { priceText = it.filter { ch -> ch.isDigit() || ch == '.' } }, Modifier.weight(1f), label = { Text("Limit price") }, singleLine = true)
+                }
+                Text("Tick size at this price: " + formatPrice(tick), color = Muted, fontSize = 8.sp)
+                Text((if (side == "BUY") "Estimated cost: " else "Estimated proceeds: ") + formatPrice(amount), fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                Text(if (side == "BUY") "Available cash: " + formatPrice(cash) else "Available shares: " + formatShares(ownedShares), color = Muted, fontSize = 8.sp)
+                error?.let { Text(it, color = Red, fontSize = 9.sp, lineHeight = 12.sp) }
+            }
+        },
+        confirmButton = {
+            Button({
+                val result = if (side == "BUY") PaperPortfolioStore.buy(context, stock, shares, price) else PaperPortfolioStore.sell(context, stock, shares, price)
+                result.fold({ error = it.message ?: "Order rejected by the simulator." }, { onComplete() })
+            }, colors = ButtonDefaults.buttonColors(containerColor = if (side == "BUY") Green else Red)) {
+                Text(if (side == "BUY") "Approve practice buy" else "Approve practice sell")
+            }
+        },
+        dismissButton = { TextButton(onDismiss) { Text("Cancel") } }
+    )
+}
+
 @Composable private fun More(go:(Page)->Unit){LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(9.dp)){item{Section("More","Your NSE Watcher tools")};item{RowItem(Icons.Default.AccountCircle,"Profile","Personal information and profile picture"){go(Page.PROFILE)}};item{RowItem(Icons.Default.AccountBalanceWallet,"Paper Investing","Practice with virtual money"){go(Page.PAPER)}};item{RowItem(Icons.Default.Settings,"Settings","Theme, notifications, data and privacy"){go(Page.SETTINGS)}};item{RowItem(Icons.Default.HelpOutline,"Help & Support","FAQs, contact and report issues"){go(Page.HELP)}};item{RowItem(Icons.Default.Info,"About NSE Watcher","Version and product information"){go(Page.ABOUT)}}}}
 
 @Composable private fun Profile(name:String,username:String,email:String,description:String,onName:(String)->Unit,onUsername:(String)->Unit,onEmail:(String)->Unit,onDescription:(String)->Unit,pick:()->Unit,back:()->Unit,go:(Page)->Unit){var editing by rememberSaveable{mutableStateOf(false)};var n by rememberSaveable(name){mutableStateOf(name)};var u by rememberSaveable(username){mutableStateOf(username)};var e by rememberSaveable(email){mutableStateOf(email)};var d by rememberSaveable(description){mutableStateOf(description)};LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){item{Header("Profile","Your NSE Watcher account",back)};item{ProfileHero(name,username,pick)};item{if(editing){Card(Modifier.fillMaxWidth(),RoundedCornerShape(18.dp),border=BorderStroke(1.dp,Border)){Column(Modifier.padding(14.dp)){ProfileField("Full name",n,{n=it},Icons.Default.Person);ProfileField("Username",u,{u=it},Icons.Default.AccountCircle);ProfileField("Email",e,{e=it},Icons.Default.Email);ProfileField("Description",d,{d=it},Icons.Default.Info);Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End){TextButton({editing=false}){Text("Cancel")};Button({onName(n);onUsername(u);onEmail(e);onDescription(d);editing=false},colors=ButtonDefaults.buttonColors(containerColor=Green)){Text("Save")}}}}}else{Card(Modifier.fillMaxWidth(),RoundedCornerShape(18.dp),border=BorderStroke(1.dp,Border)){Column(Modifier.padding(14.dp)){ProfileInfo(Icons.Default.AccountCircle,"Username","@$username");ProfileInfo(Icons.Default.Email,"Email",email);ProfileInfo(Icons.Default.Info,"Description",description);Spacer(Modifier.height(5.dp));Button({editing=true},Modifier.fillMaxWidth(),colors=ButtonDefaults.buttonColors(containerColor=Green)){Icon(Icons.Default.Edit,null);Spacer(Modifier.width(7.dp));Text("Edit Profile")}}}}};item{RowItem(Icons.Default.PhotoCamera,"Profile Picture","Change your profile photo",pick)};item{RowItem(Icons.Default.AccountBalanceWallet,"Paper Investing","Practice with virtual money"){go(Page.PAPER)}};item{RowItem(Icons.Default.Settings,"Settings","Theme, notifications, data and privacy"){go(Page.SETTINGS)}};item{RowItem(Icons.Default.Lock,"Account Security","Password and device protection"){go(Page.SECURITY)}};item{RowItem(Icons.Default.PrivacyTip,"Privacy","Review your privacy settings"){go(Page.PRIVACY)}};item{Note("NSE Watcher provides market information and analysis. It does not execute trades or guarantee returns.")}}}
