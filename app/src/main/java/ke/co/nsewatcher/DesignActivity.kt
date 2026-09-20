@@ -625,7 +625,7 @@ private object PaperPortfolioStore {
         prefs(context).edit().putString(HISTORY, a.toString()).apply()
     }
 
-    fun buy(context: Context, stock: Stock, shares: Long, price: Double): Result<String> {
+    fun buy(context: Context, stock: Stock, shares: Long, price: Double): Result<Unit> {
         val error = validate(stock.price, shares, price)
         if (error != null) return Result.failure(IllegalArgumentException(error))
         val tradeValue = shares * price
@@ -640,10 +640,10 @@ private object PaperPortfolioStore {
         saveHoldings(context, map.values.toList())
         prefs(context).edit().putFloat(CASH, (cash - tradeValue - fee).toFloat()).apply()
         addTrade(context, "BUY " + stock.symbol + " • " + formatShares(shares) + " @ " + formatPrice(price))
-        return Result.success("OK")
+        return Result.success(Unit)
     }
 
-    fun sell(context: Context, stock: Stock, shares: Long, price: Double): Result<String> {
+    fun sell(context: Context, stock: Stock, shares: Long, price: Double): Result<Unit> {
         val error = validate(stock.price, shares, price)
         if (error != null) return Result.failure(IllegalArgumentException(error))
         val map = holdings(context).associateBy { it.symbol }.toMutableMap()
@@ -655,7 +655,7 @@ private object PaperPortfolioStore {
         saveHoldings(context, map.values.toList())
         prefs(context).edit().putFloat(CASH, (cash(context) + tradeValue - fee).toFloat()).apply()
         addTrade(context, "SELL " + stock.symbol + " • " + formatShares(shares) + " @ " + formatPrice(price))
-        return Result.success("OK")
+        return Result.success(Unit)
     }
 
     private fun validate(marketPrice: Double, shares: Long, price: Double): String? {
@@ -1073,11 +1073,11 @@ private fun PaperOrderDialog(
             Button({
                 val result = if (side == "BUY") PaperPortfolioStore.buy(context, stock, shares, price) else PaperPortfolioStore.sell(context, stock, shares, price)
                 result.fold(
-                    { error = it },
                     {
                         error = null
                         onComplete(PaperTradeSuccess(side, stock.symbol, shares, price, amount))
-                    }
+                    },
+                    { error = it }
                 )
             }, colors = ButtonDefaults.buttonColors(containerColor = if (side == "BUY") Green else Red)) {
                 Text(if (side == "BUY") "Approve practice buy" else "Approve practice sell")
