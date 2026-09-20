@@ -1524,4 +1524,3 @@ private fun percentReturn(values: List<Double>): Double? {
 }
 
 private fun formatSigned(value: Double): String = String.format(Locale.US, "%+.1f%%", value)
-        }
