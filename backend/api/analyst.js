@@ -1,5 +1,5 @@
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5.6-luna';
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
 const APP_BASE_URL = process.env.APP_BASE_URL || 'https://nse-watcher.vercel.app';
 
 function json(res, status, body) {
@@ -84,32 +84,56 @@ function validateCitations(answer, evidence) {
   };
 }
 
-async function askOpenAI(question, packet) {
-  if (!OPENAI_API_KEY) return null;
+function buildGeminiRequest(question, packet) {
   const evidenceText = JSON.stringify(packet, null, 2);
-  const input = `${systemInstructions()}\n\nUser question: ${question}\n\nEvidence packet:\n${evidenceText}`;
+  const prompt = `${systemInstructions()}\n\nUser question: ${question}\n\nEvidence packet:\n${evidenceText}`;
+  return {
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: {
+      maxOutputTokens: 900,
+    },
+  };
+}
+
+function extractGeminiAnswer(data) {
+  if (!Array.isArray(data?.candidates)) return '';
+  return data.candidates
+    .flatMap(candidate => candidate?.content?.parts || [])
+    .map(part => typeof part?.text === 'string' ? part.text : '')
+    .filter(Boolean)
+    .join('\n')
+    .trim();
+}
+
+async function askGemini(question, packet) {
+  if (!GEMINI_API_KEY) return null;
   const timeout = withTimeout(30_000);
   try {
-    const response = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: OPENAI_MODEL, input, max_output_tokens: 900 }),
-      signal: timeout.signal,
-    });
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent`,
+      {
+        method: 'POST',
+        headers: {
+          'x-goog-api-key': GEMINI_API_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(buildGeminiRequest(question, packet)),
+        signal: timeout.signal,
+      },
+    );
     const text = await response.text();
     let data;
     try { data = JSON.parse(text); } catch { data = { error: text }; }
     if (!response.ok) {
-      const error = new Error(data.error?.message || `AI service ${response.status}`);
+      const error = new Error(data.error?.message || `Gemini service ${response.status}`);
       error.status = response.status;
       throw error;
     }
-    const answer = typeof data.output_text === 'string'
-      ? data.output_text.trim()
-      : Array.isArray(data.output)
-        ? data.output.flatMap(item => item.content || []).map(item => item.text || '').filter(Boolean).join('\n').trim()
-        : '';
-    return { answer, model: OPENAI_MODEL, responseId: data.id || null };
+    return {
+      answer: extractGeminiAnswer(data),
+      model: GEMINI_MODEL,
+      responseId: data.responseId || null,
+    };
   } finally {
     timeout.clear();
   }
@@ -123,20 +147,23 @@ module.exports = async (req, res) => {
   if (!symbol) return json(res, 400, { error: 'symbol is required' });
   if (!question) return json(res, 400, { error: 'question is required' });
   if (question.length > 1200) return json(res, 400, { error: 'question is too long' });
+
   try {
     const company = await loadCompany(symbol);
     const packet = buildEvidencePacket(company);
-    if (!OPENAI_API_KEY) {
+    if (!GEMINI_API_KEY) {
       return json(res, 200, {
         aiAvailable: false,
         message: 'AI Analyst is not enabled yet. The evidence packet is ready for the AI layer.',
         evidencePacket: packet,
       });
     }
-    const result = await askOpenAI(question, packet);
+
+    const result = await askGemini(question, packet);
     const citationIntegrity = validateCitations(result?.answer, packet.evidence);
     return json(res, 200, {
       aiAvailable: true,
+      provider: 'gemini',
       symbol: company.symbol || symbol,
       fetchedAt: company.fetchedAt,
       evidenceCount: packet.evidence.length,
@@ -151,3 +178,5 @@ module.exports = async (req, res) => {
 
 module.exports.buildEvidencePacket = buildEvidencePacket;
 module.exports.validateCitations = validateCitations;
+module.exports.buildGeminiRequest = buildGeminiRequest;
+module.exports.extractGeminiAnswer = extractGeminiAnswer;
