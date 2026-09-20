@@ -1914,3 +1914,45 @@ Phase 13 may build explanations only on evidence that survives the existing prov
 ### Result
 
 **Phase 12 — Evidence Quality & Data Confidence is complete.** The next phase is Phase 13 — AI Explanation Layer, with the evidence-quality boundary above treated as a hard architectural constraint.
+
+
+# 55. FINAL CHAT HANDOFF — SEPTEMBER 2026
+
+Current position: focused product/functional closure work after the Phase 12 evidence-quality closure. Active path audited across Home, Market, Companies, Company Intelligence, News, Watchlist, Alerts, More and Settings.
+
+Recent work: beginner metric guides; company comparison; dividend intelligence snapshot; notification-settings copy alignment; AlertEvaluator current-day news semantics; AlertWorker current-day news matching; notification settings wired into the background AlertWorker.
+
+LATEST ALERTWORKER STATE — IMPORTANT
+A previous AlertWorker change (907c9c8ff46243c2df970a2a33e3cf8d64b2551f) failed Android CI #707 because literal newline text was accidentally inserted into AlertWorker.kt. This was fixed in a48215cc812ab5d9034d07714f9749abf2e58a93 (Fix AlertWorker Kotlin newline syntax).
+
+Latest functional fix: a76e94f7298c24a9bea2f55dd2e57909d4727f87 — Wire notification settings to alert worker.
+It makes AlertWorker honor notification-category toggles: Price alerts controls PRICE_ABOVE/PRICE_BELOW; Market alerts controls DAILY_GAIN/DAILY_LOSS/HIGH_VOLUME; News alerts controls NEWS/CORPORATE_ACTION.
+
+STRICT USER CLOSURE RULE
+Never close an implementation merely because code was changed. The relevant CLI/GitHub Actions run must be checked and must PASS. If it fails, inspect logs, troubleshoot, fix, commit, and verify again until it passes.
+
+At handoff time, GitHub Actions returned no workflow run for a76e94f7298c24a9bea2f55dd2e57909d4727f87. Therefore this change is PENDING CI VERIFICATION and must not be described as complete until a successful run is confirmed.
+
+LATEST KNOWN GREEN: 42bd748a29422d208faf3ed7e3680713d20d78c4, Android CI #706 / run 35495993894 SUCCESS.
+
+ALERT ARCHITECTURE
+AlertStore is DataStore-backed and persists alert rules, previous prices, daily trigger dates and news trigger IDs. Supported types: PRICE_ABOVE, PRICE_BELOW, DAILY_GAIN, DAILY_LOSS, HIGH_VOLUME, NEWS, CORPORATE_ACTION. BREAKOUT remains unsupported and must not fabricate a signal.
+
+AlertWorker uses WorkManager, network constraints, market-open/known guards, a no-more-than-15-minute background interval, provider-backed inputs, Nairobi calendar-day semantics, and now the notification-category settings. AlertEvaluatorTest covers threshold crossing, daily gain, current-day news, deduplication, corporate actions, high volume and unsupported BREAKOUT.
+
+SETTINGS NOTE
+Market alerts, Price alerts and News alerts are now connected to AlertWorker. App notifications is a broader product-notification toggle and must not be assumed to control market-alert evaluation unless explicitly implemented. Auto refresh, volume and price-change toggles should be audited before changing runtime behavior.
+
+KNOWN LIMITATIONS
+Theme System remains a placeholder. Chart Settings is descriptive/static rather than applying chart configuration. Language, Security, Privacy and Font & Display remain limited/static. Legacy BackendApi.kt, MarketRepository.kt and MarketDataProvider.kt remain technical debt and must not be deleted until references are proven unused. Watchlist lacks a dedicated Android DataStore/UI unit-test suite. AI/deployment work remains paused when Vercel/OpenAI limits prevent verification. Never invent index values/delay metadata or claim production verification without actually checking.
+
+IMMEDIATE NEXT ACTION
+1. Check GitHub Actions for a76e94f7298c24a9bea2f55dd2e57909d4727f87.
+2. If no run exists, recheck rather than closing the task.
+3. If it fails, inspect the exact logs, fix the concrete cause, commit and verify again.
+4. Close AlertWorker/settings only after CI is GREEN.
+5. Then continue the focused final functional/UI closure audit and implement only concrete defects.
+6. Update PROJECT_CONTEXT.md after every meaningful implementation/verification milestone.
+
+WORKING STYLE
+Direct continuation. Preserve working features. Make surgical changes. Inspect CI proactively. Report what was found, what changed, commit, actual CI status and next step. A task is complete only when required CLI/CI verification is GREEN.
