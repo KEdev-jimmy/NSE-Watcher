@@ -15,22 +15,7 @@ function withTimeout(ms) {
   return { signal: controller.signal, clear: () => clearTimeout(timer) };
 }
 
-async function loadMovement(symbol) {
-  const url = `${APP_BASE_URL}/api/movement?symbol=${encodeURIComponent(symbol)}`;
-  const timeout = withTimeout(15_000);
-  try {
-    const response = await fetch(url, { headers: { Accept: 'application/json' }, signal: timeout.signal });
-    const text = await response.text();
-    let data;
-    try { data = JSON.parse(text); } catch { data = null; }
-    if (!response.ok || !data || typeof data !== 'object') return null;
-    return data;
-  } catch {
-    return null;
-  } finally {
-    timeout.clear();
-  }
-}
+
 
 async function loadCompany(symbol) {
   const url = `${APP_BASE_URL}/api/company?action=intelligence&symbol=${encodeURIComponent(symbol)}`;
@@ -232,8 +217,7 @@ module.exports = async (req, res) => {
 
   try {
     const company = await loadCompany(symbol);
-    const movement = await loadMovement(symbol);
-    const context = buildNseIntelligenceContext({ company, movement });
+    const context = buildNseIntelligenceContext({ company });
     const contextIntegrity = validateNseIntelligenceContext(context);
     const packet = buildEvidencePacket(context);
     if (!contextIntegrity.valid) return json(res, 502, { error: 'AI Analyst unavailable' });
