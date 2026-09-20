@@ -216,12 +216,12 @@ async function askGeminiStory(packet) {
   const timeout = withTimeout(30_000);
   try {
     const response = await fetch(
-      \`https://generativelanguage.googleapis.com/v1beta/models/\${encodeURIComponent(GEMINI_MODEL)}:generateContent\`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent`,
       { method: 'POST', headers: { 'x-goog-api-key': GEMINI_API_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(buildCompanyStoryRequest(packet)), signal: timeout.signal },
     );
     const text = await response.text();
     let data; try { data = JSON.parse(text); } catch { data = { error: text }; }
-    if (!response.ok) { const error = new Error(data.error?.message || \`Gemini service \${response.status}\`); error.status = response.status; throw error; }
+    if (!response.ok) { const error = new Error(data.error?.message || `Gemini service ${response.status}`); error.status = response.status; throw error; }
     const story = extractGeminiStory(data);
     if (!story) { const error = new Error('Gemini returned an invalid structured Company Story'); error.status = 502; throw error; }
     return { story, model: GEMINI_MODEL, responseId: data.responseId || null };
