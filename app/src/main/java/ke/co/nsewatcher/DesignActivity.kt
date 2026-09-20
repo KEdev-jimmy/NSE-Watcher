@@ -497,8 +497,7 @@ private fun newsDisplayMeta(item:NewsItem):NewsDisplayMeta{
     if(company.isNotBlank()||symbol.isNotBlank()){
         val logo=stock?.logoUrl?.takeIf{it.isNotBlank()} ?: "https://mystocks.africa/logos/${symbol.lowercase(Locale.US)}-ke.svg"
         return NewsDisplayMeta(symbol,company,logo,symbol.ifBlank{"COMPANY"},Icons.Default.Business)
-    }
-    val c=item.category.lowercase(Locale.US)
+    }    val c=item.category.lowercase(Locale.US)
     return when{
         c.contains("dividend")->NewsDisplayMeta("","","","NSE DIVIDEND",Icons.Default.Payments)
         c.contains("corporate")||c.contains("action")->NewsDisplayMeta("","","","NSE ACTION",Icons.Default.Event)
@@ -997,8 +996,7 @@ stocks.filter { companyQuery.isBlank() || it.symbol.contains(companyQuery, true)
 private fun PaperMetric(label: String, value: String, modifier: Modifier) {
     Surface(modifier, RoundedCornerShape(14.dp), color = Color(0x331A5A45)) {
         Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
-            Text(label, color = Color(0xFFB8D5C9), fontSize = 7.sp)
-            Text(value, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+            Text(label, color = Color(0xFFB8D5C9), fontSize = 7.sp)            Text(value, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
         }
     }
 }
@@ -1077,7 +1075,7 @@ private fun PaperOrderDialog(
                         error = null
                         onComplete(PaperTradeSuccess(side, stock.symbol, shares, price, amount))
                     },
-                    { error = it }
+                    { error = it.message ?: "Practice trade could not be completed" }
                 )
             }, colors = ButtonDefaults.buttonColors(containerColor = if (side == "BUY") Green else Red)) {
                 Text(if (side == "BUY") "Approve practice buy" else "Approve practice sell")
