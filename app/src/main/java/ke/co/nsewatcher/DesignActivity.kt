@@ -655,7 +655,7 @@ private object PaperPortfolioStore {
         saveHoldings(context, map.values.toList())
         prefs(context).edit().putFloat(CASH, (cash(context) + tradeValue - fee).toFloat()).apply()
         addTrade(context, "SELL " + stock.symbol + " • " + formatShares(shares) + " @ " + formatPrice(price))
-        return Result.success(Unit)
+        return Result.success("OK")
     }
 
     private fun validate(marketPrice: Double, shares: Long, price: Double): String? {
