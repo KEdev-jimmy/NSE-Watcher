@@ -1892,3 +1892,49 @@ No other confirmed P2 Companies defect was identified in this focused audit. Leg
 ### Next audit target
 
 Continue with **P2 More / Settings**, then P3 technical debt/cleanup. AI work remains active in parallel and should not be treated as deferred solely because this closure audit is proceeding.
+
+
+## CURRENT CLOSURE AUDIT — MORE / SETTINGS
+
+### P2 More / Settings audit result
+
+The active More/Settings flow was audited for truthful behavior, persistence, and navigation.
+
+Verified:
+- More provides navigation to Profile, Paper Investing, Settings, Help & Support, and About.
+- Core notification toggles and market-data display toggles are persisted through SharedPreferences and are wired into the active app state.
+- Auto refresh is persisted and controls the existing 15-minute in-app refresh loop.
+- Theme Light/Dark is persisted and changes the active Material color scheme.
+- Profile edits and avatar selection use the existing local device storage path.
+- Alert management is connected to the real AlertStore/WatchlistStore rather than demo state.
+
+### Concrete UX truthfulness defect found and fixed
+
+The Theme page advertised a **System** theme option, but its click handler was empty and the app theme state only supported a Light/Dark boolean. Selecting System therefore could not actually change or persist a system theme.
+
+Fix commit:
+- **1deca4e6d3e00d53c16862a913aad664dd7e1614** — `Remove unimplemented system theme option`
+
+The Settings summary and Theme page now expose only the implemented **Light / Dark** choices. This avoids presenting a non-functional setting as available.
+
+### Known limitations / technical debt
+
+Several secondary pages remain intentionally lightweight/static rather than fully functional preference editors:
+- Language
+- Account Security
+- Privacy
+- Font & Display
+- Chart Settings
+- Help & Support
+
+These are not being expanded during the closure audit unless a concrete data-integrity or navigation defect is found. Their current presentation should be treated as informational/placeholder UI rather than evidence that the advertised future controls are fully implemented.
+
+### Verification state
+
+The theme correction is committed, but the GitHub workflow-run connector did not report a workflow run for commit 1deca4e6d3e00d53c16862a913aad664dd7e1614. Therefore this fix is **NOT YET CI-VERIFIED GREEN**.
+
+No other confirmed P2 More/Settings blocker was identified in this audit.
+
+### Next audit target
+
+Proceed to **P3 technical debt / cleanup**, while preserving the current working architecture and avoiding broad cleanup rewrites.
