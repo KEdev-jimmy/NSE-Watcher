@@ -2193,3 +2193,24 @@ Required acceptance test:
 
 Until an APK artifact tied to the verified current source exists, runtime behavior must be treated as **unverified**.
 
+
+
+# CURRENT ACTIVE IMPLEMENTATION — PRACTICE PORTFOLIO MARKET PRICE RULES
+
+## Status
+Implemented in the active practice-trading flow; CI verification is required before treating the new APK as validated.
+
+## What changed
+- Practice share quantity no longer has an artificial 100-share minimum. NSE normal-board trading was changed to allow single-share units from August 1, 2025.
+- The Android `Stock` model now preserves the provider's `previousClose` field when it is available.
+- Practice price-band validation no longer reconstructs the reference price from the displayed daily percentage change.
+- The practice order uses each company's own provider-supplied previous close as the reference input for the standard NSE +/-10% equity price band.
+- NSE tick-size validation remains active.
+- Immediate-fill simulation still requires BUY limits at/above the latest observed price and SELL limits at/below it because NSE Watcher does not have a live bid/ask order book.
+- The current MyStocks market feed is documented by the provider as exchange-supplied and 15-minute delayed.
+- The provider documentation inspected during this implementation does not expose a verified `limitUp`/`limitDown` or exact exchange reference-price field in the current stock-list contract. Therefore the app must not invent an exact per-company limit field.
+- Important distinction: the CMA/NSE rule describes the equity reference price as the session VWAP. Provider `previousClose` is therefore a real company-specific market input, but it must not be described as an exact VWAP reference unless the provider supplies that field. If exact exchange reference/limit values become available, replace the proxy with the provider/exchange field.
+- Do not claim that the current implementation has a live order-book limit price. It has real delayed company quotes plus provider previous-close-based standard band validation.
+
+## Verification target
+For a stock around KSh 28, entering KSh 2 as a practice BUY must be rejected. The app should show the company's applicable standard band and the delayed-data reference. CI must be GREEN and the APK must be tied to the final commit before claiming the implementation is validated.

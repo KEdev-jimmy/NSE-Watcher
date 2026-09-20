@@ -260,7 +260,7 @@ object MyStocksCache {
                     // The quote endpoint does not provide a time series, so never synthesize
                     // a two-point series from previousClose/price. Company Intelligence loads
                     // sourced history through loadHistoryDetails() instead.
-                    add(Stock(symbol, name, price, changePct, emptyList(), item.optString("logoUrl").takeIf { it.isNotBlank() }, item.optString("sector", "Other").ifBlank { "Other" }, volume, changeAvailable, volumeAvailable, source, observedAt, freshnessMode, dataOrigin, averageVolume, averageVolumeAvailable))
+                    add(Stock(symbol, name, price, changePct, emptyList(), item.optString("logoUrl").takeIf { it.isNotBlank() }, item.optString("sector", "Other").ifBlank { "Other" }, volume, changeAvailable, volumeAvailable, source, observedAt, freshnessMode, dataOrigin, averageVolume, averageVolumeAvailable, previousClose.takeIf { it.isFinite() && it > 0.0 }))
                 }
             }
         } finally { connection.disconnect() }

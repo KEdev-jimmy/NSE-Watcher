@@ -70,7 +70,7 @@ private const val PREFS = "nse_watcher_preferences"
 private fun formatPrice(value: Double): String = "KSh " + String.format(Locale.US, "%,.2f", value)
 private fun formatShares(value: Long): String = String.format(Locale.US, "%,d", value)
 
-data class Stock(val symbol:String,val name:String,val price:Double,val change:Double,val history:List<Double>,val logoUrl:String?=null,val sector:String="Other",val volume:Long=0L,val changeAvailable:Boolean=true,val volumeAvailable:Boolean=true,val source:String="",val observedAt:String="",val freshnessMode:String="UNKNOWN",val dataOrigin:String="unknown",val averageVolume:Long=0L,val averageVolumeAvailable:Boolean=false)
+data class Stock(val symbol:String,val name:String,val price:Double,val change:Double,val history:List<Double>,val logoUrl:String?=null,val sector:String="Other",val volume:Long=0L,val changeAvailable:Boolean=true,val volumeAvailable:Boolean=true,val source:String="",val observedAt:String="",val freshnessMode:String="UNKNOWN",val dataOrigin:String="unknown",val averageVolume:Long=0L,val averageVolumeAvailable:Boolean=false,val previousClose:Double?=null)
 
 data class NewsItem(
     val id:String, val title:String, val summary:String, val body:String, val source:String,
@@ -667,16 +667,17 @@ private object PaperPortfolioStore {
         // NSE equities now trade in single-share units; there is no blanket 100-share
         // minimum on the normal board. The practice simulator therefore does not
         // impose an artificial lot-size restriction.
-        val referencePrice = if (stock.changeAvailable && stock.change.isFinite() && stock.change > -100.0) {
-            marketPrice / (1.0 + stock.change / 100.0)
-        } else {
-            null
-        } ?: return "Daily price band is unavailable for this quote. Refresh the market data before placing the practice order."
+        // Use the provider's company-specific previous-close field as the
+        // market-data reference input. Do not reconstruct it from the displayed
+        // percentage change: that is a derived value and can drift from the
+        // provider's actual reference field.
+        val referencePrice = stock.previousClose
+            ?.takeIf { it.isFinite() && it > 0.0 }
+            ?: return "This company's NSE reference price is unavailable in the current market feed. Refresh the market data before placing the practice order."
 
-        // Model the NSE equity daily movement band around the session reference price.
-        // The NSE market reference also has exceptions for material announcements;
-        // those cannot be inferred safely from the quote alone, so this simulator
-        // uses the standard 10% band when no verified exception is available.
+        // Standard NSE equity movement band. Material-announcement exceptions
+        // can change the permitted band; without an explicit exchange/provider
+        // exception field we must not invent one.
         val lowerBand = referencePrice * 0.90
         val upperBand = referencePrice * 1.10
         if (price < lowerBand - 0.000001 || price > upperBand + 0.000001) {
@@ -721,10 +722,10 @@ private object PaperPortfolioStore {
 
 private fun paperPriceBand(stock: Stock): Pair<Double, Double> {
     val market = stock.price
-    if (!market.isFinite() || market <= 0.0 || !stock.changeAvailable || !stock.change.isFinite() || stock.change <= -100.0) {
+    val reference = stock.previousClose?.takeIf { it.isFinite() && it > 0.0 }
+    if (!market.isFinite() || market <= 0.0 || reference == null) {
         return market to market
     }
-    val reference = market / (1.0 + stock.change / 100.0)
     return reference * 0.90 to reference * 1.10
 }
 
@@ -873,7 +874,8 @@ stocks.filter { companyQuery.isBlank() || it.symbol.contains(companyQuery, true)
                         Text("Practice rules", fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
                         Text("• Simulated locally — nothing is sent to a broker or the NSE ATS.", color = Muted, fontSize = 9.sp)
                         Text("• NSE equities use single-share trading; the simulator does not impose an artificial 100-share minimum.", color = Muted, fontSize = 9.sp)
-                        Text("• Limit prices use the NSE tick-size schedule and the current session price band where verified market data is available.", color = Muted, fontSize = 9.sp)
+                        Text("• Each company uses its own provider-supplied previous close as the reference input for the standard NSE ±10% price band; no blanket KSh limit is used.", color = Muted, fontSize = 9.sp)
+                        Text("• The market feed is exchange-supplied and 15-minute delayed. If an exact exchange reference/limit field is unavailable, the app does not invent one.", color = Muted, fontSize = 9.sp)
                         Text("• Practice orders fill immediately only when the limit price could cross the latest observed market price. A real order book is not simulated.", color = Muted, fontSize = 9.sp)
                         Text("• A 2.0% practice transaction-cost assumption is applied to buys and sells; it is not a live brokerage quote.", color = Muted, fontSize = 9.sp)
                         Text("• Portfolio value uses the latest available quote in NSE Watcher.", color = Muted, fontSize = 9.sp)
@@ -1107,7 +1109,8 @@ private fun PaperOrderDialog(
                     OutlinedTextField(priceText, { priceText = it.filter { ch -> ch.isDigit() || ch == '.' } }, Modifier.weight(1f), label = { Text("Limit price") }, singleLine = true)
                 }
                 Text("NSE tick size at this price: " + formatPrice(tick), color = Muted, fontSize = 8.sp)
-                Text("Standard session band: " + formatPrice(paperPriceBand(stock).first) + " – " + formatPrice(paperPriceBand(stock).second), color = Muted, fontSize = 8.sp)
+                Text("NSE standard band: " + formatPrice(paperPriceBand(stock).first) + " – " + formatPrice(paperPriceBand(stock).second), color = Muted, fontSize = 8.sp)
+                Text("Reference: provider previous close • market data is 15 min delayed", color = Muted, fontSize = 8.sp)
                 Text((if (side == "BUY") "Estimated cost: " else "Estimated proceeds: ") + formatPrice(amount), fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 Text(if (side == "BUY") "Available cash: " + formatPrice(cash) else "Available shares: " + formatShares(ownedShares), color = Muted, fontSize = 8.sp)
                 error?.let { Text(it, color = Red, fontSize = 9.sp, lineHeight = 12.sp) }
