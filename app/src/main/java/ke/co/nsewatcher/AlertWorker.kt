@@ -19,8 +19,7 @@ import ke.co.nsewatcher.data.AlertStore
 import ke.co.nsewatcher.data.NewsCache
 import kotlinx.coroutines.flow.first
 import ke.co.nsewatcher.domain.AlertType
-import java.time.LocalDate
-import java.time.ZoneId
+import java.time.Instant\nimport java.time.LocalDate\nimport java.time.ZoneId\nimport java.time.format.DateTimeParseException
 import java.util.concurrent.TimeUnit
 
 class AlertWorker(appContext: Context, workerParams: WorkerParameters) : CoroutineWorker(appContext, workerParams) {
@@ -46,7 +45,7 @@ class AlertWorker(appContext: Context, workerParams: WorkerParameters) : Corouti
         }
         store.recordNewsTriggers(
             triggered.filter { item -> alerts.firstOrNull { it.id == item.alertId }?.type in setOf(AlertType.NEWS, AlertType.CORPORATE_ACTION) }
-                .associate { it.alertId to (news.firstOrNull { n -> n.symbol.equals(it.symbol, true) && n.freshnessMode == "CURRENT_DAY" && (it.message.endsWith(n.title) || it.message.contains(n.title)) }?.id ?: "") }
+                .associate { it.alertId to (news.firstOrNull { n -> n.symbol.equals(it.symbol, true) && isPublishedToday(n.publishedAt) && (it.message.endsWith(n.title) || it.message.contains(n.title)) }?.id ?: "") }
                 .filterValues { it.isNotBlank() }
         )
         store.recordDailyTriggers(
@@ -75,7 +74,7 @@ class AlertWorker(appContext: Context, workerParams: WorkerParameters) : Corouti
         return Result.success()
     }
 
-    private fun ensureChannel() {
+    private fun isPublishedToday(publishedAt: String): Boolean {\n        if (publishedAt.isBlank()) return false\n        return try {\n            Instant.parse(publishedAt).atZone(ZoneId.of("Africa/Nairobi")).toLocalDate() == LocalDate.now(ZoneId.of("Africa/Nairobi"))\n        } catch (_: DateTimeParseException) {\n            publishedAt.take(10) == LocalDate.now(ZoneId.of("Africa/Nairobi")).toString()\n        }\n    }\n\n    private fun ensureChannel() {
         val manager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         manager.createNotificationChannel(NotificationChannel(CHANNEL_ID, "NSE Watcher alerts", NotificationManager.IMPORTANCE_DEFAULT))
     }
