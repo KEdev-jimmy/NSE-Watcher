@@ -155,10 +155,8 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
     val hasSessionNavigationItem = period == "1D" || period == "NOW"
     val listState = rememberLazyListState()
     var primarySection by rememberSaveable(s.symbol) { mutableStateOf(CompanyIntelligenceSection.INTELLIGENCE) }
-    var performanceSection by rememberSaveable(s.symbol) { mutableStateOf(CompanyIntelligenceSection.PERFORMANCE) }
-    var valuationSection by rememberSaveable(s.symbol) { mutableStateOf(CompanyIntelligenceSection.VALUATION) }
-    var analysisSection by rememberSaveable(s.symbol) { mutableStateOf(CompanyIntelligenceSection.NEWS) }
-    var evidenceSection by rememberSaveable(s.symbol) { mutableStateOf(CompanyIntelligenceSection.EVIDENCE) }
+    var metricsSection by rememberSaveable(s.symbol) { mutableStateOf(CompanyIntelligenceSection.PERFORMANCE) }
+    var researchSection by rememberSaveable(s.symbol) { mutableStateOf(CompanyIntelligenceSection.NEWS) }
 
     LazyColumn(
         state = listState,
@@ -282,6 +280,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
             }
         }
 
+        if (primarySection == CompanyIntelligenceSection.INTELLIGENCE) {
         item {
             Card(Modifier.fillMaxWidth(), RoundedCornerShape(19.dp), colors = CardDefaults.cardColors(containerColor = IntelligenceDark)) {
                 Column(Modifier.padding(17.dp)) {
@@ -352,10 +351,24 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
             }
 
         }
+        }
 
 
-        if (performanceSection == CompanyIntelligenceSection.FINANCIALS) {
-        item { SectionTitle("Financial health", "Latest reported annual financial evidence", Icons.Default.Assessment) }
+
+        item {
+            CompanySectionNavigation(
+                labels = listOf(
+                    CompanyIntelligenceSection.PERFORMANCE,
+                    CompanyIntelligenceSection.FINANCIALS,
+                    CompanyIntelligenceSection.VALUATION,
+                    CompanyIntelligenceSection.DIVIDENDS
+                ),
+                selected = metricsSection,
+                onSelected = { metricsSection = it }
+            )
+        }
+
+        if (metricsSection == CompanyIntelligenceSection.FINANCIALS) {
         item {
             IntelligenceCard {
                 Text(
@@ -381,16 +394,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
 
         }
 
-        item {
-            CompanySectionNavigation(
-                labels = listOf(CompanyIntelligenceSection.PERFORMANCE, CompanyIntelligenceSection.FINANCIALS),
-                selected = performanceSection,
-                onSelected = { performanceSection = it }
-            )
-        }
-
-        if (performanceSection == CompanyIntelligenceSection.PERFORMANCE) {
-        item { SectionTitle("Growth", "Year-over-year change in the latest reported figures", Icons.Default.TrendingUp) }
+        if (metricsSection == CompanyIntelligenceSection.PERFORMANCE) {
         item {
             IntelligenceCard {
                 MetricGrid(
@@ -409,16 +413,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
 
         }
 
-        item {
-            CompanySectionNavigation(
-                labels = listOf(CompanyIntelligenceSection.VALUATION, CompanyIntelligenceSection.DIVIDENDS),
-                selected = valuationSection,
-                onSelected = { valuationSection = it }
-            )
-        }
-
-        if (valuationSection == CompanyIntelligenceSection.VALUATION) {
-        item { SectionTitle("Current ratios & valuation", "Current market-price and ratio snapshot", Icons.Default.Calculate) }
+        if (metricsSection == CompanyIntelligenceSection.VALUATION) {
         item {
             IntelligenceCard {
                 if (profile.ratioBasis.equals("Current", ignoreCase = true)) {
@@ -450,8 +445,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
 
         }
 
-        if (valuationSection == CompanyIntelligenceSection.DIVIDENDS) {
-        item { SectionTitle("Dividends", "Declared and historical distributions", Icons.Default.Payments) }
+        if (metricsSection == CompanyIntelligenceSection.DIVIDENDS) {
         item {
             IntelligenceCard {
                 if (intelligence.dividends.isEmpty()) {
@@ -588,14 +582,17 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
 
         item {
             CompanySectionNavigation(
-                labels = listOf(CompanyIntelligenceSection.NEWS, CompanyIntelligenceSection.ANALYSIS),
-                selected = analysisSection,
-                onSelected = { analysisSection = it }
+                labels = listOf(
+                    CompanyIntelligenceSection.NEWS,
+                    CompanyIntelligenceSection.EVIDENCE,
+                    CompanyIntelligenceSection.ANALYSIS
+                ),
+                selected = researchSection,
+                onSelected = { researchSection = it }
             )
         }
 
-        if (analysisSection == CompanyIntelligenceSection.NEWS) {
-        item { SectionTitle("What changed?", "Recent company events and intelligence", Icons.Default.Newspaper) }
+        if (researchSection == CompanyIntelligenceSection.NEWS) {
         item {
             IntelligenceCard {
                 when {
@@ -620,15 +617,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
 
         }
 
-        item {
-            CompanySectionNavigation(
-                labels = listOf(CompanyIntelligenceSection.EVIDENCE, CompanyIntelligenceSection.ANALYSIS),
-                selected = evidenceSection,
-                onSelected = { evidenceSection = it }
-            )
-        }
-
-        if (evidenceSection == CompanyIntelligenceSection.EVIDENCE) {
+        if (researchSection == CompanyIntelligenceSection.EVIDENCE) {
         item { SectionTitle("Evidence", "Sourced records behind this intelligence view", Icons.Default.Verified) }
         item {
             IntelligenceCard {
@@ -660,7 +649,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
 
         }
 
-        if (analysisSection == CompanyIntelligenceSection.ANALYSIS) {
+        if (researchSection == CompanyIntelligenceSection.ANALYSIS) {
         item { SectionTitle("Risks to investigate", "Questions raised by the available evidence", Icons.Default.Warning) }
         item {
             IntelligenceCard {
@@ -789,6 +778,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
 
         }
 
+        if (researchSection == CompanyIntelligenceSection.EVIDENCE) {
         item {
             IntelligenceCard {
                 EvidenceRow("Coverage", "${intelligenceView.quality.state} • ${intelligenceView.quality.availableCount}/5 areas")
@@ -1534,3 +1524,4 @@ private fun percentReturn(values: List<Double>): Double? {
 }
 
 private fun formatSigned(value: Double): String = String.format(Locale.US, "%+.1f%%", value)
+        }
