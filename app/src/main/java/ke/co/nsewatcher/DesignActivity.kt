@@ -824,7 +824,7 @@ stocks.filter { companyQuery.isBlank() || it.symbol.contains(companyQuery, true)
             }
 
             item {
-                Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), border = BorderStroke(1.dp, Border))
+                Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), border = BorderStroke(1.dp, Border)) {
                     Column(Modifier.padding(14.dp)) {
                         Text("Practice rules", fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
                         Text("• Simulated locally — nothing is sent to a broker or the NSE ATS.", color = Muted, fontSize = 9.sp)
