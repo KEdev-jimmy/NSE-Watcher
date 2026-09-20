@@ -46,55 +46,49 @@ fun NSEWatcherOpeningScreen(
 ) {
     var stage by remember { mutableIntStateOf(0) }
     val lineProgress = remember { Animatable(0f) }
-    val logoScale = remember { Animatable(0.82f) }
+    val logoScale = remember { Animatable(0.86f) }
     val logoAlpha = remember { Animatable(0f) }
     val glowPulse = remember { Animatable(0f) }
 
     LaunchedEffect(Unit) {
         logoAlpha.animateTo(1f, tween(420, easing = FastOutSlowInEasing))
-        logoScale.animateTo(1f, tween(520, easing = FastOutSlowInEasing))
+        logoScale.animateTo(1f, tween(560, easing = FastOutSlowInEasing))
         stage = 1
-        delay(260)
+        delay(180)
         stage = 2
-        delay(220)
-        lineProgress.animateTo(1f, tween(720, easing = FastOutSlowInEasing))
+        delay(180)
+        lineProgress.animateTo(1f, tween(780, easing = FastOutSlowInEasing))
         stage = 3
-        delay(160)
-        glowPulse.animateTo(1f, tween(180))
-        glowPulse.animateTo(0f, tween(420))
+        delay(130)
+        glowPulse.animateTo(1f, tween(170))
+        glowPulse.animateTo(0f, tween(520))
         stage = 4
-        delay(240)
+        delay(160)
         stage = 5
-    }
-
-    LaunchedEffect(ready, stage) {
-        if (!ready || stage < 5) return@LaunchedEffect
-        delay(620)
-        onFinished()
     }
 
     val bars = listOf(
         androidx.compose.animation.core.animateFloatAsState(
-            targetValue = if (stage >= 2) 0.42f else 0f,
+            targetValue = if (stage >= 2) 0.48f else 0f,
             animationSpec = tween(420, easing = FastOutSlowInEasing),
             label = "bar1"
         ).value,
         androidx.compose.animation.core.animateFloatAsState(
-            targetValue = if (stage >= 2) 0.62f else 0f,
-            animationSpec = tween(460, delayMillis = 100, easing = FastOutSlowInEasing),
+            targetValue = if (stage >= 2) 0.70f else 0f,
+            animationSpec = tween(470, delayMillis = 90, easing = FastOutSlowInEasing),
             label = "bar2"
         ).value,
         androidx.compose.animation.core.animateFloatAsState(
-            targetValue = if (stage >= 2) 0.80f else 0f,
-            animationSpec = tween(500, delayMillis = 190, easing = FastOutSlowInEasing),
+            targetValue = if (stage >= 2) 0.92f else 0f,
+            animationSpec = tween(520, delayMillis = 170, easing = FastOutSlowInEasing),
             label = "bar3"
         ).value
     )
 
-    val textAlpha by androidx.compose.animation.core.animateFloatAsState(
+    val contentAlpha by androidx.compose.animation.core.animateFloatAsState(
         targetValue = if (stage >= 4) 1f else 0f,
-        animationSpec = tween(480, easing = FastOutSlowInEasing),
-        label = "textAlpha"
+        animationSpec = tween(500, easing = FastOutSlowInEasing),
+        label = "contentAlpha"
     )
     val buttonAlpha by androidx.compose.animation.core.animateFloatAsState(
         targetValue = if (stage >= 5) 1f else 0f,
@@ -102,8 +96,8 @@ fun NSEWatcherOpeningScreen(
         label = "buttonAlpha"
     )
     val buttonOffset by androidx.compose.animation.core.animateDpAsState(
-        targetValue = if (stage >= 5) 0.dp else 28.dp,
-        animationSpec = tween(520, easing = FastOutSlowInEasing),
+        targetValue = if (stage >= 5) 0.dp else 22.dp,
+        animationSpec = tween(500, easing = FastOutSlowInEasing),
         label = "buttonOffset"
     )
 
@@ -118,29 +112,48 @@ fun NSEWatcherOpeningScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 24.dp, vertical = 18.dp),
+                .padding(horizontal = 22.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(Modifier.weight(0.18f))
+            Spacer(Modifier.height(6.dp))
 
             Box(
                 modifier = Modifier
-                    .size(176.dp)
+                    .clip(RoundedCornerShape(50.dp))
+                    .background(Color.White.copy(alpha = 0.68f))
+                    .padding(horizontal = 14.dp, vertical = 7.dp)
+            ) {
+                Text(
+                    text = "NSE  •  KENYA MARKET INTELLIGENCE",
+                    color = SplashMutedGreen,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.8.sp
+                )
+            }
+
+            Spacer(Modifier.weight(0.12f))
+
+            Box(
+                modifier = Modifier
+                    .size(158.dp)
                     .alpha(logoAlpha.value)
-                    .graphicsLayerScale(logoScale.value)
+                    .graphicsLayer {
+                        scaleX = logoScale.value
+                        scaleY = logoScale.value
+                    }
             ) {
                 NSEWatcherAnimatedLogo(
-                    modifier = Modifier.fillMaxSize(),
                     bars = bars,
                     lineProgress = lineProgress.value,
                     glow = glowPulse.value
                 )
             }
 
-            Spacer(Modifier.height(42.dp))
+            Spacer(Modifier.height(23.dp))
 
             Column(
-                modifier = Modifier.alpha(textAlpha),
+                modifier = Modifier.alpha(contentAlpha),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
@@ -148,68 +161,123 @@ fun NSEWatcherOpeningScreen(
                     color = SplashNavy,
                     fontFamily = FontFamily.Serif,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 47.sp,
-                    lineHeight = 50.sp,
+                    fontSize = 43.sp,
+                    lineHeight = 46.sp,
                     textAlign = TextAlign.Center
                 )
-                Spacer(Modifier.height(15.dp))
-                Canvas(
-                    modifier = Modifier
-                        .width(245.dp)
-                        .height(14.dp)
-                ) {
-                    val y = size.height / 2f
-                    val dotX = size.width / 2f
-                    drawLine(SplashGreen.copy(alpha = 0.42f), androidx.compose.ui.geometry.Offset(0f, y), androidx.compose.ui.geometry.Offset(dotX - 18.dp.toPx(), y), 1.5.dp.toPx())
-                    drawLine(SplashGreen.copy(alpha = 0.42f), androidx.compose.ui.geometry.Offset(dotX + 18.dp.toPx(), y), androidx.compose.ui.geometry.Offset(size.width, y), 1.5.dp.toPx())
-                    drawCircle(SplashGreen.copy(alpha = 0.85f), 5.dp.toPx(), androidx.compose.ui.geometry.Offset(dotX, y))
-                }
-                Spacer(Modifier.height(12.dp))
+
+                Spacer(Modifier.height(9.dp))
+
+                Text(
+                    text = "See the market. Understand the movement.",
+                    color = SplashTextDark,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(Modifier.height(7.dp))
+
                 Text(
                     text = "Real data. Clear calculations.\nTraceable evidence.",
                     color = SplashMutedGreen,
-                    fontFamily = FontFamily.SansSerif,
+                    fontSize = 14.sp,
+                    lineHeight = 21.sp,
                     fontWeight = FontWeight.Medium,
-                    fontSize = 17.sp,
-                    lineHeight = 27.sp,
                     textAlign = TextAlign.Center
                 )
             }
 
-            Spacer(Modifier.weight(0.34f))
+            Spacer(Modifier.weight(0.12f))
 
-            Box(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(68.dp)
-                    .offset(y = buttonOffset)
-                    .alpha(buttonAlpha)
-                    .clip(RoundedCornerShape(25.dp))
-                    .background(SplashButton)
-                    .clickable(enabled = ready, onClick = onFinished),
-                contentAlignment = Alignment.Center
+                    .alpha(buttonAlpha),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Row(
+                    modifier = Modifier.padding(bottom = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center
                 ) {
-                    Text(
-                        text = "Start Exploring",
-                        color = Color.White,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(Modifier.width(18.dp))
-                    Text(
-                        text = "→",
-                        color = Color.White,
-                        fontSize = 32.sp,
-                        fontWeight = FontWeight.Normal
-                    )
+                    if (!ready) {
+                        androidx.compose.material3.CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            color = SplashButton,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = "Preparing your market view…",
+                            color = SplashMutedGreen,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .clip(RoundedCornerShape(50.dp))
+                                .background(SplashButton)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = "Market view ready",
+                            color = SplashButton,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
+
+                Box(
+                    modifier = Modifier
+                        .widthIn(min = 240.dp, max = 340.dp)
+                        .fillMaxWidth(0.88f)
+                        .height(60.dp)
+                        .offset(y = buttonOffset)
+                        .clip(RoundedCornerShape(21.dp))
+                        .background(
+                            if (ready) SplashButton else SplashNavy.copy(alpha = 0.10f)
+                        )
+                        .clickable(enabled = ready, onClick = onFinished),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = if (ready) "Start Exploring" else "Preparing…",
+                            color = if (ready) Color.White else SplashMutedGreen,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                        if (ready) {
+                            Spacer(Modifier.width(14.dp))
+                            Text(
+                                text = "→",
+                                color = Color.White,
+                                fontSize = 25.sp
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(9.dp))
+
+                Text(
+                    text = if (ready) "Tap to enter NSE Watcher" else "Loading verified market data and news",
+                    color = SplashMutedGreen.copy(alpha = 0.9f),
+                    fontSize = 9.sp,
+                    textAlign = TextAlign.Center
+                )
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(8.dp))
         }
     }
 }
