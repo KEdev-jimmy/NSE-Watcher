@@ -18,6 +18,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -566,6 +568,7 @@ private object PaperPortfolioStore {
     private const val HOLDINGS = "holdings"
     private const val HISTORY = "history"
     private const val TRADES = "trades"
+    private const val CONTRIBUTIONS = "contributions"
     const val PRACTICE_COST_RATE = 0.02
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -597,6 +600,30 @@ private object PaperPortfolioStore {
         } catch (_: Exception) { emptyList() }
     }
 
+    fun contributions(context: Context): List<PaperContribution> {
+        return try {
+            val a = JSONArray(prefs(context).getString(CONTRIBUTIONS, "[]") ?: "[]")
+            buildList {
+                for (i in 0 until a.length()) {
+                    val o = a.getJSONObject(i)
+                    add(PaperContribution(o.getLong("time"), o.getDouble("amount")))
+                }
+            }.let { stored ->
+                if (stored.isNotEmpty()) stored.sortedBy { it.time }
+                else {
+                    val original = initial(context)
+                    val firstTime = history(context).firstOrNull()?.first ?: System.currentTimeMillis()
+                    if (original > 0.0) listOf(PaperContribution(firstTime, original)) else emptyList()
+                }
+            }
+        } catch (_: Exception) { emptyList() }
+    }
+
+    fun totalContributed(context: Context): Double {
+        val stored = contributions(context).sumOf { it.amount }
+        return if (stored > 0.0) stored else initial(context)
+    }
+
     fun trades(context: Context): List<String> {
         return try {
             val a = JSONArray(prefs(context).getString(TRADES, "[]") ?: "[]")
@@ -606,10 +633,30 @@ private object PaperPortfolioStore {
 
     fun create(context: Context, amount: Double) {
         val safe = amount.coerceAtLeast(1000.0)
-        val history = JSONArray().put(JSONObject().put("time", System.currentTimeMillis()).put("value", safe))
+        val now = System.currentTimeMillis()
+        val history = JSONArray().put(JSONObject().put("time", now).put("value", safe))
+        val contributions = JSONArray().put(JSONObject().put("time", now).put("amount", safe))
         prefs(context).edit().putBoolean(ENABLED, true).putFloat(INITIAL, safe.toFloat())
             .putFloat(CASH, safe.toFloat()).putString(HOLDINGS, "[]")
-            .putString(HISTORY, history.toString()).putString(TRADES, "[]").apply()
+            .putString(HISTORY, history.toString()).putString(CONTRIBUTIONS, contributions.toString())
+            .putString(TRADES, "[]").apply()
+    }
+
+    fun addPracticeMoney(context: Context, amount: Double): Result<Unit> {
+        if (!amount.isFinite() || amount < 1000.0) {
+            return Result.failure(IllegalArgumentException("Enter at least KSh 1,000 of practice money."))
+        }
+        if (!isEnabled(context)) {
+            return Result.failure(IllegalArgumentException("Create a practice portfolio first."))
+        }
+        val now = System.currentTimeMillis()
+        val entries = contributions(context).toMutableList()
+        entries.add(PaperContribution(now, amount))
+        val a = JSONArray()
+        entries.forEach { a.put(JSONObject().put("time", it.time).put("amount", it.amount)) }
+        prefs(context).edit().putFloat(CASH, (cash(context) + amount).toFloat()).putString(CONTRIBUTIONS, a.toString()).apply()
+        addTrade(context, "CAPITAL ADD • " + formatPrice(amount))
+        return Result.success(Unit)
     }
 
     fun reset(context: Context) { prefs(context).edit().clear().apply() }
@@ -621,7 +668,7 @@ private object PaperPortfolioStore {
         if (entries.isEmpty() || now - entries.last().first >= 15 * 60 * 1000L) entries.add(now to value)
         else entries[entries.lastIndex] = now to value
         val a = JSONArray()
-        entries.takeLast(180).forEach { a.put(JSONObject().put("time", it.first).put("value", it.second)) }
+        entries.takeLast(4000).forEach { a.put(JSONObject().put("time", it.first).put("value", it.second)) }
         prefs(context).edit().putString(HISTORY, a.toString()).apply()
     }
 
@@ -663,37 +710,18 @@ private object PaperPortfolioStore {
         if (!marketPrice.isFinite() || marketPrice <= 0.0) return "Current market price is unavailable."
         if (shares <= 0) return "Enter a positive share quantity."
         if (!price.isFinite() || price <= 0.0) return "Enter a valid limit price."
-
-        // NSE equities now trade in single-share units; there is no blanket 100-share
-        // minimum on the normal board. The practice simulator therefore does not
-        // impose an artificial lot-size restriction.
-        // Use the provider's company-specific previous-close field as the
-        // market-data reference input. Do not reconstruct it from the displayed
-        // percentage change: that is a derived value and can drift from the
-        // provider's actual reference field.
-        val referencePrice = stock.previousClose
-            ?.takeIf { it.isFinite() && it > 0.0 }
+        val referencePrice = stock.previousClose?.takeIf { it.isFinite() && it > 0.0 }
             ?: return "This company's NSE reference price is unavailable in the current market feed. Refresh the market data before placing the practice order."
-
-        // Standard NSE equity movement band. Material-announcement exceptions
-        // can change the permitted band; without an explicit exchange/provider
-        // exception field we must not invent one.
         val lowerBand = referencePrice * 0.90
         val upperBand = referencePrice * 1.10
         if (price < lowerBand - 0.000001 || price > upperBand + 0.000001) {
-            return "Limit price must be within the current NSE price band: " +
-                formatPrice(lowerBand) + " – " + formatPrice(upperBand) + "."
+            return "Limit price must be within the current NSE price band: " + formatPrice(lowerBand) + " – " + formatPrice(upperBand) + "."
         }
-
         val tick = paperTickSize(price)
         val steps = price / tick
         if (kotlin.math.abs(steps - kotlin.math.round(steps)) > 0.000001) {
             return "Limit price must follow the NSE tick size of " + formatPrice(tick) + " at this price."
         }
-
-        // This simulator fills practice orders immediately. A real limit order below
-        // the current offer (buy) or above the current bid (sell) could remain resting;
-        // without a live order book we do not pretend to simulate that queue.
         if (side == "BUY" && price + 0.000001 < marketPrice) {
             return "Practice buy limit must be at or above the latest observed price (" + formatPrice(marketPrice) + ") for an immediate simulated fill."
         }
@@ -719,7 +747,6 @@ private object PaperPortfolioStore {
         prefs(context).edit().putString(TRADES, a.toString()).apply()
     }
 }
-
 private fun paperPriceBand(stock: Stock): Pair<Double, Double> {
     val market = stock.price
     val reference = stock.previousClose?.takeIf { it.isFinite() && it > 0.0 }
@@ -743,24 +770,30 @@ private fun Paper() {
     val context = androidx.compose.ui.platform.LocalContext.current
     var refresh by remember { mutableIntStateOf(0) }
     var showCreate by remember { mutableStateOf(!PaperPortfolioStore.isEnabled(context)) }
+    var showAddMoney by remember { mutableStateOf(false) }
     var startingAmount by rememberSaveable { mutableStateOf("100000") }
+    var addedAmount by rememberSaveable { mutableStateOf("10000") }
+    var addMoneyError by remember { mutableStateOf<String?>(null) }
     var selectedStock by remember { mutableStateOf<Stock?>(null) }
     var side by remember { mutableStateOf("BUY") }
     var resetConfirm by remember { mutableStateOf(false) }
     var pendingTradeSuccess by remember { mutableStateOf<PaperTradeSuccess?>(null) }
     var tradeSuccess by remember { mutableStateOf<PaperTradeSuccess?>(null) }
+    var chartRange by rememberSaveable { mutableStateOf(PaperChartRange.ALL.name) }
 
     val enabled = remember(refresh) { PaperPortfolioStore.isEnabled(context) }
     val holdings = remember(refresh, stocks) { PaperPortfolioStore.holdings(context) }
     val cash = remember(refresh) { PaperPortfolioStore.cash(context) }
-    val initial = remember(refresh) { PaperPortfolioStore.initial(context) }
+    val contributed = remember(refresh) { PaperPortfolioStore.totalContributed(context) }
     val value = cash + holdings.sumOf { h ->
         val stock = stocks.firstOrNull { it.symbol == h.symbol }
         (stock?.price ?: h.averageCost) * h.shares
     }
-    val gain = value - initial
-    val returnPct = if (initial > 0) gain / initial * 100.0 else 0.0
+    val gain = value - contributed
+    val returnPct = if (contributed > 0) gain / contributed * 100.0 else 0.0
     val history = remember(refresh, stocks) { PaperPortfolioStore.history(context) }
+    val contributions = remember(refresh) { PaperPortfolioStore.contributions(context) }
+    val activeRange = PaperChartRange.valueOf(chartRange)
 
     LaunchedEffect(refresh, stocks) {
         if (enabled) PaperPortfolioStore.recordSnapshot(context, value)
@@ -778,34 +811,43 @@ private fun Paper() {
                 }
             }
         }
-
         item {
             Card(Modifier.fillMaxWidth(), RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = DarkGreen)) {
                 Column(Modifier.padding(18.dp)) {
-                    Text("YOUR PRACTICE ACCOUNT", color = Color(0xFFA9DEC5), fontSize = 8.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
-                    Text(if (enabled) formatPrice(value) else "Not started", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("YOUR PRACTICE ACCOUNT", color = Color(0xFFA9DEC5), fontSize = 8.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
+                            Text(if (enabled) formatPrice(value) else "Not started", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
+                            if (enabled) Text((if (gain >= 0) "+" else "") + formatPrice(gain) + "  •  " + (if (returnPct >= 0) "+" else "") + String.format(Locale.US, "%.2f%%", returnPct), color = if (gain >= 0) Color(0xFF7CE6B3) else Color(0xFFFF9B9B), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                        if (enabled) FilledTonalButton(
+                            onClick = { addMoneyError = null; showAddMoney = true },
+                            colors = ButtonDefaults.filledTonalButtonColors(containerColor = Color(0x337CE6B3), contentColor = Color(0xFFE5FFF1)),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Add money", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
                     if (enabled) {
-                        Text((if (gain >= 0) "+" else "") + formatPrice(gain) + "  •  " + (if (returnPct >= 0) "+" else "") + String.format(Locale.US, "%.2f%%", returnPct),
-                            color = if (gain >= 0) Color(0xFF7CE6B3) else Color(0xFFFF9B9B), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(12.dp))
-                        PaperHistoryChart(history)
+                        PaperHistoryChart(history, contributions, activeRange) { range -> chartRange = range.name }
                         Spacer(Modifier.height(10.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             PaperMetric("Available", formatPrice(cash), Modifier.weight(1f))
                             PaperMetric("Invested", formatPrice(value - cash), Modifier.weight(1f))
+                            PaperMetric("Contributed", formatPrice(contributed), Modifier.weight(1f))
                         }
                     } else {
                         Spacer(Modifier.height(4.dp))
                         Text("Start with virtual money. No broker, CDS account or real trade is involved.", color = Color(0xFFD5E9DF), fontSize = 10.sp, lineHeight = 14.sp)
                         Spacer(Modifier.height(14.dp))
-                        Button({ showCreate = true }, Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Green), shape = RoundedCornerShape(14.dp)) {
-                            Text("Create practice portfolio", fontWeight = FontWeight.Bold)
-                        }
+                        Button({ showCreate = true }, Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Green), shape = RoundedCornerShape(14.dp)) { Text("Create practice portfolio", fontWeight = FontWeight.Bold) }
                     }
                 }
             }
         }
-
         if (enabled) {
             item {
                 Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), border = BorderStroke(1.dp, Border)) {
@@ -820,33 +862,30 @@ private fun Paper() {
                         if (holdings.isEmpty()) {
                             Text("No positions yet", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             Text("Choose a company below to test a practice purchase.", color = Muted, fontSize = 9.sp)
-                        } else {
-                            holdings.forEach { h ->
-                                val stock = stocks.firstOrNull { it.symbol == h.symbol }
-                                if (stock != null) {
-                                    val marketValue = h.shares * stock.price
-                                    val pnl = marketValue - h.shares * h.averageCost
-                                    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        Logo(stock.symbol, 38, stock.logoUrl)
-                                        Spacer(Modifier.width(8.dp))
-                                        Column(Modifier.weight(1f)) {
-                                            Text(stock.symbol, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp)
-                                            Text(formatShares(h.shares) + " shares • avg " + formatPrice(h.averageCost), color = Muted, fontSize = 8.sp)
-                                        }
-                                        Column(horizontalAlignment = Alignment.End) {
-                                            Text(formatPrice(marketValue), fontWeight = FontWeight.Bold, fontSize = 10.sp)
-                                            Text((if (pnl >= 0) "+" else "") + formatPrice(pnl), color = if (pnl >= 0) Green else Red, fontWeight = FontWeight.Bold, fontSize = 9.sp)
-                                        }
-                                        IconButton({ selectedStock = stock; side = "SELL" }) { Icon(Icons.Default.RemoveCircleOutline, "Sell", tint = Red) }
+                        } else holdings.forEach { h ->
+                            val stock = stocks.firstOrNull { it.symbol == h.symbol }
+                            if (stock != null) {
+                                val marketValue = h.shares * stock.price
+                                val pnl = marketValue - h.shares * h.averageCost
+                                Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Logo(stock.symbol, 38, stock.logoUrl)
+                                    Spacer(Modifier.width(8.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        Text(stock.symbol, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp)
+                                        Text(formatShares(h.shares) + " shares • avg " + formatPrice(h.averageCost), color = Muted, fontSize = 8.sp)
                                     }
-                                    HorizontalDivider(color = Border)
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text(formatPrice(marketValue), fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                                        Text((if (pnl >= 0) "+" else "") + formatPrice(pnl), color = if (pnl >= 0) Green else Red, fontWeight = FontWeight.Bold, fontSize = 9.sp)
+                                    }
+                                    TextButton({ selectedStock = stock; side = "SELL" }) { Text("SELL", color = Red, fontWeight = FontWeight.ExtraBold, fontSize = 9.sp) }
                                 }
+                                HorizontalDivider(color = Border)
                             }
                         }
                     }
                 }
             }
-
             item {
                 Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = LightGreen)) {
                     Column(Modifier.padding(14.dp)) {
@@ -854,20 +893,19 @@ private fun Paper() {
                         Text("Choose a company, enter a limit price and quantity. The simulator validates the order and fills it immediately when the rules pass.", color = TextDark, fontSize = 9.sp, lineHeight = 13.sp)
                         Spacer(Modifier.height(8.dp))
                         var companyQuery by rememberSaveable { mutableStateOf("") }
-OutlinedTextField(value = companyQuery, onValueChange = { companyQuery = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text("Search companies…", fontSize = 10.sp) }, leadingIcon = { Icon(Icons.Default.Search, null, Modifier.size(18.dp)) })
-Spacer(Modifier.height(7.dp))
-stocks.filter { companyQuery.isBlank() || it.symbol.contains(companyQuery, true) || it.name.contains(companyQuery, true) }.take(8).forEach { stock ->
-    Row(Modifier.fillMaxWidth().clickable { selectedStock = stock; side = "BUY" }.padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-        Logo(stock.symbol, 36, stock.logoUrl); Spacer(Modifier.width(8.dp))
-        Column(Modifier.weight(1f)) { Text(stock.symbol, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp); Text(stock.name, color = Muted, fontSize = 8.sp, maxLines = 1) }
-        Column(horizontalAlignment = Alignment.End) { Text(formatPrice(stock.price), fontWeight = FontWeight.Bold, fontSize = 10.sp); Text((if (stock.change >= 0) "+" else "") + String.format(Locale.US, "%.2f%%", stock.change), color = if (stock.change >= 0) Green else Red, fontSize = 8.sp, fontWeight = FontWeight.Bold) }
-    }
-    HorizontalDivider(color = Border)
+                        OutlinedTextField(value = companyQuery, onValueChange = { companyQuery = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text("Search companies…", fontSize = 10.sp) }, leadingIcon = { Icon(Icons.Default.Search, null, Modifier.size(18.dp)) })
+                        Spacer(Modifier.height(7.dp))
+                        stocks.filter { companyQuery.isBlank() || it.symbol.contains(companyQuery, true) || it.name.contains(companyQuery, true) }.take(8).forEach { stock ->
+                            Row(Modifier.fillMaxWidth().clickable { selectedStock = stock; side = "BUY" }.padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Logo(stock.symbol, 36, stock.logoUrl); Spacer(Modifier.width(8.dp))
+                                Column(Modifier.weight(1f)) { Text(stock.symbol, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp); Text(stock.name, color = Muted, fontSize = 8.sp, maxLines = 1) }
+                                Column(horizontalAlignment = Alignment.End) { Text(formatPrice(stock.price), fontWeight = FontWeight.Bold, fontSize = 10.sp); Text((if (stock.change >= 0) "+" else "") + String.format(Locale.US, "%.2f%%", stock.change), color = if (stock.change >= 0) Green else Red, fontSize = 8.sp, fontWeight = FontWeight.Bold) }
+                            }
+                            HorizontalDivider(color = Border)
                         }
                     }
                 }
             }
-
             item {
                 Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), border = BorderStroke(1.dp, Border)) {
                     Column(Modifier.padding(14.dp)) {
@@ -878,149 +916,96 @@ stocks.filter { companyQuery.isBlank() || it.symbol.contains(companyQuery, true)
                         Text("• The market feed is exchange-supplied and 15-minute delayed. If an exact exchange reference/limit field is unavailable, the app does not invent one.", color = Muted, fontSize = 9.sp)
                         Text("• Practice orders fill immediately only when the limit price could cross the latest observed market price. A real order book is not simulated.", color = Muted, fontSize = 9.sp)
                         Text("• A 2.0% practice transaction-cost assumption is applied to buys and sells; it is not a live brokerage quote.", color = Muted, fontSize = 9.sp)
-                        Text("• Portfolio value uses the latest available quote in NSE Watcher.", color = Muted, fontSize = 9.sp)
+                        Text("• Portfolio value is repriced from the latest available quote. Added practice money is capital, not investment profit.", color = Muted, fontSize = 9.sp)
                     }
                 }
             }
-
             item {
                 OutlinedButton({ resetConfirm = true }, Modifier.fillMaxWidth(), shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, Color(0xFFD8A3A3))) {
-                    Icon(Icons.Default.RestartAlt, null, tint = Red)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Reset practice portfolio", color = Red, fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.RestartAlt, null, tint = Red); Spacer(Modifier.width(6.dp)); Text("Reset practice portfolio", color = Red, fontWeight = FontWeight.Bold)
                 }
             }
-
             val recent = PaperPortfolioStore.trades(context).take(5)
-            if (recent.isNotEmpty()) {
-                item {
-                    Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), border = BorderStroke(1.dp, Border)) {
-                        Column(Modifier.padding(14.dp)) {
-                            Text("Recent practice activity", fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
-                            recent.forEach { Text(it, color = Muted, fontSize = 8.sp, modifier = Modifier.padding(vertical = 3.dp)) }
-                        }
+            if (recent.isNotEmpty()) item {
+                Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), border = BorderStroke(1.dp, Border)) {
+                    Column(Modifier.padding(14.dp)) {
+                        Text("Recent practice activity", fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
+                        recent.forEach { Text(it, color = Muted, fontSize = 8.sp, modifier = Modifier.padding(vertical = 3.dp)) }
                     }
                 }
             }
         }
-
-        item {
-            Text("Practice investing is educational only. It does not execute trades, guarantee returns or represent a brokerage account.",
-                color = Muted, fontSize = 8.sp, lineHeight = 11.sp, modifier = Modifier.padding(horizontal = 4.dp))
-        }
+        item { Text("Practice investing is educational only. It does not execute trades, guarantee returns or represent a brokerage account.", color = Muted, fontSize = 8.sp, lineHeight = 11.sp, modifier = Modifier.padding(horizontal = 4.dp)) }
     }
 
-    if (showCreate) {
-        AlertDialog(
-            onDismissRequest = { if (enabled) showCreate = false },
-            title = { Text("Create practice portfolio", fontWeight = FontWeight.ExtraBold) },
-            text = {
-                Column {
-                    Text("Choose the virtual starting balance you want to test.", color = Muted, fontSize = 10.sp)
-                    Spacer(Modifier.height(8.dp))
-                    OutlinedTextField(startingAmount, { startingAmount = it.filter(Char::isDigit) }, label = { Text("Starting balance (KSh)") }, singleLine = true)
-                    Spacer(Modifier.height(5.dp))
-                    Text("No real money is involved.", color = Green, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                }
-            },
-            confirmButton = {
-                Button({
-                    val amount = startingAmount.toDoubleOrNull()
-                    if (amount != null && amount >= 1000.0) {
-                        PaperPortfolioStore.create(context, amount)
-                        showCreate = false
-                        refresh++
-                    }
-                }, colors = ButtonDefaults.buttonColors(containerColor = Green)) { Text("Start") }
-            },
-            dismissButton = { if (enabled) TextButton({ showCreate = false }) { Text("Cancel") } }
-        )
-    }
+    if (showCreate) AlertDialog(
+        onDismissRequest = { if (enabled) showCreate = false },
+        title = { Text("Create practice portfolio", fontWeight = FontWeight.ExtraBold) },
+        text = {
+            Column {
+                Text("Choose the virtual starting balance you want to test.", color = Muted, fontSize = 10.sp)
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(startingAmount, { startingAmount = it.filter(Char::isDigit) }, label = { Text("Starting balance (KSh)") }, singleLine = true)
+                Spacer(Modifier.height(5.dp)); Text("No real money is involved.", color = Green, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+            }
+        },
+        confirmButton = {
+            Button({
+                val amount = startingAmount.toDoubleOrNull()
+                if (amount != null && amount >= 1000.0) { PaperPortfolioStore.create(context, amount); showCreate = false; refresh++ }
+            }, colors = ButtonDefaults.buttonColors(containerColor = Green)) { Text("Start") }
+        },
+        dismissButton = { if (enabled) TextButton({ showCreate = false }) { Text("Cancel") } }
+    )
+
+    if (showAddMoney) AlertDialog(
+        onDismissRequest = { showAddMoney = false },
+        title = { Text("Add practice money", fontWeight = FontWeight.ExtraBold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Add virtual capital without changing your investment gain or return. Your account value increases by the added cash.", color = Muted, fontSize = 10.sp, lineHeight = 14.sp)
+                OutlinedTextField(addedAmount, { addedAmount = it.filter(Char::isDigit) }, label = { Text("Amount (KSh)") }, singleLine = true)
+                addMoneyError?.let { Text(it, color = Red, fontSize = 9.sp) }
+            }
+        },
+        confirmButton = {
+            Button({
+                val result = PaperPortfolioStore.addPracticeMoney(context, addedAmount.toDoubleOrNull() ?: 0.0)
+                result.fold(
+                    { showAddMoney = false; addMoneyError = null; refresh++ },
+                    { addMoneyError = it.message ?: "Could not add practice money." }
+                )
+            }, colors = ButtonDefaults.buttonColors(containerColor = Green)) { Text("Add money") }
+        },
+        dismissButton = { TextButton({ showAddMoney = false }) { Text("Cancel") } }
+    )
 
     selectedStock?.let { stock ->
         PaperOrderDialog(context, stock, side, cash, holdings.firstOrNull { it.symbol == stock.symbol }?.shares ?: 0L,
-            { selectedStock = null }, { success ->
-                // Close the order dialog first. The success dialog is opened on the
-                // next composition pass so Android never has to replace two Dialog
-                // windows in the same frame.
-                selectedStock = null
-                refresh++
-                pendingTradeSuccess = success
-            })
+            { selectedStock = null }, { success -> selectedStock = null; refresh++; pendingTradeSuccess = success })
     }
 
     LaunchedEffect(selectedStock, pendingTradeSuccess) {
         if (selectedStock == null && pendingTradeSuccess != null) {
-            kotlinx.coroutines.delay(150)
-            tradeSuccess = pendingTradeSuccess
-            pendingTradeSuccess = null
+            kotlinx.coroutines.delay(150); tradeSuccess = pendingTradeSuccess; pendingTradeSuccess = null
         }
     }
 
     tradeSuccess?.let { success ->
         androidx.compose.ui.window.Dialog(onDismissRequest = { tradeSuccess = null }) {
-            Surface(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
-                shape = RoundedCornerShape(24.dp),
-                color = Color.White
-            ) {
-                Column(
-                    modifier = Modifier.padding(22.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Surface(shape = CircleShape, color = LightGreen, modifier = Modifier.size(72.dp)) {
-                        Icon(
-                            Icons.Default.CheckCircle,
-                            contentDescription = "Practice trade approved",
-                            tint = Green,
-                            modifier = Modifier.padding(13.dp).fillMaxSize()
-                        )
-                    }
-                    Text(
-                        if (success.side == "BUY") "Practice buy approved" else "Practice sell approved",
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 20.sp,
-                        color = TextDark,
-                        textAlign = TextAlign.Center
-                    )
-                    Text(
-                        if (success.side == "BUY") "Your virtual purchase was added to the practice portfolio."
-                        else "Your virtual sale was added to the practice portfolio.",
-                        color = Muted,
-                        fontSize = 11.sp,
-                        textAlign = TextAlign.Center
-                    )
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = LightGreen)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(15.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(
-                                formatShares(success.shares) + " shares of " + success.symbol,
-                                fontWeight = FontWeight.ExtraBold,
-                                fontSize = 14.sp
-                            )
+            Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp), shape = RoundedCornerShape(24.dp), color = Color.White) {
+                Column(modifier = Modifier.padding(22.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Surface(shape = CircleShape, color = LightGreen, modifier = Modifier.size(72.dp)) { Icon(Icons.Default.CheckCircle, "Practice trade approved", tint = Green, modifier = Modifier.padding(13.dp).fillMaxSize()) }
+                    Text(if (success.side == "BUY") "Practice buy approved" else "Practice sell approved", fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, color = TextDark, textAlign = TextAlign.Center)
+                    Text(if (success.side == "BUY") "Your virtual purchase was added to the practice portfolio." else "Your virtual sale was added to the practice portfolio.", color = Muted, fontSize = 11.sp, textAlign = TextAlign.Center)
+                    Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = LightGreen)) {
+                        Column(modifier = Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(formatShares(success.shares) + " shares of " + success.symbol, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
                             Text("Execution price  •  " + formatPrice(success.price), color = Muted, fontSize = 10.sp)
-                            Text(
-                                (if (success.side == "BUY") "Estimated cost  •  " else "Estimated proceeds  •  ") + formatPrice(success.amount),
-                                color = TextDark,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp
-                            )
+                            Text((if (success.side == "BUY") "Estimated cost  •  " else "Estimated proceeds  •  ") + formatPrice(success.amount), color = TextDark, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         }
                     }
-                    Button(
-                        onClick = { tradeSuccess = null },
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Green)
-                    ) {
-                        Text("Done")
-                    }
+                    Button(onClick = { tradeSuccess = null }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Green)) { Text("Done") }
                 }
             }
         }
@@ -1037,7 +1022,6 @@ stocks.filter { companyQuery.isBlank() || it.symbol.contains(companyQuery, true)
         )
     }
 }
-
 @Composable
 private fun PaperMetric(label: String, value: String, modifier: Modifier) {
     Surface(modifier, RoundedCornerShape(14.dp), color = Color(0x331A5A45)) {
@@ -1049,23 +1033,105 @@ private fun PaperMetric(label: String, value: String, modifier: Modifier) {
 }
 
 @Composable
-private fun PaperHistoryChart(history: List<Pair<Long, Double>>) {
-    val points = history.takeLast(60)
-    Canvas(Modifier.fillMaxWidth().height(90.dp)) {
-        if (points.size >= 2) {
-            val min = points.minOf { it.second }
-            val max = points.maxOf { it.second }
-            val range = (max - min).takeIf { it > 0.0 } ?: 1.0
-            val path = Path()
-            points.forEachIndexed { i, p ->
-                val x = size.width * i / points.lastIndex
-                val y = size.height - (((p.second - min) / range).toFloat() * (size.height - 8f) + 4f)
-                if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+private data class PaperContribution(val time: Long, val amount: Double)
+
+private enum class PaperChartRange(val label: String, val millis: Long?) {
+    DAY("1D", 24L * 60L * 60L * 1000L),
+    WEEK("1W", 7L * 24L * 60L * 60L * 1000L),
+    MONTH("1M", 30L * 24L * 60L * 60L * 1000L),
+    THREE_MONTHS("3M", 90L * 24L * 60L * 60L * 1000L),
+    SIX_MONTHS("6M", 180L * 24L * 60L * 60L * 1000L),
+    YEAR("1Y", 365L * 24L * 60L * 60L * 1000L),
+    ALL("All", null)
+}
+
+@Composable
+private fun PaperHistoryChart(
+    history: List<Pair<Long, Double>>,
+    contributions: List<PaperContribution>,
+    selectedRange: PaperChartRange,
+    onRangeSelected: (PaperChartRange) -> Unit
+) {
+    val now = System.currentTimeMillis()
+    val cutoff = selectedRange.millis?.let { now - it }
+    val filtered = history.filter { cutoff == null || it.first >= cutoff }.takeLast(240)
+    val allPoints = if (filtered.isEmpty()) history.takeLast(2) else filtered
+    var selectedIndex by remember(selectedRange, history) { mutableIntStateOf(-1) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Investment performance", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+                Text("Market movement only • capital additions are excluded from gain", color = Color(0xFFB8D5C9), fontSize = 8.sp)
             }
-            drawPath(path, Color(0xFF7CE6B3), style = Stroke(width = 4f, cap = StrokeCap.Round))
+            if (allPoints.size >= 2) {
+                val latestPerformance = allPoints.last().second - cumulativeContribution(contributions, allPoints.last().first)
+                Text(formatPrice(latestPerformance), color = Color(0xFF7CE6B3), fontSize = 9.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(5.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+            PaperChartRange.values().forEach { range ->
+                val active = range == selectedRange
+                Surface(
+                    modifier = Modifier.clickable { onRangeSelected(range) },
+                    shape = RoundedCornerShape(14.dp),
+                    color = if (active) Color(0xFF7CE6B3) else Color(0x331A5A45)
+                ) {
+                    Text(range.label, color = if (active) DarkGreen else Color(0xFFB8D5C9), fontSize = 8.sp, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp))
+                }
+            }
+        }
+        if (allPoints.size >= 2) {
+            val performance = allPoints.map { it.first to (it.second - cumulativeContribution(contributions, it.first)) }
+            val min = performance.minOf { it.second }
+            val max = performance.maxOf { it.second }
+            val range = (max - min).takeIf { it > 0.0 } ?: 1.0
+            val selected = performance.getOrNull(selectedIndex.coerceIn(-1, performance.lastIndex))
+            Canvas(
+                Modifier.fillMaxWidth().height(150.dp).pointerInput(selectedRange, performance) {
+                    detectTapGestures { offset ->
+                        val index = ((offset.x / size.width) * performance.lastIndex).toInt().coerceIn(0, performance.lastIndex)
+                        selectedIndex = index
+                    }
+                }
+            ) {
+                repeat(4) { row ->
+                    val y = size.height * row / 3f
+                    drawLine(Color(0x334E8B70), androidx.compose.ui.geometry.Offset(0f, y), androidx.compose.ui.geometry.Offset(size.width, y), 1f)
+                }
+                val path = Path()
+                performance.forEachIndexed { i, p ->
+                    val x = size.width * i / performance.lastIndex
+                    val y = size.height - (((p.second - min) / range).toFloat() * (size.height - 18f) + 9f)
+                    if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                }
+                drawPath(path, Color(0xFF7CE6B3), style = Stroke(width = 4f, cap = StrokeCap.Round))
+                contributions.filter { it.time >= performance.first().first && it.time <= performance.last().first }.forEach { event ->
+                    val x = performance.indexOfFirst { it.first >= event.time }
+                    if (x >= 0) {
+                        val px = size.width * x / performance.lastIndex
+                        drawLine(Color(0x6687C8AC), androidx.compose.ui.geometry.Offset(px, 8f), androidx.compose.ui.geometry.Offset(px, size.height - 8f), 2f)
+                    }
+                }
+                if (selected != null && selectedIndex in performance.indices) {
+                    val px = size.width * selectedIndex / performance.lastIndex
+                    val py = size.height - (((selected.second - min) / range).toFloat() * (size.height - 18f) + 9f)
+                    drawCircle(Color(0xFFBFF5D7), 8f, androidx.compose.ui.geometry.Offset(px, py))
+                    drawCircle(Green, 4f, androidx.compose.ui.geometry.Offset(px, py))
+                }
+            }
+            selected?.let {
+                Text(formatPrice(it.second) + " • " + java.text.SimpleDateFormat("dd MMM, HH:mm", Locale.US).format(java.util.Date(it.first)), color = Color(0xFFB8D5C9), fontSize = 8.sp)
+            }
+        } else {
+            Text("More observations will appear as the practice account is repriced from delayed market data.", color = Color(0xFFB8D5C9), fontSize = 8.sp)
         }
     }
 }
+
+private fun cumulativeContribution(contributions: List<PaperContribution>, time: Long): Double =
+    contributions.filter { it.time <= time }.sumOf { it.amount }
 
 private data class PaperTradeSuccess(
     val side: String,
@@ -1088,6 +1154,10 @@ private fun PaperOrderDialog(
     var sharesText by rememberSaveable(stock.symbol, side) { mutableStateOf("100") }
     var priceText by rememberSaveable(stock.symbol, side) { mutableStateOf(String.format(Locale.US, "%.2f", stock.price)) }
     var error by remember { mutableStateOf<String?>(null) }
+    val marketPrice = stock.price
+    val currentPrice = priceText.toDoubleOrNull() ?: 0.0
+    val currentTick = paperTickSize(currentPrice.coerceAtLeast(0.01))
+    val band = paperPriceBand(stock)
     val shares = sharesText.toLongOrNull() ?: 0L
     val price = priceText.toDoubleOrNull() ?: 0.0
     val gross = shares * price
@@ -1098,18 +1168,41 @@ private fun PaperOrderDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Column {
-            Text(if (side == "BUY") "Practice Buy" else "Practice Sell", fontWeight = FontWeight.ExtraBold)
+            Row(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically) {
+                Surface(shape = RoundedCornerShape(8.dp), color = if (side == "BUY") LightGreen else Color(0xFFFFEEEE)) {
+                    Text(if (side == "BUY") "BUY" else "SELL", color = if (side == "BUY") Green else Red, fontWeight = FontWeight.ExtraBold, fontSize = 10.sp, modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp))
+                }
+                Text("Practice " + if (side == "BUY") "Buy" else "Sell", fontWeight = FontWeight.ExtraBold)
+            }
             Text(stock.symbol + " • " + stock.name, color = Muted, fontSize = 9.sp)
         }},
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                Text("Latest observed price: " + formatPrice(stock.price), color = Muted, fontSize = 9.sp)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Latest observed price: " + formatPrice(stock.price) + " • 15 min delayed market data", color = Muted, fontSize = 9.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
                     OutlinedTextField(sharesText, { sharesText = it.filter(Char::isDigit) }, Modifier.weight(1f), label = { Text("Shares") }, singleLine = true)
-                    OutlinedTextField(priceText, { priceText = it.filter { ch -> ch.isDigit() || ch == '.' } }, Modifier.weight(1f), label = { Text("Limit price") }, singleLine = true)
+                    Column(Modifier.weight(1.15f)) {
+                        OutlinedTextField(priceText, { priceText = it.filter { ch -> ch.isDigit() || ch == '.' } }, Modifier.fillMaxWidth(), label = { Text("Limit price") }, singleLine = true)
+                        TextButton(onClick = { priceText = String.format(Locale.US, "%.2f", marketPrice); error = null }, contentPadding = PaddingValues(horizontal = 5.dp, vertical = 0.dp)) {
+                            Text("Use market price", fontSize = 8.sp, color = Green, fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
-                Text("NSE tick size at this price: " + formatPrice(tick), color = Muted, fontSize = 8.sp)
-                Text("NSE standard band: " + formatPrice(paperPriceBand(stock).first) + " – " + formatPrice(paperPriceBand(stock).second), color = Muted, fontSize = 8.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedButton(onClick = {
+                        val next = (currentPrice - currentTick).coerceAtLeast(band.first)
+                        priceText = String.format(Locale.US, "%.2f", next); error = null
+                    }, enabled = currentPrice > band.first + 0.000001, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)) {
+                        Text("−", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                    OutlinedButton(onClick = {
+                        val next = (currentPrice + currentTick).coerceAtMost(band.second)
+                        priceText = String.format(Locale.US, "%.2f", next); error = null
+                    }, enabled = currentPrice < band.second - 0.000001, contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)) {
+                        Text("+", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Text("Tick " + formatPrice(currentTick) + " • band " + formatPrice(band.first) + " – " + formatPrice(band.second), color = Muted, fontSize = 8.sp, modifier = Modifier.weight(1f))
+                }
                 Text("Reference: provider previous close • market data is 15 min delayed", color = Muted, fontSize = 8.sp)
                 Text((if (side == "BUY") "Estimated cost: " else "Estimated proceeds: ") + formatPrice(amount), fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 Text(if (side == "BUY") "Available cash: " + formatPrice(cash) else "Available shares: " + formatShares(ownedShares), color = Muted, fontSize = 8.sp)

@@ -2214,3 +2214,31 @@ Implemented in the active practice-trading flow; CI verification is required bef
 
 ## Verification target
 For a stock around KSh 28, entering KSh 2 as a practice BUY must be rejected. The app should show the company's applicable standard band and the delayed-data reference. CI must be GREEN and the APK must be tied to the final commit before claiming the implementation is validated.
+
+
+## CURRENT ACTIVE IMPLEMENTATION — PRACTICE PORTFOLIO PERFORMANCE + TRADING UX
+
+Implemented as one coherent batch from `c7726e9407024c394292b76c610fa51b33863c8a`:
+- Practice Portfolio is now contribution-aware: original starting money and every later **Add practice money** action are recorded as capital contributions.
+- Portfolio **investment gain** is calculated as current account value minus total contributed capital. Adding KSh 50,000 therefore increases account value/cash by KSh 50,000 but does **not** increase investment gain or return.
+- Added **Add money** control to the practice account and a contribution ledger that survives app restarts.
+- Existing portfolios are migrated safely: if no contribution ledger exists, the original starting balance is treated as the initial contribution.
+- Holdings remain dynamically valued from the latest available delayed company quote, so market-price changes flow through portfolio value and position P/L when the market feed refreshes.
+- The portfolio chart is now a selectable performance chart with **1D / 1W / 1M / 3M / 6M / 1Y / All** ranges, more observations, grid structure, touch selection, and contribution markers.
+- Charted performance is contribution-adjusted, so adding capital does not create a fake investment gain spike.
+- Practice trading ticket now has explicit BUY/SELL labeling, **Use market price** shortcut, and NSE tick-size-aware +/- controls constrained by the company's current reference-price band.
+- The default 100-share quantity remains only a starting input, never a minimum or maximum.
+- Existing real delayed market-data rules, provider previous-close reference, NSE tick-size validation, immediate-fill behavior, and separate green-check trade approval modal remain intact.
+- Best Bid / Best Offer is intentionally not shown unless a verified provider order-book field is available; no bid/ask values are fabricated.
+- Adaptive app icon and opening-screen visual designs are **not implemented in this batch**. Those will be handled after visual concepts are generated and approved.
+
+### Acceptance checks for this batch
+1. Add KSh 50,000 to a KSh 110,000 account: account value/cash rises by KSh 50,000 while investment gain remains unchanged.
+2. A holding's market value/P&L reprices from the latest available quote after refresh.
+3. Chart range buttons change the displayed history window.
+4. Chart performance excludes capital additions from gain.
+5. Tapping the chart selects a point and shows its performance/time.
+6. Use market price fills the latest observed quote into Limit Price.
+7. +/- controls move by the applicable NSE tick size and stop at the displayed company band.
+8. BUY/SELL are explicit words in the trade ticket.
+9. No Best Bid/Offer is displayed without provider evidence.
