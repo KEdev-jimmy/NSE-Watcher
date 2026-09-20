@@ -8,6 +8,9 @@ const {
   extractGeminiAnswer,
   extractGeminiAnalysis,
   validateStructuredAnalysis,
+  buildCompanyStoryRequest,
+  extractGeminiStory,
+  validateCompanyStory,
 } = require('../api/analyst');
 const { buildNseIntelligenceContext, validateNseIntelligenceContext } = require('../lib/nseIntelligenceContext');
 
@@ -174,4 +177,29 @@ test('validateNseIntelligenceContext rejects duplicate evidence IDs', () => {
   });
   assert.equal(result.valid, false);
   assert.deepEqual(result.duplicateIds, ['E1']);
+});
+
+
+test('buildCompanyStoryRequest creates a structured evidence-grounded story request', () => {
+  const request = buildCompanyStoryRequest({ symbol: 'SCOM.KE', evidence: [{ id: 'E1', claim: 'Revenue', value: '100' }] });
+  assert.equal(request.generationConfig.responseMimeType, 'application/json');
+  assert.equal(request.generationConfig.responseSchema.type, 'object');
+  assert.match(request.contents[0].parts[0].text, /Create a Company Story/i);
+  assert.match(request.contents[0].parts[0].text, /"id": "E1"/);
+});
+
+test('extractGeminiStory parses a structured Company Story', () => {
+  const story = extractGeminiStory({ candidates: [{ content: { parts: [{ text: JSON.stringify({
+    title: 'Company story', business: 'Telecommunications', performance: 'Reported performance is available.',
+    changes: ['Revenue changed'], events: ['A dated event'], interpretation: 'The evidence may indicate change.',
+    unknowns: ['Cause is unknown'], evidenceIds: ['E1'],
+  }) }] } }] });
+  assert.equal(story.title, 'Company story');
+  assert.deepEqual(story.evidenceIds, ['E1']);
+});
+
+test('validateCompanyStory rejects evidence IDs outside the supplied context', () => {
+  const result = validateCompanyStory({ evidenceIds: ['E1', 'E999'] }, [{ id: 'E1' }]);
+  assert.equal(result.valid, false);
+  assert.deepEqual(result.invalidIds, ['E999']);
 });
