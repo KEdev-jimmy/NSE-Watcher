@@ -60,6 +60,8 @@ fun NSEWatcherOpeningScreen(
         stage = 3
         delay(130)
         stage = 4
+        delay(160)
+        stage = 5
         // Keep the completed mark alive with a very subtle pulse instead of
         // leaving the chart animation looking like it stopped halfway.
         while (isActive) {
