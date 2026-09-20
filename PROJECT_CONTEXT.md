@@ -1857,3 +1857,38 @@ The Watchlist entry now shows **Daily change unavailable** when `changeAvailable
 The fix has been committed, but the connector has not yet reported a workflow run for commit 5d0d87d1a17f3848b1dbfc0efdc110db6fffb599. Therefore this fix is **NOT YET CI-VERIFIED GREEN** and Watchlist closure must not be declared final until the relevant Android CI result is confirmed.
 
 No further Watchlist changes should be made unless CI exposes a concrete failure or a separate audit finds a real defect.
+
+
+## CURRENT CLOSURE AUDIT — COMPANIES
+
+### P2 Companies audit result
+
+The active Companies screen in `DesignActivity.kt` was re-audited against the current Stock ingestion/provenance model.
+
+Verified:
+- Companies uses the shared live stock feed; it does not maintain a second company-data source.
+- Search filters the real loaded company list by name or symbol.
+- Company rows open the existing Company Intelligence flow.
+- Compare and Watchlist navigation use the existing pages/stores.
+- Prices come from the loaded Stock records; no hardcoded company market values were introduced.
+- CompanyDataCoverage is present and uses the current stock dataset.
+- The page preserves the existing compact mobile UI and green visual system.
+
+### Concrete data-integrity defect found and fixed
+
+The Companies list always displayed `s.change` as a percentage, even when `Stock.changeAvailable == false`. The ingestion layer correctly distinguishes unavailable movement from a real zero/unchanged movement, so the Companies UI must not present an unavailable value as `+0.0%`.
+
+Fix commit:
+- **24f133b6acfcdeadcfe3c554b6ec273ef62eb117** — `Show unavailable when company daily change is missing`
+
+The row now shows **Daily change unavailable** when `changeAvailable` is false; real provider/derived movement remains displayed normally.
+
+### Verification state
+
+The fix is committed. The GitHub workflow-run connector did not report a workflow run for this commit, so the fix is **NOT YET CI-VERIFIED GREEN**. Do not claim Companies closure as fully verified until a relevant Android CI result is confirmed.
+
+No other confirmed P2 Companies defect was identified in this focused audit. Legacy/inactive code remains technical debt unless it affects the active Companies flow.
+
+### Next audit target
+
+Continue with **P2 More / Settings**, then P3 technical debt/cleanup. AI work remains active in parallel and should not be treated as deferred solely because this closure audit is proceeding.
