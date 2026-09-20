@@ -2137,10 +2137,10 @@ The Practice Portfolio trade flow has been hardened around the exact required UX
 ### Relevant commits
 - `56d95a01311c0929a76bb18729327d5c4110aa3a` — `Fix practice trade refresh and success flow` — CI #762 GREEN.
 - `de6d910dd000253b4d6c55660cc735cbe9a15864` — `Ensure practice trade approval modal opens after order closes` — CI #763 GREEN.
-- Current follow-up commit for the final success/error-channel hardening: **created after this section is written; verify its exact SHA and CI before marking GREEN.**
+- Final UX hardening commit: `ce951dc4e7ed5b5fafcdc8817e38b55c8605c4a2` — `Finalize practice trade approval UX and error handling`. This commit contains the final source change and this handoff update is being recorded in a follow-up documentation commit so the CI workflow is triggered on the current main branch.
 
 ### Verification requirement
-Do not tell a future chat that this final UX hardening is verified until the Android CI run for the final commit is confirmed GREEN and the resulting APK artifact is tied to that exact commit SHA.
+At the moment this handoff is written, `ce951dc4e7ed5b5fafcdc8817e38b55c8605c4a2` is the final source commit. GitHub Actions must be checked for the current main-head CI run before calling the implementation GREEN. The resulting APK artifact must be tied to the tested source commit (or the immediate documentation-only follow-up commit whose parent is this source commit). Do not claim runtime verification from source inspection alone.
 
 ### User acceptance criteria
 The user must see:
