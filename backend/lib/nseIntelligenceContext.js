@@ -112,6 +112,14 @@ function buildNseIntelligenceContext({ company = {}, movement = null, market = n
       profile: compactProfile(company?.profile),
       financialHistory: compactFinancialHistory(company?.financialHistory),
       dividends: compactDividends(company?.dividends),
+      news: Array.isArray(company?.news) ? company.news.slice(0, 8).map(item => ({
+        title: text(item?.title),
+        summary: text(item?.summary),
+        category: text(item?.category),
+        publishedAt: text(item?.publishedAt),
+        source: text(item?.source),
+        sourceUrl: text(item?.sourceUrl || item?.url),
+      })).filter(item => item.title || item.summary) : [],
     },
     movement: {
       latest: move ? {
