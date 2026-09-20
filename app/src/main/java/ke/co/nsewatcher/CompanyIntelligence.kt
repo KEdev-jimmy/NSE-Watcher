@@ -389,6 +389,16 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
                     fieldSources = intelligence.fieldSources,
                     fieldQuality = intelligence.fieldQuality
                 )
+                Spacer(Modifier.height(9.dp))
+                BeginnerMetricGuide(
+                    title = "How to read these figures",
+                    items = listOf(
+                        "Revenue" to "Money the company reported from its business activities for the stated period.",
+                        "Profit" to "Reported earnings left after the company's expenses for the stated period.",
+                        "EPS" to "Reported earnings expressed per share.",
+                        "Net margin" to "The share of reported revenue that remained as profit."
+                    )
+                )
             }
         }
 
@@ -408,6 +418,15 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
                 )
                 Spacer(Modifier.height(8.dp))
                 Text("Growth compares the latest reported annual figures with the previous comparable annual period.", color = IntelligenceMuted, fontSize = 9.sp)
+                Spacer(Modifier.height(9.dp))
+                BeginnerMetricGuide(
+                    title = "What growth means",
+                    items = listOf(
+                        "Revenue growth" to "How reported annual revenue changed versus the previous comparable annual period.",
+                        "Profit growth" to "How reported annual profit changed versus the previous comparable annual period.",
+                        "EPS growth" to "How reported earnings per share changed versus the previous comparable annual period."
+                    )
+                )
             }
         }
 
@@ -440,6 +459,17 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
                 )
                 Spacer(Modifier.height(8.dp))
                 Text("These ratios are the source's current snapshot; they are not FY 2025 historical ratio values.", color = IntelligenceMuted, fontSize = 9.sp)
+                Spacer(Modifier.height(9.dp))
+                BeginnerMetricGuide(
+                    title = "How to read valuation & ratios",
+                    items = listOf(
+                        "P/E" to "Compares the share price with reported earnings per share.",
+                        "P/B" to "Compares the market value of shares with reported book value.",
+                        "ROE" to "Shows reported profit relative to shareholders' equity.",
+                        "Debt / Equity" to "Shows debt relative to shareholders' equity; compare it over time and with peers.",
+                        "Dividend yield" to "Shows the dividend relative to the current share price."
+                    )
+                )
             }
         }
 
@@ -1405,6 +1435,35 @@ private fun CompanyLogo(symbol: String, size: Int, logoUrl: String? = null) {
         Box(Modifier.fillMaxSize(), Alignment.Center) {
             AsyncImage(model = model, contentDescription = symbol, modifier = Modifier.fillMaxSize().padding(6.dp), contentScale = ContentScale.Fit)
             Text(symbol.take(3), color = IntelligenceGreen, fontWeight = FontWeight.ExtraBold, fontSize = 7.sp)
+        }
+    }
+}
+
+@Composable
+private fun BeginnerMetricGuide(
+    title: String,
+    items: List<Pair<String, String>>
+) {
+    Surface(
+        Modifier.fillMaxWidth(),
+        RoundedCornerShape(12.dp),
+        color = IntelligenceLight,
+        border = BorderStroke(1.dp, IntelligenceBorder)
+    ) {
+        Column(Modifier.padding(11.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.School, contentDescription = null, tint = IntelligenceGreen, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(7.dp))
+                Text(title, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = IntelligenceText)
+            }
+            Spacer(Modifier.height(5.dp))
+            items.forEachIndexed { index, (term, explanation) ->
+                Column(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+                    Text(term, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = IntelligenceGreen)
+                    Text(explanation, fontSize = 8.sp, lineHeight = 12.sp, color = IntelligenceText)
+                }
+                if (index < items.lastIndex) HorizontalDivider(color = IntelligenceBorder)
+            }
         }
     }
 }
