@@ -182,13 +182,36 @@ private fun Companies(open:(Stock)->Unit, openWatchlist:()->Unit, openCompare:()
                 Box(Modifier.fillMaxWidth().height(270.dp).clip(RoundedCornerShape(bottomStart=26.dp,bottomEnd=26.dp))){
                     Image(painter=androidx.compose.ui.res.painterResource(id=ke.co.nsewatcher.R.drawable.companies_city_background),contentDescription=null,modifier=Modifier.fillMaxSize(),contentScale=androidx.compose.ui.layout.ContentScale.Crop)
                     Box(Modifier.fillMaxSize().background(Color(0x99052B24)))
-                    Column(Modifier.fillMaxSize().padding(10.dp,20.dp,10.dp,18.dp),verticalArrangement=Arrangement.Bottom){Text("Discover",color=Color.White,fontSize=25.sp,fontWeight=FontWeight.ExtraBold);Text("Great Companies",color=Color.White,fontSize=25.sp,fontWeight=FontWeight.ExtraBold);Spacer(Modifier.height(5.dp));Text("Research. Analyze. Understand.\nExplore sourced NSE company information.",color=Color.White,fontSize=11.sp)}
+                    Column(Modifier.fillMaxSize().padding(10.dp,20.dp,10.dp,18.dp),verticalArrangement=Arrangement.Bottom){Text("Discover",color=Color.White,fontSize=25.sp,fontWeight=FontWeight.ExtraBold);Text("Great Companies",color=Color.White,fontSize=25.sp,fontWeight=FontWeight.ExtraBold);Spacer(Modifier.height(5.dp));Text("Research. Analyze. Understand.\\nExplore sourced NSE company information.",color=Color.White,fontSize=11.sp)}
                 }
             }
             item{CompanyDataCoverage(stocks)}
             item{OutlinedTextField(value=query,onValueChange={query=it},modifier=Modifier.fillMaxWidth(),singleLine=true,placeholder={Text("Search companies...",color=Muted)},leadingIcon={Icon(Icons.Default.Search,null,tint=Muted)},shape=RoundedCornerShape(24.dp),colors=OutlinedTextFieldDefaults.colors(unfocusedContainerColor=Color.White,focusedContainerColor=Color.White,unfocusedBorderColor=Color.Transparent,focusedBorderColor=Green,unfocusedTextColor=TextDark,focusedTextColor=TextDark))}
-            item{Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text("Companies",color=Color.White,fontWeight=FontWeight.ExtraBold,fontSize=17.sp);Spacer(Modifier.weight(1f));OutlinedButton(onClick=openCompare,shape=RoundedCornerShape(18.dp),border=BorderStroke(1.dp,Color(0xFF55E0A0)),contentPadding=PaddingValues(horizontal=11.dp,vertical=4.dp)){Icon(Icons.Default.StarBorder,null,tint=Color(0xFF55E0A0),modifier=Modifier.size(16.dp));Spacer(Modifier.width(4.dp));Text("Compare",color=Color(0xFF55E0A0),fontSize=10.sp,fontWeight=FontWeight.Bold)}};Spacer(Modifier.width(6.dp));OutlinedButton(onClick=openWatchlist,shape=RoundedCornerShape(18.dp),border=BorderStroke(1.dp,Color(0xFF55E0A0)),contentPadding=PaddingValues(horizontal=11.dp,vertical=4.dp)){Icon(Icons.Default.StarBorder,null,tint=Color(0xFF55E0A0),modifier=Modifier.size(16.dp));Spacer(Modifier.width(4.dp));Text("Watchlist",color=Color(0xFF55E0A0),fontSize=10.sp,fontWeight=FontWeight.Bold)}}}
-            item{Card(Modifier.fillMaxWidth(),RoundedCornerShape(17.dp),colors=CardDefaults.cardColors(containerColor=Color.White)){Column(Modifier.padding(horizontal=12.dp)){filtered.forEachIndexed{index,s->Row(Modifier.fillMaxWidth().clickable{open(s)}.padding(vertical=10.dp),verticalAlignment=Alignment.CenterVertically){Logo(s.symbol,40,s.logoUrl);Spacer(Modifier.width(10.dp));Column(Modifier.weight(1f)){Text(s.name,color=TextDark,fontWeight=FontWeight.ExtraBold,fontSize=12.sp);Text(s.symbol,color=Muted,fontSize=10.sp)};Column(horizontalAlignment=Alignment.End){Text(String.format(Locale.US,"KSh %.2f",s.price),color=TextDark,fontWeight=FontWeight.Bold,fontSize=11.sp);Text(String.format(Locale.US,"%+.1f%%",s.change),color=if(s.change>=0)Green else Red,fontWeight=FontWeight.Bold,fontSize=10.sp)}};if(index<filtered.lastIndex)HorizontalDivider(color=Border)}}}}
+            item{
+                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
+                    Text("Companies",color=Color.White,fontWeight=FontWeight.ExtraBold,fontSize=17.sp)
+                    Spacer(Modifier.weight(1f))
+                    OutlinedButton(onClick=openCompare,shape=RoundedCornerShape(18.dp),border=BorderStroke(1.dp,Color(0xFF55E0A0)),contentPadding=PaddingValues(horizontal=11.dp,vertical=4.dp)){
+                        Icon(Icons.Default.StarBorder,null,tint=Color(0xFF55E0A0),modifier=Modifier.size(16.dp));Spacer(Modifier.width(4.dp));Text("Compare",color=Color(0xFF55E0A0),fontSize=10.sp,fontWeight=FontWeight.Bold)
+                    }
+                    Spacer(Modifier.width(6.dp))
+                    OutlinedButton(onClick=openWatchlist,shape=RoundedCornerShape(18.dp),border=BorderStroke(1.dp,Color(0xFF55E0A0)),contentPadding=PaddingValues(horizontal=11.dp,vertical=4.dp)){
+                        Icon(Icons.Default.StarBorder,null,tint=Color(0xFF55E0A0),modifier=Modifier.size(16.dp));Spacer(Modifier.width(4.dp));Text("Watchlist",color=Color(0xFF55E0A0),fontSize=10.sp,fontWeight=FontWeight.Bold)
+                    }
+                }
+            }
+            item{
+                Card(Modifier.fillMaxWidth(),RoundedCornerShape(17.dp),colors=CardDefaults.cardColors(containerColor=Color.White)){
+                    Column(Modifier.padding(horizontal=12.dp)){
+                        filtered.forEachIndexed{index,s->
+                            Row(Modifier.fillMaxWidth().clickable{open(s)}.padding(vertical=10.dp),verticalAlignment=Alignment.CenterVertically){
+                                Logo(s.symbol,40,s.logoUrl);Spacer(Modifier.width(10.dp));Column(Modifier.weight(1f)){Text(s.name,color=TextDark,fontWeight=FontWeight.ExtraBold,fontSize=12.sp);Text(s.symbol,color=Muted,fontSize=10.sp)};Column(horizontalAlignment=Alignment.End){Text(String.format(Locale.US,"KSh %.2f",s.price),color=TextDark,fontWeight=FontWeight.Bold,fontSize=11.sp);Text(String.format(Locale.US,"%+.1f%%",s.change),color=if(s.change>=0)Green else Red,fontWeight=FontWeight.Bold,fontSize=10.sp)}
+                            }
+                            if(index<filtered.lastIndex)HorizontalDivider(color=Border)
+                        }
+                    }
+                }
+            }
         }
     }
 }
