@@ -54,26 +54,17 @@ fun HomeDashboard(
     var news by remember { mutableStateOf(emptyList<NewsItem>()) }
     var newsLoading by remember { mutableStateOf(true) }
     var newsError by remember { mutableStateOf<String?>(null) }
-    var marketIndices by remember { mutableStateOf(emptyList<MyStocksCache.MarketIndex>()) }
     var marketStatus by remember { mutableStateOf(MyStocksCache.MarketStatus()) }
 
     LaunchedEffect(currentStocks) {
-        // Refresh Home context whenever the shared stock refresh publishes a new snapshot.
-        // This keeps status, indices and news aligned with the quote snapshot instead of
-        // leaving them at the values from the first Home composition.
         marketStatus = MyStocksCache.loadMarketStatus()
-        marketIndices = MyStocksCache.loadMarketIndices(marketStatus.isOpen)
         val result = NewsCache.loadFeedResult()
         news = result.items
         newsError = result.error
         newsLoading = false
     }
 
-    val intelligence = remember(currentStocks, news, marketIndices, marketStatus.isOpen) {
-        HomeIntelligenceEngine.build(currentStocks, news, marketIndices.map { index ->
-        HomeMarketIndex(index.symbol, index.name, index.value, index.changePct, index.asOf, freshnessMode(index.freshnessMode))
-    })
-    }
+    val intelligence = remember(currentStocks, news, marketStatus.isOpen) { HomeIntelligenceEngine.build(currentStocks, news) }
     val breadth = intelligence.breadth
     val gainers = intelligence.gainers
     val losers = intelligence.losers
@@ -81,189 +72,59 @@ fun HomeDashboard(
     val corporateActions = intelligence.corporateActions
     val companyNews = intelligence.companyNews
 
-    LazyColumn(
-        contentPadding = PaddingValues(bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(0.dp)
-    ) {
-        item {
-            HomeHero(
-                advancing = breadth.advancing,
-                declining = breadth.declining,
-                unchanged = breadth.unchanged,
-                reportedVolume = breadth.reportedVolume
-            )
-        }
-
-        if (marketIndices.isNotEmpty()) {
-            item {
-                Spacer(Modifier.height(10.dp))
-                MarketIndexPulse(marketIndices, marketStatus)
-            }
-        }
-
-        item {
-            MarketFreshnessStrip(currentStocks, marketStatus)
-        }
-
-        item {
-            Spacer(Modifier.height(10.dp))
-            WatchlistQuickAccess(openWatchlist)
-        }
-
-        item {
-            Spacer(Modifier.height(11.dp))
-            SectionLabel("Today's Intelligence", "Evidence from the current market and news feed", Icons.Default.Psychology)
-        }
-
-        item {
-            Spacer(Modifier.height(7.dp))
-            TodaysIntelligence(
-                items = intelligence.intelligence,
-                currentStocks = currentStocks,
-                news = news,
-                openCompany = openCompany,
-                openNews = openNews,
-                openMarket = openMarket
-            )
-        }
-
-        item {
-            Spacer(Modifier.height(12.dp))
-            SectionLabel("What Changed?", "Observable changes — no invented causes", Icons.Default.ChangeCircle)
-        }
-        item {
-            Spacer(Modifier.height(7.dp))
-            WhatChanged(
-                changes = intelligence.changes,
-                openCompany = openCompany,
-                currentStocks = currentStocks
-            )
-        }
-
-        if (gainers.isNotEmpty() || losers.isNotEmpty()) {
-            item {
-                Spacer(Modifier.height(12.dp))
-                SectionLabel("Market Movers", "Current session movement", Icons.Default.Whatshot, openMarket)
-            }
-            item {
-                Spacer(Modifier.height(7.dp))
-                MarketMovers(gainers, losers, openCompany)
-            }
-        }
-
+    LazyColumn(contentPadding = PaddingValues(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(0.dp)) {
+        item { HomeHero(breadth.advancing, breadth.declining, breadth.unchanged, breadth.reportedVolume, marketStatus) }
+        item { Spacer(Modifier.height(16.dp)); HomeSectionHeader("YOUR MARKET RADAR", "What is happening?", "A simple view of the latest available NSE evidence.") }
+        item { Spacer(Modifier.height(8.dp)); TodaysIntelligence(intelligence.intelligence, currentStocks, news, openCompany, openNews, openMarket) }
+        item { Spacer(Modifier.height(18.dp)); HomeSectionHeader("MARKET MOVEMENT", "What's moving", "The strongest and weakest observed price changes.") }
+        item { Spacer(Modifier.height(8.dp)); if (gainers.isNotEmpty() || losers.isNotEmpty()) MarketMovers(gainers, losers, openCompany) else EmptyHomeCard("Movement unavailable", "Verified daily change data is not available for the current feed.") }
+        item { Spacer(Modifier.height(18.dp)); HomeSectionHeader("EXPLAINED", "What changed?", "Observable changes, with evidence attached.") }
+        item { Spacer(Modifier.height(8.dp)); WhatChanged(intelligence.changes, openCompany, currentStocks) }
         if (sectorChanges.isNotEmpty()) {
-            item {
-                Spacer(Modifier.height(12.dp))
-                SectionLabel("Sector Pulse", "Average movement by sector", Icons.Default.Insights, openMarket)
-            }
-            item {
-                Spacer(Modifier.height(7.dp))
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 14.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(sectorChanges.take(5)) { (sector, change) -> SectorPulseCard(sector, change) }
-                }
-            }
+            item { Spacer(Modifier.height(18.dp)); HomeSectionHeader("MARKET STRUCTURE", "Sector pulse", "Calculated from available counters — not an official sector index.") }
+            item { Spacer(Modifier.height(8.dp)); LazyRow(contentPadding = PaddingValues(horizontal = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) { items(sectorChanges.take(5)) { (sector, change) -> SectorPulseCard(sector, change) } } }
         }
-
-        if (corporateActions.isNotEmpty()) {
-            item {
-                Spacer(Modifier.height(12.dp))
-                SectionLabel("Corporate Actions", "Dividends, rights, bonuses and announcements", Icons.Default.Event, openMarket)
-            }
-            item {
-                Spacer(Modifier.height(7.dp))
-                Column(Modifier.padding(horizontal = 14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    corporateActions.take(2).forEach { action ->
-                        CorporateActionCard(action) { openNews(action) }
-                    }
-                }
-            }
-        }
-
         if (companyNews.isNotEmpty() || newsLoading || newsError != null) {
-            item {
-                Spacer(Modifier.height(12.dp))
-                SectionLabel("Important News", "Company-linked information that may matter", Icons.Default.Lightbulb, openMarket)
+            item { Spacer(Modifier.height(18.dp)); HomeSectionHeader("FROM THE NEWS FEED", "Worth knowing", "Company-linked information surfaced from the available feed.", if (news.isNotEmpty()) "All news" else null, if (news.isNotEmpty()) { { openNews(news.first()) } } else null) }
+            item { Spacer(Modifier.height(8.dp)); when { companyNews.isNotEmpty() -> Column(Modifier.padding(horizontal = 14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) { companyNews.take(3).forEach { story -> IntelligenceNewsCard(story) { openNews(story) } } }; newsLoading -> LoadingHomeCard("Preparing the latest market news…"); else -> EmptyHomeCard("News temporarily unavailable", "The feed returned an error. NSE Watcher will not invent a story.") } }
+        }
+        if (corporateActions.isNotEmpty()) {
+            item { Spacer(Modifier.height(18.dp)); HomeSectionHeader("CORPORATE EVENTS", "Corporate actions", "Dividends, rights, bonuses and announcements.", "View market", openMarket) }
+            item { Spacer(Modifier.height(8.dp)); Column(Modifier.padding(horizontal = 14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) { corporateActions.take(2).forEach { action -> CorporateActionCard(action) { openNews(action) } } } }
+        }
+        item { Spacer(Modifier.height(18.dp)); WatchlistQuickAccess(openWatchlist); Spacer(Modifier.height(14.dp)); HomeQuickActions(openMarket, if (news.isNotEmpty()) { { openNews(news.first()) } } else null); Spacer(Modifier.height(12.dp)); Text(marketDataFooter(currentStocks), color = HomeMuted, fontSize = 8.sp, lineHeight = 11.sp, modifier = Modifier.padding(horizontal = 17.dp)) }
+    }
+}
+
+@Composable
+private fun HomeHero(advancing: Int, declining: Int, unchanged: Int, reportedVolume: Long, marketStatus: MyStocksCache.MarketStatus) {
+    Box(Modifier.fillMaxWidth().height(300.dp).clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))) {
+        AsyncImage(model = NairobiSkyline, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        Box(Modifier.fillMaxSize().background(Color(0xE609241C)))
+        Box(Modifier.fillMaxSize().background(Color(0x4000A859)))
+        Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(42.dp).clip(RoundedCornerShape(13.dp)).background(HomeGreen), contentAlignment = Alignment.Center) { Icon(Icons.Default.ShowChart, null, tint = Color.White, modifier = Modifier.size(24.dp)) }
+                Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text("NSE WATCHER", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 0.5.sp); Text("Understand the market. Follow the evidence.", color = Color(0xFFD6EDE3), fontSize = 10.sp, maxLines = 1) }
+                Icon(Icons.Default.NotificationsNone, "Notifications", tint = Color.White, modifier = Modifier.size(25.dp))
             }
-            item {
-                Spacer(Modifier.height(7.dp))
-                when {
-                    companyNews.isNotEmpty() -> {
-                        Column(Modifier.padding(horizontal = 14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            companyNews.take(3).forEach { story ->
-                                IntelligenceNewsCard(story) { openNews(story) }
-                            }
-                        }
+            Spacer(Modifier.height(22.dp)); Text(greetingForNairobi(), color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold); Spacer(Modifier.height(3.dp)); Text("Here is your latest NSE market snapshot.", color = Color(0xFFD7E9E2), fontSize = 11.sp); Spacer(Modifier.height(18.dp))
+            Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), color = Color(0xE61A3C31), border = BorderStroke(1.dp, Color(0x5539D995))) {
+                Column(Modifier.padding(horizontal = 15.dp, vertical = 13.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) { Text("MARKET BREADTH", color = Color(0xFF9ED9BF), fontSize = 9.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 0.7.sp); Text(when { advancing > declining -> "More stocks are advancing"; declining > advancing -> "More stocks are declining"; else -> "Advancers and decliners are balanced" }, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold) }
+                        Surface(shape = RoundedCornerShape(20.dp), color = if (marketStatus.isKnown && marketStatus.isOpen) Color(0x3327C982) else Color(0x33FFFFFF)) { Text(if (!marketStatus.isKnown) "STATUS UNKNOWN" else if (marketStatus.isOpen) "MARKET OPEN" else "MARKET CLOSED", color = if (marketStatus.isKnown && marketStatus.isOpen) Color(0xFF7CE6B3) else Color(0xFFD5E1DC), fontSize = 8.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)) }
                     }
-                    newsLoading -> LoadingHomeCard("Loading market news…")
-                    newsError != null -> EmptyHomeCard(
-                        "Market intelligence temporarily unavailable",
-                        "The news feed returned an error. No stories are being fabricated."
-                    )
+                    Spacer(Modifier.height(12.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { HeroMetric("Advancing", advancing.toString(), HomeGreen, Modifier.weight(1f)); HeroMetric("Declining", declining.toString(), HomeRed, Modifier.weight(1f)); HeroMetric("Unchanged", unchanged.toString(), Color(0xFFD4DFDB), Modifier.weight(1f)) }
+                    Spacer(Modifier.height(9.dp)); Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.BarChart, null, tint = Color(0xFF9ED9BF), modifier = Modifier.size(14.dp)); Spacer(Modifier.width(5.dp)); Text("Reported volume  " + formatShares(reportedVolume), color = Color(0xFFD5E5DE), fontSize = 9.sp, fontWeight = FontWeight.SemiBold); Spacer(Modifier.weight(1f)); Text("Latest available", color = Color(0xFF9ED9BF), fontSize = 8.sp, fontWeight = FontWeight.Bold) }
                 }
             }
-        }
-
-        item {
-            Spacer(Modifier.height(12.dp))
-            QuickActions(openMarket, if (news.isNotEmpty()) { { openNews(news.first()) } } else null)
-            Spacer(Modifier.height(11.dp))
-            Text(
-                marketDataFooter(currentStocks),
-                color = HomeMuted,
-                fontSize = 8.sp,
-                lineHeight = 11.sp,
-                modifier = Modifier.padding(horizontal = 17.dp)
-            )
         }
     }
 }
 
 @Composable
-private fun HomeHero(advancing: Int, declining: Int, unchanged: Int, reportedVolume: Long) {
-    Box(Modifier.fillMaxWidth().height(278.dp)) {
-        Box(Modifier.fillMaxWidth().height(194.dp)) {
-            AsyncImage(
-                model = NairobiSkyline,
-                contentDescription = "Nairobi skyline",
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
-            Box(Modifier.fillMaxSize().background(Color(0xCC00523B)))
-            Box(Modifier.fillMaxSize().background(Color(0x66002018)))
-        }
-        Column(Modifier.fillMaxWidth()) {
-            Row(
-                Modifier.padding(start = 24.dp, end = 20.dp, top = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(Modifier.size(46.dp).clip(RoundedCornerShape(14.dp)).background(HomeGreen)) {
-                    Icon(Icons.Default.ShowChart, null, tint = Color.White, modifier = Modifier.padding(8.dp).fillMaxSize())
-                }
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("NSE Watcher", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("Analyse • Understand • Invest Smarter", color = Color(0xFFD7F2E4), fontSize = 10.sp)
-                }
-                Box(Modifier.size(38.dp), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.Notifications, "Notifications", tint = Color.White, modifier = Modifier.size(25.dp))
-                    Box(Modifier.size(8.dp).clip(CircleShape).background(Color(0xFFFF4D5A)).align(Alignment.TopEnd))
-                }
-            }
-            Column(Modifier.padding(start = 30.dp, top = 7.dp, end = 24.dp)) {
-                Text(greetingForNairobi(), color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
-                Text("Here's what's happening in the NSE today", color = Color(0xFFE0F2EA), fontSize = 11.sp)
-            }
-            Spacer(Modifier.height(5.dp))
-            NasiPulseCard()
-            Spacer(Modifier.height(6.dp))
-            CompactBreadthCard(advancing, declining, unchanged, reportedVolume)
-        }
-    }
-}
-
+private fun HeroMetric(label: String, value: String, accent: Color, modifier: Modifier) { Surface(modifier = modifier, shape = RoundedCornerShape(13.dp), color = Color(0x331A5A45)) { Column(Modifier.padding(horizontal = 9.dp, vertical = 8.dp)) { Text(label, color = Color(0xFFB8D5C9), fontSize = 7.sp, maxLines = 1); Text(value, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold); Box(Modifier.padding(top = 3.dp).width(20.dp).height(2.dp).clip(RoundedCornerShape(2.dp)).background(accent)) } } }
 @Composable
 private fun CompactBreadthCard(advancing: Int, declining: Int, unchanged: Int, reportedVolume: Long) {
     Card(
@@ -438,22 +299,12 @@ private fun formatLocalTime(valueMs: Long): String =
     Instant.ofEpochMilli(valueMs).atZone(ZoneId.of("Africa/Nairobi")).toLocalTime().toString().take(5) + " EAT"
 
 @Composable
-private fun SectionLabel(title: String, subtitle: String, icon: ImageVector, onViewAll: (() -> Unit)? = null) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(27.dp).clip(RoundedCornerShape(8.dp)).background(HomeLightGreen)) {
-            Icon(icon, null, tint = HomeDarkGreen, modifier = Modifier.padding(5.dp))
-        }
-        Spacer(Modifier.width(8.dp))
-        Column(Modifier.weight(1f)) {
-            Text(title, color = HomeTextDark, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
-            if (subtitle.isNotBlank()) Text(subtitle, color = HomeMuted, fontSize = 8.sp)
-        }
-        if (onViewAll != null) {
-            Text("View all →", color = HomeDarkGreen, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable(onClick = onViewAll))
-        }
+private fun HomeSectionHeader(eyebrow: String, title: String, subtitle: String, action: String? = null, onAction: (() -> Unit)? = null) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.Bottom) {
+        Column(Modifier.weight(1f)) { Text(eyebrow, color = HomeGreen, fontSize = 8.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 0.9.sp); Spacer(Modifier.height(2.dp)); Text(title, color = HomeTextDark, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold); Text(subtitle, color = HomeMuted, fontSize = 9.sp, lineHeight = 13.sp, maxLines = 2) }
+        if (action != null && onAction != null) Text(action, color = HomeGreen, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable(onClick = onAction).padding(start = 8.dp, bottom = 2.dp))
     }
 }
-
 @Composable
 private fun TodaysIntelligence(
     items: List<HomeIntelligenceItem>,
@@ -780,9 +631,9 @@ private fun WatchlistQuickAccess(openWatchlist: () -> Unit) {
 }
 
 @Composable
-private fun QuickActions(openMarket: () -> Unit, openNews: (() -> Unit)?) {
+private fun HomeQuickActions(openMarket: () -> Unit, openNews: (() -> Unit)?) {
     Column(Modifier.padding(horizontal = 14.dp)) {
-        Text("Quick Actions", color = HomeTextDark, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
+        Text("Explore", color = HomeTextDark, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
         Spacer(Modifier.height(7.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             QuickAction("Market", Icons.Default.ShowChart, openMarket, Modifier.weight(1f))
