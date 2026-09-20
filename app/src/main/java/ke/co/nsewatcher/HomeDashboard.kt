@@ -250,7 +250,7 @@ private fun HomeHero(advancing: Int, declining: Int, unchanged: Int, reportedVol
                 }
             }
             Column(Modifier.padding(start = 30.dp, top = 7.dp, end = 24.dp)) {
-                Text("Good morning, James", color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
+                Text(greetingForNairobi(), color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
                 Text("Here's what's happening in the NSE today", color = Color(0xFFE0F2EA), fontSize = 11.sp)
             }
             Spacer(Modifier.height(5.dp))
@@ -827,6 +827,16 @@ private fun HomeLogo(symbol: String, logoUrl: String?, size: Int) {
         if (resolved != null) AsyncImage(model = resolved, contentDescription = symbol, modifier = Modifier.fillMaxSize().padding(4.dp), contentScale = ContentScale.Fit)
         else Icon(Icons.Default.Article, null, tint = HomeGreen, modifier = Modifier.padding((size / 4).dp))
     }
+}
+
+private fun greetingForNairobi(): String {
+    val hour = java.time.ZonedDateTime.now(java.time.ZoneId.of("Africa/Nairobi")).hour
+    val greeting = when {
+        hour < 12 -> "Good morning"
+        hour < 17 -> "Good afternoon"
+        else -> "Good evening"
+    }
+    return "$greeting, James"
 }
 
 private fun formatPrice(value: Double): String = if (value.isFinite()) String.format(Locale.US, "KSh %.2f", value) else "Price unavailable"
