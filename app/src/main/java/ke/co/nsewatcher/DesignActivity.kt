@@ -818,13 +818,13 @@ stocks.filter { companyQuery.isBlank() || it.symbol.contains(companyQuery, true)
         Column(horizontalAlignment = Alignment.End) { Text(formatPrice(stock.price), fontWeight = FontWeight.Bold, fontSize = 10.sp); Text((if (stock.change >= 0) "+" else "") + String.format(Locale.US, "%.2f%%", stock.change), color = if (stock.change >= 0) Green else Red, fontSize = 8.sp, fontWeight = FontWeight.Bold) }
     }
     HorizontalDivider(color = Border)
-}                        }
+                        }
                     }
                 }
             }
 
             item {
-                Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), border = BorderStroke(1.dp, Border)) {
+                Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), border = BorderStroke(1.dp, Border))
                     Column(Modifier.padding(14.dp)) {
                         Text("Practice rules", fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
                         Text("• Simulated locally — nothing is sent to a broker or the NSE ATS.", color = Muted, fontSize = 9.sp)
