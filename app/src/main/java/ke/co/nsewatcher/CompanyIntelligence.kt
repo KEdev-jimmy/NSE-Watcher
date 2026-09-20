@@ -336,12 +336,53 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
                             analystResult.error.isNotBlank() -> Text("Analyst unavailable: " + analystResult.error, color = Color(0xFFFFC4C4), fontSize = 9.sp)
                             analystResult.message.isNotBlank() && analystResult.answer.isBlank() -> Text(analystResult.message, color = Color.White.copy(alpha = .82f), fontSize = 9.sp, lineHeight = 14.sp)
                             else -> {
-                                Text(analystResult.answer, color = Color.White, fontSize = 10.sp, lineHeight = 15.sp)
-                                if (analystResult.evidence.isNotEmpty()) {
-                                    Spacer(Modifier.height(7.dp))
-                                    Text("Evidence used", color = Color(0xFFBFE8D0), fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                                    analystResult.evidence.take(6).forEach { evidence ->
-                                        Text(evidence.id + ": " + evidence.claim, color = Color.White.copy(alpha = .75f), fontSize = 8.sp, lineHeight = 12.sp)
+                                val analysis = analystResult.analysis
+                                if (analysis == null) {
+                                    Text(analystResult.answer, color = Color.White, fontSize = 10.sp, lineHeight = 15.sp)
+                                } else {
+                                    if (analysis.headline.isNotBlank()) {
+                                        Text(analysis.headline, color = Color.White, fontSize = 12.sp, lineHeight = 17.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    if (analysis.summary.isNotBlank()) {
+                                        Spacer(Modifier.height(5.dp))
+                                        Text(analysis.summary, color = Color.White.copy(alpha = .88f), fontSize = 10.sp, lineHeight = 15.sp)
+                                    }
+                                    analysis.signals.take(4).forEach { signal ->
+                                        Spacer(Modifier.height(7.dp))
+                                        Surface(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            color = Color.White.copy(alpha = .08f),
+                                            shape = RoundedCornerShape(10.dp)
+                                        ) {
+                                            Column(Modifier.padding(9.dp)) {
+                                                Text(signal.title, color = Color(0xFFBFE8D0), fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                                if (signal.detail.isNotBlank()) {
+                                                    Spacer(Modifier.height(2.dp))
+                                                    Text(signal.detail, color = Color.White.copy(alpha = .86f), fontSize = 9.sp, lineHeight = 13.sp)
+                                                }
+                                                if (signal.evidenceIds.isNotEmpty()) {
+                                                    Spacer(Modifier.height(3.dp))
+                                                    Text(
+                                                        "Evidence " + signal.evidenceIds.joinToString(" · "),
+                                                        color = Color.White.copy(alpha = .58f),
+                                                        fontSize = 7.sp
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if (analysis.interpretation.isNotBlank()) {
+                                        Spacer(Modifier.height(7.dp))
+                                        Text("What it may mean", color = Color(0xFFBFE8D0), fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                        Spacer(Modifier.height(2.dp))
+                                        Text(analysis.interpretation, color = Color.White.copy(alpha = .82f), fontSize = 9.sp, lineHeight = 13.sp)
+                                    }
+                                    if (analysis.unknowns.isNotEmpty()) {
+                                        Spacer(Modifier.height(7.dp))
+                                        Text("Still unknown", color = Color(0xFFBFE8D0), fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                        analysis.unknowns.take(4).forEach { unknown ->
+                                            Text("• " + unknown, color = Color.White.copy(alpha = .72f), fontSize = 8.sp, lineHeight = 12.sp)
+                                        }
                                     }
                                 }
                             }
