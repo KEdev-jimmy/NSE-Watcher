@@ -470,8 +470,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
         }
 
         if (metricsSection == CompanyIntelligenceSection.PERFORMANCE) {
-        item { SectionTitle("Market behaviour", "Price movement across time", Icons.Default.ShowChart) }
-        item {
+                item {
             IntelligenceCard {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
                     Column(Modifier.weight(1f)) {
@@ -618,8 +617,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
         }
 
         if (researchSection == CompanyIntelligenceSection.EVIDENCE) {
-        item { SectionTitle("Evidence", "Sourced records behind this intelligence view", Icons.Default.Verified) }
-        item {
+                item {
             IntelligenceCard {
                 if (intelligenceView.evidenceRecords.isEmpty()) {
                     Text("No normalized evidence records are available from the current response.", color = IntelligenceMuted, fontSize = 10.sp)
