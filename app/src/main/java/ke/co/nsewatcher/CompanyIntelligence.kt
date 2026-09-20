@@ -469,7 +469,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
 
         }
 
-        if (performanceSection == CompanyIntelligenceSection.PERFORMANCE) {
+        if (metricsSection == CompanyIntelligenceSection.PERFORMANCE) {
         item { SectionTitle("Market behaviour", "Price movement across time", Icons.Default.ShowChart) }
         item {
             IntelligenceCard {
