@@ -7,9 +7,9 @@
 **Repository:** `KEdev-jimmy/NSE-Watcher`  
 **Product:** NSE Watcher Android app  
 **Primary goal:** Evidence-grounded NSE market intelligence for beginner investors.  
-**Current roadmap phase:** **Phase 10 — Real Market & Index Context**  
-**Latest verified implementation area:** Company Intelligence financial evidence provenance + Android CI verification.  
-**Latest implementation commit before this state update:** `19459fc4aaa2cb607dd9fea07d7045daed357738` — Align financial growth fixture with provider values.
+**Current roadmap phase:** **Phase 10 closure / whole-app integration audit**  
+**Latest verified implementation area:** Whole-app navigation/data-flow audit and Home market-navigation callback fix.  
+**Latest implementation commit:** `62396dd02c0e373a147bce8f2746dbda13524965` — Fix Home market navigation callback.
 
 ---
 
@@ -2571,3 +2571,61 @@ The core evidence/data-confidence audit is otherwise clean based on the current 
 ## Next action
 
 Verify the new commit-triggered Android CI run. If it passes, the evidence/data-confidence foundation should be treated as closed. The remaining live `/api/company` check is a runtime verification task, not a reason for further field-by-field changes unless it exposes a concrete defect.
+
+
+# 56. Whole-app integration and legacy audit — 20 Sep 2026
+
+**Status: audited; no risky cleanup applied**
+
+## Verified current state
+
+The active navigation/data path was audited across Home, Market, Companies, Company Intelligence, News, Watchlist, More, Settings and Alerts.
+
+The active architecture is effectively:
+
+```
+MyStocks/provider data
+        ↓
+Vercel backend
+        ↓
+Android cache/data layer
+        ↓
+Active screens
+```
+
+Confirmed active areas include Home intelligence, market movers/history, Companies, Company Intelligence, News/feed/detail, Watchlist, alerts and evidence/provenance.
+
+## Concrete integration fix already completed
+
+Home's market callback had been incorrectly wired to the Watchlist destination. It was corrected so the Home Market action opens the Market screen.
+
+Commit:
+- `62396dd02c0e373a147bce8f2746dbda13524965` — Fix Home market navigation callback
+
+## Legacy-code finding
+
+The repository still contains older abstractions:
+- `data/BackendApi.kt`
+- `data/MarketRepository.kt`
+- `data/MarketDataProvider.kt`
+
+These were not deleted because `MarketRepository.kt` also contains the live `WatchlistStore`, and the remaining references were not proven safe to remove. They are classified as technical debt rather than confirmed defects.
+
+## Current UI limitations found
+
+- Theme → System is currently a placeholder action.
+- Chart Settings is currently a static settings page rather than a fully applied chart configuration surface.
+- Language, Security, Privacy and Font & Display contain limited/static controls.
+- Notification settings copy should be reconciled with the already-existing alert worker/evaluator so the UI does not imply alerts are entirely unimplemented.
+
+These are separate from the core market/company data path and should not be changed during cleanup without a targeted implementation plan.
+
+## Verification
+
+The latest Home-navigation commit reports a successful Vercel status. GitHub's commit-workflow connector did not expose a separate workflow run for this commit, so no additional Android CI result is claimed from that connector response.
+
+## Next logical step
+
+Perform a focused final UI/functional closure audit of the active path:
+Home → Market → Companies → Company Intelligence → News → Watchlist → Alerts.
+Only implement concrete defects found. Avoid deleting legacy abstractions until their references are fully proven unused.
