@@ -1938,3 +1938,48 @@ No other confirmed P2 More/Settings blocker was identified in this audit.
 ### Next audit target
 
 Proceed to **P3 technical debt / cleanup**, while preserving the current working architecture and avoiding broad cleanup rewrites.
+
+
+# CURRENT CLOSURE AUDIT — P3 TECHNICAL DEBT / CLEANUP
+
+## Audit result
+
+The P3 cleanup audit was intentionally conservative. The active Android/data architecture was not refactored because the remaining older abstractions were not proven safe to remove, and the current working feature set should not be disturbed during AI development.
+
+### Concrete documentation/dead-code cleanup completed
+
+1. README was stale and materially misleading. It still described the app as being in clearly labelled demo mode with sample quotes, performance, volume, news and status values. The current repository instead contains provider-backed market/news paths, evidence/provenance, Company Intelligence, Watchlist, Alerts and explicit unavailable/fallback handling. The README was rewritten to describe the current architecture and to point to PROJECT_CONTEXT.md as the authoritative handoff.
+   - Commit: 4ba3466c4be3764a4caba1d25fcf91c7d8947bb4
+
+2. Obsolete demo UI notes were removed. DESIGN_UPDATE_NOTES.md described an old demo UI refresh and no longer represented the active product state.
+   - Commit: 003301502085c90779adb1eb8135811805a479be
+
+3. Stale duplicate project-state handoff was removed. PROJECT_STATE.md still described Phase 10 as current and placed AI in a future phase, conflicting with the authoritative and much newer PROJECT_CONTEXT.md. Keeping both would risk future chats following stale instructions.
+   - Commit: dadf478cbbce10371c551baa4ae327af3db51a10
+
+### Known technical debt intentionally retained
+
+- data/BackendApi.kt
+- data/MarketRepository.kt
+- data/MarketDataProvider.kt
+
+These remain because MarketRepository.kt contains the active WatchlistStore, and a complete reference proof for deleting the older abstractions has not been established. They are technical debt, not confirmed defects.
+
+The one-off scripts/wire_mystocks_ui.py migration script is also obsolete and contains assumptions from the old demo-to-MyStocks wiring stage. The repository deletion operation returned a conflict even though the current tree still shows the expected blob SHA, so the script was not deleted. Do not run it; deletion can be revisited with a lower-level Git operation later. No application code was changed by this failed deletion attempt.
+
+### P3 classification
+
+- README stale demo description: FIXED
+- obsolete demo design note: REMOVED
+- stale duplicate project-state handoff: REMOVED
+- obsolete migration script: KNOWN TECHNICAL DEBT / RETAINED
+- older data abstractions: KNOWN TECHNICAL DEBT / RETAINED
+- broad DesignActivity refactor: DEFERRED — too risky during closure/AI work without a concrete defect
+
+### Verification state
+
+The cleanup commits changed documentation/files only; the final repository head still needs Android/backend CI verification. Do not mark this P3 milestone GREEN until the current head's CI result is confirmed. The GitHub workflow-run connector may omit push-triggered runs, so an empty workflow-run response is not proof that no run exists.
+
+### Next action
+
+Check the CI status for the current head. If GREEN, P3 cleanup is closed for now and the project should return to the active AI implementation/audit rather than continuing speculative cleanup. If CI fails, inspect the exact failure and fix only the root cause.
