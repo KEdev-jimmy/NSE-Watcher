@@ -626,7 +626,7 @@ private object PaperPortfolioStore {
     }
 
     fun buy(context: Context, stock: Stock, shares: Long, price: Double): Result<Unit> {
-        val error = validate(stock.price, shares, price)
+        val error = validate(stock, "BUY", shares, price)
         if (error != null) return Result.failure(IllegalArgumentException(error))
         val tradeValue = shares * price
         val fee = tradeValue * PRACTICE_COST_RATE
@@ -644,7 +644,7 @@ private object PaperPortfolioStore {
     }
 
     fun sell(context: Context, stock: Stock, shares: Long, price: Double): Result<Unit> {
-        val error = validate(stock.price, shares, price)
+        val error = validate(stock, "SELL", shares, price)
         if (error != null) return Result.failure(IllegalArgumentException(error))
         val map = holdings(context).associateBy { it.symbol }.toMutableMap()
         val old = map[stock.symbol] ?: return Result.failure(IllegalArgumentException("You do not hold " + stock.symbol + "."))
@@ -658,14 +658,47 @@ private object PaperPortfolioStore {
         return Result.success(Unit)
     }
 
-    private fun validate(marketPrice: Double, shares: Long, price: Double): String? {
+    private fun validate(stock: Stock, side: String, shares: Long, price: Double): String? {
+        val marketPrice = stock.price
         if (!marketPrice.isFinite() || marketPrice <= 0.0) return "Current market price is unavailable."
         if (shares <= 0) return "Enter a positive share quantity."
-        if (shares % 100L != 0L) return "Normal-board practice orders use 100-share lots."
         if (!price.isFinite() || price <= 0.0) return "Enter a valid limit price."
+
+        // NSE equities now trade in single-share units; there is no blanket 100-share
+        // minimum on the normal board. The practice simulator therefore does not
+        // impose an artificial lot-size restriction.
+        val referencePrice = if (stock.changeAvailable && stock.change.isFinite() && stock.change > -100.0) {
+            marketPrice / (1.0 + stock.change / 100.0)
+        } else {
+            null
+        } ?: return "Daily price band is unavailable for this quote. Refresh the market data before placing the practice order."
+
+        // Model the NSE equity daily movement band around the session reference price.
+        // The NSE market reference also has exceptions for material announcements;
+        // those cannot be inferred safely from the quote alone, so this simulator
+        // uses the standard 10% band when no verified exception is available.
+        val lowerBand = referencePrice * 0.90
+        val upperBand = referencePrice * 1.10
+        if (price < lowerBand - 0.000001 || price > upperBand + 0.000001) {
+            return "Limit price must be within the current NSE price band: " +
+                formatPrice(lowerBand) + " – " + formatPrice(upperBand) + "."
+        }
+
         val tick = paperTickSize(price)
         val steps = price / tick
-        if (kotlin.math.abs(steps - kotlin.math.round(steps)) > 0.000001) return "Price does not follow the modeled NSE tick size of " + formatPrice(tick) + "."
+        if (kotlin.math.abs(steps - kotlin.math.round(steps)) > 0.000001) {
+            return "Limit price must follow the NSE tick size of " + formatPrice(tick) + " at this price."
+        }
+
+        // This simulator fills practice orders immediately. A real limit order below
+        // the current offer (buy) or above the current bid (sell) could remain resting;
+        // without a live order book we do not pretend to simulate that queue.
+        if (side == "BUY" && price + 0.000001 < marketPrice) {
+            return "Practice buy limit must be at or above the latest observed price (" + formatPrice(marketPrice) + ") for an immediate simulated fill."
+        }
+        if (side == "SELL" && price - 0.000001 > marketPrice) {
+            return "Practice sell limit must be at or below the latest observed price (" + formatPrice(marketPrice) + ") for an immediate simulated fill."
+        }
         return null
     }
 
@@ -684,6 +717,15 @@ private object PaperPortfolioStore {
         list.take(50).forEach(a::put)
         prefs(context).edit().putString(TRADES, a.toString()).apply()
     }
+}
+
+private fun paperPriceBand(stock: Stock): Pair<Double, Double> {
+    val market = stock.price
+    if (!market.isFinite() || market <= 0.0 || !stock.changeAvailable || !stock.change.isFinite() || stock.change <= -100.0) {
+        return market to market
+    }
+    val reference = market / (1.0 + stock.change / 100.0)
+    return reference * 0.90 to reference * 1.10
 }
 
 private fun paperTickSize(price: Double): Double = when {
@@ -830,8 +872,9 @@ stocks.filter { companyQuery.isBlank() || it.symbol.contains(companyQuery, true)
                     Column(Modifier.padding(14.dp)) {
                         Text("Practice rules", fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
                         Text("• Simulated locally — nothing is sent to a broker or the NSE ATS.", color = Muted, fontSize = 9.sp)
-                        Text("• Normal-board practice orders use 100-share lots.", color = Muted, fontSize = 9.sp)
-                        Text("• Limit prices must follow the modeled NSE tick-size schedule.", color = Muted, fontSize = 9.sp)
+                        Text("• NSE equities use single-share trading; the simulator does not impose an artificial 100-share minimum.", color = Muted, fontSize = 9.sp)
+                        Text("• Limit prices use the NSE tick-size schedule and the current session price band where verified market data is available.", color = Muted, fontSize = 9.sp)
+                        Text("• Practice orders fill immediately only when the limit price could cross the latest observed market price. A real order book is not simulated.", color = Muted, fontSize = 9.sp)
                         Text("• A 2.0% practice transaction-cost assumption is applied to buys and sells; it is not a live brokerage quote.", color = Muted, fontSize = 9.sp)
                         Text("• Portfolio value uses the latest available quote in NSE Watcher.", color = Muted, fontSize = 9.sp)
                     }
@@ -1063,7 +1106,8 @@ private fun PaperOrderDialog(
                     OutlinedTextField(sharesText, { sharesText = it.filter(Char::isDigit) }, Modifier.weight(1f), label = { Text("Shares") }, singleLine = true)
                     OutlinedTextField(priceText, { priceText = it.filter { ch -> ch.isDigit() || ch == '.' } }, Modifier.weight(1f), label = { Text("Limit price") }, singleLine = true)
                 }
-                Text("Tick size at this price: " + formatPrice(tick), color = Muted, fontSize = 8.sp)
+                Text("NSE tick size at this price: " + formatPrice(tick), color = Muted, fontSize = 8.sp)
+                Text("Standard session band: " + formatPrice(paperPriceBand(stock).first) + " – " + formatPrice(paperPriceBand(stock).second), color = Muted, fontSize = 8.sp)
                 Text((if (side == "BUY") "Estimated cost: " else "Estimated proceeds: ") + formatPrice(amount), fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 Text(if (side == "BUY") "Available cash: " + formatPrice(cash) else "Available shares: " + formatShares(ownedShares), color = Muted, fontSize = 8.sp)
                 error?.let { Text(it, color = Red, fontSize = 9.sp, lineHeight = 12.sp) }
