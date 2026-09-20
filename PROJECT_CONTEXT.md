@@ -2242,3 +2242,30 @@ Implemented as one coherent batch from `c7726e9407024c394292b76c610fa51b33863c8a
 7. +/- controls move by the applicable NSE tick size and stop at the displayed company band.
 8. BUY/SELL are explicit words in the trade ticket.
 9. No Best Bid/Offer is displayed without provider evidence.
+
+
+---
+
+# 2026-09-20 — NSE Watcher Opening Screen / Startup Gate Update
+
+- Android CI run #787 succeeded after fixing the opening-screen graphicsLayer extension call.
+- Opening screen was refined to a centered, more polished welcome composition:
+  - centered NSE/market-intelligence badge
+  - centered animated NSE Watcher logo
+  - stronger visual hierarchy for title and taglines
+  - centered CTA with consistent width and alignment
+  - explicit startup status indicator
+  - subtle skyline/chart background retained
+  - calmer spacing and reduced visual imbalance
+- The opening screen does not auto-enter Home anymore. It remains visible until startup data preparation completes and the user taps Start Exploring.
+- Startup preparation now runs the Home's essential data work concurrently:
+  - market stocks
+  - news feed
+  - market status
+- Startup has a bounded 12-second maximum so a provider outage cannot trap the user permanently on the welcome screen.
+- Home receives the prepared startup data and does not immediately show its own loading-news state on first entry when startup preparation completed.
+- Active files changed for this phase:
+  - app/src/main/java/ke/co/nsewatcher/SplashIntro.kt
+  - app/src/main/java/ke/co/nsewatcher/DesignActivity.kt
+  - app/src/main/java/ke/co/nsewatcher/HomeDashboard.kt
+- Important UX rule going forward: Welcome screen = startup gate; Start Exploring = explicit user entry; Home should open only after startup preparation has completed.
