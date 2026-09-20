@@ -19,7 +19,10 @@ import ke.co.nsewatcher.data.AlertStore
 import ke.co.nsewatcher.data.NewsCache
 import kotlinx.coroutines.flow.first
 import ke.co.nsewatcher.domain.AlertType
-import java.time.Instant\nimport java.time.LocalDate\nimport java.time.ZoneId\nimport java.time.format.DateTimeParseException
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeParseException
 import java.util.concurrent.TimeUnit
 
 class AlertWorker(appContext: Context, workerParams: WorkerParameters) : CoroutineWorker(appContext, workerParams) {
@@ -74,7 +77,16 @@ class AlertWorker(appContext: Context, workerParams: WorkerParameters) : Corouti
         return Result.success()
     }
 
-    private fun isPublishedToday(publishedAt: String): Boolean {\n        if (publishedAt.isBlank()) return false\n        return try {\n            Instant.parse(publishedAt).atZone(ZoneId.of("Africa/Nairobi")).toLocalDate() == LocalDate.now(ZoneId.of("Africa/Nairobi"))\n        } catch (_: DateTimeParseException) {\n            publishedAt.take(10) == LocalDate.now(ZoneId.of("Africa/Nairobi")).toString()\n        }\n    }\n\n    private fun ensureChannel() {
+    private fun isPublishedToday(publishedAt: String): Boolean {
+        if (publishedAt.isBlank()) return false
+        return try {
+            Instant.parse(publishedAt).atZone(ZoneId.of("Africa/Nairobi")).toLocalDate() == LocalDate.now(ZoneId.of("Africa/Nairobi"))
+        } catch (_: DateTimeParseException) {
+            publishedAt.take(10) == LocalDate.now(ZoneId.of("Africa/Nairobi")).toString()
+        }
+    }
+
+    private fun ensureChannel() {
         val manager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         manager.createNotificationChannel(NotificationChannel(CHANNEL_ID, "NSE Watcher alerts", NotificationManager.IMPORTANCE_DEFAULT))
     }
