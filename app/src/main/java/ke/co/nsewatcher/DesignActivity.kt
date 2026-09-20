@@ -67,6 +67,9 @@ private val Border = Color(0xFFE1EAE5)
 private val Red = Color(0xFFE04444)
 private const val PREFS = "nse_watcher_preferences"
 
+private fun formatPrice(value: Double): String = "KSh " + String.format(Locale.US, "%,.2f", value)
+private fun formatShares(value: Long): String = String.format(Locale.US, "%,d", value)
+
 data class Stock(val symbol:String,val name:String,val price:Double,val change:Double,val history:List<Double>,val logoUrl:String?=null,val sector:String="Other",val volume:Long=0L,val changeAvailable:Boolean=true,val volumeAvailable:Boolean=true,val source:String="",val observedAt:String="",val freshnessMode:String="UNKNOWN",val dataOrigin:String="unknown",val averageVolume:Long=0L,val averageVolumeAvailable:Boolean=false)
 
 data class NewsItem(
@@ -676,7 +679,7 @@ private object PaperPortfolioStore {
 
     private fun addTrade(context: Context, text: String) {
         val list = trades(context).toMutableList()
-        list.add(0, java.time.LocalDate.now().toString() + " • " + text)
+        list.add(0, java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US).format(java.util.Date()) + " • " + text)
         val a = JSONArray()
         list.take(50).forEach(a::put)
         prefs(context).edit().putString(TRADES, a.toString()).apply()
