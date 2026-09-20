@@ -57,7 +57,10 @@ fun HomeDashboard(
     var marketIndices by remember { mutableStateOf(emptyList<MyStocksCache.MarketIndex>()) }
     var marketStatus by remember { mutableStateOf(MyStocksCache.MarketStatus()) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(currentStocks) {
+        // Refresh Home context whenever the shared stock refresh publishes a new snapshot.
+        // This keeps status, indices and news aligned with the quote snapshot instead of
+        // leaving them at the values from the first Home composition.
         marketStatus = MyStocksCache.loadMarketStatus()
         marketIndices = MyStocksCache.loadMarketIndices(marketStatus.isOpen)
         val result = NewsCache.loadFeedResult()
