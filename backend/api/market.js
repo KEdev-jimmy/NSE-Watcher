@@ -24,6 +24,27 @@ async function mystocks(path) {
   return data;
 }
 
+async function loadAllNseStocks() {
+  const pageSize = 200;
+  const stocks = [];
+  let cursor = '';
+  const seenCursors = new Set();
+
+  while (true) {
+    const suffix = cursor ? `&cursor=${encodeURIComponent(cursor)}` : '';
+    const page = await mystocks(`/stocks?exchange=NSE&limit=${pageSize}${suffix}`);
+    const pageStocks = Array.isArray(page?.stocks) ? page.stocks : [];
+    stocks.push(...pageStocks);
+
+    if (!page?.hasMore || !page?.nextCursor || seenCursors.has(page.nextCursor)) {
+      return { ...page, stocks, count: stocks.length, hasMore: false, nextCursor: null };
+    }
+
+    seenCursors.add(page.nextCursor);
+    cursor = page.nextCursor;
+  }
+}
+
 function periodConfig(period) {
   const end = new Date();
   const start = new Date(end);
@@ -173,7 +194,7 @@ module.exports = async (req, res) => {
       });
     }
     if (action === 'stocks') {
-      const data = await mystocks('/stocks?exchange=NSE&limit=50');
+      const data = await loadAllNseStocks();
       return json(res, 200, { source: 'MyStocks Africa', delayMinutes: 15, fetchedAt: new Date().toISOString(), data });
     }
     if (action === 'indices') {
