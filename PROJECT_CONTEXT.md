@@ -1983,3 +1983,83 @@ The cleanup commits changed documentation/files only; the final repository head 
 ### Next action
 
 Check the CI status for the current head. If GREEN, P3 cleanup is closed for now and the project should return to the active AI implementation/audit rather than continuing speculative cleanup. If CI fails, inspect the exact failure and fix only the root cause.
+
+
+# CURRENT ACTIVE AI AUDIT — ANALYST HARDENING
+
+## Status
+
+**IMPLEMENTED — CI VERIFICATION REQUIRED**
+
+AI Analyst is an active product feature, not a future placeholder.
+
+### Audit findings and grouped hardening
+
+The first AI integrity/security audit identified several concrete reliability concerns that could be addressed without changing the product architecture:
+
+1. Evidence text is external/provider data and must be treated as untrusted data, not instructions.
+2. The model could cite an evidence ID that does not exist in the supplied packet; the backend previously had no integrity check.
+3. Upstream company-data and OpenAI requests had no explicit timeout.
+4. OpenAI output had no explicit token ceiling.
+5. Public AI errors exposed raw upstream error details to callers.
+
+### Implemented
+
+Commit:
+- **45c1a073c92918a86e18cbbc02cb44da2a36d390** — `Harden the Analyst evidence boundary and request handling`
+
+Changes in backend/api/analyst.js:
+- Added a 15-second timeout for the internal Company Intelligence fetch.
+- Added a 30-second timeout for the OpenAI Responses API call.
+- Added an explicit max_output_tokens: 900 ceiling.
+- Strengthened the system instructions so evidence fields are explicitly treated as untrusted data and never as instructions.
+- Added citation-integrity validation against the actual evidence IDs supplied in the packet.
+- Returns citationIntegrity metadata with valid/cited/invalid IDs and a warning when citations are missing or invalid.
+- Public errors now return only `AI Analyst unavailable` rather than exposing raw upstream error details.
+- Exported buildEvidencePacket and validateCitations for regression testing.
+
+### Regression tests
+
+Created:
+- backend/test/analyst.test.js
+- Tests evidence-packet field isolation.
+- Tests valid evidence-ID citations.
+- Tests invalid/nonexistent evidence IDs.
+- Tests missing evidence citations.
+
+CI workflow was updated in commit:
+- **006cf11a078bf7f96e8a9502aaad8a5d293d6f75** — `Run Analyst regression tests in CI`
+
+The backend quality-test step now includes backend/test/analyst.test.js.
+
+### Important remaining AI audit item
+
+The Analyst endpoint remains publicly callable because the Android app cannot safely contain the OpenAI secret. A durable rate-limit/cost-control mechanism should be evaluated before treating AI hardening as fully closed. Do not add an ad-hoc in-memory limiter and call it production protection; Vercel serverless instances are not a reliable shared rate-limit store.
+
+Potential future options should be evaluated against the actual deployed architecture before implementation:
+- Vercel-native firewall/rate controls if available/configured
+- an appropriate persistent rate-limit store
+- authenticated access if/when the app has real user identity
+- conservative request controls at the provider/platform layer
+
+Do not put OPENAI_API_KEY into Android code or the APK.
+
+### AI audit principle
+
+The Analyst must continue to obey:
+
+**RAW DATA → CALCULATION → EXPLANATION → EVIDENCE**
+
+The model is an explanation layer over supplied evidence, not a source of market facts.
+
+No BUY / SELL / HOLD recommendations, target prices, guaranteed returns, fabricated confidence scores, invented facts, or unsupported causal claims.
+
+### Verification
+
+The hardening commits above require the next Android/backend CI run to be inspected before this milestone is called GREEN.
+
+### Next action
+
+1. Verify CI for the current head.
+2. If GREEN, continue the AI audit with the public endpoint/cost-control question and live Analyst response behavior.
+3. If CI fails, inspect the exact failure and fix only the root cause.
