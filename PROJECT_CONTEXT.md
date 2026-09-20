@@ -1247,7 +1247,6 @@ Report:
 Only include sections A-J when a full implementation report is requested.
 
 ---
-
 # 36. DO NOT REPEAT PAST MISTAKES
 
 ### Mistake: assuming a feature is missing without searching
@@ -1497,7 +1496,6 @@ Run and inspect the new Android CI result. If green, perform a focused Phase 11 
 **IMPLEMENTED — REQUIRES CI VERIFICATION**
 
 Focused audit after the dedicated Watchlist view passed CI found two small integration improvements worth making before closing Phase 11:
-
 - The Watchlist page now refreshes the existing MyStocksCache stock feed when the page is opened, so it does not depend only on the app-level initial load.
 - The Watchlist page explicitly identifies its price/daily-change provenance as MyStocks Africa and warns that market data may be delayed and material announcements should be verified with the issuer or NSE.
 
@@ -1956,3 +1954,171 @@ IMMEDIATE NEXT ACTION
 
 WORKING STYLE
 Direct continuation. Preserve working features. Make surgical changes. Inspect CI proactively. Report what was found, what changed, commit, actual CI status and next step. A task is complete only when required CLI/CI verification is GREEN.
+
+
+# 56. CHAT HANDOFF — SEPTEMBER 2026 — CURRENT EXACT STATE
+
+## Purpose
+This section is the authoritative handoff for the next coding chat. Read it before making any project change. Preserve everything already implemented; do not restart or redesign completed work.
+
+## Product rules / working contract
+- Product principle: RAW DATA → CALCULATION → EXPLANATION → EVIDENCE.
+- Never fabricate prices, financials, EPS, revenue, profit, dividends, corporate actions, indices, volume, news, evidence, URLs, portfolio values/holdings, watchlist companies, AI conclusions, confidence scores, causation, or market delay.
+- Missing data must remain unavailable/unknown; never convert missing into zero/unchanged/fresh.
+- Calculations must be distinguishable from provider facts.
+- Preserve source, URL, symbol/company, observation/publication date, period and provenance whenever available.
+- Never create BUY/SELL/HOLD recommendations or predictive trading signals.
+- Never invent NASI/NSE20/NSE25 values or a fixed index delay.
+- Do not build a second parallel data/intelligence architecture.
+- Preserve working UI/features; use surgical changes only.
+- Never expose or modify secrets.
+- Do not claim a change is complete until the relevant CLI/GitHub Actions run is actually GREEN.
+- If CI fails: inspect exact logs → identify root cause → fix → commit → check CI again → repeat until GREEN. Do not hand the user a “done” status while CI is failing or unverified.
+- After every meaningful implementation/verification milestone, update this file so the next chat can continue without reconstruction.
+
+## Current UX/product direction
+- Green branding and compact mobile-first layout are intentional.
+- Avoid giant cards, excessive whitespace, oversized icons, redundant titles and technical wording.
+- Home remains intelligence-first.
+- User rejected a huge global sticky tab bar. Company Intelligence uses local embedded section navigation controlling the content immediately below it.
+- Existing Gainers/Losers must remain.
+- Watchlist is genuine user-owned state; do not replace it with fabricated portfolio data.
+- AI/deployment work may be paused when Vercel deployment limits or OpenAI API credits prevent verification. Do not bypass this with fake AI/data.
+
+## Active app architecture
+Navigation/path audited: Home → Market → Companies → Company Intelligence → News → Watchlist → Alerts → More/Settings.
+
+Active Home: HomeDashboard.kt, routed by DesignActivity.kt. The older Home() inside DesignActivity.kt contains hardcoded paper-portfolio/demo values and is inactive technical debt; do not reuse it. Remove only after references/tests are proven safe.
+
+Core data path:
+MyStocks/provider data → Vercel backend → Android cache/data layer → active screens.
+
+Important files:
+- HomeDashboard.kt — active Home UI.
+- HomeIntelligence.kt / HomeIntelligenceEngine — structured Home calculations/evidence.
+- MyStocksCache.kt — provider/cache parsing, stock/history/index data.
+- MarketRefreshController.kt — refresh/check interval (15 minutes is an app check interval, not proof provider data is exactly 15 minutes old).
+- backend/api/market.js — market/index endpoint.
+- backend/lib/movementIntelligence.js, backend/api/moving.js, WhyStockMoving.kt — movement intelligence.
+- backend/lib/companyIntelligence.js, CompanyIntelligenceCache.kt, CompanyIntelligence.kt — company intelligence.
+- backend/lib/newsFeed.js, backend/lib/newsRelevance.js, NewsCache.kt, NewsDashboard.kt — news.
+- AlertStore.kt, AlertEvaluator.kt, AlertWorker.kt, AlertEvaluatorTest.kt — alerts.
+- .github/workflows/android.yml — Android/backend CI.
+- PROJECT_CONTEXT.md — persistent handoff.
+
+## Implemented and preserved — major product layers
+### Evidence Graph
+Shared EvidenceGraph is used by Home, company and movement intelligence. Duplicate/invalid/self relationships are handled. Relationships remain explicit (RELATED/POSSIBLE/NOT_ESTABLISHED); they are not causal proof.
+
+### Home intelligence/provenance
+Home calculates breadth, gainers/losers, sector averages, What Changed?, news/corporate-action context and available index context. Evidence IDs and source links are preserved. Sector values are explicitly calculations/averages, not official NSE sector indices. Fallback data cannot silently inherit MyStocks provenance.
+
+### Movement intelligence
+Real movement intelligence already exists and is integrated into Company Intelligence. It uses current quote, history, company news and dividends; supports 1D/1W/1M/3M; attaches dated evidence and cautious relationship classifications. Do not reimplement or remove it.
+
+### Company Intelligence
+Implemented with profile, financials, ratios, valuation, dividends, news, evidence, source/provenance and financial history. Annual parser selects FY YYYY, not TTM. Provider growth values are preferred over calculated values. Current ratio parser selects Current; missing Current is unavailable. Financial and ratio provider-update/check timestamps are separate. History is oldest→latest. Synthetic chart/history has been removed; 1D uses the latest real Nairobi trading session. Longer candles are chronologically ordered. Dividend fallback exists. Evidence includes latest history rows.
+
+A live production /api/company?symbol=SCOM response was previously verified and returned real provider-backed fields including market cap, revenue, profit, EPS, ROE, debt/equity, margin, growth, P/E, P/B, dividend yield, current ratio and FY2026 financial period. Do not treat those historical values as current without rechecking production.
+
+A known market-cap source conflict was observed: MyStocks Africa value vs StockAnalysis/S&P Global value; the system now represents conflicts instead of silently hiding them. A malformed Safaricom URL was isolated as source data, not treated as an architecture blocker.
+
+### Company Intelligence navigation
+Current grouped local navigation:
+1. About | Intelligence
+2. Performance | Financials | Valuation | Dividends
+3. News | Evidence | Analysis
+Analyst card is under Intelligence. Redundant section titles were removed. Evidence/source cards are under Evidence. No global oversized sticky navigation.
+
+### Company comparison
+Page.COMPARE exists. Companies screen has Compare and Watchlist actions. Comparison uses existing Stock + CompanyIntelligenceCache data and shows side-by-side factual metrics: Price, Revenue, Profit, EPS, revenue growth, profit growth, P/E, P/B, ROE, Debt/Equity, dividend yield. Unavailable values show “Unavailable”. No ranking, BUY/SELL/HOLD or winner is produced.
+
+### Beginner metric guides
+Beginner-friendly explanations were added for relevant company metrics. Preserve compactness and factual wording.
+
+### Dividends
+Dividend intelligence snapshot is implemented with provider-backed yield/history count, ex-date/payment-date labels when supplied, and “Dates not supplied” when absent. Past payments do not guarantee future dividends. Existing provider-backed dividend history remains.
+
+### News
+newsFeed.js canonicalizes URLs, strips tracking/trailing slash and deduplicates by canonical URL or normalized title+publication day. /api/news?action=feed returns source/fetchedAt/historyDays/windowStart/partial/providerErrors/sources/sourceCount/freshnessPolicy/items. Company news uses MyStocks company news. News relevance is deterministic/keyword/category based, not AI certainty. News freshness distinguishes feed-window state from actual publication freshness.
+
+### Market
+Market Dashboard has 3D/1W/1M/3M/6M/1Y/3Y periods and uses real cached history. It requires at least two real history points before calculating performance. No interpolation. Backend candles are validated for positive closes.
+
+### Indices
+Backend supports action=indices using provider symbols ^NASI, ^N20I, ^N25I through the existing quote surface. Android has MarketIndex and loadMarketIndices(). Home has compact Market Index Pulse and evidence. Index direction is descriptive only: higher/lower/mixed/unavailable, never a forecast. If provider does not return verified values, omit them. delayMinutes must remain null/unset unless provider metadata verifies it.
+
+### Watchlist
+DataStore-backed WatchlistStore stores uppercase user-selected symbols under nse_watcher_preferences / watchlist_symbols. Explicit user action only; no fabricated holdings. Dedicated Android DataStore/UI tests remain a future QA improvement.
+
+## Alerts — exact current state
+AlertStore.kt persists alert rules, previous prices, daily trigger dates and news trigger IDs. Supported alert types: PRICE_ABOVE, PRICE_BELOW, DAILY_GAIN, DAILY_LOSS, HIGH_VOLUME, NEWS, CORPORATE_ACTION. BREAKOUT is intentionally unsupported/null and must not fabricate a signal.
+
+AlertEvaluator.kt uses threshold crossing for price alerts, provider change for daily gain/loss, provider-backed average volume for high-volume alerts, current-day company news for NEWS, and corporate-action/dividend news for CORPORATE_ACTION. News deduplication uses stored alert→news IDs.
+
+AlertWorker.kt uses WorkManager with network constraints, market-open/known guards, no-more-often-than-15-minute background checks, provider-backed inputs, Nairobi calendar-day semantics, and notification-category settings.
+
+AlertEvaluatorTest.kt covers price crossing, daily gain, current-day news + deduplication, corporate-action/dividend news, high-volume provider average/threshold, and unsupported BREAKOUT.
+
+Notification settings wiring was just implemented in commit a76e94f7298c24a9bea2f55dd2e57909d4727f87:
+- Price alerts setting controls PRICE_ABOVE/PRICE_BELOW.
+- Market alerts setting controls DAILY_GAIN/DAILY_LOSS/HIGH_VOLUME.
+- News alerts setting controls NEWS/CORPORATE_ACTION.
+- Alert rules remain stored; category toggles determine which enabled rules are evaluated.
+- App notifications is broader and must NOT be assumed to control market-alert evaluation unless explicitly implemented.
+- Auto refresh, volume and price-change settings still require separate audit before runtime behavior is changed.
+
+## Latest AlertWorker CI history — DO NOT LOSE THIS
+Commit 907c9c8ff46243c2df970a2a33e3cf8d64b2551f failed Android CI #707/run 35496234632. Backend quality tests passed; Gradle failed compiling AlertWorker.kt because literal \\n text had accidentally been inserted into imports/helper code. Root cause was malformed Kotlin source from the edit, not the intended logic.
+
+Commit a48215cc812ab5d9034d07714f9749abf2e58a93 fixed that literal-newline syntax. At the last check it had not returned a workflow run.
+
+Commit a76e94f7298c24a9bea2f55dd2e57909d4727f87 then wired notification settings into AlertWorker. At handoff it also had no workflow run returned yet. Therefore this latest AlertWorker/settings change is PENDING CI VERIFICATION. It is NOT closed.
+
+Latest independently verified green commit before these AlertWorker changes: 42bd748a29422d208faf3ed7e3680713d20d78c4, Android CI #706/run 35495993894, SUCCESS.
+
+## Recent verified/fixed CI history that must not be repeated
+- Company Intelligence navigation had multiple failed runs due an extra } in CompanyIntelligence.kt; fixed in 34e8ccd60e94ebcb24c2c41e5bf028f5596b54f5, then CI #696 passed.
+- Whole-app Home market callback integration defect fixed in 62396dd02c0e373a147bce8f2746dbda13524965; CI #697 passed.
+- Comparison-related malformed Companies() row fixed in 42bd748a29422d208faf3ed7e3680713d20d78c4; CI #706 passed.
+- Dividend snapshot commit 12ca553b6ee1f80e4c27c5875b21b84ee848234b initially failed due the Companies row; 42bd748... fixed it.
+- AlertEvaluator current-day news semantics were fixed in a4c4ddd8ea4ff3b04f1b6828848131c5da07ecd4; provider freshness metadata test in 315a8fcfb44515edbe8dbffbccefe96a7a421920 followed.
+
+## Phase status
+Phase 8 — Unified Evidence Graph: COMPLETE.
+Phase 9 — Complete Home Provenance: COMPLETE.
+Phase 10 — Real Market & Index Context: implemented with conservative provider handling; final production verification of index endpoint remains a limitation.
+Phase 11 — Genuine Personal Portfolio/Watchlist: watchlist implemented; genuine portfolio must not be fabricated.
+Phase 12 — Evidence Quality & Data Confidence: CLOSED by final audit. It covers missing-vs-zero semantics, stock provenance, Home provenance, news freshness, company field quality/source attribution and conflict handling.
+Phase 13 — AI Explanation Layer: NEXT MAJOR PRODUCT PHASE, but do not start blindly. First close the current AlertWorker/settings CI and finish the focused final functional/UI closure audit.
+
+## Phase 12 closure details
+Stock now carries changeAvailable, volumeAvailable, source, observedAt, freshnessMode, dataOrigin. Missing movement/volume remain compatibility numeric placeholders but are explicitly unavailable and excluded from mover/breadth/sector/evidence calculations. Stock evidence consumes actual ingestion provenance. News carries freshness state; unknown publication dates remain UNKNOWN. Company material fields expose fieldSources, fieldQuality AVAILABLE/UNAVAILABLE/CONFLICT and preserve both provider values in conflicts. CI runs Node company-quality tests. These safeguards are the hard boundary for future AI.
+
+## Known limitations / technical debt
+- DesignActivity.kt contains inactive legacy Home with hardcoded paper-portfolio values; do not use as real data.
+- Legacy data/BackendApi.kt, data/MarketRepository.kt, data/MarketDataProvider.kt remain until all references are proven unused. Do not delete casually.
+- Theme → System is a placeholder.
+- Chart Settings is descriptive/static rather than applying configuration.
+- Language, Security, Privacy, Font & Display remain limited/static.
+- App notifications vs market-alert category semantics require explicit implementation if desired.
+- Auto refresh, volume and price-change settings require audit before changing runtime behavior.
+- Watchlist lacks dedicated Android DataStore/UI tests.
+- Company valuation/ratio metrics lack a universal normalized observation-period model.
+- Company field conflict handling covers material profile fields, not every historical financial row/dividend event.
+- Conflicted company display values could be made more explicit in a future UI refinement.
+- Index production endpoint has not been independently verified from the current environment.
+- fetchedAt is response/retrieval time, not automatically provider observation/reporting time.
+- AI/deployment may remain paused by OpenAI API credit/Vercel deployment limits; never substitute fabricated AI/data.
+
+## IMMEDIATE NEXT CHAT PROCEDURE — EXACT ORDER
+1. First check CI for a76e94f7298c24a9bea2f55dd2e57909d4727f87. Do not assume it passed merely because code exists.
+2. If no run exists, recheck. If it appears and fails, inspect logs and troubleshoot until a new commit is GREEN.
+3. Only after GREEN, close the notification-settings/AlertWorker task.
+4. Then perform the focused final functional/UI closure audit across Home → Market → Companies → Company Intelligence → News → Watchlist → Alerts → More/Settings.
+5. Implement only concrete defects found. For every defect: inspect existing code first, make the smallest safe fix, commit, check CI, troubleshoot any failure, and verify GREEN before closing.
+6. After the closure audit is green, decide whether any remaining technical debt is worth a dedicated cleanup. Do not mix cleanup into feature work.
+7. Only then begin Phase 13 planning/implementation. Phase 13 must consume real EvidenceGraph/provenance/quality data and must not invent missing facts, URLs, freshness, causation, confidence scores or investment recommendations.
+
+## Handoff reminder
+The next chat should NOT ask the user to restate the project. Start by reading this PROJECT_CONTEXT.md, checking the latest commit and CI status, then continue exactly from the procedure above. Never repeat completed phases or reimplement features that are already present.
