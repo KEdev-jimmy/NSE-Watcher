@@ -105,6 +105,8 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
     var analystQuestion by rememberSaveable(s.symbol) { mutableStateOf("Explain the latest company performance using only the available evidence.") }
     var analystResult by remember(s.symbol) { mutableStateOf(AnalystCache.Result()) }
     var analystLoading by remember(s.symbol) { mutableStateOf(false) }
+    var companyStoryResult by remember(s.symbol) { mutableStateOf(AnalystCache.Result()) }
+    var companyStoryLoading by remember(s.symbol) { mutableStateOf(false) }
 
     LaunchedEffect(s.symbol) {
         intelligenceLoading = true
