@@ -2269,3 +2269,9 @@ Implemented as one coherent batch from `c7726e9407024c394292b76c610fa51b33863c8a
   - app/src/main/java/ke/co/nsewatcher/DesignActivity.kt
   - app/src/main/java/ke/co/nsewatcher/HomeDashboard.kt
 - Important UX rule going forward: Welcome screen = startup gate; Start Exploring = explicit user entry; Home should open only after startup preparation has completed.
+
+
+### Startup timeout refinement
+- The 12-second startup gate now distinguishes **startup complete** from **startup allowed to continue**.
+- If all Home prerequisites finish, Home uses the preloaded stocks/news/status without immediately fetching them again.
+- If the 12-second fallback is reached, the welcome screen can still be entered, but Home is allowed to retry incomplete data rather than treating the incomplete startup as fully loaded.
