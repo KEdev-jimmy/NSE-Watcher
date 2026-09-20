@@ -33,8 +33,15 @@ object AnalystCache {
         val unknowns: List<String> = emptyList()
     )
 
+    data class CompanyStory(
+        val title: String = "", val business: String = "", val performance: String = "",
+        val changes: List<String> = emptyList(), val events: List<String> = emptyList(),
+        val interpretation: String = "", val unknowns: List<String> = emptyList(), val evidenceIds: List<String> = emptyList()
+    )
+
     data class Result(
         val answer: String = "",
+        val story: CompanyStory? = null,
         val analysis: Analysis? = null,
         val evidence: List<Evidence> = emptyList(),
         val model: String = "",
@@ -43,7 +50,11 @@ object AnalystCache {
         val error: String = ""
     )
 
-    suspend fun ask(symbol: String, question: String): Result = withContext(Dispatchers.IO) {
+    suspend fun ask(symbol: String, question: String): Result = request(symbol, question, "ask")
+
+    suspend fun story(symbol: String): Result = request(symbol, "", "story")
+
+    private suspend fun request(symbol: String, question: String, mode: String): Result = withContext(Dispatchers.IO) {
         runCatching {
             val connection = (URL(ENDPOINT).openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
@@ -53,7 +64,7 @@ object AnalystCache {
                 setRequestProperty("Content-Type", "application/json")
                 setRequestProperty("Accept", "application/json")
             }
-            val body = JSONObject().put("symbol", symbol).put("question", question).toString()
+            val body = JSONObject().put("symbol", symbol).put("question", question).put("mode", mode).toString()
             connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
             val status = connection.responseCode
             val stream = if (status in 200..299) connection.inputStream else connection.errorStream
@@ -73,6 +84,19 @@ object AnalystCache {
                     evidence += Evidence(item.optString("id"), item.optString("claim"), item.optString("value"), item.optString("source"), item.optString("url"), item.optString("period"))
                 }
             }
+
+            val storyObject = json.optJSONObject("story")
+            val story = storyObject?.let {
+                fun strings(name: String): List<String> {
+                    val out = mutableListOf<String>()
+                    val array = it.optJSONArray(name)
+                    if (array != null) for (i in 0 until array.length()) out += array.optString(i)
+                    return out
+                }
+                CompanyStory(it.optString("title"), it.optString("business"), it.optString("performance"),
+                    strings("changes"), strings("events"), it.optString("interpretation"), strings("unknowns"), strings("evidenceIds"))
+            }
+
             val analysisObject = json.optJSONObject("analysis")
             val signals = mutableListOf<Signal>()
             val signalArray = analysisObject?.optJSONArray("signals")
@@ -108,6 +132,7 @@ object AnalystCache {
             }
             Result(
                 answer = json.optString("answer"),
+                story = story,
                 analysis = analysis,
                 evidence = evidence,
                 model = json.optString("model"),
