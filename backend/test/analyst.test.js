@@ -1,7 +1,12 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
-const { buildEvidencePacket, validateCitations } = require('../api/analyst');
+const {
+  buildEvidencePacket,
+  validateCitations,
+  buildGeminiRequest,
+  extractGeminiAnswer,
+} = require('../api/analyst');
 
 test('buildEvidencePacket preserves only the evidence fields used by the Analyst', () => {
   const packet = buildEvidencePacket({
@@ -55,4 +60,37 @@ test('validateCitations flags an answer with no evidence citation', () => {
   assert.deepEqual(result.citedIds, []);
   assert.deepEqual(result.invalidIds, []);
   assert.match(result.warning, /did not contain an evidence citation/i);
+});
+
+test('buildGeminiRequest keeps the evidence-grounded prompt and output ceiling', () => {
+  const request = buildGeminiRequest('What changed?', {
+    symbol: 'SCOM',
+    evidence: [{ id: 'E1', claim: 'Revenue increased', value: '100' }],
+  });
+
+  assert.equal(request.generationConfig.maxOutputTokens, 900);
+  assert.equal(request.contents.length, 1);
+  assert.match(request.contents[0].parts[0].text, /Use ONLY the supplied evidence packet/i);
+  assert.match(request.contents[0].parts[0].text, /What changed\?/);
+  assert.match(request.contents[0].parts[0].text, /"id": "E1"/);
+});
+
+test('extractGeminiAnswer reads text parts and ignores non-text parts', () => {
+  const answer = extractGeminiAnswer({
+    candidates: [{
+      content: {
+        parts: [
+          { text: 'What is happening [E1].' },
+          { inlineData: { mimeType: 'image/png', data: 'ignored' } },
+          { text: ' What may matter [E2].' },
+        ],
+      },
+    }],
+  });
+
+  assert.equal(answer, 'What is happening [E1].\n What may matter [E2].');
+});
+
+test('extractGeminiAnswer returns empty text when Gemini returns no candidates', () => {
+  assert.equal(extractGeminiAnswer({ candidates: [] }), '');
 });
