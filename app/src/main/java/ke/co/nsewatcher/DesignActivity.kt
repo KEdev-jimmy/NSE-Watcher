@@ -640,7 +640,7 @@ private object PaperPortfolioStore {
         saveHoldings(context, map.values.toList())
         prefs(context).edit().putFloat(CASH, (cash - tradeValue - fee).toFloat()).apply()
         addTrade(context, "BUY " + stock.symbol + " • " + formatShares(shares) + " @ " + formatPrice(price))
-        return Result.success("Practice buy approved")
+        return Result.success(Unit)
     }
 
     fun sell(context: Context, stock: Stock, shares: Long, price: Double): Result<String> {
@@ -655,7 +655,7 @@ private object PaperPortfolioStore {
         saveHoldings(context, map.values.toList())
         prefs(context).edit().putFloat(CASH, (cash(context) + tradeValue - fee).toFloat()).apply()
         addTrade(context, "SELL " + stock.symbol + " • " + formatShares(shares) + " @ " + formatPrice(price))
-        return Result.success("Practice sell approved")
+        return Result.success(Unit)
     }
 
     private fun validate(marketPrice: Double, shares: Long, price: Double): String? {
@@ -913,31 +913,72 @@ stocks.filter { companyQuery.isBlank() || it.symbol.contains(companyQuery, true)
     }
 
     tradeSuccess?.let { success ->
-        AlertDialog(
-            onDismissRequest = { tradeSuccess = null },
-            title = { Text("Practice trade approved", fontWeight = FontWeight.ExtraBold) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Surface(shape = CircleShape, color = LightGreen) {
-                            Icon(Icons.Default.CheckCircle, null, tint = Green, modifier = Modifier.padding(9.dp).size(28.dp))
-                        }
-                        Column {
-                            Text(if (success.side == "BUY") "Practice buy approved" else "Practice sell approved", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                            Text("The practice portfolio has been updated.", color = Muted, fontSize = 9.sp)
+        Dialog(onDismissRequest = { tradeSuccess = null }) {
+            Surface(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+                shape = RoundedCornerShape(24.dp),
+                color = Color.White
+            ) {
+                Column(
+                    modifier = Modifier.padding(22.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Surface(shape = CircleShape, color = LightGreen, modifier = Modifier.size(72.dp)) {
+                        Icon(
+                            Icons.Default.CheckCircle,
+                            contentDescription = "Practice trade approved",
+                            tint = Green,
+                            modifier = Modifier.padding(13.dp).fillMaxSize()
+                        )
+                    }
+                    Text(
+                        if (success.side == "BUY") "Practice buy approved" else "Practice sell approved",
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 20.sp,
+                        color = TextDark,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        if (success.side == "BUY") "Your virtual purchase was added to the practice portfolio."
+                        else "Your virtual sale was added to the practice portfolio.",
+                        color = Muted,
+                        fontSize = 11.sp,
+                        textAlign = TextAlign.Center
+                    )
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = LightGreen)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(15.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                formatShares(success.shares) + " shares of " + success.symbol,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 14.sp
+                            )
+                            Text("Execution price  •  " + formatPrice(success.price), color = Muted, fontSize = 10.sp)
+                            Text(
+                                (if (success.side == "BUY") "Estimated cost  •  " else "Estimated proceeds  •  ") + formatPrice(success.amount),
+                                color = TextDark,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            )
                         }
                     }
-                    Card(Modifier.fillMaxWidth(), RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = LightGreen)) {
-                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(formatShares(success.shares) + " shares of " + success.symbol, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp)
-                            Text("Execution price  •  " + formatPrice(success.price), color = Muted, fontSize = 9.sp)
-                            Text((if (success.side == "BUY") "Estimated cost  •  " else "Estimated proceeds  •  ") + formatPrice(success.amount), color = TextDark, fontWeight = FontWeight.Bold, fontSize = 10.sp)
-                        }
+                    Button(
+                        onClick = { tradeSuccess = null },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Green)
+                    ) {
+                        Text("Done")
                     }
                 }
-            },
-            confirmButton = { Button({ tradeSuccess = null }, colors = ButtonDefaults.buttonColors(containerColor = Green)) { Text("Done") } }
-        )
+            }
+        }
     }
 
     if (resetConfirm) {

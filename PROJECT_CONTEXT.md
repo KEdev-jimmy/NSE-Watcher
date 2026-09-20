@@ -2117,3 +2117,38 @@ Gemini is the reasoning/explanation layer, not the source of truth. The next imp
 
 Gemini API access is not equivalent to unlimited consumer Gemini chat. Google documents a Free Tier with model-specific rate limits; paid API usage requires billing. Therefore the application must handle quota/rate-limit exhaustion gracefully and must not assume the API is permanently free.
 
+
+
+# CURRENT ACTIVE IMPLEMENTATION — PRACTICE PORTFOLIO TRADE APPROVAL UX
+
+## Status
+**IMPLEMENTED — SOURCE FIX COMMITTED; CI VERIFICATION REQUIRED**
+
+The Practice Portfolio trade flow has been hardened around the exact required UX:
+1. User selects a real company from the existing live `stocks` universe.
+2. Practice Buy/Sell order dialog shows the selected company, quantity, limit price, modeled cost/proceeds and validation.
+3. On successful execution, the order dialog closes first.
+4. Portfolio state refreshes immediately.
+5. A separate approval dialog then appears with a prominent green circular check icon, explicit “Practice buy approved” / “Practice sell approved” title, shares, execution price, estimated cost/proceeds, and Done.
+6. The success dialog is a separate Compose `Dialog` surface rather than an error-styled message.
+7. Store success results no longer carry the string “Practice buy approved” / “Practice sell approved”; they return `Result.success(Unit)`. This prevents a success message from ever being confused with the red validation/error channel.
+8. Actual failures remain the only messages rendered in red inside the order dialog.
+
+### Relevant commits
+- `56d95a01311c0929a76bb18729327d5c4110aa3a` — `Fix practice trade refresh and success flow` — CI #762 GREEN.
+- `de6d910dd000253b4d6c55660cc735cbe9a15864` — `Ensure practice trade approval modal opens after order closes` — CI #763 GREEN.
+- Current follow-up commit for the final success/error-channel hardening: **created after this section is written; verify its exact SHA and CI before marking GREEN.**
+
+### Verification requirement
+Do not tell a future chat that this final UX hardening is verified until the Android CI run for the final commit is confirmed GREEN and the resulting APK artifact is tied to that exact commit SHA.
+
+### User acceptance criteria
+The user must see:
+- no red “Practice buy approved” message;
+- order dialog disappears after approval;
+- separate green-check approval modal appears;
+- portfolio metrics are refreshed immediately;
+- Done closes the approval modal;
+- BUY and SELL use the same behavior.
+
+If the installed APK does not match this behavior, inspect the exact artifact SHA/build before making further code assumptions.
