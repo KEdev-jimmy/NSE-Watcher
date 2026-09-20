@@ -197,7 +197,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
                 colors = CardDefaults.cardColors(containerColor = IntelligenceLight)
             ) {
                 Column(Modifier.padding(17.dp)) {
-                    Text("NSE DATA • 15 MIN DELAYED", color = IntelligenceMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Text("NSE DATA • LATEST AVAILABLE", color = IntelligenceMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     Text(
                         String.format(Locale.US, "KSh %.2f", s.price),
                         fontSize = 30.sp,
@@ -1210,7 +1210,7 @@ private fun SessionAtGlance(
     SectionTitle(
         "Market status",
         when {
-            openSession -> "NSE session • 15 min delayed"
+            openSession -> "NSE session • latest available data"
             known -> "Market is closed"
             else -> "Session status is currently unavailable"
         },
@@ -1260,7 +1260,7 @@ private fun SessionAtGlance(
                     Text("Latest observation: $it", color = IntelligenceMuted, fontSize = 8.sp)
                 }
                 Text(
-                    "Market open • price data is exchange-supplied and 15 min delayed.",
+                    "Market open • price data is exchange-supplied.",
                     color = IntelligenceMuted,
                     fontSize = 8.sp
                 )
@@ -1587,7 +1587,7 @@ private fun periodDescription(period: String): String = when (period) {
     "1Y" -> "Past 1 year"
     "3Y" -> "Past 3 years"
     "5Y" -> "Past 5 years"
-    "NOW" -> "Latest available intraday data • 15 min delayed"
+    "NOW" -> "Latest available intraday data"
     else -> period
 }
 
