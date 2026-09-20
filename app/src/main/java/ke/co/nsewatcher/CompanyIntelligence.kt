@@ -296,6 +296,39 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
                     }
                     Spacer(Modifier.height(8.dp))
                     Text("Uses the company evidence available to NSE Watcher. It explains the data; it does not give BUY/SELL instructions.", color = Color.White.copy(alpha = .78f), fontSize = 8.sp, lineHeight = 12.sp)
+                    Button(
+                        onClick = {
+                            analystScope.launch {
+                                companyStoryLoading = true
+                                companyStoryResult = AnalystCache.story(s.symbol)
+                                companyStoryLoading = false
+                            }
+                        },
+                        enabled = !companyStoryLoading,
+                        colors = ButtonDefaults.buttonColors(containerColor = IntelligenceGreen),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 7.dp)
+                    ) {
+                        if (companyStoryLoading) CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp, color = Color.White)
+                        else Icon(Icons.Default.AutoStories, null, Modifier.size(14.dp))
+                        Spacer(Modifier.width(5.dp))
+                        Text(if (companyStoryLoading) "Building story…" else "Company Story", fontSize = 10.sp)
+                    }
+                    if (companyStoryResult.story != null) {
+                        val story = companyStoryResult.story!!
+                        Spacer(Modifier.height(10.dp))
+                        Surface(Modifier.fillMaxWidth(), color = Color.White.copy(alpha = .07f), shape = RoundedCornerShape(12.dp)) {
+                            Column(Modifier.padding(10.dp)) {
+                                if (story.title.isNotBlank()) Text(story.title, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                if (story.business.isNotBlank()) { Spacer(Modifier.height(5.dp)); Text("What the company does", color = Color(0xFFBFE8D0), fontSize = 8.sp, fontWeight = FontWeight.Bold); Text(story.business, color = Color.White.copy(alpha = .86f), fontSize = 9.sp, lineHeight = 13.sp) }
+                                if (story.performance.isNotBlank()) { Spacer(Modifier.height(6.dp)); Text("Performance", color = Color(0xFFBFE8D0), fontSize = 8.sp, fontWeight = FontWeight.Bold); Text(story.performance, color = Color.White.copy(alpha = .86f), fontSize = 9.sp, lineHeight = 13.sp) }
+                                if (story.changes.isNotEmpty()) { Spacer(Modifier.height(6.dp)); Text("What changed", color = Color(0xFFBFE8D0), fontSize = 8.sp, fontWeight = FontWeight.Bold); story.changes.take(4).forEach { Text("• $it", color = Color.White.copy(alpha = .82f), fontSize = 8.sp, lineHeight = 12.sp) } }
+                                if (story.events.isNotEmpty()) { Spacer(Modifier.height(6.dp)); Text("Notable events", color = Color(0xFFBFE8D0), fontSize = 8.sp, fontWeight = FontWeight.Bold); story.events.take(5).forEach { Text("• $it", color = Color.White.copy(alpha = .82f), fontSize = 8.sp, lineHeight = 12.sp) } }
+                                if (story.interpretation.isNotBlank()) { Spacer(Modifier.height(6.dp)); Text("What the evidence may mean", color = Color(0xFFBFE8D0), fontSize = 8.sp, fontWeight = FontWeight.Bold); Text(story.interpretation, color = Color.White.copy(alpha = .82f), fontSize = 9.sp, lineHeight = 13.sp) }
+                                if (story.unknowns.isNotEmpty()) { Spacer(Modifier.height(6.dp)); Text("Still unknown", color = Color(0xFFBFE8D0), fontSize = 8.sp, fontWeight = FontWeight.Bold); story.unknowns.take(4).forEach { Text("• $it", color = Color.White.copy(alpha = .72f), fontSize = 8.sp, lineHeight = 12.sp) } }
+                                if (story.evidenceIds.isNotEmpty()) { Spacer(Modifier.height(5.dp)); Text("Evidence " + story.evidenceIds.joinToString(" · "), color = Color.White.copy(alpha = .55f), fontSize = 7.sp) }
+                            }
+                        }
+                    }
                     Spacer(Modifier.height(9.dp))
                     OutlinedTextField(
                         value = analystQuestion,
