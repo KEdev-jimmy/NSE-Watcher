@@ -478,6 +478,27 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
         if (metricsSection == CompanyIntelligenceSection.DIVIDENDS) {
         item {
             IntelligenceCard {
+                Text("Dividend snapshot", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = IntelligenceText)
+                Spacer(Modifier.height(7.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(Modifier.weight(1f)) {
+                        MiniFact("Dividend yield", formatMetricValue("Dividend yield", profile.dividendYield))
+                    }
+                    Box(Modifier.weight(1f)) {
+                        MiniFact("History records", intelligence.dividends.size.toString())
+                    }
+                }
+                Spacer(Modifier.height(7.dp))
+                Text(
+                    "Dividend events are shown from the available provider history. Past payments do not guarantee future dividends.",
+                    color = IntelligenceMuted,
+                    fontSize = 9.sp,
+                    lineHeight = 13.sp
+                )
+            }
+        }
+        item {
+            IntelligenceCard {
                 if (intelligence.dividends.isEmpty()) {
                     Text("No dividend history was returned by the current provider response.", color = IntelligenceMuted, fontSize = 11.sp)
                 } else {
@@ -487,9 +508,20 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
                             Spacer(Modifier.width(9.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(if (dividend.amount.isNotBlank()) "KSh ${dividend.amount}" else "Dividend amount not supplied", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                                Text(listOf(dividend.exDate, dividend.paymentDate).filter(String::isNotBlank).joinToString(" • ").ifBlank { "Date not supplied" }, color = IntelligenceMuted, fontSize = 9.sp)
+                                Text(
+                                    buildString {
+                                        if (dividend.exDate.isNotBlank()) append("Ex-date: " + dividend.exDate)
+                                        if (dividend.paymentDate.isNotBlank()) {
+                                            if (isNotEmpty()) append(" • ")
+                                            append("Payment: " + dividend.paymentDate)
+                                        }
+                                        if (isEmpty()) append("Dates not supplied")
+                                    },
+                                    color = IntelligenceMuted,
+                                    fontSize = 9.sp
+                                )
                             }
-                            if (dividend.status.isNotBlank()) Text(dividend.status, color = IntelligenceGreen, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                            if (dividend.status.isNotBlank()) Text(dividend.status, color = IntelligenceMuted, fontSize = 8.sp, fontWeight = FontWeight.Bold)
                         }
                         if (index < intelligence.dividends.take(5).lastIndex) HorizontalDivider(color = IntelligenceBorder)
                     }
