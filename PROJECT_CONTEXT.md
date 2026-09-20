@@ -2063,3 +2063,57 @@ The hardening commits above require the next Android/backend CI run to be inspec
 1. Verify CI for the current head.
 2. If GREEN, continue the AI audit with the public endpoint/cost-control question and live Analyst response behavior.
 3. If CI fails, inspect the exact failure and fix only the root cause.
+
+# CURRENT ACTIVE AI IMPLEMENTATION — STRUCTURED NSE WATCHER ANALYST
+
+## Status
+
+**IMPLEMENTED — CI VERIFICATION IN PROGRESS**
+
+The active Gemini Analyst has now been moved from raw paragraph output toward a product-owned structured intelligence layer.
+
+### Implemented
+
+- Gemini remains the model provider; the server-side `GEMINI_API_KEY` is used and the key is never placed in Android.
+- The Analyst now requests structured JSON from Gemini rather than relying on a free-form paragraph.
+- Structured fields:
+  - `headline`
+  - `summary`
+  - up to 4 `signals` with `type`, `title`, `detail`, and `evidenceIds`
+  - `interpretation`
+  - up to 4 `unknowns`
+- Gemini is explicitly instructed to use plain beginner-friendly language, explain changes instead of dumping raw numbers, and keep every signal tied to supplied evidence.
+- Backend validates the evidence IDs referenced by structured signals against the actual evidence packet.
+- Android now parses the structured analysis and renders:
+  - main takeaway
+  - readable summary
+  - compact evidence-backed signal cards
+  - cautious interpretation
+  - explicit unknowns
+- Existing evidence list remains available in the API response.
+- The existing `answer` field is retained as the structured summary for compatibility.
+- No BUY/SELL/HOLD, target price, guaranteed return, fabricated evidence, or model-supplied market facts were introduced.
+
+### Commits
+
+- `0d3e1ae595063512eaf6e594737d3a06a864459e` — Make Analyst output structured and beginner-friendly
+- `b03cc47974b2cadd926d508ffcf07616f38569a6` — Test structured Analyst output and evidence links
+- `8afe0c010917e8884ea90aaf7bd53ead74338055` — Add structured Analyst models to Android
+- `228dd25aa0037bad175cf566a3abdcc0fc9112d0` — Render Analyst insights as readable evidence cards
+
+### Verification
+
+Android CI run **#738 / 35506101151** is currently **in progress** for the latest Android UI commit. Do not mark this milestone GREEN until the run completes successfully.
+
+### Product direction
+
+This is the first vertical slice of the larger AI architecture:
+
+**RAW DATA → CALCULATION → EVIDENCE → NSE INTELLIGENCE CONTEXT → GEMINI REASONING → STRUCTURED STORY → ANDROID UI → VOICE**
+
+Gemini is the reasoning/explanation layer, not the source of truth. The next implementation work should strengthen the backend-owned NSE Intelligence Context and then add user-facing AI experiences such as **What Changed**, **Company Story**, beginner explanations, and eventually voice-ready summaries.
+
+### Gemini cost note
+
+Gemini API access is not equivalent to unlimited consumer Gemini chat. Google documents a Free Tier with model-specific rate limits; paid API usage requires billing. Therefore the application must handle quota/rate-limit exhaustion gracefully and must not assume the API is permanently free.
+
