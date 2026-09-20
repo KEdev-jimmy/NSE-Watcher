@@ -1,6 +1,7 @@
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
 const APP_BASE_URL = process.env.APP_BASE_URL || 'https://nse-watcher.vercel.app';
+const { buildNseIntelligenceContext, validateNseIntelligenceContext } = require('../lib/nseIntelligenceContext');
 
 function json(res, status, body) {
   res.status(status).setHeader('Content-Type', 'application/json');
@@ -12,6 +13,23 @@ function withTimeout(ms) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ms);
   return { signal: controller.signal, clear: () => clearTimeout(timer) };
+}
+
+async function loadMovement(symbol) {
+  const url = `${APP_BASE_URL}/api/movement?symbol=${encodeURIComponent(symbol)}`;
+  const timeout = withTimeout(15_000);
+  try {
+    const response = await fetch(url, { headers: { Accept: 'application/json' }, signal: timeout.signal });
+    const text = await response.text();
+    let data;
+    try { data = JSON.parse(text); } catch { data = null; }
+    if (!response.ok || !data || typeof data !== 'object') return null;
+    return data;
+  } catch {
+    return null;
+  } finally {
+    timeout.clear();
+  }
 }
 
 async function loadCompany(symbol) {
@@ -33,8 +51,11 @@ async function loadCompany(symbol) {
   }
 }
 
-function buildEvidencePacket(data) {
-  const evidence = (data.evidence || []).map((item, index) => ({
+function buildEvidencePacket(data, movement = null) {
+  const context = data?.contextVersion
+    ? data
+    : buildNseIntelligenceContext({ company: data, movement });
+  const evidence = (context.evidence || []).map((item, index) => ({
     id: item.id || `E${index + 1}`,
     claim: item.claim || '',
     value: item.value ?? '',
@@ -43,14 +64,19 @@ function buildEvidencePacket(data) {
     period: item.period || '',
   }));
   return {
-    symbol: data.symbol,
-    source: data.source,
-    fetchedAt: data.fetchedAt,
-    profile: data.profile || null,
-    financialHistory: data.financialHistory || [],
-    dividends: data.dividends || [],
+    contextVersion: context.contextVersion,
+    symbol: context.symbol,
+    source: context.sourceOfTruth,
+    fetchedAt: context.freshness?.fetchedAt || '',
+    company: context.company || {},
+    movement: context.movement || {},
+    market: context.market || null,
+    profile: context.company?.profile || null,
+    financialHistory: context.company?.financialHistory || [],
+    dividends: context.company?.dividends || [],
     evidence,
-    dataQuality: data.dataQuality || {},
+    dataQuality: context.dataQuality || {},
+    freshness: context.freshness || {},
   };
 }
 
@@ -68,6 +94,8 @@ function systemInstructions() {
     'Never create a signal without evidenceIds. If the evidence is insufficient, say so in unknowns.',
     'For possible causes of price movement, use cautious language such as may, could, or cannot be established from the supplied evidence.',
     'Do not manufacture financial-history trends when only a current snapshot is available.',
+    'Use the NSE Watcher Intelligence Context as the application-owned synthesis of verified data and calculations; Gemini is only the explanation layer.',
+    'Do not treat the context itself as a source of truth beyond the evidence and calculations it contains.',
   ].join(' ');
 }
 
@@ -204,7 +232,11 @@ module.exports = async (req, res) => {
 
   try {
     const company = await loadCompany(symbol);
-    const packet = buildEvidencePacket(company);
+    const movement = await loadMovement(symbol);
+    const context = buildNseIntelligenceContext({ company, movement });
+    const contextIntegrity = validateNseIntelligenceContext(context);
+    const packet = buildEvidencePacket(context);
+    if (!contextIntegrity.valid) return json(res, 502, { error: 'AI Analyst unavailable' });
     if (!GEMINI_API_KEY) {
       return json(res, 200, {
         aiAvailable: false,
@@ -221,6 +253,8 @@ module.exports = async (req, res) => {
       symbol: company.symbol || symbol,
       fetchedAt: company.fetchedAt,
       evidenceCount: packet.evidence.length,
+      contextVersion: context.contextVersion,
+      contextIntegrity,
       evidence: packet.evidence,
       citationIntegrity,
       ...result,
@@ -231,6 +265,8 @@ module.exports = async (req, res) => {
 };
 
 module.exports.buildEvidencePacket = buildEvidencePacket;
+module.exports.buildNseIntelligenceContext = buildNseIntelligenceContext;
+module.exports.validateNseIntelligenceContext = validateNseIntelligenceContext;
 module.exports.validateCitations = validateCitations;
 module.exports.buildGeminiRequest = buildGeminiRequest;
 module.exports.extractGeminiAnswer = extractGeminiAnswer;
