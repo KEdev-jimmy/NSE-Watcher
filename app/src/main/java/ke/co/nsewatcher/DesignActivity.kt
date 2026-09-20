@@ -704,6 +704,7 @@ private fun Paper() {
     var selectedStock by remember { mutableStateOf<Stock?>(null) }
     var side by remember { mutableStateOf("BUY") }
     var resetConfirm by remember { mutableStateOf(false) }
+    var tradeSuccess by remember { mutableStateOf<PaperTradeSuccess?>(null) }
 
     val enabled = remember(refresh) { PaperPortfolioStore.isEnabled(context) }
     val holdings = remember(refresh, stocks) { PaperPortfolioStore.holdings(context) }
@@ -892,7 +893,39 @@ stocks.filter { companyQuery.isBlank() || it.symbol.contains(companyQuery, true)
 
     selectedStock?.let { stock ->
         PaperOrderDialog(context, stock, side, cash, holdings.firstOrNull { it.symbol == stock.symbol }?.shares ?: 0L,
-            { selectedStock = null }, { selectedStock = null; refresh++ })
+            { selectedStock = null }, { success ->
+                selectedStock = null
+                refresh++
+                tradeSuccess = success
+            })
+    }
+
+    tradeSuccess?.let { success ->
+        AlertDialog(
+            onDismissRequest = { tradeSuccess = null },
+            title = { Text("Practice trade approved", fontWeight = FontWeight.ExtraBold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Surface(shape = CircleShape, color = LightGreen) {
+                            Icon(Icons.Default.CheckCircle, null, tint = Green, modifier = Modifier.padding(9.dp).size(28.dp))
+                        }
+                        Column {
+                            Text(if (success.side == "BUY") "Practice buy approved" else "Practice sell approved", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text("The practice portfolio has been updated.", color = Muted, fontSize = 9.sp)
+                        }
+                    }
+                    Card(Modifier.fillMaxWidth(), RoundedCornerShape(14.dp), colors = CardDefaults.cardColors(containerColor = LightGreen)) {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(formatShares(success.shares) + " shares of " + success.symbol, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp)
+                            Text("Execution price  •  " + formatPrice(success.price), color = Muted, fontSize = 9.sp)
+                            Text((if (success.side == "BUY") "Estimated cost  •  " else "Estimated proceeds  •  ") + formatPrice(success.amount), color = TextDark, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                        }
+                    }
+                }
+            },
+            confirmButton = { Button({ tradeSuccess = null }, colors = ButtonDefaults.buttonColors(containerColor = Green)) { Text("Done") } }
+        )
     }
 
     if (resetConfirm) {
@@ -936,6 +969,14 @@ private fun PaperHistoryChart(history: List<Pair<Long, Double>>) {
     }
 }
 
+private data class PaperTradeSuccess(
+    val side: String,
+    val symbol: String,
+    val shares: Long,
+    val price: Double,
+    val amount: Double
+)
+
 @Composable
 private fun PaperOrderDialog(
     context: Context,
@@ -944,12 +985,11 @@ private fun PaperOrderDialog(
     cash: Double,
     ownedShares: Long,
     onDismiss: () -> Unit,
-    onComplete: () -> Unit
+    onComplete: (PaperTradeSuccess) -> Unit
 ) {
     var sharesText by rememberSaveable(stock.symbol, side) { mutableStateOf("100") }
     var priceText by rememberSaveable(stock.symbol, side) { mutableStateOf(String.format(Locale.US, "%.2f", stock.price)) }
     var error by remember { mutableStateOf<String?>(null) }
-    var showSuccess by remember { mutableStateOf(false) }
     val shares = sharesText.toLongOrNull() ?: 0L
     val price = priceText.toDoubleOrNull() ?: 0.0
     val gross = shares * price
@@ -979,24 +1019,19 @@ private fun PaperOrderDialog(
         confirmButton = {
             Button({
                 val result = if (side == "BUY") PaperPortfolioStore.buy(context, stock, shares, price) else PaperPortfolioStore.sell(context, stock, shares, price)
-                result.fold({ error = it }, { error = null; showSuccess = true })
+                result.fold(
+                    { error = it },
+                    {
+                        error = null
+                        onComplete(PaperTradeSuccess(side, stock.symbol, shares, price, amount))
+                    }
+                )
             }, colors = ButtonDefaults.buttonColors(containerColor = if (side == "BUY") Green else Red)) {
                 Text(if (side == "BUY") "Approve practice buy" else "Approve practice sell")
             }
         },
         dismissButton = { TextButton(onDismiss) { Text("Cancel") } }
     )
-    if (showSuccess) {
-        AlertDialog(
-            onDismissRequest = { showSuccess = false; onComplete() },
-            title = { Text("Practice trade approved", fontWeight = FontWeight.ExtraBold) },
-            text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Surface(shape = CircleShape, color = LightGreen) { Icon(Icons.Default.CheckCircle, null, tint = Green, modifier = Modifier.padding(8.dp).size(24.dp)) }
-                Text("${formatShares(shares)} shares of ${stock.symbol} were processed in your practice portfolio.", color = TextDark, fontSize = 10.sp)
-            }},
-            confirmButton = { Button({ showSuccess = false; onComplete() }, colors = ButtonDefaults.buttonColors(containerColor = Green)) { Text("Done") } }
-        )
-    }
 }
 
 @Composable private fun More(go:(Page)->Unit){LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(9.dp)){item{Section("More","Your NSE Watcher tools")};item{RowItem(Icons.Default.AccountCircle,"Profile","Personal information and profile picture"){go(Page.PROFILE)}};item{RowItem(Icons.Default.AccountBalanceWallet,"Paper Investing","Practice with virtual money"){go(Page.PAPER)}};item{RowItem(Icons.Default.Settings,"Settings","Theme, notifications, data and privacy"){go(Page.SETTINGS)}};item{RowItem(Icons.Default.HelpOutline,"Help & Support","FAQs, contact and report issues"){go(Page.HELP)}};item{RowItem(Icons.Default.Info,"About NSE Watcher","Version and product information"){go(Page.ABOUT)}}}}
