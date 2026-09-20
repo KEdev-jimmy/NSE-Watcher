@@ -972,7 +972,7 @@ private fun PaperOrderDialog(
         confirmButton = {
             Button({
                 val result = if (side == "BUY") PaperPortfolioStore.buy(context, stock, shares, price) else PaperPortfolioStore.sell(context, stock, shares, price)
-                result.fold({ error = it.message ?: "Order rejected by the simulator." }, { onComplete() })
+                result.fold({ error = it }, { onComplete() })
             }, colors = ButtonDefaults.buttonColors(containerColor = if (side == "BUY") Green else Red)) {
                 Text(if (side == "BUY") "Approve practice buy" else "Approve practice sell")
             }
