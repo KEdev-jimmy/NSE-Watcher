@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Build
 import androidx.activity.ComponentActivity
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -58,6 +59,7 @@ import ke.co.nsewatcher.domain.PriceAlert
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import ke.co.nsewatcher.data.WatchlistStore
 
 private val Green = Color(0xFF00A859)
@@ -91,16 +93,35 @@ class DesignActivity : ComponentActivity() {
         try { contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
         getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString("avatar_uri", uri.toString()).apply()
     }
-    override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); AlertWorker.schedule(this); setContent { App { picker.launch(arrayOf("image/*")) } } }
+    override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
+        super.onCreate(savedInstanceState)
+        AlertWorker.schedule(this)
+        setContent { App { picker.launch(arrayOf("image/*")) } }
+    }
 }
 
 @Composable
 private fun App(pickAvatar:()->Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    var showOpeningScreen by rememberSaveable { mutableStateOf(true) }
+    var startupReady by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) {
-        MyStocksCache.loadStocks().takeIf { it.isNotEmpty() }?.let { liveStocks.value = it }
+        val startedAt = System.currentTimeMillis()
+        val loadedStocks = withTimeoutOrNull(4_500L) {
+            MyStocksCache.loadStocks()
+        }.orEmpty()
+        if (loadedStocks.isNotEmpty()) {
+            liveStocks.value = loadedStocks
+        }
+
+        val remaining = 3_000L - (System.currentTimeMillis() - startedAt)
+        if (remaining > 0L) delay(remaining)
+        startupReady = true
     }
+
     var page by remember { mutableStateOf(Page.HOME) }
     var history by remember { mutableStateOf(emptyList<Page>()) }
     var tab by rememberSaveable { mutableIntStateOf(0) }
@@ -117,6 +138,14 @@ private fun App(pickAvatar:()->Unit) {
     var appAlerts by rememberSaveable { mutableStateOf(prefs.getBoolean("app_alerts", true)) }
     var autoRefresh by rememberSaveable { mutableStateOf(prefs.getBoolean("auto_refresh", true)) }
     val latestSelected by rememberUpdatedState(selected)
+
+    if (showOpeningScreen) {
+        NSEWatcherOpeningScreen(
+            ready = startupReady,
+            onFinished = { showOpeningScreen = false }
+        )
+        return
+    }
     LaunchedEffect(autoRefresh) {
         if (!autoRefresh) return@LaunchedEffect
         while (isActive) {
