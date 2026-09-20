@@ -60,6 +60,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import ke.co.nsewatcher.data.WatchlistStore
 
 private val Green = Color(0xFF00A859)
@@ -107,18 +109,33 @@ private fun App(pickAvatar:()->Unit) {
     val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     var showOpeningScreen by rememberSaveable { mutableStateOf(true) }
     var startupReady by remember { mutableStateOf(false) }
+    var startupNews by remember { mutableStateOf(emptyList<NewsItem>()) }
+    var startupMarketStatus by remember { mutableStateOf(MyStocksCache.MarketStatus()) }
 
     LaunchedEffect(Unit) {
-        val startedAt = System.currentTimeMillis()
-        val loadedStocks = withTimeoutOrNull(4_500L) {
-            MyStocksCache.loadStocks()
-        }.orEmpty()
-        if (loadedStocks.isNotEmpty()) {
-            liveStocks.value = loadedStocks
+        withTimeoutOrNull(12_000L) {
+            coroutineScope {
+                val stocksDeferred = async {
+                    runCatching { MyStocksCache.loadStocks() }.getOrDefault(emptyList())
+                }
+                val newsDeferred = async {
+                    runCatching { NewsCache.loadFeed() }.getOrDefault(emptyList())
+                }
+                val statusDeferred = async {
+                    runCatching { MyStocksCache.loadMarketStatus() }.getOrDefault(MyStocksCache.MarketStatus())
+                }
+
+                val loadedStocks = stocksDeferred.await()
+                if (loadedStocks.isNotEmpty()) {
+                    liveStocks.value = loadedStocks
+                }
+                startupNews = newsDeferred.await()
+                startupMarketStatus = statusDeferred.await()
+            }
         }
 
-        val remaining = 3_000L - (System.currentTimeMillis() - startedAt)
-        if (remaining > 0L) delay(remaining)
+        // The welcome screen is intentionally the gate. If a provider is unavailable,
+        // the app still becomes usable after the bounded startup window instead of hanging forever.
         startupReady = true
     }
 
@@ -170,7 +187,7 @@ private fun App(pickAvatar:()->Unit) {
     val scheme=if(dark) darkColorScheme(primary=Color(0xFF32D486),background=Color(0xFF0D1712),surface=Color(0xFF132019),onSurface=Color.White,onBackground=Color.White,onSurfaceVariant=Color(0xFFB7C7BE)) else lightColorScheme(primary=Green,background=Color.White,surface=Color.White,onSurface=TextDark,onBackground=TextDark,onSurfaceVariant=Muted)
     MaterialTheme(colorScheme=scheme){Surface(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing),color=scheme.background){
         when(page){
-            Page.HOME,Page.MARKET,Page.NEWS,Page.COMPANIES,Page.PAPER,Page.MORE -> Scaffold(topBar={if(page!=Page.HOME && page!=Page.MARKET) TopBar(name,::go)},bottomBar={BottomNav(tab){tab=it;history=emptyList();page=when(it){0->Page.HOME;1->Page.MARKET;2->Page.NEWS;3->Page.COMPANIES;else->Page.MORE}}}){pad->Box(Modifier.fillMaxSize().padding(pad)){when(page){Page.HOME->HomeDashboard(stocks,{selected=it;go(Page.COMPANY)},{selectedNews=it;go(Page.NEWS_DETAIL)},{go(Page.MARKET)},{go(Page.WATCHLIST)});Page.MARKET->MarketDashboard(stocks);Page.NEWS->NewsDashboard{selectedNews=it;go(Page.NEWS_DETAIL)};Page.COMPANIES->Companies({selected=it;go(Page.COMPANY)},{go(Page.WATCHLIST)},{go(Page.COMPARE)});Page.PAPER->Paper();else->More(::go)}}}
+            Page.HOME,Page.MARKET,Page.NEWS,Page.COMPANIES,Page.PAPER,Page.MORE -> Scaffold(topBar={if(page!=Page.HOME && page!=Page.MARKET) TopBar(name,::go)},bottomBar={BottomNav(tab){tab=it;history=emptyList();page=when(it){0->Page.HOME;1->Page.MARKET;2->Page.NEWS;3->Page.COMPANIES;else->Page.MORE}}}){pad->Box(Modifier.fillMaxSize().padding(pad)){when(page){Page.HOME->HomeDashboard(stocks,{selected=it;go(Page.COMPANY)},{selectedNews=it;go(Page.NEWS_DETAIL)},{go(Page.MARKET)},{go(Page.WATCHLIST)},startupNews,startupMarketStatus,startupReady);Page.MARKET->MarketDashboard(stocks);Page.NEWS->NewsDashboard{selectedNews=it;go(Page.NEWS_DETAIL)};Page.COMPANIES->Companies({selected=it;go(Page.COMPANY)},{go(Page.WATCHLIST)},{go(Page.COMPARE)});Page.PAPER->Paper();else->More(::go)}}}
             Page.COMPANY->Company(selected,::back)
             Page.WATCHLIST->Watchlist({selected=it;go(Page.COMPANY)},::back)
             Page.COMPARE->CompanyComparison(stocks,::back)
