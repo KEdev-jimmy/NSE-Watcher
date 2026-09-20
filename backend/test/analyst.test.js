@@ -11,6 +11,7 @@ const {
   buildCompanyStoryRequest,
   extractGeminiStory,
   validateCompanyStory,
+  normalizeGeminiStatus,
 } = require('../api/analyst');
 const { buildNseIntelligenceContext, validateNseIntelligenceContext } = require('../lib/nseIntelligenceContext');
 
@@ -202,4 +203,11 @@ test('validateCompanyStory rejects evidence IDs outside the supplied context', (
   const result = validateCompanyStory({ evidenceIds: ['E1', 'E999'] }, [{ id: 'E1' }]);
   assert.equal(result.valid, false);
   assert.deepEqual(result.invalidIds, ['E999']);
+});
+
+test('normalizeGeminiStatus prevents upstream 5xx errors from becoming app 5xx responses', () => {
+  assert.equal(normalizeGeminiStatus(500), 502);
+  assert.equal(normalizeGeminiStatus(503), 502);
+  assert.equal(normalizeGeminiStatus(429), 429);
+  assert.equal(normalizeGeminiStatus(400), 400);
 });
