@@ -6,6 +6,8 @@ const {
   validateCitations,
   buildGeminiRequest,
   extractGeminiAnswer,
+  extractGeminiAnalysis,
+  validateStructuredAnalysis,
 } = require('../api/analyst');
 
 test('buildEvidencePacket preserves only the evidence fields used by the Analyst', () => {
@@ -69,6 +71,9 @@ test('buildGeminiRequest keeps the evidence-grounded prompt and output ceiling',
   });
 
   assert.equal(request.generationConfig.maxOutputTokens, 900);
+  assert.equal(request.generationConfig.responseMimeType, 'application/json');
+  assert.equal(request.generationConfig.responseSchema.type, 'object');
+  assert.deepEqual(request.generationConfig.responseSchema.required, ['headline', 'summary', 'signals', 'interpretation', 'unknowns']);
   assert.equal(request.contents.length, 1);
   assert.match(request.contents[0].parts[0].text, /Use ONLY the supplied evidence packet/i);
   assert.match(request.contents[0].parts[0].text, /What changed\?/);
@@ -93,4 +98,44 @@ test('extractGeminiAnswer reads text parts and ignores non-text parts', () => {
 
 test('extractGeminiAnswer returns empty text when Gemini returns no candidates', () => {
   assert.equal(extractGeminiAnswer({ candidates: [] }), '');
+});
+
+
+test('extractGeminiAnalysis parses the structured Analyst response', () => {
+  const analysis = extractGeminiAnalysis({
+    candidates: [{
+      content: {
+        parts: [{
+          text: JSON.stringify({
+            headline: 'Revenue improved',
+            summary: 'The company reported stronger revenue.',
+            signals: [{ type: 'CHANGE', title: 'Revenue', detail: 'Revenue increased.', evidenceIds: ['E1'] }],
+            interpretation: 'This may indicate stronger business activity.',
+            unknowns: ['The supplied evidence does not explain the cause.'],
+          }),
+        }],
+      },
+    }],
+  });
+
+  assert.equal(analysis.headline, 'Revenue improved');
+  assert.equal(analysis.signals[0].evidenceIds[0], 'E1');
+});
+
+test('validateStructuredAnalysis accepts only supplied evidence IDs', () => {
+  const analysis = {
+    signals: [
+      { evidenceIds: ['E1', 'E2'] },
+      { evidenceIds: ['E999'] },
+    ],
+  };
+  const result = validateStructuredAnalysis(analysis, [{ id: 'E1' }, { id: 'E2' }]);
+  assert.equal(result.valid, false);
+  assert.deepEqual(result.invalidIds, ['E999']);
+
+  const valid = validateStructuredAnalysis(
+    { signals: [{ evidenceIds: ['E1'] }] },
+    [{ id: 'E1' }],
+  );
+  assert.equal(valid.valid, true);
 });
