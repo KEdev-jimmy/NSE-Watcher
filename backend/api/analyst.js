@@ -99,6 +99,23 @@ function validateCitations(answer, evidence) {
   };
 }
 
+
+const COMPANY_STORY_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    title: { type: 'string' },
+    business: { type: 'string' },
+    performance: { type: 'string' },
+    changes: { type: 'array', maxItems: 4, items: { type: 'string' } },
+    events: { type: 'array', maxItems: 5, items: { type: 'string' } },
+    interpretation: { type: 'string' },
+    unknowns: { type: 'array', maxItems: 4, items: { type: 'string' } },
+    evidenceIds: { type: 'array', items: { type: 'string' }, maxItems: 8 },
+  },
+  required: ['title', 'business', 'performance', 'changes', 'events', 'interpretation', 'unknowns', 'evidenceIds'],
+};
+
 const ANALYSIS_SCHEMA = {
   type: 'object',
   additionalProperties: false,
@@ -125,6 +142,24 @@ const ANALYSIS_SCHEMA = {
   },
   required: ['headline', 'summary', 'signals', 'interpretation', 'unknowns'],
 };
+
+
+function validateCompanyStory(story, evidence) {
+  const validIds = new Set((evidence || []).map(item => String(item.id || '').trim()).filter(Boolean));
+  const ids = Array.isArray(story?.evidenceIds) ? story.evidenceIds.map(id => String(id || '').trim()).filter(Boolean) : [];
+  const invalidIds = [...new Set(ids.filter(id => !validIds.has(id)))];
+  return { valid: invalidIds.length === 0 && ids.length > 0, citedIds: [...new Set(ids)], invalidIds,
+    warning: invalidIds.length ? 'The company story cited evidence IDs that were not present in the supplied evidence packet.' : (ids.length === 0 ? 'The company story did not reference any supplied evidence.' : '') };
+}
+function buildCompanyStoryRequest(packet) {
+  const prompt = systemInstructions() + '\n\nCreate a Company Story from the supplied NSE Watcher Intelligence Context. Tell the story in this order: what the company does, reported performance, notable supplied events, what the evidence may mean, and what remains unknown. Keep it readable for a beginner. Every material section must be supported by returned evidenceIds. Do not add facts.\n\nEvidence packet:\n' + JSON.stringify(packet, null, 2);
+  return { contents: [{ parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: 1000, responseMimeType: 'application/json', responseSchema: COMPANY_STORY_SCHEMA } };
+}
+function extractGeminiStory(data) {
+  const text = extractGeminiAnswer(data);
+  if (!text) return null;
+  try { return JSON.parse(text); } catch { return null; }
+}
 
 function collectAnalysisEvidenceIds(analysis) {
   return [
@@ -175,6 +210,24 @@ function extractGeminiAnalysis(data) {
   try { return JSON.parse(text); } catch { return null; }
 }
 
+
+async function askGeminiStory(packet) {
+  if (!GEMINI_API_KEY) return null;
+  const timeout = withTimeout(30_000);
+  try {
+    const response = await fetch(
+      \`https://generativelanguage.googleapis.com/v1beta/models/\${encodeURIComponent(GEMINI_MODEL)}:generateContent\`,
+      { method: 'POST', headers: { 'x-goog-api-key': GEMINI_API_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(buildCompanyStoryRequest(packet)), signal: timeout.signal },
+    );
+    const text = await response.text();
+    let data; try { data = JSON.parse(text); } catch { data = { error: text }; }
+    if (!response.ok) { const error = new Error(data.error?.message || \`Gemini service \${response.status}\`); error.status = response.status; throw error; }
+    const story = extractGeminiStory(data);
+    if (!story) { const error = new Error('Gemini returned an invalid structured Company Story'); error.status = 502; throw error; }
+    return { story, model: GEMINI_MODEL, responseId: data.responseId || null };
+  } finally { timeout.clear(); }
+}
+
 async function askGemini(question, packet) {
   if (!GEMINI_API_KEY) return null;
   const timeout = withTimeout(30_000);
@@ -221,8 +274,9 @@ module.exports = async (req, res) => {
   const body = req.body || {};
   const symbol = String(body.symbol || '').trim().toUpperCase();
   const question = String(body.question || '').trim();
+  const mode = String(body.mode || 'ask').trim().toLowerCase();
   if (!symbol) return json(res, 400, { error: 'symbol is required' });
-  if (!question) return json(res, 400, { error: 'question is required' });
+  if (mode !== 'story' && !question) return json(res, 400, { error: 'question is required' });
   if (question.length > 1200) return json(res, 400, { error: 'question is too long' });
 
   try {
@@ -231,6 +285,14 @@ module.exports = async (req, res) => {
     const contextIntegrity = validateNseIntelligenceContext(context);
     const packet = buildEvidencePacket(context);
     if (!contextIntegrity.valid) return json(res, 502, { error: 'AI Analyst unavailable' });
+
+    if (mode === 'story') {
+      if (!GEMINI_API_KEY) return json(res, 200, { aiAvailable: false, message: 'Company Story is not enabled yet.', contextVersion: context.contextVersion, evidence: packet.evidence });
+      const result = await askGeminiStory(packet);
+      const storyIntegrity = validateCompanyStory(result?.story, packet.evidence);
+      if (!storyIntegrity.valid) return json(res, 502, { error: 'AI Analyst unavailable' });
+      return json(res, 200, { aiAvailable: true, provider: 'gemini', symbol: company.symbol || symbol, fetchedAt: company.fetchedAt, evidenceCount: packet.evidence.length, contextVersion: context.contextVersion, contextIntegrity, evidence: packet.evidence, storyIntegrity, ...result });
+    }
     if (!GEMINI_API_KEY) {
       return json(res, 200, {
         aiAvailable: false,
@@ -266,3 +328,6 @@ module.exports.buildGeminiRequest = buildGeminiRequest;
 module.exports.extractGeminiAnswer = extractGeminiAnswer;
 module.exports.extractGeminiAnalysis = extractGeminiAnalysis;
 module.exports.validateStructuredAnalysis = validateStructuredAnalysis;
+module.exports.buildCompanyStoryRequest = buildCompanyStoryRequest;
+module.exports.extractGeminiStory = extractGeminiStory;
+module.exports.validateCompanyStory = validateCompanyStory;
