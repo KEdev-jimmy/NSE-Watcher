@@ -33,11 +33,9 @@ private val SplashBackground = Color(0xFFE9F8F0)
 private val SplashNavy = Color(0xFF111827)
 private val SplashBlue = Color(0xFF4D9AF0)
 private val SplashGreen = Color(0xFF54D6A5)
-private val SplashDarkGreen = Color(0xFF063D2A)
+private val SplashTextDark = Color(0xFF12352A)
 private val SplashMutedGreen = Color(0xFF58736A)
 private val SplashButton = Color(0xFF19A96B)
-
-private const val INTRO_MIN_MS = 3_000L
 
 @Composable
 fun NSEWatcherOpeningScreen(
@@ -284,7 +282,7 @@ fun NSEWatcherOpeningScreen(
 
 @Composable
 private fun NSEWatcherAnimatedLogo(
-    modifier: Modifier,
+    modifier: Modifier = Modifier,
     bars: List<Float>,
     lineProgress: Float,
     glow: Float
@@ -451,8 +449,3 @@ private fun SplashSkyline(modifier: Modifier = Modifier) {
     }
 }
 
-private fun Modifier.graphicsLayerScale(scale: Float): Modifier =
-    this.graphicsLayer {
-        scaleX = scale
-        scaleY = scale
-    }
