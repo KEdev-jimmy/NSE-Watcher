@@ -9,6 +9,7 @@ const {
   extractGeminiAnalysis,
   validateStructuredAnalysis,
 } = require('../api/analyst');
+const { buildNseIntelligenceContext, validateNseIntelligenceContext } = require('../lib/nseIntelligenceContext');
 
 test('buildEvidencePacket preserves only the evidence fields used by the Analyst', () => {
   const packet = buildEvidencePacket({
@@ -138,4 +139,39 @@ test('validateStructuredAnalysis accepts only supplied evidence IDs', () => {
     [{ id: 'E1' }],
   );
   assert.equal(valid.valid, true);
+});
+
+
+test('buildNseIntelligenceContext combines verified company intelligence without raw-provider noise', () => {
+  const context = buildNseIntelligenceContext({
+    company: {
+      symbol: 'SCOM.KE',
+      source: 'NSE Watcher multi-source company intelligence',
+      fetchedAt: '2026-09-20T08:00:00Z',
+      profile: { sector: 'Telecommunications', revenue: '100', ignoredField: 'drop' },
+      financialHistory: [{ period: 'FY 2025', revenue: '100', profit: '20', eps: '1.2' }],
+      dividends: [{ amount: '1.00', exDate: '2026-04-01', source: 'Provider' }],
+      evidence: [
+        { id: 'E1', claim: 'Revenue', value: '100', source: 'Provider', url: 'https://example.com', period: 'FY 2025' },
+      ],
+      dataQuality: { conflictCount: 0, evidenceCount: 1 },
+    },
+  });
+
+  assert.equal(context.contextVersion, 1);
+  assert.equal(context.symbol, 'SCOM.KE');
+  assert.equal(context.company.profile.sector, 'Telecommunications');
+  assert.equal(context.company.profile.ignoredField, undefined);
+  assert.equal(context.company.financialHistory.length, 1);
+  assert.equal(context.company.dividends.length, 1);
+  assert.equal(context.evidence[0].id, 'E1');
+  assert.equal(context.freshness.fetchedAt, '2026-09-20T08:00:00Z');
+});
+
+test('validateNseIntelligenceContext rejects duplicate evidence IDs', () => {
+  const result = validateNseIntelligenceContext({
+    evidence: [{ id: 'E1' }, { id: 'E1' }],
+  });
+  assert.equal(result.valid, false);
+  assert.deepEqual(result.duplicateIds, ['E1']);
 });
