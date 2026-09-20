@@ -2152,3 +2152,44 @@ The user must see:
 - BUY and SELL use the same behavior.
 
 If the installed APK does not match this behavior, inspect the exact artifact SHA/build before making further code assumptions.
+
+# CURRENT PRACTICE TRADE CI TRIGGER — APK VERIFICATION
+
+## Status
+
+**SOURCE FIX ON MAIN — ANDROID CI MUST BE TRIGGERED/VERIFIED**
+
+The practice-trade success-routing fix is now on `main` at:
+
+- `62850fe460831ebf5a0d168a3157232683122c1b` — `Fix practice trade failure handling`
+
+This source change is the continuation of the approval-modal fix. The critical behavior is:
+
+- `PaperPortfolioStore.buy()` and `sell()` return `Result<Unit>`.
+- `Result.fold` routes the success branch to the approval-modal callback.
+- Only the failure branch populates the red error text.
+- The previous accidental red `OK` success text is eliminated.
+- The order dialog should close before the separate green-check approval dialog is shown.
+- The portfolio refresh counter is incremented immediately after a successful trade.
+
+### CI / APK gate
+
+Do **not** tell the user to download an APK from an older successful run for this verification.
+
+The required verification artifact must be produced by Android CI from the current source commit (or a documentation-only child commit whose parent is this exact source commit).
+
+Required acceptance test:
+
+1. Select a real company.
+2. Open Practice Buy.
+3. Approve the trade.
+4. The order dialog closes.
+5. A separate approval modal appears with a green circular check.
+6. It says `Practice buy approved`.
+7. It shows shares, execution price, and estimated cost.
+8. Portfolio metrics are already refreshed.
+9. No red `OK` or red success message appears.
+10. Repeat the equivalent flow for Practice Sell.
+
+Until an APK artifact tied to the verified current source exists, runtime behavior must be treated as **unverified**.
+
