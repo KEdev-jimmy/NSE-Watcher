@@ -640,7 +640,7 @@ private object PaperPortfolioStore {
         saveHoldings(context, map.values.toList())
         prefs(context).edit().putFloat(CASH, (cash - tradeValue - fee).toFloat()).apply()
         addTrade(context, "BUY " + stock.symbol + " • " + formatShares(shares) + " @ " + formatPrice(price))
-        return Result.success(Unit)
+        return Result.success("OK")
     }
 
     fun sell(context: Context, stock: Stock, shares: Long, price: Double): Result<String> {
@@ -913,7 +913,7 @@ stocks.filter { companyQuery.isBlank() || it.symbol.contains(companyQuery, true)
     }
 
     tradeSuccess?.let { success ->
-        Dialog(onDismissRequest = { tradeSuccess = null }) {
+        androidx.compose.ui.window.Dialog(onDismissRequest = { tradeSuccess = null }) {
             Surface(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
                 shape = RoundedCornerShape(24.dp),
