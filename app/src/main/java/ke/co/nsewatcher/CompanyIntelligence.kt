@@ -829,6 +829,8 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
         }
     }
 }
+}
+
 
 @Composable
 private fun SignalGroup(title: String, tint: Color, items: List<String>) {
