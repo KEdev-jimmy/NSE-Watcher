@@ -174,7 +174,7 @@ module.exports = async (req, res) => {
     }
     if (action === 'stocks') {
       const data = await mystocks('/stocks?exchange=NSE&limit=50');
-      return json(res, 200, { source: 'MyStocks Africa', delayMinutes: null, fetchedAt: new Date().toISOString(), data });
+      return json(res, 200, { source: 'MyStocks Africa', delayMinutes: 15, fetchedAt: new Date().toISOString(), data });
     }
     if (action === 'indices') {
       // MyStocks' documented market-quote surface does not provide a verified
@@ -194,7 +194,7 @@ module.exports = async (req, res) => {
     if (action === 'movers') {
       const gainers = await mystocks('/market/movers?exchange=NSE&direction=gainers&limit=10');
       const losers = await mystocks('/market/movers?exchange=NSE&direction=losers&limit=10');
-      return json(res, 200, { source: 'MyStocks Africa', delayMinutes: null, fetchedAt: new Date().toISOString(), gainers, losers });
+      return json(res, 200, { source: 'MyStocks Africa', delayMinutes: 15, fetchedAt: new Date().toISOString(), gainers, losers });
     }
     if (action === 'chart') {
       const symbol = String(req.query.symbol || '').trim();
@@ -246,7 +246,7 @@ module.exports = async (req, res) => {
         : null;
 
       return json(res, 200, {
-        source: 'MyStocks Africa', delayMinutes: null, fetchedAt: new Date().toISOString(),
+        source: 'MyStocks Africa', delayMinutes: 15, fetchedAt: new Date().toISOString(),
         symbol, period, interval: cfg.interval, asOf: chartAsOf, latestObservationAt,
         session: period === '1d' ? {
           open: Number.isFinite(sessionOpen) ? sessionOpen : null,
@@ -269,7 +269,7 @@ module.exports = async (req, res) => {
       ? `/market/snapshot?symbols=${encodeURIComponent(symbols)}`
       : '/market/snapshot?symbols=SCOM.KE,EQTY.KE,KCB.KE,ABSA.KE,COOP.KE,SBIC.KE';
     const data = await mystocks(path);
-    return json(res, 200, { source: 'MyStocks Africa', delayMinutes: null, fetchedAt: new Date().toISOString(), data });
+    return json(res, 200, { source: 'MyStocks Africa', delayMinutes: 15, fetchedAt: new Date().toISOString(), data });
   } catch (error) {
     return json(res, error.status || 502, {
       error: 'Market data unavailable', detail: error.message,
