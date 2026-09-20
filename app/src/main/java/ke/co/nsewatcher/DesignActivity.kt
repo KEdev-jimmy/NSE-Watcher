@@ -808,12 +808,17 @@ private fun Paper() {
                         Text("Test a trade", fontWeight = FontWeight.ExtraBold, fontSize = 15.sp, color = DarkGreen)
                         Text("Choose a company, enter a limit price and quantity. The simulator validates the order and fills it immediately when the rules pass.", color = TextDark, fontSize = 9.sp, lineHeight = 13.sp)
                         Spacer(Modifier.height(8.dp))
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                            items(stocks.take(8)) { stock ->
-                                AssistChip({ selectedStock = stock; side = "BUY" }, label = { Text(stock.symbol, fontSize = 9.sp) },
-                                    leadingIcon = { Icon(Icons.Default.Add, null, Modifier.size(14.dp)) })
-                            }
-                        }
+                        var companyQuery by rememberSaveable { mutableStateOf("") }
+OutlinedTextField(value = companyQuery, onValueChange = { companyQuery = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, placeholder = { Text("Search companies…", fontSize = 10.sp) }, leadingIcon = { Icon(Icons.Default.Search, null, Modifier.size(18.dp)) })
+Spacer(Modifier.height(7.dp))
+stocks.filter { companyQuery.isBlank() || it.symbol.contains(companyQuery, true) || it.name.contains(companyQuery, true) }.take(8).forEach { stock ->
+    Row(Modifier.fillMaxWidth().clickable { selectedStock = stock; side = "BUY" }.padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+        Logo(stock.symbol, 36, stock.logoUrl); Spacer(Modifier.width(8.dp))
+        Column(Modifier.weight(1f)) { Text(stock.symbol, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp); Text(stock.name, color = Muted, fontSize = 8.sp, maxLines = 1) }
+        Column(horizontalAlignment = Alignment.End) { Text(formatPrice(stock.price), fontWeight = FontWeight.Bold, fontSize = 10.sp); Text((if (stock.change >= 0) "+" else "") + String.format(Locale.US, "%.2f%%", stock.change), color = if (stock.change >= 0) Green else Red, fontSize = 8.sp, fontWeight = FontWeight.Bold) }
+    }
+    HorizontalDivider(color = Border)
+}                        }
                     }
                 }
             }
@@ -891,11 +896,12 @@ private fun Paper() {
     }
 
     if (resetConfirm) {
+        var resetText by rememberSaveable { mutableStateOf("") }
         AlertDialog(
             onDismissRequest = { resetConfirm = false },
             title = { Text("Reset practice portfolio?") },
-            text = { Text("This clears the simulated cash, holdings, history and practice activity stored on this device.") },
-            confirmButton = { TextButton({ PaperPortfolioStore.reset(context); resetConfirm = false; refresh++ }) { Text("Reset", color = Red) } },
+            text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { Text("This permanently clears your virtual cash, holdings, history and practice activity. This cannot be undone.", color = Muted, fontSize = 10.sp); Text("Type RESET to confirm.", fontWeight = FontWeight.Bold, fontSize = 10.sp); OutlinedTextField(resetText, { resetText = it }, label = { Text("Confirmation") }, singleLine = true) } },
+            confirmButton = { TextButton(enabled = resetText == "RESET", onClick = { PaperPortfolioStore.reset(context); resetConfirm = false; resetText = ""; refresh++ }) { Text("Reset", color = if (resetText == "RESET") Red else Muted) } },
             dismissButton = { TextButton({ resetConfirm = false }) { Text("Cancel") } }
         )
     }
@@ -943,6 +949,7 @@ private fun PaperOrderDialog(
     var sharesText by rememberSaveable(stock.symbol, side) { mutableStateOf("100") }
     var priceText by rememberSaveable(stock.symbol, side) { mutableStateOf(String.format(Locale.US, "%.2f", stock.price)) }
     var error by remember { mutableStateOf<String?>(null) }
+    var showSuccess by remember { mutableStateOf(false) }
     val shares = sharesText.toLongOrNull() ?: 0L
     val price = priceText.toDoubleOrNull() ?: 0.0
     val gross = shares * price
@@ -972,13 +979,24 @@ private fun PaperOrderDialog(
         confirmButton = {
             Button({
                 val result = if (side == "BUY") PaperPortfolioStore.buy(context, stock, shares, price) else PaperPortfolioStore.sell(context, stock, shares, price)
-                result.fold({ error = it }, { onComplete() })
+                result.fold({ error = it }, { error = null; showSuccess = true })
             }, colors = ButtonDefaults.buttonColors(containerColor = if (side == "BUY") Green else Red)) {
                 Text(if (side == "BUY") "Approve practice buy" else "Approve practice sell")
             }
         },
         dismissButton = { TextButton(onDismiss) { Text("Cancel") } }
     )
+    if (showSuccess) {
+        AlertDialog(
+            onDismissRequest = { showSuccess = false; onComplete() },
+            title = { Text("Practice trade approved", fontWeight = FontWeight.ExtraBold) },
+            text = { Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Surface(shape = CircleShape, color = LightGreen) { Icon(Icons.Default.CheckCircle, null, tint = Green, modifier = Modifier.padding(8.dp).size(24.dp)) }
+                Text("${formatShares(shares)} shares of ${stock.symbol} were processed in your practice portfolio.", color = TextDark, fontSize = 10.sp)
+            }},
+            confirmButton = { Button({ showSuccess = false; onComplete() }, colors = ButtonDefaults.buttonColors(containerColor = Green)) { Text("Done") } }
+        )
+    }
 }
 
 @Composable private fun More(go:(Page)->Unit){LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(9.dp)){item{Section("More","Your NSE Watcher tools")};item{RowItem(Icons.Default.AccountCircle,"Profile","Personal information and profile picture"){go(Page.PROFILE)}};item{RowItem(Icons.Default.AccountBalanceWallet,"Paper Investing","Practice with virtual money"){go(Page.PAPER)}};item{RowItem(Icons.Default.Settings,"Settings","Theme, notifications, data and privacy"){go(Page.SETTINGS)}};item{RowItem(Icons.Default.HelpOutline,"Help & Support","FAQs, contact and report issues"){go(Page.HELP)}};item{RowItem(Icons.Default.Info,"About NSE Watcher","Version and product information"){go(Page.ABOUT)}}}}
