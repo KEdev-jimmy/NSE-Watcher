@@ -62,8 +62,10 @@ function systemInstructions() {
     'Do not give BUY, SELL, HOLD, target-price, or guaranteed-return instructions.',
     'Clearly separate documented facts from interpretation.',
     'If evidence is missing or conflicting, say so explicitly.',
-    'Every material factual statement must cite one or more evidence IDs such as [E1]. Never invent or alter evidence IDs.',
-    'Use this response structure: What is happening; What the evidence says; What may matter; Risks/questions to investigate; What is unknown; Sources used.',
+    'Every signal must reference one or more evidence IDs from the supplied packet. Never invent or alter evidence IDs.',
+    'Return the requested structured analysis fields. Keep the language plain enough for a beginner and avoid transcription-like lists of numbers.',
+    'Prefer explaining what changed and why it matters over repeating raw values. If a number matters, explain it in words.',
+    'Never create a signal without evidenceIds. If the evidence is insufficient, say so in unknowns.',
     'For possible causes of price movement, use cautious language such as may, could, or cannot be established from the supplied evidence.',
     'Do not manufacture financial-history trends when only a current snapshot is available.',
   ].join(' ');
@@ -84,25 +86,70 @@ function validateCitations(answer, evidence) {
   };
 }
 
+const ANALYSIS_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    headline: { type: 'string', description: 'Short plain-English main takeaway, about 18 words or fewer.' },
+    summary: { type: 'string', description: 'Concise plain-English explanation for a beginner. Avoid jargon and raw number lists.' },
+    signals: {
+      type: 'array',
+      maxItems: 4,
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          type: { type: 'string', enum: ['FACT', 'CHANGE', 'CONTEXT', 'RISK'] },
+          title: { type: 'string' },
+          detail: { type: 'string' },
+          evidenceIds: { type: 'array', items: { type: 'string' }, maxItems: 4 },
+        },
+        required: ['type', 'title', 'detail', 'evidenceIds'],
+      },
+    },
+    interpretation: { type: 'string', description: 'What the supplied evidence may mean, using cautious language. No investment instructions.' },
+    unknowns: { type: 'array', maxItems: 4, items: { type: 'string' } },
+  },
+  required: ['headline', 'summary', 'signals', 'interpretation', 'unknowns'],
+};
+
+function collectAnalysisEvidenceIds(analysis) {
+  return [
+    ...(Array.isArray(analysis?.signals) ? analysis.signals.flatMap(signal => Array.isArray(signal?.evidenceIds) ? signal.evidenceIds : []) : []),
+  ].map(id => String(id || '').trim()).filter(Boolean);
+}
+
+function validateStructuredAnalysis(analysis, evidence) {
+  const validIds = new Set((evidence || []).map(item => String(item.id || '').trim()).filter(Boolean));
+  const citedIds = [...new Set(collectAnalysisEvidenceIds(analysis))];
+  const invalidIds = citedIds.filter(id => !validIds.has(id));
+  return {
+    valid: invalidIds.length === 0 && citedIds.length > 0,
+    citedIds,
+    invalidIds,
+    warning: invalidIds.length
+      ? 'The analyst response cited evidence IDs that were not present in the supplied evidence packet.'
+      : (citedIds.length === 0 ? 'The analyst response did not reference any supplied evidence.' : ''),
+  };
+}
+
 function buildGeminiRequest(question, packet) {
   const evidenceText = JSON.stringify(packet, null, 2);
-  const prompt = `${systemInstructions()}\n\nUser question: ${question}\n\nEvidence packet:\n${evidenceText}`;
+  const prompt = systemInstructions() + '\n\nUser question: ' + question + '\n\nEvidence packet:\n' + evidenceText;
   return {
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig: {
       maxOutputTokens: 900,
+      responseMimeType: 'application/json',
+      responseSchema: ANALYSIS_SCHEMA,
     },
   };
 }
 
-function extractGeminiAnswer(data) {
-  if (!Array.isArray(data?.candidates)) return '';
-  return data.candidates
-    .flatMap(candidate => candidate?.content?.parts || [])
-    .map(part => typeof part?.text === 'string' ? part.text : '')
-    .filter(Boolean)
-    .join('\n')
-    .trim();
+function extractGeminiAnalysis(data) {
+  const text = extractGeminiAnswer(data);
+  if (!text) return null;
+  try { return JSON.parse(text); } catch { return null; }
 }
 
 async function askGemini(question, packet) {
@@ -129,8 +176,15 @@ async function askGemini(question, packet) {
       error.status = response.status;
       throw error;
     }
+    const analysis = extractGeminiAnalysis(data);
+    if (!analysis) {
+      const error = new Error('Gemini returned an invalid structured Analyst response');
+      error.status = 502;
+      throw error;
+    }
     return {
-      answer: extractGeminiAnswer(data),
+      analysis,
+      answer: analysis.summary || '',
       model: GEMINI_MODEL,
       responseId: data.responseId || null,
     };
@@ -160,7 +214,7 @@ module.exports = async (req, res) => {
     }
 
     const result = await askGemini(question, packet);
-    const citationIntegrity = validateCitations(result?.answer, packet.evidence);
+    const citationIntegrity = validateStructuredAnalysis(result?.analysis, packet.evidence);
     return json(res, 200, {
       aiAvailable: true,
       provider: 'gemini',
@@ -180,3 +234,5 @@ module.exports.buildEvidencePacket = buildEvidencePacket;
 module.exports.validateCitations = validateCitations;
 module.exports.buildGeminiRequest = buildGeminiRequest;
 module.exports.extractGeminiAnswer = extractGeminiAnswer;
+module.exports.extractGeminiAnalysis = extractGeminiAnalysis;
+module.exports.validateStructuredAnalysis = validateStructuredAnalysis;
