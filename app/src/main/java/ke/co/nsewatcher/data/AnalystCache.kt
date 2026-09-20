@@ -18,8 +18,24 @@ object AnalystCache {
         val period: String = ""
     )
 
+    data class Signal(
+        val type: String = "",
+        val title: String = "",
+        val detail: String = "",
+        val evidenceIds: List<String> = emptyList()
+    )
+
+    data class Analysis(
+        val headline: String = "",
+        val summary: String = "",
+        val signals: List<Signal> = emptyList(),
+        val interpretation: String = "",
+        val unknowns: List<String> = emptyList()
+    )
+
     data class Result(
         val answer: String = "",
+        val analysis: Analysis? = null,
         val evidence: List<Evidence> = emptyList(),
         val model: String = "",
         val responseId: String = "",
@@ -57,8 +73,42 @@ object AnalystCache {
                     evidence += Evidence(item.optString("id"), item.optString("claim"), item.optString("value"), item.optString("source"), item.optString("url"), item.optString("period"))
                 }
             }
+            val analysisObject = json.optJSONObject("analysis")
+            val signals = mutableListOf<Signal>()
+            val signalArray = analysisObject?.optJSONArray("signals")
+            if (signalArray != null) {
+                for (i in 0 until signalArray.length()) {
+                    val item = signalArray.optJSONObject(i) ?: continue
+                    val ids = mutableListOf<String>()
+                    val idsArray = item.optJSONArray("evidenceIds")
+                    if (idsArray != null) {
+                        for (j in 0 until idsArray.length()) ids += idsArray.optString(j)
+                    }
+                    signals += Signal(
+                        type = item.optString("type"),
+                        title = item.optString("title"),
+                        detail = item.optString("detail"),
+                        evidenceIds = ids
+                    )
+                }
+            }
+            val analysis = analysisObject?.let {
+                val unknowns = mutableListOf<String>()
+                val unknownArray = it.optJSONArray("unknowns")
+                if (unknownArray != null) {
+                    for (i in 0 until unknownArray.length()) unknowns += unknownArray.optString(i)
+                }
+                Analysis(
+                    headline = it.optString("headline"),
+                    summary = it.optString("summary"),
+                    signals = signals,
+                    interpretation = it.optString("interpretation"),
+                    unknowns = unknowns
+                )
+            }
             Result(
                 answer = json.optString("answer"),
+                analysis = analysis,
                 evidence = evidence,
                 model = json.optString("model"),
                 responseId = json.optString("responseId"),
