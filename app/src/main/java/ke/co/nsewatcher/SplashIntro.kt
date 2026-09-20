@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlin.math.max
 import kotlin.math.min
 
@@ -58,11 +59,14 @@ fun NSEWatcherOpeningScreen(
         lineProgress.animateTo(1f, tween(780, easing = FastOutSlowInEasing))
         stage = 3
         delay(130)
-        glowPulse.animateTo(1f, tween(170))
-        glowPulse.animateTo(0f, tween(520))
         stage = 4
-        delay(160)
-        stage = 5
+        // Keep the completed mark alive with a very subtle pulse instead of
+        // leaving the chart animation looking like it stopped halfway.
+        while (isActive) {
+            glowPulse.animateTo(1f, tween(240))
+            glowPulse.animateTo(0f, tween(700))
+            delay(1_700)
+        }
     }
 
     val bars = listOf(
