@@ -28,15 +28,32 @@ import java.util.concurrent.TimeUnit
 class AlertWorker(appContext: Context, workerParams: WorkerParameters) : CoroutineWorker(appContext, workerParams) {
     override suspend fun doWork(): Result {
         val store = AlertStore(applicationContext)
-        val alerts = store.alerts.first()
-        if (alerts.none { it.enabled }) return Result.success()
+        val configuredAlerts = store.alerts.first()
+        val prefs = applicationContext.getSharedPreferences("nse_watcher_preferences", Context.MODE_PRIVATE)
+        val activeTypes = buildSet {
+            if (prefs.getBoolean("price_alerts", true)) {
+                add(AlertType.PRICE_ABOVE)
+                add(AlertType.PRICE_BELOW)
+            }
+            if (prefs.getBoolean("market_alerts", true)) {
+                add(AlertType.DAILY_GAIN)
+                add(AlertType.DAILY_LOSS)
+                add(AlertType.HIGH_VOLUME)
+            }
+            if (prefs.getBoolean("news_alerts", true)) {
+                add(AlertType.NEWS)
+                add(AlertType.CORPORATE_ACTION)
+            }
+        }
+        val alerts = configuredAlerts.filter { it.enabled && it.type in activeTypes }
+        if (alerts.isEmpty()) return Result.success()
         val marketStatus = MyStocksCache.loadMarketStatus()
         if (!marketStatus.isKnown || !marketStatus.isOpen) return Result.success()
         val stocks = MyStocksCache.loadStocks()
         if (stocks.isEmpty()) return Result.retry()
 
         val previous = store.previousPrices()
-        val newsAlertsEnabled = alerts.any { it.enabled && it.type in setOf(AlertType.NEWS, AlertType.CORPORATE_ACTION) }
+        val newsAlertsEnabled = alerts.any { it.type in setOf(AlertType.NEWS, AlertType.CORPORATE_ACTION) }
         val news = if (newsAlertsEnabled) NewsCache.loadFeed() else emptyList()
         val lastNews = store.lastNewsTriggerIds()
         val evaluated = AlertEvaluator.evaluate(alerts, stocks, previous, news, lastNews)
