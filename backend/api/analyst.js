@@ -211,63 +211,98 @@ function extractGeminiAnalysis(data) {
 }
 
 
-async function askGeminiStory(packet) {
-  if (!GEMINI_API_KEY) return null;
-  const timeout = withTimeout(30_000);
-  try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent`,
-      { method: 'POST', headers: { 'x-goog-api-key': GEMINI_API_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(buildCompanyStoryRequest(packet)), signal: timeout.signal },
-    );
-    const text = await response.text();
-    let data; try { data = JSON.parse(text); } catch { data = { error: text }; }
-    if (!response.ok) { const error = new Error(data.error?.message || `Gemini service ${response.status}`); error.status = response.status; throw error; }
-    const story = extractGeminiStory(data);
-    if (!story) { const error = new Error('Gemini returned an invalid structured Company Story'); error.status = 502; throw error; }
-    return { story, model: GEMINI_MODEL, responseId: data.responseId || null };
-  } finally { timeout.clear(); }
+
+function normalizeGeminiStatus(status) {
+  const numericStatus = Number(status);
+  return numericStatus >= 500 ? 502 : numericStatus || 502;
 }
 
-async function askGemini(question, packet) {
+async function callGemini(request, operation) {
   if (!GEMINI_API_KEY) return null;
+  const promptChars = JSON.stringify(request).length;
   const timeout = withTimeout(30_000);
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent`,
-      {
-        method: 'POST',
-        headers: {
-          'x-goog-api-key': GEMINI_API_KEY,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(buildGeminiRequest(question, packet)),
-        signal: timeout.signal,
-      },
-    );
-    const text = await response.text();
-    let data;
-    try { data = JSON.parse(text); } catch { data = { error: text }; }
-    if (!response.ok) {
-      const error = new Error(data.error?.message || `Gemini service ${response.status}`);
-      error.status = response.status;
-      throw error;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(GEMINI_MODEL)}:generateContent`;
+    let lastError = null;
+
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'x-goog-api-key': GEMINI_API_KEY,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(request),
+          signal: timeout.signal,
+        });
+        const text = await response.text();
+        let data;
+        try { data = JSON.parse(text); } catch { data = { error: text }; }
+
+        if (response.ok) return data;
+
+        const upstreamMessage = String(data?.error?.message || `Gemini service ${response.status}`).slice(0, 500);
+        const error = new Error(upstreamMessage);
+        error.status = normalizeGeminiStatus(response.status);
+        error.upstreamStatus = response.status;
+        error.code = 'GEMINI_UPSTREAM';
+
+        console.error('[NSE Watcher Analyst] Gemini request failed', JSON.stringify({
+          operation,
+          model: GEMINI_MODEL,
+          attempt,
+          upstreamStatus: response.status,
+          publicStatus: error.status,
+          promptChars,
+          message: upstreamMessage,
+        }));
+
+        lastError = error;
+        if (![500, 503].includes(response.status) || attempt === 2) throw error;
+        await new Promise(resolve => setTimeout(resolve, 500 * attempt));
+      } catch (error) {
+        if (error?.name === 'AbortError') throw error;
+        lastError = error;
+        if (error?.code !== 'GEMINI_UPSTREAM' || attempt === 2 || ![500, 503].includes(error.upstreamStatus)) throw error;
+      }
     }
-    const analysis = extractGeminiAnalysis(data);
-    if (!analysis) {
-      const error = new Error('Gemini returned an invalid structured Analyst response');
-      error.status = 502;
-      throw error;
-    }
-    return {
-      analysis,
-      answer: analysis.summary || '',
-      model: GEMINI_MODEL,
-      responseId: data.responseId || null,
-    };
+
+    throw lastError || new Error('Gemini request failed');
   } finally {
     timeout.clear();
   }
 }
+
+async function askGeminiStory(packet) {
+  const data = await callGemini(buildCompanyStoryRequest(packet), 'story');
+  if (!data) return null;
+  const story = extractGeminiStory(data);
+  if (!story) {
+    const error = new Error('Gemini returned an invalid structured Company Story');
+    error.status = 502;
+    throw error;
+  }
+  return { story, model: GEMINI_MODEL, responseId: data.responseId || null };
+}
+
+async function askGemini(question, packet) {
+  const data = await callGemini(buildGeminiRequest(question, packet), 'ask');
+  if (!data) return null;
+  const analysis = extractGeminiAnalysis(data);
+  if (!analysis) {
+    const error = new Error('Gemini returned an invalid structured Analyst response');
+    error.status = 502;
+    throw error;
+  }
+  return {
+    analysis,
+    answer: analysis.summary || '',
+    model: GEMINI_MODEL,
+    responseId: data.responseId || null,
+  };
+}
+
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return json(res, 405, { error: 'POST only' });
@@ -331,3 +366,4 @@ module.exports.validateStructuredAnalysis = validateStructuredAnalysis;
 module.exports.buildCompanyStoryRequest = buildCompanyStoryRequest;
 module.exports.extractGeminiStory = extractGeminiStory;
 module.exports.validateCompanyStory = validateCompanyStory;
+module.exports.normalizeGeminiStatus = normalizeGeminiStatus;
