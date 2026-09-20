@@ -1822,3 +1822,38 @@ Therefore this Company Intelligence P0 data-integrity defect is **CLOSED / VERIF
 - Next focused audit target: **P1 Market**, followed by News, Watchlist, Companies, More/Settings, and technical cleanup as appropriate.
 
 Important: the older roadmap/handoff sections above may describe earlier phase ordering. This latest section is the authoritative current closure-audit state for September 20, 2026.
+
+
+## CURRENT CLOSURE AUDIT — WATCHLIST RECHECK
+
+### P1 Watchlist audit result
+
+The current Watchlist implementation was re-audited against the closed Phase 11 design and the current market-data model.
+
+Verified:
+- WatchlistStore is embedded in `data/MarketRepository.kt` and is DataStore-backed.
+- New users start with an empty watchlist.
+- Add/remove normalizes symbols and ignores blank symbols.
+- DataStore's string set prevents duplicate symbols.
+- Company Intelligence and Alerts use the same persisted WatchlistStore.
+- Dedicated Watchlist view hydrates only explicitly watched symbols from the existing `liveStocks` feed.
+- Missing market-feed symbols are shown as unavailable rather than given fabricated prices.
+- Users can remove symbols directly from Watchlist.
+- Watchlist remains separate from portfolio/ownership.
+- Watchlist page refreshes the existing market feed when opened and also reacts to the shared `liveStocks` state.
+- No second market-data or intelligence architecture was introduced.
+
+### Concrete data-integrity defect found and fixed
+
+The Watchlist UI always formatted `stock.change` as a real percentage, even when the parser correctly marked `changeAvailable = false`. Because the underlying Stock model uses an unavailable/non-finite change rather than a fabricated value, the UI should not present a percentage when no provider change is available.
+
+Fix commit:
+- **5d0d87d1a17f3848b1dbfc0efdc110db6fffb599** — `Show unavailable when watchlist daily change is missing`
+
+The Watchlist entry now shows **Daily change unavailable** when `changeAvailable` is false.
+
+### Verification state
+
+The fix has been committed, but the connector has not yet reported a workflow run for commit 5d0d87d1a17f3848b1dbfc0efdc110db6fffb599. Therefore this fix is **NOT YET CI-VERIFIED GREEN** and Watchlist closure must not be declared final until the relevant Android CI result is confirmed.
+
+No further Watchlist changes should be made unless CI exposes a concrete failure or a separate audit finds a real defect.
