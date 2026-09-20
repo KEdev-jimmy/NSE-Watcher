@@ -782,7 +782,7 @@ private fun Paper() {
                                     val marketValue = h.shares * stock.price
                                     val pnl = marketValue - h.shares * h.averageCost
                                     Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        HomeLogo(stock.symbol, stock.logoUrl, 38)
+                                        Logo(stock.symbol, 38, stock.logoUrl)
                                         Spacer(Modifier.width(8.dp))
                                         Column(Modifier.weight(1f)) {
                                             Text(stock.symbol, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp)
