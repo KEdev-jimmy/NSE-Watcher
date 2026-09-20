@@ -28,14 +28,14 @@ class AlertEvaluatorTest {
 
     @Test fun newsAlertUsesCurrentDayCompanyNewsAndDeduplicates() {
         val alert = PriceAlert("news1", "SCOM", AlertType.NEWS, null, true)
-        val item = NewsItem("n1","Safaricom reports results","","","MyStocks","2026-09-19T10:00:00Z","Company News","SCOM","Safaricom","","","","","","","","CURRENT_DAY")
+        val item = NewsItem("n1","Safaricom reports results","","","MyStocks",java.time.Instant.now().toString(),"Company News","SCOM","Safaricom","","","","","","","","WITHIN_WINDOW")
         assertEquals(1, AlertEvaluator.evaluate(listOf(alert), listOf(stock(30.0)), emptyMap(), listOf(item)).size)
         assertEquals(0, AlertEvaluator.evaluate(listOf(alert), listOf(stock(30.0)), emptyMap(), listOf(item), mapOf("news1" to "n1")).size)
     }
 
     @Test fun corporateActionAlertUsesCorporateActionOrDividendNews() {
         val alert = PriceAlert("ca1", "SCOM", AlertType.CORPORATE_ACTION, null, true)
-        val item = NewsItem("n2","Safaricom dividend declaration","","","MyStocks","2026-09-19T10:00:00Z","Dividends","SCOM","Safaricom","","","","","","","","CURRENT_DAY")
+        val item = NewsItem("n2","Safaricom dividend declaration","","","MyStocks",java.time.Instant.now().toString(),"Dividends","SCOM","Safaricom","","","","","","","","WITHIN_WINDOW")
         assertEquals(1, AlertEvaluator.evaluate(listOf(alert), listOf(stock(30.0)), emptyMap(), listOf(item)).size)
     }
 
