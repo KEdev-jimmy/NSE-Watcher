@@ -384,7 +384,7 @@ private fun SplashSkyline(modifier: Modifier = Modifier) {
 }
 
 private fun Modifier.graphicsLayerScale(scale: Float): Modifier =
-    androidx.compose.ui.graphics.graphicsLayer {
+    this.graphicsLayer {
         scaleX = scale
         scaleY = scale
     }
