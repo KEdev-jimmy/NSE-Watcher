@@ -261,7 +261,11 @@ private fun Watchlist(open: (Stock) -> Unit, back: () -> Unit) {
                                 Text(String.format(Locale.US, "KSh %.2f", stock.price), color = TextDark, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             }
                             Column(horizontalAlignment = Alignment.End) {
-                                Text(String.format(Locale.US, "%+.2f%%", stock.change), color = if (stock.change >= 0) Green else Red, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                if (stock.changeAvailable) {
+                                    Text(String.format(Locale.US, "%+.2f%%", stock.change), color = if (stock.change >= 0) Green else Red, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                } else {
+                                    Text("Daily change unavailable", color = Muted, fontSize = 9.sp)
+                                }
                                 TextButton(onClick = { scope.launch { watchlistStore.remove(stock.symbol) } }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) {
                                     Text("Remove", color = Muted, fontSize = 9.sp)
                                 }
