@@ -1032,7 +1032,6 @@ private fun PaperMetric(label: String, value: String, modifier: Modifier) {
     }
 }
 
-@Composable
 private data class PaperContribution(val time: Long, val amount: Double)
 
 private enum class PaperChartRange(val label: String, val millis: Long?) {
