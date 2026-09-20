@@ -159,6 +159,16 @@ function buildGeminiRequest(question, packet) {
   };
 }
 
+function extractGeminiAnswer(data) {
+  const parts = Array.isArray(data?.candidates?.[0]?.content?.parts)
+    ? data.candidates[0].content.parts
+    : [];
+  return parts
+    .map(part => (typeof part?.text === 'string' ? part.text : ''))
+    .filter(Boolean)
+    .join('\n');
+}
+
 function extractGeminiAnalysis(data) {
   const text = extractGeminiAnswer(data);
   if (!text) return null;
