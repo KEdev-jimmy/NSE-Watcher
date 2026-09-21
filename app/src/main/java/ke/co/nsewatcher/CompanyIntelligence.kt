@@ -594,9 +594,9 @@ private fun ApprovedGlanceCard(
                 }
                 VerticalDivider(Modifier.padding(horizontal = 25.dp).height(265.dp), color = Color(0xFF17364F))
                 Column(Modifier.weight(1f)) {
-                    ApprovedMovement(true, "Today's change", dailyChange?.let { String.format(Locale.US, "%+.2f%%", it) } ?: "Unavailable", previousClose?.let { "vs previous close (" + currencyLabel(it) + ")" } ?: "vs previous close")
+                    ApprovedMovement(dailyChange?.let { it >= 0.0 }, "Today's change", dailyChange?.let { String.format(Locale.US, "%+.2f%%", it) } ?: "Unavailable", previousClose?.let { "vs previous close (" + currencyLabel(it) + ")" } ?: "vs previous close")
                     Spacer(Modifier.height(42.dp))
-                    ApprovedMovement(sinceOpen == null || sinceOpen >= 0.0, "Since open", sinceOpen?.let { String.format(Locale.US, "%+.2f%%", it) } ?: "Unavailable", if (open != null && latest != null) "(" + currencyLabel(open) + " → " + currencyLabel(latest) + ")" else "Open-to-latest movement unavailable")
+                    ApprovedMovement(sinceOpen?.let { it >= 0.0 }, "Since open", sinceOpen?.let { String.format(Locale.US, "%+.2f%%", it) } ?: "Unavailable", if (open != null && latest != null) "(" + currencyLabel(open) + " → " + currencyLabel(latest) + ")" else "Open-to-latest movement unavailable")
                 }
             }
         }
@@ -622,14 +622,27 @@ private fun ApprovedMetric(
 
 @Composable
 private fun ApprovedMovement(
-    positive: Boolean,
+    positive: Boolean?,
     label: String,
     value: String,
     detail: String
 ) {
-    val color = if (positive) Color(0xFF00D084) else Color(0xFFFF4D55)
+    val color = when (positive) {
+        true -> Color(0xFF00D084)
+        false -> Color(0xFFFF4D55)
+        null -> Color(0xFFA9BCD0)
+    }
     Row(verticalAlignment = Alignment.Top) {
-        Icon(if (positive) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward, null, tint = color, modifier = Modifier.size(34.dp))
+        Icon(
+            when (positive) {
+                true -> Icons.Default.ArrowUpward
+                false -> Icons.Default.ArrowDownward
+                null -> Icons.Default.Remove
+            },
+            null,
+            tint = color,
+            modifier = Modifier.size(34.dp)
+        )
         Spacer(Modifier.width(17.dp))
         Column {
             Text(label, color = color, fontSize = 17.sp)
@@ -745,8 +758,8 @@ private fun ApprovedIntradayCanvas(
         fun xAt(i: Int) = left + if (points.size <= 1) 0f else plotWidth * i / points.lastIndex.toFloat()
         fun yAt(v: Double) = top + plotHeight - (((v - yMin) / range).toFloat() * plotHeight)
 
-        repeat(5) { i ->
-            val y = top + plotHeight * i / 4f
+        repeat(6) { i ->
+            val y = top + plotHeight * i / 5f
             drawLine(Color(0xFF17364F), androidx.compose.ui.geometry.Offset(left, y), androidx.compose.ui.geometry.Offset(left + plotWidth, y), strokeWidth = 1f)
         }
 
@@ -778,9 +791,9 @@ private fun ApprovedIntradayCanvas(
             drawCircle(Color(0xFF00D084), 6.5f, androidx.compose.ui.geometry.Offset(lx, ly))
         }
 
-        val scale = (0 until 5).map { i -> yMax - (yMax - yMin) * i / 4 }
+        val scale = (0 until 6).map { i -> yMax - (yMax - yMin) * i / 5 }
         scale.forEachIndexed { i, value ->
-            val y = top + plotHeight * i / 4f
+            val y = top + plotHeight * i / 5f
             drawContext.canvas.nativeCanvas.drawText(
                 String.format(Locale.US, "%.0f", value),
                 left - 10f,
@@ -795,7 +808,7 @@ private fun ApprovedIntradayCanvas(
         }
 
         if (points.size > 1) {
-            val count = min(6, points.size)
+            val count = min(5, points.size)
             repeat(count) { i ->
                 val index = (points.lastIndex.toDouble() * i / (count - 1)).toInt()
                 val x = xAt(index)
