@@ -747,6 +747,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
         if (period == "1D" || period == "NOW") {
             item {
                 SessionAtGlance(
+                    stock = s,
                     historyResult = historyResult,
                     marketStatus = marketStatus
                 )
@@ -1308,6 +1309,7 @@ private fun IntelligenceChart(
 
 @Composable
 private fun SessionAtGlance(
+    stock: Stock,
     historyResult: MyStocksCache.HistoryResult,
     marketStatus: MyStocksCache.MarketStatus
 ) {
@@ -1375,6 +1377,14 @@ private fun SessionAtGlance(
                 observed?.let {
                     Text("Latest observation: $it", color = IntelligenceMuted, fontSize = 8.sp)
                 }
+                if (stock.changeAvailable && stock.change.isFinite()) {
+                    Text(
+                        "Today's move ${String.format(Locale.US, "%+.2f%%", stock.change)} vs previous close",
+                        color = if (stock.change >= 0.0) IntelligenceGreen else IntelligenceRed,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
                 Text(
                     "Market open • price data is exchange-supplied.",
                     color = IntelligenceMuted,
@@ -1395,11 +1405,19 @@ private fun SessionAtGlance(
                     Text("Close observation: $it", color = IntelligenceMuted, fontSize = 8.sp)
                 }
                 Text(
-                    "Closed at ${String.format(Locale.US, "KSh %.2f", latest)}",
+                    "Latest available price ${String.format(Locale.US, "KSh %.2f", latest)}",
                     color = IntelligenceText,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
+                if (stock.changeAvailable && stock.change.isFinite()) {
+                    Text(
+                        "Today's move ${String.format(Locale.US, "%+.2f%%", stock.change)} vs previous close",
+                        color = if (stock.change >= 0.0) IntelligenceGreen else IntelligenceRed,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
                 nextOpen?.let {
                     Spacer(Modifier.height(6.dp))
                     Text("Next regular session: $it", color = IntelligenceMuted, fontSize = 8.sp)
@@ -1567,7 +1585,7 @@ private fun chartAxisDescription(period: String): String = when (period) {
 }
 
 private fun fallbackChartLabels(period: String): List<String> = when (period) {
-    "1D" -> listOf("Start", "Mid", "Now")
+    "1D" -> listOf("Open", "Mid", "Latest")
     "1W" -> listOf("Start", "Mid", "Now")
     "1M" -> listOf("Start", "Mid", "Now")
     "3M", "6M" -> listOf("Start", "Mid", "Now")
@@ -1695,7 +1713,7 @@ private fun financialPeriodLabel(period: String): String {
 }
 
 private fun periodDescription(period: String): String = when (period) {
-    "1D" -> "Current trading session"
+    "1D" -> "Today's Nairobi trading session"
     "1W" -> "Past 1 week"
     "1M" -> "Past 1 month"
     "3M" -> "Past 3 months"
