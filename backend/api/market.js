@@ -131,31 +131,35 @@ function providerMeta(raw) {
   return raw?.meta || raw?.data?.meta || null;
 }
 
-function normalizeMarketStatus(providerData) {
+function normalizeMarketStatus(raw) {
+  // /market/status returns an exchange map:
+  // { anyOpen, checkedAt, serverTime, exchanges: { NSE: { isOpen, status, nextOpen, nextClose, ... } } }.
+  // Keep compatibility with a direct exchange object as well.
+  const exchange = raw?.exchanges?.NSE ?? raw?.data?.exchanges?.NSE ?? raw?.NSE ?? raw?.data?.NSE ?? raw;
   const rawStatus = String(
-    providerData?.status ??
-    providerData?.marketStatus ??
-    providerData?.state ??
+    exchange?.status ??
+    exchange?.marketStatus ??
+    exchange?.state ??
     ''
-  ).trim();
-  const normalizedStatus = rawStatus.toLowerCase();
-  const statusOpen = normalizedStatus === 'open' || normalizedStatus === 'trading';
-  const statusClosed = normalizedStatus === 'closed' || normalizedStatus === 'not_trading';
+  ).trim().toUpperCase();
 
-  const hasExplicitIsOpen = typeof providerData?.isOpen === 'boolean';
-  const explicitIsOpen = hasExplicitIsOpen ? providerData.isOpen : null;
+  const hasExplicitIsOpen = typeof exchange?.isOpen === 'boolean';
+  const explicitIsOpen = hasExplicitIsOpen ? exchange.isOpen : null;
+  const statusOpen = rawStatus === 'OPEN' || rawStatus === 'TRADING';
+  const statusClosed = rawStatus === 'CLOSED' || rawStatus === 'NOT_TRADING';
 
-  // A provider must not be treated as CLOSED merely because it omitted status.
-  // If explicit boolean and status disagree, preserve the uncertainty instead
-  // of silently choosing one source of truth.
+  // The provider's explicit boolean and status are both authoritative when
+  // present. If they conflict, surface UNKNOWN rather than inventing a state.
   if (hasExplicitIsOpen && (statusOpen || statusClosed)) {
     if ((explicitIsOpen && statusClosed) || (!explicitIsOpen && statusOpen)) {
-      return { isOpen: false, status: 'UNKNOWN', isKnown: false };
+      return { isOpen: false, status: 'UNKNOWN', isKnown: false, nextOpen: exchange?.nextOpen || null, nextClose: exchange?.nextClose || null };
     }
     return {
       isOpen: explicitIsOpen,
       status: explicitIsOpen ? 'OPEN' : 'CLOSED',
       isKnown: true,
+      nextOpen: exchange?.nextOpen || null,
+      nextClose: exchange?.nextClose || null,
     };
   }
 
@@ -164,17 +168,15 @@ function normalizeMarketStatus(providerData) {
       isOpen: explicitIsOpen,
       status: explicitIsOpen ? 'OPEN' : 'CLOSED',
       isKnown: true,
+      nextOpen: exchange?.nextOpen || null,
+      nextClose: exchange?.nextClose || null,
     };
   }
 
-  if (statusOpen) return { isOpen: true, status: 'OPEN', isKnown: true };
-  if (statusClosed) return { isOpen: false, status: 'CLOSED', isKnown: true };
+  if (statusOpen) return { isOpen: true, status: 'OPEN', isKnown: true, nextOpen: exchange?.nextOpen || null, nextClose: exchange?.nextClose || null };
+  if (statusClosed) return { isOpen: false, status: 'CLOSED', isKnown: true, nextOpen: exchange?.nextOpen || null, nextClose: exchange?.nextClose || null };
 
-  return { isOpen: false, status: 'UNKNOWN', isKnown: false };
-}
-
-function unwrapProviderData(raw) {
-  return raw?.data && !Array.isArray(raw.data) ? raw.data : raw;
+  return { isOpen: false, status: 'UNKNOWN', isKnown: false, nextOpen: exchange?.nextOpen || null, nextClose: exchange?.nextClose || null };
 }
 
 module.exports = async (req, res) => {
@@ -182,16 +184,15 @@ module.exports = async (req, res) => {
   const action = String(req.query.action || 'snapshot');
   try {
     if (action === 'status') {
-      const data = await mystocks('/market/status?exchange=NSE');
-      const providerData = unwrapProviderData(data);
-      const normalized = normalizeMarketStatus(providerData);
+      const data = await mystocks('/market/status');
+      const normalized = normalizeMarketStatus(data);
       return json(res, 200, {
         source: 'MyStocks Africa', delayMinutes: null, fetchedAt: new Date().toISOString(),
         isOpen: normalized.isOpen,
         status: normalized.status,
         isKnown: normalized.isKnown,
-        nextOpen: providerData?.nextOpen || providerData?.nextSessionOpen || null,
-        nextClose: providerData?.nextClose || providerData?.nextSessionClose || null,
+        nextOpen: normalized.nextOpen || null,
+        nextClose: normalized.nextClose || null,
         data,
       });
     }
