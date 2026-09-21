@@ -2347,3 +2347,24 @@ About now identifies:
 - Previous successful CI #806 predates this fix and therefore does not validate these changes.
 - A new workflow result must be checked before treating this implementation as build-verified.
 - Runtime APK verification should confirm the photograph remains visible with airplane/offline mode after installation.
+
+
+# 2026-09-21 — Company Intelligence: Today at a glance + truthful 1D chart
+
+- Implemented the recommended Company Intelligence market-summary model in commit `9044f5ab499aa93e57bf72d12e3609d9e6190eda`.
+- The session summary is now titled **Today at a glance** and is explicitly based on today's NSE session.
+- Summary fields now show, when available from real provider observations:
+  - **Previous close** — the prior trading-session close used for the daily percentage calculation.
+  - **Today's open** — first session observation returned by the history/session data.
+  - **Day high** — highest actual intraday observation in the loaded 1D series.
+  - **Day low** — lowest actual intraday observation in the loaded 1D series.
+  - **Latest observation** — latest available provider observation, not automatically called a close.
+  - **Observed at** — Nairobi/EAT timestamp for that latest observation.
+- The primary daily movement is now clearly labelled **Today's change +x.xx% vs previous close**. A secondary **Since open +x.xx%** metric remains so open-to-latest movement is not confused with daily performance.
+- When the market is closed, the UI says **MARKET CLOSED** but still labels the price as the **latest observation**. It does not claim a final close unless the source actually confirms one.
+- The 1D chart now plots **only actual exchange/provider observations**. The previous-close value is no longer inserted as a fake first chart point.
+- Previous close is rendered as a horizontal reference line and is included in the chart scale, making it visually clear how today's actual prices compare with yesterday's close.
+- 1D horizontal labels now use the provider's actual observation timestamps rather than hard-coded 09:30/15:00 labels. The chart description still identifies the Nairobi NSE session window as **09:30–15:00 EAT**.
+- The chart legend now distinguishes **Previous close** from **Actual NSE observations**.
+- This preserves the important distinction for KCB-style data: a stock can open above the previous close and later trade below its opening price while still being positive versus the previous close.
+- Build/CI verification for commit `9044f5ab499aa93e57bf72d12e3609d9e6190eda` is pending; do not treat this implementation as build-verified until the workflow result is checked.
