@@ -169,17 +169,36 @@ private fun App(pickAvatar:()->Unit) {
     }
     LaunchedEffect(autoRefresh) {
         if (!autoRefresh) return@LaunchedEffect
+        var lastStockRefreshMs = System.currentTimeMillis()
+        var previousMarketOpen = startupMarketStatus.isKnown && startupMarketStatus.isOpen
+
         while (isActive) {
-            delay(MarketRefreshController.REFRESH_INTERVAL_MS)
-            startupMarketStatus = MyStocksCache.loadMarketStatus()
-            MyStocksCache.loadStocks().takeIf { it.isNotEmpty() }?.let { refreshed ->
-                liveStocks.value = refreshed
-                // Use the latest selected company without restarting the 15-minute timer
-                // when navigation changes the selection.
-                if (latestSelected.symbol.isNotBlank()) {
-                    refreshed.firstOrNull { it.symbol == latestSelected.symbol }?.let { selected = it }
+            delay(MarketRefreshController.STATUS_POLL_INTERVAL_MS)
+
+            // Status is real-time and must not wait for the 15-minute quote cadence.
+            // This lets an app that is already open recognize the Nairobi session
+            // transition around 09:30 EAT even when the user is physically abroad.
+            val refreshedStatus = MyStocksCache.loadMarketStatus()
+            val becameOpen = refreshedStatus.isKnown && refreshedStatus.isOpen && !previousMarketOpen
+            startupMarketStatus = refreshedStatus
+
+            val now = System.currentTimeMillis()
+            val quoteRefreshDue =
+                now - lastStockRefreshMs >= MarketRefreshController.REFRESH_INTERVAL_MS
+
+            if (becameOpen || quoteRefreshDue) {
+                MyStocksCache.loadStocks().takeIf { it.isNotEmpty() }?.let { refreshed ->
+                    liveStocks.value = refreshed
+                    lastStockRefreshMs = now
+                    // Use the latest selected company without restarting the status timer
+                    // when navigation changes the selection.
+                    if (latestSelected.symbol.isNotBlank()) {
+                        refreshed.firstOrNull { it.symbol == latestSelected.symbol }?.let { selected = it }
+                    }
                 }
             }
+
+            previousMarketOpen = refreshedStatus.isKnown && refreshedStatus.isOpen
         }
     }
     var showVolume by rememberSaveable { mutableStateOf(prefs.getBoolean("show_volume", true)) }
