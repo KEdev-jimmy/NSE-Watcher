@@ -2317,3 +2317,33 @@ Implemented as one coherent batch from `c7726e9407024c394292b76c610fa51b33863c8a
 - Active files: HomeDashboard.kt, DesignActivity.kt, MarketDashboard.kt, NewsDashboard.kt.
 - The previous companies_city_background.xml was a vector approximation and has now been removed; Companies uses the approved real photograph.
 - CI/runtime verification is required before treating this photo integration as complete.
+
+
+# 2026-09-21 — Nairobi Skyline Bundling / Visibility Fix
+
+The previously approved Nairobi City County Skyline photo was initially loaded remotely through Coil and covered by very strong green/navy overlays. Runtime testing showed the downloaded APK could appear as a plain green background, so the skyline implementation was changed.
+
+## Current implementation
+- The approved Antony Trivet / Wikimedia Commons Nairobi City County Skyline photograph is now referenced as a local Android drawable resource: R.drawable.nairobi_city_county_skyline
+- The APK build creates the local resource during Gradle build from the approved 1280px Wikimedia thumbnail URL, under generated drawable-nodpi, so the finished APK contains the photograph and does not need Wikimedia at runtime to display it.
+- app/build.gradle.kts registers the generated resource directory and a downloadNairobiSkyline build task. The build fails rather than silently shipping without the image if the asset cannot be obtained.
+- Home, Companies, Market, and News now use the bundled image instead of remote AsyncImage loading.
+- The heavy flat overlays were reduced so the actual Nairobi buildings/skyline remain visibly photographic while text stays readable.
+- Companies remains the strongest skyline treatment.
+- Home and Market use visible but controlled photo treatment.
+- News uses a visible featured skyline treatment.
+- Company Detail, opening/splash, and utility/settings screens remain without photographic skyline.
+
+## Attribution
+About now identifies:
+- Nairobi skyline photo: Antony Trivet
+- Creative Commons BY-SA 4.0
+- Wikimedia Commons source page
+- CC BY-SA 4.0 license
+- Notes that the app applies crop/overlay treatment.
+
+## Verification status
+- Source inspection confirms the four visual screens reference the local drawable.
+- Previous successful CI #806 predates this fix and therefore does not validate these changes.
+- A new workflow result must be checked before treating this implementation as build-verified.
+- Runtime APK verification should confirm the photograph remains visible with airplane/offline mode after installation.
