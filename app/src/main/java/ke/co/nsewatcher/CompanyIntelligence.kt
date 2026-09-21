@@ -53,6 +53,16 @@ private val IntelligenceMuted = Color(0xFF6C7A72)
 private val IntelligenceBorder = Color(0xFFE1EAE5)
 private val IntelligenceRed = Color(0xFFE04444)
 
+private fun marketObservationLabel(stock: Stock): String {
+    val delay = stock.delayMinutes ?: 15
+    val observed = runCatching {
+        Instant.parse(stock.observedAt)
+            .atZone(ZoneId.of("Africa/Nairobi"))
+            .format(DateTimeFormatter.ofPattern("dd MMM, HH:mm", Locale.US))
+    }.getOrDefault(stock.observedAt.replace("T", " ").removeSuffix("Z").take(16))
+    return "Latest NSE observation • $observed EAT • $delay-min delayed"
+}
+
 
 private enum class CompanyIntelligenceSection(val label: String) {
     ABOUT("About"), INTELLIGENCE("Intelligence"), PERFORMANCE("Performance"),
@@ -200,15 +210,36 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
             ) {
                 Column(Modifier.padding(17.dp)) {
                     Text("NSE DATA • LATEST AVAILABLE", color = IntelligenceMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    Text(
-                        String.format(Locale.US, "KSh %.2f", s.price),
-                        fontSize = 30.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = IntelligenceText
-                    )
+                    if (s.observedAt.isNotBlank() && s.dataOrigin == "backend" && s.price.isFinite()) {
+                        Text(
+                            String.format(Locale.US, "KSh %.2f", s.price),
+                            fontSize = 30.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = IntelligenceText
+                        )
+                    } else {
+                        Text(
+                            "Price unavailable",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = IntelligenceMuted
+                        )
+                    }
                     Spacer(Modifier.height(2.dp))
                     Text(
-                        if (s.changeAvailable && s.change.isFinite()) {
+                        if (s.observedAt.isNotBlank() && s.dataOrigin == "backend") {
+                            marketObservationLabel(s)
+                        } else {
+                            "Latest NSE observation unavailable from the market feed"
+                        },
+                        color = IntelligenceMuted,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 9.sp,
+                        maxLines = 2
+                    )
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        if (s.changeAvailable && s.change.isFinite() && s.dataOrigin == "backend") {
                             formatHeaderChange(s.change, marketStatus, historyResult)
                         } else {
                             formatHeaderUnavailable(marketStatus, historyResult)
@@ -612,8 +643,17 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
             IntelligenceCard {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
                     Column(Modifier.weight(1f)) {
-                        Text("${currencyLabel(s.price)}", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, color = IntelligenceText)
-                        Text("NSE • 15 min delayed", color = IntelligenceMuted, fontSize = 9.sp)
+                        Text(
+                            if (s.observedAt.isNotBlank() && s.dataOrigin == "backend" && s.price.isFinite()) currencyLabel(s.price) else "Price unavailable",
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = IntelligenceText
+                        )
+                        Text(
+                            if (s.observedAt.isNotBlank() && s.dataOrigin == "backend") marketObservationLabel(s) else "NSE latest observation unavailable",
+                            color = IntelligenceMuted,
+                            fontSize = 9.sp
+                        )
                     }
                     if ((period == "1D" || period == "NOW") && marketStatus.isKnown && !marketStatus.isOpen) {
                         Text(
