@@ -19,10 +19,7 @@ object MyStocksCache {
 
     data class HistoryPoint(
         val close: Double,
-        val date: String = "",
-        val open: Double? = null,
-        val high: Double? = null,
-        val low: Double? = null
+        val date: String = ""
     )
 
     data class HistoryResult(
@@ -231,10 +228,7 @@ object MyStocksCache {
                     val close = candle.optDouble("close", Double.NaN)
                     if (close.isFinite() && close > 0.0) {
                         val date = candle.optString("date", "").ifBlank { candle.optString("timestamp", "") }
-                        val open = candle.optDouble("open", Double.NaN).takeIf { it.isFinite() && it > 0.0 }
-                        val high = candle.optDouble("high", Double.NaN).takeIf { it.isFinite() && it > 0.0 }
-                        val low = candle.optDouble("low", Double.NaN).takeIf { it.isFinite() && it > 0.0 }
-                        add(HistoryPoint(close, date, open, high, low))
+                        add(HistoryPoint(close, date))
                     }
                 }
             }
