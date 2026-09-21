@@ -1,5 +1,3 @@
-import java.net.URI
-
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -12,11 +10,6 @@ android { namespace = "ke.co.nsewatcher"; compileSdk = 35
     buildFeatures { compose = true; buildConfig = true }
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
 
-    sourceSets {
-        getByName("main") {
-            res.srcDir(layout.buildDirectory.dir("generated/nairobi-res"))
-        }
-    }
     buildTypes { release { isMinifyEnabled = false; proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro") } }
     lint {
         disable += "ProduceStateDoesNotAssignValue"
@@ -63,34 +56,3 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
 
-
-val downloadNairobiSkyline by tasks.registering {
-    val outputFile = layout.buildDirectory.file(
-        "generated/nairobi-res/drawable-nodpi/nairobi_city_county_skyline.jpg"
-    )
-    outputs.file(outputFile)
-
-    doLast {
-        val target = outputFile.get().asFile
-        if (!target.exists() || target.length() < 10_000L) {
-            target.parentFile.mkdirs()
-            val source = URI(
-                "https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/Nairobi_City_County_Skyline.jpg/1280px-Nairobi_City_County_Skyline.jpg"
-            ).toURL()
-
-            source.openStream().use { input ->
-                target.outputStream().use { output ->
-                    input.copyTo(output)
-                }
-            }
-        }
-
-        if (!target.exists() || target.length() < 10_000L) {
-            throw GradleException("Nairobi skyline asset could not be downloaded for the APK.")
-        }
-    }
-}
-
-tasks.named("preBuild").configure {
-    dependsOn(downloadNairobiSkyline)
-}
