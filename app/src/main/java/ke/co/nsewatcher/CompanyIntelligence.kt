@@ -1340,11 +1340,11 @@ private fun SessionAtGlance(
     val openSession = known && marketStatus.isOpen
 
     SectionTitle(
-        "Market status",
+        "Today's trading session",
         when {
             openSession -> "NSE session • latest available data"
-            known -> "Market is closed"
-            else -> "Session status is currently unavailable"
+            known -> "NSE session • completed today"
+            else -> "NSE session status is currently unavailable"
         },
         Icons.Default.Schedule
     )
@@ -1363,7 +1363,7 @@ private fun SessionAtGlance(
                     if (openSession) {
                         "The latest NSE session observation is not available."
                     } else {
-                        "The last completed NSE session close is not available."
+                        "Today's trading session close is not available."
                     },
                     color = IntelligenceMuted,
                     fontSize = 10.sp
@@ -1374,15 +1374,14 @@ private fun SessionAtGlance(
                 }
             }
             openSession -> {
+                val intradayMove = if (open != null && open > 0.0 && latest != null) {
+                    ((latest - open) / open) * 100.0
+                } else null
+
                 Row(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    stock.previousClose?.takeIf { it > 0.0 }?.let {
-                        Box(Modifier.weight(1f)) {
-                            MiniFact("PREVIOUS CLOSE", String.format(Locale.US, "KSh %.2f", it))
-                        }
-                    }
                     open?.takeIf { it > 0.0 }?.let {
                         Box(Modifier.weight(1f)) {
                             MiniFact("OPEN", String.format(Locale.US, "KSh %.2f", it))
@@ -1391,14 +1390,27 @@ private fun SessionAtGlance(
                     Box(Modifier.weight(1f)) {
                         MiniFact("LATEST", String.format(Locale.US, "KSh %.2f", latest))
                     }
+                    stock.previousClose?.takeIf { it > 0.0 }?.let {
+                        Box(Modifier.weight(1f)) {
+                            MiniFact("PREVIOUS CLOSE", String.format(Locale.US, "KSh %.2f", it))
+                        }
+                    }
                 }
                 Spacer(Modifier.height(9.dp))
                 observed?.let {
                     Text("Latest observation: $it", color = IntelligenceMuted, fontSize = 8.sp)
                 }
+                intradayMove?.let {
+                    Text(
+                        "Today's session move ${String.format(Locale.US, "%+.2f%%", it)} from open",
+                        color = if (it >= 0.0) IntelligenceGreen else IntelligenceRed,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
                 if (stock.changeAvailable && stock.change.isFinite()) {
                     Text(
-                        "Today's move ${String.format(Locale.US, "%+.2f%%", stock.change)} vs previous close",
+                        "Daily move ${String.format(Locale.US, "%+.2f%%", stock.change)} vs previous close",
                         color = if (stock.change >= 0.0) IntelligenceGreen else IntelligenceRed,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold
@@ -1411,6 +1423,10 @@ private fun SessionAtGlance(
                 )
             }
             else -> {
+                val intradayMove = if (open != null && open > 0.0 && latest != null) {
+                    ((latest - open) / open) * 100.0
+                } else null
+
                 Text(
                     "MARKET CLOSED",
                     color = IntelligenceText,
@@ -1418,20 +1434,36 @@ private fun SessionAtGlance(
                     fontWeight = FontWeight.ExtraBold
                 )
                 sessionDate?.let {
-                    Text("Last completed NSE trading session • $it", color = IntelligenceMuted, fontSize = 9.sp)
+                    Text("Today's trading session • $it", color = IntelligenceMuted, fontSize = 9.sp)
                 }
                 observed?.let {
                     Text("Latest available observation: $it • 15 min delayed", color = IntelligenceMuted, fontSize = 8.sp)
                 }
-                Text(
-                    "Latest available session price ${String.format(Locale.US, "KSh %.2f", latest)}",
-                    color = IntelligenceText,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.ExtraBold
-                )
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    open?.takeIf { it > 0.0 }?.let {
+                        Box(Modifier.weight(1f)) {
+                            MiniFact("OPEN", String.format(Locale.US, "KSh %.2f", it))
+                        }
+                    }
+                    Box(Modifier.weight(1f)) {
+                        MiniFact("LATEST", String.format(Locale.US, "KSh %.2f", latest))
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                intradayMove?.let {
+                    Text(
+                        "Today's session move ${String.format(Locale.US, "%+.2f%%", it)} from open",
+                        color = if (it >= 0.0) IntelligenceGreen else IntelligenceRed,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
                 if (stock.changeAvailable && stock.change.isFinite()) {
                     Text(
-                        "Today's move ${String.format(Locale.US, "%+.2f%%", stock.change)} vs previous close",
+                        "Daily move ${String.format(Locale.US, "%+.2f%%", stock.change)} vs previous close",
                         color = if (stock.change >= 0.0) IntelligenceGreen else IntelligenceRed,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold
@@ -1445,6 +1477,7 @@ private fun SessionAtGlance(
         }
     }
 }
+
 private fun formatHeaderUnavailable(
     marketStatus: MyStocksCache.MarketStatus,
     historyResult: MyStocksCache.HistoryResult
@@ -1535,8 +1568,20 @@ private fun chartAxisLabels(
     }
     if (dated.size < 2) return fallbackChartLabels(period).mapIndexed { index, text -> ChartLabel(index, text) }
 
-    // At normal scale keep the chart calm. As the user zooms in, reveal more
-    // real observations rather than fabricating intermediate points.
+    if (period == "1D") {
+        // Session boundary labels provide the Nairobi trading window context.
+        // They do not create or claim missing provider price observations.
+        val uniqueTimes = dated.distinctBy { it.text }
+        if (uniqueTimes.size >= 2) {
+            val middle = uniqueTimes[uniqueTimes.lastIndex / 2]
+            return listOf(
+                ChartLabel(uniqueTimes.first().index, "09:30"),
+                ChartLabel(middle.index, middle.text),
+                ChartLabel(uniqueTimes.last().index, "15:00")
+            ).distinctBy { it.index }
+        }
+    }
+
     val baseCount = when (period) {
         "1D" -> 5
         "1W" -> 5
@@ -1594,7 +1639,7 @@ private fun formatChartDate(
 }
 
 private fun chartAxisDescription(period: String): String = when (period) {
-    "1D" -> "Time • Nairobi trading session"
+    "1D" -> "Nairobi NSE session • 09:30–15:00 EAT • plotted points are exchange observations"
     "1W" -> "Trading days"
     "1M" -> "Trading dates"
     "3M", "6M" -> "Months across the selected period"
