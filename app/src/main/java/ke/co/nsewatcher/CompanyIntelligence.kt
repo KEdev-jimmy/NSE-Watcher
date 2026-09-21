@@ -1155,22 +1155,17 @@ private fun IntelligenceChart(
     tint: Color,
     previousClose: Double? = null
 ) {
-    val actualValid = points.filter { it.close.isFinite() && it.close > 0.0 }
-    if (actualValid.size < 2) return
+    // Plot only actual exchange observations. Previous close is a reference level,
+    // not a synthetic price observation at today's open.
+    val valid = points.filter { it.close.isFinite() && it.close > 0.0 }
+    if (valid.size < 2) return
 
-    // For 1D, anchor the visual at the previous trading-session close.
-    // The remaining points are untouched, exchange-supplied intraday observations.
-    val valid = if (period == "1D" && previousClose != null && previousClose.isFinite() && previousClose > 0.0) {
-        listOf(MyStocksCache.HistoryPoint(previousClose, actualValid.first().date)) + actualValid
-    } else {
-        actualValid
-    }
-
-    val min = valid.minOf { it.close }
-    val max = valid.maxOf { it.close }
-    val range = (max - min).takeIf { it > 0.0 } ?: (max * 0.01).coerceAtLeast(1.0)
-    val top = max + range * 0.08
-    val bottom = (min - range * 0.08).coerceAtLeast(0.0)
+    val referenceClose = previousClose?.takeIf { it.isFinite() && it > 0.0 }
+    val minPrice = listOfNotNull(valid.minOfOrNull { it.close }, referenceClose).minOrNull() ?: return
+    val maxPrice = listOfNotNull(valid.maxOfOrNull { it.close }, referenceClose).maxOrNull() ?: return
+    val range = (maxPrice - minPrice).takeIf { it > 0.0 } ?: (maxPrice * 0.01).coerceAtLeast(1.0)
+    val top = maxPrice + range * 0.08
+    val bottom = (minPrice - range * 0.08).coerceAtLeast(0.0)
     val chartRange = (top - bottom).coerceAtLeast(0.0001)
     val mid = (top + bottom) / 2.0
 
@@ -1212,12 +1207,9 @@ private fun IntelligenceChart(
                                 val oldZoom = zoomX
                                 val newZoom = (oldZoom * zoom).coerceIn(1f, 6f)
                                 val scaleRatio = newZoom / oldZoom
-
-                                // Keep the data point under the pinch centre anchored while zooming.
                                 val anchoredPan = centroid.x - (centroid.x - panX) * scaleRatio
                                 val candidatePan = anchoredPan + pan.x
                                 val maxPan = (plotWidthPx * (newZoom - 1f)).coerceAtLeast(0f)
-
                                 zoomX = newZoom
                                 panX = candidatePan.coerceIn(-maxPan, 0f)
                             }
@@ -1226,7 +1218,6 @@ private fun IntelligenceChart(
                     Canvas(Modifier.fillMaxSize()) {
                         val contentWidth = size.width * zoomX
 
-                        // Keep the chart horizontally interactive while the price axis stays fixed.
                         clipRect(left = 0f, top = 0f, right = size.width, bottom = size.height) {
                             val line = Path()
                             val area = Path()
@@ -1257,13 +1248,22 @@ private fun IntelligenceChart(
                                 )
                             )
                             drawPath(line, tint, style = Stroke(width = 3.5f, cap = StrokeCap.Round))
+
+                            referenceClose?.let { close ->
+                                val y = size.height - (((close - bottom) / chartRange).toFloat() * size.height)
+                                drawLine(
+                                    color = IntelligenceMuted.copy(alpha = 0.65f),
+                                    start = androidx.compose.ui.geometry.Offset(0f, y),
+                                    end = androidx.compose.ui.geometry.Offset(size.width, y),
+                                    strokeWidth = 1.5f,
+                                    pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 8f))
+                                )
+                            }
                         }
                     }
                 }
             }
 
-            // The X-axis uses the same transformed positions as the line, so labels stay
-            // attached to their actual observations while the user pans/zooms.
             Row(Modifier.fillMaxWidth()) {
                 Spacer(Modifier.width(42.dp))
                 Box(
@@ -1299,29 +1299,14 @@ private fun IntelligenceChart(
             }
 
             Spacer(Modifier.height(4.dp))
-            Text(
-                chartAxisDescription(period),
-                color = IntelligenceMuted,
-                fontSize = 8.sp,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center
-            )
-
-            if (zoomX > 1.01f) {
-                Spacer(Modifier.height(3.dp))
-                Text(
-                    "Pinch to zoom • drag horizontally to inspect the timeline",
-                    color = IntelligenceMuted,
-                    fontSize = 7.sp,
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
-    }
-}
-
-@Composable
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Spacer(Modifier.width(42.dp))
+                Box(Modifier.size(18.dp, 1.dp).background(IntelligenceMuted))
+                Spacer(Modifier.width(5.dp))
+                Text("Previous close", color = IntelligenceMuted,@Composable
 private fun SessionAtGlance(
     stock: Stock,
     historyResult: MyStocksCache.HistoryResult,
@@ -1329,21 +1314,24 @@ private fun SessionAtGlance(
 ) {
     val open = historyResult.sessionOpen
     val latest = historyResult.sessionClose
+    val actualPoints = historyResult.points.filter { it.close.isFinite() && it.close > 0.0 }
+    val dayHigh = actualPoints.maxOfOrNull { it.close }
+    val dayLow = actualPoints.minOfOrNull { it.close }
     val hasSession = latest != null && latest > 0.0
-    val sessionDate = historyResult.sessionCloseAt.takeIf { it.isNotBlank() }?.let(::formatChartTimestampDate)
-    val observed = historyResult.sessionCloseAt
+    val observedRaw = historyResult.sessionCloseAt
         .takeIf { it.isNotBlank() }
-        ?.let(::formatChartTimestamp)
-        ?: historyResult.observedAt.takeIf { it.isNotBlank() }?.let(::formatChartTimestamp)
+        ?: historyResult.observedAt.takeIf { it.isNotBlank() }
+    val observed = observedRaw?.let(::formatChartTimestamp)
+    val sessionDate = observedRaw?.let(::formatChartTimestampDate)
     val nextOpen = marketStatus.nextOpen.takeIf { it.isNotBlank() }?.let(::formatChartTimestamp)
     val known = marketStatus.isKnown
     val openSession = known && marketStatus.isOpen
 
     SectionTitle(
-        "Today's trading session",
+        "Today at a glance",
         when {
             openSession -> "NSE session • latest available data"
-            known -> "NSE session • completed today"
+            known -> "NSE session • latest available observation"
             else -> "NSE session status is currently unavailable"
         },
         Icons.Default.Schedule
@@ -1360,103 +1348,113 @@ private fun SessionAtGlance(
             }
             !hasSession -> {
                 Text(
-                    if (openSession) {
-                        "The latest NSE session observation is not available."
-                    } else {
-                        "Today's trading session close is not available."
-                    },
+                    "Today's intraday price summary is not available from the current market feed.",
                     color = IntelligenceMuted,
                     fontSize = 10.sp
                 )
                 nextOpen?.let {
                     Spacer(Modifier.height(6.dp))
-                    Text("Next regular session: $it", color = IntelligenceMuted, fontSize = 8.sp)
+                    Text("Next regular session: " + it, color = IntelligenceMuted, fontSize = 8.sp)
                 }
-            }
-            openSession -> {
-                val intradayMove = if (open != null && open > 0.0 && latest != null) {
-                    ((latest - open) / open) * 100.0
-                } else null
-
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    open?.takeIf { it > 0.0 }?.let {
-                        Box(Modifier.weight(1f)) {
-                            MiniFact("OPEN", String.format(Locale.US, "KSh %.2f", it))
-                        }
-                    }
-                    Box(Modifier.weight(1f)) {
-                        MiniFact("LATEST", String.format(Locale.US, "KSh %.2f", latest))
-                    }
-                    stock.previousClose?.takeIf { it > 0.0 }?.let {
-                        Box(Modifier.weight(1f)) {
-                            MiniFact("PREVIOUS CLOSE", String.format(Locale.US, "KSh %.2f", it))
-                        }
-                    }
-                }
-                Spacer(Modifier.height(9.dp))
-                observed?.let {
-                    Text("Latest observation: $it", color = IntelligenceMuted, fontSize = 8.sp)
-                }
-                intradayMove?.let {
-                    Text(
-                        "Today's session move ${String.format(Locale.US, "%+.2f%%", it)} from open",
-                        color = if (it >= 0.0) IntelligenceGreen else IntelligenceRed,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                if (stock.changeAvailable && stock.change.isFinite()) {
-                    Text(
-                        "Daily move ${String.format(Locale.US, "%+.2f%%", stock.change)} vs previous close",
-                        color = if (stock.change >= 0.0) IntelligenceGreen else IntelligenceRed,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                Text(
-                    "Market open • price data is exchange-supplied.",
-                    color = IntelligenceMuted,
-                    fontSize = 8.sp
-                )
             }
             else -> {
                 val intradayMove = if (open != null && open > 0.0 && latest != null) {
                     ((latest - open) / open) * 100.0
                 } else null
 
-                Text(
-                    "MARKET CLOSED",
-                    color = IntelligenceText,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.ExtraBold
-                )
-                sessionDate?.let {
-                    Text("Today's trading session • $it", color = IntelligenceMuted, fontSize = 9.sp)
+                val dailyMove = stock.change.takeIf {
+                    stock.changeAvailable && it.isFinite() && stock.dataOrigin == "backend"
+                } ?: stock.previousClose?.takeIf { it > 0.0 }?.let { previous ->
+                    latest?.takeIf { it > 0.0 }?.let { current ->
+                        ((current - previous) / previous) * 100.0
+                    }
                 }
-                observed?.let {
-                    Text("Latest available observation: $it • 15 min delayed", color = IntelligenceMuted, fontSize = 8.sp)
-                }
+
                 Row(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    open?.takeIf { it > 0.0 }?.let {
-                        Box(Modifier.weight(1f)) {
-                            MiniFact("OPEN", String.format(Locale.US, "KSh %.2f", it))
-                        }
+                    stock.previousClose?.takeIf { it > 0.0 }?.let {
+                        Box(Modifier.weight(1f)) { MiniFact("PREVIOUS CLOSE", currencyLabel(it)) }
                     }
-                    Box(Modifier.weight(1f)) {
-                        MiniFact("LATEST", String.format(Locale.US, "KSh %.2f", latest))
+                    open?.takeIf { it > 0.0 }?.let {
+                        Box(Modifier.weight(1f)) { MiniFact("TODAY'S OPEN", currencyLabel(it)) }
+                    }
+                    dayHigh?.let {
+                        Box(Modifier.weight(1f)) { MiniFact("DAY HIGH", currencyLabel(it)) }
                     }
                 }
+
                 Spacer(Modifier.height(8.dp))
+
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    dayLow?.let {
+                        Box(Modifier.weight(1f)) { MiniFact("DAY LOW", currencyLabel(it)) }
+                    }
+                    latest?.takeIf { it > 0.0 }?.let {
+                        Box(Modifier.weight(1f)) { MiniFact("LATEST OBSERVATION", currencyLabel(it)) }
+                    }
+                    observed?.let {
+                        Box(Modifier.weight(1f)) { MiniFact("OBSERVED AT", it.removeSuffix(" EAT")) }
+                    }
+                }
+
+                Spacer(Modifier.height(9.dp))
+
+                if (!openSession) {
+                    Text(
+                        "MARKET CLOSED",
+                        color = IntelligenceText,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    sessionDate?.let {
+                        Text("Today's NSE session • " + it, color = IntelligenceMuted, fontSize = 8.sp)
+                    }
+                }
+
+                dailyMove?.let {
+                    Text(
+                        "Today's change " + String.format(Locale.US, "%+.2f%%", it) + " vs previous close",
+                        color = if (it >= 0.0) IntelligenceGreen else IntelligenceRed,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
+
                 intradayMove?.let {
                     Text(
-                        "Today's session move ${String.format(Locale.US, "%+.2f%%", it)} from open",
+                        "Since open " + String.format(Locale.US, "%+.2f%%", it),
                         color = if (it >= 0.0) IntelligenceGreen else IntelligenceRed,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                observed?.let {
+                    Text(
+                        "Latest observation: " + it + " • exchange-supplied • 15 min delayed",
+                        color = IntelligenceMuted,
+                        fontSize = 8.sp
+                    )
+                }
+
+                if (!openSession) {
+                    Text(
+                        "The feed is showing the latest available observation; it is not labelled as a final close unless the source confirms one.",
+                        color = IntelligenceMuted,
+                        fontSize = 8.sp,
+                        lineHeight = 12.sp
+                    )
+                }
+            }
+        }
+    }
+}
+                       color = if (it >= 0.0) IntelligenceGreen else IntelligenceRed,
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -1569,16 +1567,12 @@ private fun chartAxisLabels(
     if (dated.size < 2) return fallbackChartLabels(period).mapIndexed { index, text -> ChartLabel(index, text) }
 
     if (period == "1D") {
-        // Session boundary labels provide the Nairobi trading window context.
-        // They do not create or claim missing provider price observations.
+        // Use the provider's real observation timestamps. The description below
+        // supplies the NSE session window (09:30–15:00 EAT) without inventing
+        // observations at the session boundaries.
         val uniqueTimes = dated.distinctBy { it.text }
         if (uniqueTimes.size >= 2) {
-            val middle = uniqueTimes[uniqueTimes.lastIndex / 2]
-            return listOf(
-                ChartLabel(uniqueTimes.first().index, "09:30"),
-                ChartLabel(middle.index, middle.text),
-                ChartLabel(uniqueTimes.last().index, "15:00")
-            ).distinctBy { it.index }
+            return evenlySpacedLabels(uniqueTimes, uniqueTimes.size.coerceAtMost(6))
         }
     }
 
