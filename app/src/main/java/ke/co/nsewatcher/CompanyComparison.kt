@@ -74,6 +74,7 @@ fun CompanyComparison(stocks: List<Stock>, back: () -> Unit) {
         item { Row(verticalAlignment = Alignment.CenterVertically) { IconButton(onClick = back) { Icon(Icons.Default.ArrowBack, "Back") }; Column(Modifier.weight(1f)) { Text("Compare companies", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold); Text("Compare sourced figures side by side", fontSize = 10.sp, color = CompareMuted) }; Icon(Icons.Default.CompareArrows, null, tint = CompareGreen, modifier = Modifier.size(24.dp)) } }
         item { Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) { CompanySelector("Company 1", leftSymbol, available) { symbol -> if (symbol != rightSymbol) leftSymbol = symbol }; CompanySelector("Company 2", rightSymbol, available) { symbol -> if (symbol != leftSymbol) rightSymbol = symbol } } }
         item { if (loading) CompareNote("Loading sourced company data…") else CompareTable(leftStock, rightStock, metrics) }
+        if (!loading) item { CompareNote("Prices use each company’s latest available NSE observation (" + observationTime(leftStock) + "; " + observationTime(rightStock) + "). The feed is provider-supplied and 15-minute delayed.") }
         if (!loading) {
             item { CompareNote("This is a side-by-side factual comparison of available provider data. It does not rank the companies or give a BUY/SELL instruction.") }
             item { Text("Source dates", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = CompareText) }
@@ -112,6 +113,15 @@ fun CompanyComparison(stocks: List<Stock>, back: () -> Unit) {
     Column { Text(name, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = CompareText); Text(buildString { if (updated.isNotBlank()) append("Provider updated " + updated); if (checked.isNotBlank()) { if (isNotEmpty()) append(" • "); append("page checked " + checked) }; if (isEmpty()) append("Provider dates unavailable") }, fontSize = 8.sp, color = CompareMuted) }
 }
 @Composable private fun CompareNote(text: String) { Card(Modifier.fillMaxWidth(), RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = CompareLight)) { Row(Modifier.padding(11.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Info, null, tint = CompareGreen, modifier = Modifier.size(17.dp)); Spacer(Modifier.width(8.dp)); Text(text, fontSize = 9.sp, lineHeight = 13.sp, color = CompareMuted) } } }
+private fun observationTime(stock: Stock): String {
+    if (stock.observedAt.isBlank()) return stock.symbol + ": time unavailable"
+    val observed = runCatching {
+        java.time.Instant.parse(stock.observedAt)
+            .atZone(java.time.ZoneId.of("Africa/Nairobi"))
+            .format(java.time.format.DateTimeFormatter.ofPattern("dd MMM, HH:mm", java.util.Locale.US))
+    }.getOrDefault(stock.observedAt.replace("T", " ").removeSuffix("Z").take(16))
+    return stock.symbol + " as of " + observed + " EAT"
+}
 private fun value(raw: String): String = raw.trim().ifBlank { "Unavailable" }
 private fun percent(raw: String): String { val v = raw.trim(); if (v.isBlank()) return "Unavailable"; return if (v.contains("%")) v else v + "%" }
 private fun financial(raw: String, unit: String): String { val v = raw.trim(); if (v.isBlank()) return "Unavailable"; return if (unit.isBlank()) v else v + " " + unit }
