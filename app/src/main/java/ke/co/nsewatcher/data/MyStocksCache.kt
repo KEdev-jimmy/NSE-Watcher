@@ -119,7 +119,16 @@ object MyStocksCache {
             val marketStatus = loadMarketStatus()
             val marketOpen = marketStatus.isOpen.takeIf { marketStatus.isKnown }
             val backend = loadFromUrl(BACKEND_STOCKS_URL, "backend", marketOpen)
-            val base = backend.takeIf { it.isNotEmpty() } ?: loadFromUrl(FALLBACK_URL, "fallback", marketOpen)
+            // Never silently substitute the static catalogue while the Nairobi
+            // continuous market is open. A fallback price can make a live market
+            // look frozen and can turn missing change data into misleading 0.00%.
+            // During a known closed session the catalogue remains useful for
+            // browsing, but it is explicitly marked as fallback data.
+            val base = when {
+                backend.isNotEmpty() -> backend
+                marketOpen == true -> emptyList()
+                else -> loadFromUrl(FALLBACK_URL, "fallback", marketOpen)
+            }
             if (base.isEmpty()) {
                 MarketRefreshController.markFailed()
                 return@withContext emptyList()
