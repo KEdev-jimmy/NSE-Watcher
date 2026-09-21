@@ -58,7 +58,6 @@ private val IntelligenceRed = Color(0xFFE04444)
 private fun CompanyOverviewCard(
     stock: Stock,
     marketStatus: MyStocksCache.MarketStatus,
-    historyResult: MyStocksCache.HistoryResult,
     watched: Boolean,
     onBack: () -> Unit,
     onWatchToggle: (() -> Unit)?
@@ -483,7 +482,6 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
             CompanyOverviewCard(
                 stock = s,
                 marketStatus = marketStatus,
-                historyResult = historyResult,
                 watched = watched,
                 onBack = back,
                 onWatchToggle = onWatchToggle
