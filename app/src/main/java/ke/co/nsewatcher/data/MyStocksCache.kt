@@ -302,12 +302,13 @@ object MyStocksCache {
                     val previousClose = item.optDouble("previousClose", Double.NaN)
                     val suppliedChangePct = item.optDouble("changePct", Double.NaN)
                     val derived = if (previousClose.isFinite() && previousClose > 0.0) ((price - previousClose) / previousClose) * 100.0 else Double.NaN
-                    // Stock.change is a percentage. Prefer the provider's explicit changePct;
-                    // derive it from price/previousClose only when changePct is absent.
-                    // Do not treat a generic "change" field as a percentage because its unit
-                    // is provider-schema dependent and may be an absolute price delta.
+                    // MyStocks returns changePct as a decimal fraction (for example KCB
+                    // 0.027473 means +2.7473%). Stock.change is stored/displayed as a
+                    // percentage value, so convert the provider fraction to percentage
+                    // points before it reaches Gainers/Losers or the UI.
+                    // Derivation from price/previousClose already produces percentage points.
                     val changePct = when {
-                        suppliedChangePct.isFinite() -> suppliedChangePct
+                        suppliedChangePct.isFinite() -> suppliedChangePct * 100.0
                         derived.isFinite() -> derived
                         else -> Double.NaN
                     }
