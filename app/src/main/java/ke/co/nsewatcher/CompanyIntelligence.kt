@@ -1559,6 +1559,10 @@ private fun formatChartTimestamp(raw: String): String = runCatching {
     Instant.parse(raw).atZone(ZoneId.of("Africa/Nairobi")).format(DateTimeFormatter.ofPattern("dd MMM yy • h:mm a", Locale.US)) + " EAT"
 }.getOrElse { raw.take(19) }
 
+private fun formatChartTimestampDate(raw: String): String = runCatching {
+    Instant.parse(raw).atZone(ZoneId.of("Africa/Nairobi")).format(DateTimeFormatter.ofPattern("EEE, dd MMM yy", Locale.US))
+}.getOrElse { raw.take(10) }
+
 private fun formatCompactChartTimestamp(raw: String): String = runCatching {
     Instant.parse(raw).atZone(ZoneId.of("Africa/Nairobi")).format(DateTimeFormatter.ofPattern("dd MMM yy • h:mm a", Locale.US))
 }.getOrElse { raw.take(19) }
