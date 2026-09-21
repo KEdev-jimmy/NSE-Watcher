@@ -1154,8 +1154,8 @@ private fun IntelligenceChart(
     val minPrice = listOfNotNull(valid.minOfOrNull { it.close }, referenceClose).minOrNull() ?: return
     val maxPrice = listOfNotNull(valid.maxOfOrNull { it.close }, referenceClose).maxOrNull() ?: return
     val range = (maxPrice - minPrice).takeIf { it > 0.0 } ?: (maxPrice * 0.01).coerceAtLeast(1.0)
-    val top = max + range * 0.08
-    val bottom = (min - range * 0.08).coerceAtLeast(0.0)
+    val top = maxPrice + range * 0.08
+    val bottom = (minPrice - range * 0.08).coerceAtLeast(0.0)
     val chartRange = (top - bottom).coerceAtLeast(0.0001)
     val mid = (top + bottom) / 2.0
 
@@ -1403,10 +1403,6 @@ private fun formatChartTimestamp(raw: String): String = runCatching {
 private fun formatCompactChartTimestamp(raw: String): String = runCatching {
     Instant.parse(raw).atZone(ZoneId.of("Africa/Nairobi")).format(DateTimeFormatter.ofPattern("dd MMM yy • h:mm a", Locale.US))
 }.getOrElse { raw.take(19) }
-
-private fun formatChartTimestampDate(raw: String): String = runCatching {
-    Instant.parse(raw).atZone(ZoneId.of("Africa/Nairobi")).format(DateTimeFormatter.ofPattern("EEE, dd MMM yy", Locale.US))
-}.getOrElse { raw.take(10) }
 
 private data class ChartLabel(val index: Int, val text: String)
 
