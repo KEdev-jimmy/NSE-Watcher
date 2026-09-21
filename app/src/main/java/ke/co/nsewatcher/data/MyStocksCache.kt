@@ -255,7 +255,8 @@ object MyStocksCache {
                     val averageVolume = if (averageVolumeAvailable) averageVolumeValue.toLong() else 0L
                     val source = item.optString("source", "").trim().ifBlank { if (dataOrigin == "backend") "MyStocks Africa" else "NSE Watcher fallback catalogue" }
                     val observedAt = item.optString("lastPriceUpdate", "").trim().ifBlank { item.optString("asOf", "").trim() }
-                    val freshnessMode = stockFreshnessMode(observedAt, marketOpen)
+                    val stale = item.optBoolean("stale", false)
+                    val freshnessMode = stockFreshnessMode(observedAt, marketOpen, stale)
                     // Stock.history is reserved for real historical observations.
                     // The quote endpoint does not provide a time series, so never synthesize
                     // a two-point series from previousClose/price. Company Intelligence loads
@@ -266,7 +267,8 @@ object MyStocksCache {
         } finally { connection.disconnect() }
     }.getOrDefault(emptyList())
 
-    private fun stockFreshnessMode(observedAt: String, marketOpen: Boolean?): String {
+    private fun stockFreshnessMode(observedAt: String, marketOpen: Boolean?, providerStale: Boolean = false): String {
+        if (providerStale) return "STALE"
         if (observedAt.isBlank()) return "UNKNOWN"
         val now = java.time.Instant.now().atZone(java.time.ZoneId.of("Africa/Nairobi"))
         val instant = runCatching { java.time.Instant.parse(observedAt) }.getOrNull()
