@@ -616,9 +616,9 @@ private fun ApprovedMetric(
         Icon(icon, null, tint = Color(0xFFAFC2F0), modifier = Modifier.size(27.dp))
         Spacer(Modifier.width(20.dp))
         Column {
-            Text(label, color = Color(0xFFA9BCD0), fontSize = if (phone) 12.sp else 17.sp)
+            Text(label, color = Color(0xFFA9BCD0), fontSize = 17.sp)
             Spacer(Modifier.height(8.dp))
-            Text(value, color = Color(0xFFF4F7FA), fontSize = if (phone) 12.sp else 22.sp, fontWeight = FontWeight.SemiBold)
+            Text(value, color = Color(0xFFF4F7FA), fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }
