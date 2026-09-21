@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -43,13 +44,20 @@ fun NSEWatcherOpeningScreen(
     ready: Boolean,
     onFinished: () -> Unit
 ) {
+    var showLogoOnly by rememberSaveable { mutableStateOf(true) }
     var stage by remember { mutableIntStateOf(0) }
     val lineProgress = remember { Animatable(0f) }
-    val logoScale = remember { Animatable(0.86f) }
+    val logoScale = remember { Animatable(0.82f) }
     val logoAlpha = remember { Animatable(0f) }
     val glowPulse = remember { Animatable(0f) }
 
+    // The first screen is a short branded hand-off from Android's system splash.
+    // It transitions automatically into the real startup gate; the second screen
+    // remains until the user taps Start Exploring.
     LaunchedEffect(Unit) {
+        delay(1_650)
+        showLogoOnly = false
+
         logoAlpha.animateTo(1f, tween(420, easing = FastOutSlowInEasing))
         logoScale.animateTo(1f, tween(560, easing = FastOutSlowInEasing))
         stage = 1
@@ -62,13 +70,17 @@ fun NSEWatcherOpeningScreen(
         stage = 4
         delay(160)
         stage = 5
-        // Keep the completed mark alive with a very subtle pulse instead of
-        // leaving the chart animation looking like it stopped halfway.
+
         while (isActive) {
             glowPulse.animateTo(1f, tween(240))
             glowPulse.animateTo(0f, tween(700))
             delay(1_700)
         }
+    }
+
+    if (showLogoOnly) {
+        NSEWatcherLogoOnlyIntro()
+        return
     }
 
     val bars = listOf(
@@ -112,35 +124,19 @@ fun NSEWatcherOpeningScreen(
             .windowInsetsPadding(WindowInsets.safeDrawing)
     ) {
         SplashSkyline(modifier = Modifier.align(Alignment.BottomCenter))
+        SplashWaves(modifier = Modifier.align(Alignment.BottomCenter))
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 22.dp, vertical = 16.dp),
+                .padding(horizontal = 22.dp, vertical = 14.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(4.dp))
 
             Box(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(50.dp))
-                    .background(Color.White.copy(alpha = 0.68f))
-                    .padding(horizontal = 14.dp, vertical = 7.dp)
-            ) {
-                Text(
-                    text = "NSE  •  KENYA MARKET INTELLIGENCE",
-                    color = SplashMutedGreen,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 0.8.sp
-                )
-            }
-
-            Spacer(Modifier.weight(0.12f))
-
-            Box(
-                modifier = Modifier
-                    .size(158.dp)
+                    .size(168.dp)
                     .alpha(logoAlpha.value)
                     .graphicsLayer {
                         scaleX = logoScale.value
@@ -154,7 +150,59 @@ fun NSEWatcherOpeningScreen(
                 )
             }
 
-            Spacer(Modifier.height(23.dp))
+            Spacer(Modifier.height(8.dp))
+
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50.dp))
+                    .background(Color.White.copy(alpha = 0.72f))
+                    .padding(horizontal = 15.dp, vertical = 7.dp)
+            ) {
+                Text(
+                    text = "NSE  •  KENYA MARKET INTELLIGENCE",
+                    color = SplashMutedGreen,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.75.sp
+                )
+            }
+
+            Spacer(Modifier.height(13.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Canvas(Modifier.fillMaxWidth(0.66f).height(8.dp)) {
+                    val centerY = size.height / 2f
+                    drawLine(
+                        color = SplashGreen.copy(alpha = 0.28f),
+                        start = androidx.compose.ui.geometry.Offset.Zero.x.let { androidx.compose.ui.geometry.Offset(it, centerY) },
+                        end = androidx.compose.ui.geometry.Offset(size.width, centerY),
+                        strokeWidth = 1.4.dp.toPx(),
+                        cap = StrokeCap.Round
+                    )
+                    drawCircle(
+                        color = SplashGreen.copy(alpha = 0.28f),
+                        radius = 2.4.dp.toPx(),
+                        center = androidx.compose.ui.geometry.Offset(size.width * 0.42f, centerY)
+                    )
+                    drawCircle(
+                        color = SplashGreen,
+                        radius = 5.dp.toPx(),
+                        center = androidx.compose.ui.geometry.Offset(size.width * 0.57f, centerY)
+                    )
+                    drawCircle(
+                        color = SplashBackground,
+                        radius = 2.dp.toPx(),
+                        center = androidx.compose.ui.geometry.Offset(size.width * 0.57f, centerY)
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(7.dp))
 
             Column(
                 modifier = Modifier.alpha(contentAlpha),
@@ -165,34 +213,36 @@ fun NSEWatcherOpeningScreen(
                     color = SplashNavy,
                     fontFamily = FontFamily.Serif,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 43.sp,
-                    lineHeight = 46.sp,
+                    fontSize = 42.sp,
+                    lineHeight = 45.sp,
                     textAlign = TextAlign.Center
                 )
 
-                Spacer(Modifier.height(9.dp))
+                Spacer(Modifier.height(8.dp))
 
                 Text(
-                    text = "See the market. Understand the movement.",
+                    text = "Real data. Clear calculations.\nTraceable evidence.",
                     color = SplashTextDark,
-                    fontSize = 15.sp,
+                    fontSize = 14.sp,
+                    lineHeight = 21.sp,
                     fontWeight = FontWeight.SemiBold,
                     textAlign = TextAlign.Center
                 )
 
-                Spacer(Modifier.height(7.dp))
+                Spacer(Modifier.height(17.dp))
 
-                Text(
-                    text = "Real data. Clear calculations.\nTraceable evidence.",
-                    color = SplashMutedGreen,
-                    fontSize = 14.sp,
-                    lineHeight = 21.sp,
-                    fontWeight = FontWeight.Medium,
-                    textAlign = TextAlign.Center
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.Top
+                ) {
+                    SplashFeature("↗", "Live\nMarket Data")
+                    SplashFeature("✓", "Verified\nSources")
+                    SplashFeature("✦", "Smarter\nInsights")
+                }
             }
 
-            Spacer(Modifier.weight(0.12f))
+            Spacer(Modifier.weight(1f))
 
             Column(
                 modifier = Modifier
@@ -201,7 +251,7 @@ fun NSEWatcherOpeningScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Row(
-                    modifier = Modifier.padding(bottom = 10.dp),
+                    modifier = Modifier.padding(bottom = 9.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center
                 ) {
@@ -271,7 +321,7 @@ fun NSEWatcherOpeningScreen(
                     }
                 }
 
-                Spacer(Modifier.height(9.dp))
+                Spacer(Modifier.height(8.dp))
 
                 Text(
                     text = if (ready) "Tap to enter NSE Watcher" else "Loading verified market data and news",
@@ -281,8 +331,131 @@ fun NSEWatcherOpeningScreen(
                 )
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(7.dp))
         }
+    }
+}
+
+@Composable
+private fun NSEWatcherLogoOnlyIntro() {
+    var rotation by remember { mutableFloatStateOf(0f) }
+
+    LaunchedEffect(Unit) {
+        while (isActive) {
+            rotation = (rotation + 30f) % 360f
+            delay(80)
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.radialGradient(
+                    colors = listOf(Color(0xFF123454), Color(0xFF061422), Color(0xFF020A12))
+                )
+            )
+            .windowInsetsPadding(WindowInsets.safeDrawing),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Box(
+                modifier = Modifier.size(236.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Canvas(Modifier.fillMaxSize()) {
+                    val center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
+                    val base = size.minDimension * 0.33f
+                    drawCircle(
+                        color = SplashGreen.copy(alpha = 0.08f),
+                        radius = base * 1.58f
+                    )
+                    drawCircle(
+                        color = SplashGreen.copy(alpha = 0.28f),
+                        radius = base * 1.34f,
+                        style = Stroke(width = 1.2.dp.toPx())
+                    )
+                    drawCircle(
+                        color = SplashGreen.copy(alpha = 0.20f),
+                        radius = base * 1.13f,
+                        style = Stroke(width = 1.dp.toPx())
+                    )
+                    val arcRadius = base * 1.44f
+                    drawArc(
+                        color = SplashGreen,
+                        startAngle = rotation,
+                        sweepAngle = 92f,
+                        useCenter = false,
+                        topLeft = androidx.compose.ui.geometry.Offset(
+                            center.x - arcRadius,
+                            center.y - arcRadius
+                        ),
+                        size = androidx.compose.ui.geometry.Size(arcRadius * 2f, arcRadius * 2f),
+                        style = Stroke(width = 3.5.dp.toPx(), cap = StrokeCap.Round)
+                    )
+                }
+
+                NSEWatcherAnimatedLogo(
+                    modifier = Modifier.size(164.dp),
+                    bars = listOf(1f, 1f, 1f),
+                    lineProgress = 1f,
+                    glow = 1f
+                )
+            }
+
+            Spacer(Modifier.height(28.dp))
+
+            CircularProgressIndicator(
+                modifier = Modifier.size(30.dp),
+                color = SplashGreen,
+                strokeWidth = 3.dp
+            )
+
+            Spacer(Modifier.height(25.dp))
+
+            Text(
+                text = "N S E   W A T C H E R",
+                color = Color.White,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 4.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun SplashFeature(icon: String, label: String) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.width(94.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(42.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.48f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = icon,
+                color = SplashButton,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = label,
+            color = SplashTextDark,
+            fontSize = 10.sp,
+            lineHeight = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center
+        )
     }
 }
 
@@ -293,40 +466,87 @@ private fun NSEWatcherAnimatedLogo(
     lineProgress: Float,
     glow: Float
 ) {
-    Canvas(modifier = modifier) {
-        val left = size.width * 0.08f
-        val top = size.height * 0.06f
-        val right = size.width * 0.92f
-        val bottom = size.height * 0.94f
+    Canvas(modifier = modifier.fillMaxSize()) {
+        val inset = size.width * 0.075f
+        val shadowOffset = size.width * 0.035f
+        val face = size.width - inset * 2f
         val corner = size.width * 0.23f
 
+        // Soft neon aura.
+        if (glow > 0f) {
+            drawRoundRect(
+                color = SplashGreen.copy(alpha = 0.08f + glow * 0.11f),
+                topLeft = androidx.compose.ui.geometry.Offset(inset - shadowOffset, inset - shadowOffset),
+                size = androidx.compose.ui.geometry.Size(face + shadowOffset * 2f, face + shadowOffset * 2f),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(corner + shadowOffset, corner + shadowOffset)
+            )
+        }
+
+        // Dark lower extrusion for the 3D depth.
         drawRoundRect(
-            color = SplashNavy,
-            topLeft = androidx.compose.ui.geometry.Offset(left, top),
-            size = androidx.compose.ui.geometry.Size(right - left, bottom - top),
+            color = Color(0xFF020812),
+            topLeft = androidx.compose.ui.geometry.Offset(inset + shadowOffset, inset + shadowOffset * 1.7f),
+            size = androidx.compose.ui.geometry.Size(face, face),
             cornerRadius = androidx.compose.ui.geometry.CornerRadius(corner, corner)
         )
 
-        val chartLeft = size.width * 0.25f
-        val chartRight = size.width * 0.78f
-        val chartBottom = size.height * 0.73f
-        val chartTop = size.height * 0.25f
-
-        val barWidth = size.width * 0.12f
-        val gap = size.width * 0.045f
-        val barBase = chartBottom + size.height * 0.04f
-        val heights = listOf(
-            size.height * 0.20f * bars[0],
-            size.height * 0.31f * bars[1],
-            size.height * 0.42f * bars[2]
+        // Bright rim: this is the clean light border visible around the mark.
+        drawRoundRect(
+            color = Color(0xFFF7FFFB),
+            topLeft = androidx.compose.ui.geometry.Offset(inset - 1.5.dp.toPx(), inset - 1.5.dp.toPx()),
+            size = androidx.compose.ui.geometry.Size(face + 3.dp.toPx(), face + 3.dp.toPx()),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(corner + 1.5.dp.toPx(), corner + 1.5.dp.toPx())
         )
+
+        // Glossy navy face.
+        drawRoundRect(
+            brush = Brush.linearGradient(
+                colors = listOf(Color(0xFF173E69), Color(0xFF0B1B32), Color(0xFF050D1A))
+            ),
+            topLeft = androidx.compose.ui.geometry.Offset(inset, inset),
+            size = androidx.compose.ui.geometry.Size(face, face),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(corner, corner)
+        )
+
+        // Top glass highlight.
+        drawRoundRect(
+            color = Color.White.copy(alpha = 0.08f),
+            topLeft = androidx.compose.ui.geometry.Offset(inset + face * 0.05f, inset + face * 0.04f),
+            size = androidx.compose.ui.geometry.Size(face * 0.90f, face * 0.30f),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(corner * 0.72f, corner * 0.72f)
+        )
+
+        val chartLeft = size.width * 0.27f
+        val chartRight = size.width * 0.78f
+        val chartBottom = size.width * 0.73f
+        val chartTop = size.width * 0.25f
+
+        val barWidth = size.width * 0.105f
+        val gap = size.width * 0.052f
+        val barBase = chartBottom + size.width * 0.035f
+        val heights = listOf(
+            size.height * 0.18f * bars[0],
+            size.height * 0.29f * bars[1],
+            size.height * 0.40f * bars[2]
+        )
+
+        val barBrush = Brush.linearGradient(
+            colors = listOf(Color(0xFF8BC5FF), Color(0xFF2C7CF0))
+        )
+        val barShadow = Color(0xFF0A2E64)
 
         listOf(0, 1, 2).forEach { i ->
             val x = chartLeft + i * (barWidth + gap)
             val h = heights[i]
             if (h > 0f) {
                 drawRoundRect(
-                    color = SplashBlue,
+                    color = barShadow,
+                    topLeft = androidx.compose.ui.geometry.Offset(x + size.width * 0.012f, barBase - h + size.width * 0.012f),
+                    size = androidx.compose.ui.geometry.Size(barWidth, h),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(5.dp.toPx(), 5.dp.toPx())
+                )
+                drawRoundRect(
+                    brush = barBrush,
                     topLeft = androidx.compose.ui.geometry.Offset(x, barBase - h),
                     size = androidx.compose.ui.geometry.Size(barWidth, h),
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(5.dp.toPx(), 5.dp.toPx())
@@ -364,31 +584,75 @@ private fun NSEWatcherAnimatedLogo(
         if (p > 0f) {
             drawPath(
                 path = path,
-                color = SplashGreen.copy(alpha = 0.18f + glow * 0.18f),
-                style = Stroke(width = 11.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+                color = SplashGreen.copy(alpha = 0.16f + glow * 0.18f),
+                style = Stroke(width = 12.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
             )
             drawPath(
                 path = path,
                 color = SplashGreen,
                 style = Stroke(width = 5.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
             )
-        }
-
-        points.dropLast(1).forEachIndexed { index, point ->
-            if (p >= (index + 1f) / totalSegments) {
-                drawCircle(SplashGreen, 7.dp.toPx(), point)
-            }
+            drawPath(
+                path = path,
+                color = Color(0xFFB5FFDB),
+                style = Stroke(width = 1.4.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+            )
         }
 
         if (p >= 1f) {
             val tip = points.last()
             val arrowSize = 13.dp.toPx()
-            drawLine(SplashGreen, tip, tip + androidx.compose.ui.geometry.Offset(-arrowSize, arrowSize * 0.2f), 5.dp.toPx(), StrokeCap.Round)
-            drawLine(SplashGreen, tip, tip + androidx.compose.ui.geometry.Offset(-arrowSize * 0.15f, arrowSize), 5.dp.toPx(), StrokeCap.Round)
+            drawLine(
+                SplashGreen,
+                tip,
+                tip + androidx.compose.ui.geometry.Offset(-arrowSize, arrowSize * 0.2f),
+                5.dp.toPx(),
+                StrokeCap.Round
+            )
+            drawLine(
+                SplashGreen,
+                tip,
+                tip + androidx.compose.ui.geometry.Offset(-arrowSize * 0.15f, arrowSize),
+                5.dp.toPx(),
+                StrokeCap.Round
+            )
             if (glow > 0f) {
-                drawCircle(SplashGreen.copy(alpha = glow * 0.16f), 27.dp.toPx(), tip)
+                drawCircle(
+                    SplashGreen.copy(alpha = glow * 0.18f),
+                    27.dp.toPx(),
+                    tip
+                )
             }
         }
+    }
+}
+
+
+@Composable
+private fun SplashWaves(modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.fillMaxWidth().height(155.dp)) {
+        fun wave(offset: Float, amplitude: Float, alpha: Float, width: Float) {
+            val path = Path()
+            path.moveTo(-size.width * 0.05f, size.height * offset)
+            path.cubicTo(
+                size.width * 0.22f, size.height * (offset - amplitude),
+                size.width * 0.42f, size.height * (offset + amplitude),
+                size.width * 0.66f, size.height * (offset - amplitude * 0.45f)
+            )
+            path.cubicTo(
+                size.width * 0.82f, size.height * (offset - amplitude * 0.78f),
+                size.width * 0.94f, size.height * (offset + amplitude * 0.40f),
+                size.width * 1.06f, size.height * (offset - amplitude * 0.20f)
+            )
+            drawPath(
+                path,
+                color = SplashGreen.copy(alpha = alpha),
+                style = Stroke(width = width.dp.toPx(), cap = StrokeCap.Round)
+            )
+        }
+        wave(0.82f, 0.16f, 0.16f, 1.2f)
+        wave(0.92f, 0.14f, 0.25f, 2.0f)
+        wave(1.02f, 0.16f, 0.34f, 3.2f)
     }
 }
 
