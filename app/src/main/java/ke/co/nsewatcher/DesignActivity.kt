@@ -123,6 +123,7 @@ private fun App(pickAvatar:()->Unit) {
     var startupComplete by remember { mutableStateOf(false) }
     var startupNews by remember { mutableStateOf(emptyList<NewsItem>()) }
     var startupMarketStatus by remember { mutableStateOf(MyStocksCache.MarketStatus()) }
+    var companyCatalog by remember { mutableStateOf(emptyList<Stock>()) }
 
     LaunchedEffect(Unit) {
         val completed = withTimeoutOrNull(12_000L) {
@@ -133,6 +134,9 @@ private fun App(pickAvatar:()->Unit) {
                 val newsDeferred = async {
                     runCatching { NewsCache.loadFeed() }.getOrDefault(emptyList())
                 }
+                val companiesDeferred = async {
+                    runCatching { MyStocksCache.loadCompanies() }.getOrDefault(emptyList())
+                }
                 val statusDeferred = async {
                     runCatching { MyStocksCache.loadMarketStatus() }.getOrDefault(MyStocksCache.MarketStatus())
                 }
@@ -142,6 +146,7 @@ private fun App(pickAvatar:()->Unit) {
                     liveStocks.value = loadedStocks
                 }
                 startupNews = newsDeferred.await()
+                companyCatalog = companiesDeferred.await()
                 startupMarketStatus = statusDeferred.await()
             }
             true
@@ -176,6 +181,11 @@ private fun App(pickAvatar:()->Unit) {
             onFinished = { showOpeningScreen = false }
         )
         return
+    }
+    LaunchedEffect(page) {
+        if (page == Page.COMPANIES && companyCatalog.isEmpty()) {
+            MyStocksCache.loadCompanies().takeIf { it.isNotEmpty() }?.let { companyCatalog = it }
+        }
     }
     LaunchedEffect(autoRefresh) {
         if (!autoRefresh) return@LaunchedEffect
@@ -221,7 +231,7 @@ private fun App(pickAvatar:()->Unit) {
     val scheme=if(dark) darkColorScheme(primary=Color(0xFF32D486),background=Color(0xFF0D1712),surface=Color(0xFF132019),onSurface=Color.White,onBackground=Color.White,onSurfaceVariant=Color(0xFFB7C7BE)) else lightColorScheme(primary=Green,background=Color.White,surface=Color.White,onSurface=TextDark,onBackground=TextDark,onSurfaceVariant=Muted)
     MaterialTheme(colorScheme=scheme){Surface(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing),color=scheme.background){
         when(page){
-            Page.HOME,Page.MARKET,Page.NEWS,Page.COMPANIES,Page.PAPER,Page.MORE -> Scaffold(topBar={if(page!=Page.HOME && page!=Page.MARKET) TopBar(name,::go)},bottomBar={BottomNav(tab){tab=it;history=emptyList();page=when(it){0->Page.HOME;1->Page.MARKET;2->Page.NEWS;3->Page.COMPANIES;else->Page.MORE}}}){pad->Box(Modifier.fillMaxSize().padding(pad)){when(page){Page.HOME->HomeDashboard(stocks,{selected=it;go(Page.COMPANY)},{selectedNews=it;go(Page.NEWS_DETAIL)},{go(Page.MARKET)},{go(Page.WATCHLIST)},startupNews,startupMarketStatus,startupComplete);Page.MARKET->MarketDashboard(stocks);Page.NEWS->NewsDashboard{selectedNews=it;go(Page.NEWS_DETAIL)};Page.COMPANIES->Companies({selected=it;go(Page.COMPANY)},{go(Page.WATCHLIST)},{go(Page.COMPARE)});Page.PAPER->Paper();else->More(::go)}}}
+            Page.HOME,Page.MARKET,Page.NEWS,Page.COMPANIES,Page.PAPER,Page.MORE -> Scaffold(topBar={if(page!=Page.HOME && page!=Page.MARKET) TopBar(name,::go)},bottomBar={BottomNav(tab){tab=it;history=emptyList();page=when(it){0->Page.HOME;1->Page.MARKET;2->Page.NEWS;3->Page.COMPANIES;else->Page.MORE}}}){pad->Box(Modifier.fillMaxSize().padding(pad)){when(page){Page.HOME->HomeDashboard(stocks,{selected=it;go(Page.COMPANY)},{selectedNews=it;go(Page.NEWS_DETAIL)},{go(Page.MARKET)},{go(Page.WATCHLIST)},startupNews,startupMarketStatus,startupComplete);Page.MARKET->MarketDashboard(stocks);Page.NEWS->NewsDashboard{selectedNews=it;go(Page.NEWS_DETAIL)};Page.COMPANIES->Companies(companyCatalog, stocks, {selected=it;go(Page.COMPANY)},{go(Page.WATCHLIST)},{go(Page.COMPARE)});Page.PAPER->Paper();else->More(::go)}}}
             Page.COMPANY->Company(selected,::back)
             Page.WATCHLIST->Watchlist({selected=it;go(Page.COMPANY)},::back)
             Page.COMPARE->CompanyComparison(stocks,::back)
@@ -260,9 +270,30 @@ private fun App(pickAvatar:()->Unit) {
 @Composable private fun Header(title:String,sub:String?=null,back:(()->Unit)?=null){Row(Modifier.fillMaxWidth().padding(horizontal=8.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically){if(back!=null)IconButton(back){Icon(Icons.Default.ArrowBack,"Back")};Column{Text(title,fontSize=20.sp,fontWeight=FontWeight.ExtraBold);if(sub!=null)Text(sub,fontSize=10.sp,color=Muted)}}}
 
 @Composable
-private fun Companies(open:(Stock)->Unit, openWatchlist:()->Unit, openCompare:()->Unit){
+private fun Companies(catalog: List<Stock>, quoteStocks: List<Stock>, open:(Stock)->Unit, openWatchlist:()->Unit, openCompare:()->Unit){
     var query by rememberSaveable{mutableStateOf("")}
-    val filtered=stocks.filter{it.name.contains(query,true)||it.symbol.contains(query,true)}
+    val displayed = if (catalog.isNotEmpty()) {
+        catalog.map { company ->
+            quoteStocks.firstOrNull { it.symbol.equals(company.symbol, ignoreCase = true) }?.let { quote ->
+                company.copy(
+                    price = quote.price,
+                    change = quote.change,
+                    changeAvailable = quote.changeAvailable,
+                    volume = quote.volume,
+                    volumeAvailable = quote.volumeAvailable,
+                    source = quote.source,
+                    observedAt = quote.observedAt,
+                    freshnessMode = quote.freshnessMode,
+                    dataOrigin = quote.dataOrigin,
+                    averageVolume = quote.averageVolume,
+                    averageVolumeAvailable = quote.averageVolumeAvailable,
+                    previousClose = quote.previousClose,
+                    delayMinutes = quote.delayMinutes
+                )
+            } ?: company
+        }
+    } else quoteStocks
+    val filtered=displayed.filter{it.name.contains(query,true)||it.symbol.contains(query,true)}
     Box(Modifier.fillMaxSize().background(Color(0xFF062A23))){
         LazyColumn(contentPadding=PaddingValues(16.dp,0.dp,16.dp,20.dp),verticalArrangement=Arrangement.spacedBy(11.dp)){
             item{
@@ -271,7 +302,7 @@ private fun Companies(open:(Stock)->Unit, openWatchlist:()->Unit, openCompare:()
                     Column(Modifier.fillMaxSize().padding(10.dp,20.dp,10.dp,18.dp),verticalArrangement=Arrangement.Bottom){Text("Discover",color=Color.White,fontSize=25.sp,fontWeight=FontWeight.ExtraBold);Text("Great Companies",color=Color.White,fontSize=25.sp,fontWeight=FontWeight.ExtraBold);Spacer(Modifier.height(5.dp));Text("Research. Analyze. Understand.\\nExplore sourced NSE company information.",color=Color.White,fontSize=11.sp)}
                 }
             }
-            item{CompanyDataCoverage(stocks)}
+            item{CompanyDataCoverage(filtered)}
             item{OutlinedTextField(value=query,onValueChange={query=it},modifier=Modifier.fillMaxWidth(),singleLine=true,placeholder={Text("Search companies...",color=Muted)},leadingIcon={Icon(Icons.Default.Search,null,tint=Muted)},shape=RoundedCornerShape(24.dp),colors=OutlinedTextFieldDefaults.colors(unfocusedContainerColor=Color.White,focusedContainerColor=Color.White,unfocusedBorderColor=Color.Transparent,focusedBorderColor=Green,unfocusedTextColor=TextDark,focusedTextColor=TextDark))}
             item{
                 Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
