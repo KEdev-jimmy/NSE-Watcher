@@ -1,17 +1,41 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="48dp" android:height="48dp" android:viewportWidth="48" android:viewportHeight="48">
-  <!-- subtle bottom/right extrusion gives the existing mark a premium 3D depth -->
-  <path android:fillColor="#0A101A" android:pathData="M5,6h40v38c0,1.1 -0.9,2 -2,2H7c-1.1,0 -2,-0.9 -2,-2V6z"/>
-  <path android:fillColor="#182131" android:pathData="M4,4h40v38c0,1.1 -0.9,2 -2,2H6c-1.1,0 -2,-0.9 -2,-2V4z"/>
-  <!-- main face -->
-  <path android:fillColor="#111827" android:pathData="M6,4h36c1.1,0 2,0.9 2,2v34c0,1.1 -0.9,2 -2,2H6c-1.1,0 -2,-0.9 -2,-2V6c0,-1.1 0.9,-2 2,-2z"/>
-  <!-- soft top-left highlight -->
-  <path android:fillColor="#263247" android:pathData="M6,4h36c1.1,0 2,0.9 2,2v2H4V6c0,-1.1 0.9,-2 2,-2z"/>
-  <!-- blue bars with darker lower faces -->
-  <path android:fillColor="#315F9D" android:pathData="M10,25h5v11h-5zM19,18h5v18h-5zM28,21h5v15h-5z"/>
-  <path android:fillColor="#78B4FF" android:pathData="M10,11h5v14h-5zM19,11h5v7h-5zM28,11h5v10h-5z"/>
-  <!-- chart shadow/depth -->
-  <path android:fillColor="#08754D" android:pathData="M9,36l9,-11 6,5 10,-14 3,3 -12,17 -6,-5 -7,8z"/>
-  <!-- bright chart face -->
-  <path android:fillColor="#54D6A5" android:pathData="M9,34l9,-10 6,5 10,-14 3,3 -12,16 -6,-5 -7,8z"/>
-  <path android:fillColor="#8AF0C6" android:pathData="M10,33l8,-9 6,5 10,-13 1,1 -11,15 -6,-5 -7,8z"/>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+
+    <!-- Light outer rim matches the premium launcher/splash treatment. -->
+    <path
+        android:fillColor="#F7FFFB"
+        android:pathData="M6,2h36c4.42,0 8,3.58 8,8v28c0,4.42 -3.58,8 -8,8H6c-4.42,0 -8,-3.58 -8,-8V10C-2,5.58 1.58,2 6,2z" />
+
+    <!-- Lower extrusion gives the mark its subtle 3D depth. -->
+    <path
+        android:fillColor="#020812"
+        android:pathData="M6,6h36c3.31,0 6,2.69 6,6v28c0,3.31 -2.69,6 -6,6H6c-3.31,0 -6,-2.69 -6,-6V12c0,-3.31 2.69,-6 6,-6z" />
+
+    <!-- Glossy navy face. -->
+    <path
+        android:fillColor="#102744"
+        android:pathData="M6,4h36c3.31,0 6,2.69 6,6v28c0,3.31 -2.69,6 -6,6H6c-3.31,0 -6,-2.69 -6,-6V10c0,-3.31 2.69,-6 6,-6z" />
+
+    <path
+        android:fillColor="#1D456F"
+        android:pathData="M6,4h36c3.31,0 6,2.69 6,6v4H0v-4c0,-3.31 2.69,-6 6,-6z" />
+
+    <!-- Blue market bars. -->
+    <path
+        android:fillColor="#8BC5FF"
+        android:pathData="M9,27h6v10H9zM19,20h6v17h-6zM29,15h6v22h-6z" />
+    <path
+        android:fillColor="#2C7CF0"
+        android:pathData="M9,34h6v3H9zM19,32h6v5h-6zM29,31h6v6h-6z" />
+
+    <!-- Rising green market line and arrow. -->
+    <path
+        android:fillColor="#54D6A5"
+        android:pathData="M8,33l10,-11 6,5 10,-14 3,3 -12,17 -6,-5 -8,9z" />
+    <path
+        android:fillColor="#B5FFDB"
+        android:pathData="M10,31l8,-9 6,5 10,-13 1,1 -11,15 -6,-5 -7,8z" />
 </vector>
