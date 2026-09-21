@@ -394,43 +394,487 @@ private fun CompanySectionNavigation(
     }
 }
 
+
+@Composable
+private fun ApprovedCompanyOverview(
+    stock: Stock,
+    previousClose: Double?,
+    open: Double?,
+    dayHigh: Double?,
+    dayLow: Double?,
+    latest: Double?,
+    observedAt: String,
+    dailyChange: Double?,
+    sinceOpen: Double?,
+    points: List<MyStocksCache.HistoryPoint>,
+    loading: Boolean
+) {
+    Box(
+        Modifier.fillMaxSize().background(Color(0xFF061625))
+    ) {
+        LazyColumn(
+            contentPadding = PaddingValues(bottom = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            item {
+                ApprovedCompanyHeader(
+                    stock = stock,
+                    price = latest,
+                    change = dailyChange,
+                    sector = "Banking and Financial Services"
+                )
+            }
+
+            item {
+                ApprovedCompanyTabs()
+            }
+
+            item {
+                ApprovedGlanceCard(
+                    previousClose, open, dayHigh, dayLow, latest,
+                    observedAt, dailyChange, sinceOpen
+                )
+            }
+
+            item {
+                ApprovedChartCard(points, previousClose, latest, loading)
+            }
+
+            item {
+                Surface(
+                    Modifier.padding(horizontal = 36.dp).fillMaxWidth(),
+                    color = Color(0xFF0A1F32),
+                    shape = RoundedCornerShape(18.dp),
+                    border = BorderStroke(1.dp, Color(0xFF17364F)),
+                    onClick = { }
+                ) {
+                    Row(
+                        Modifier.padding(horizontal = 26.dp, vertical = 24.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            Modifier.size(54.dp),
+                            RoundedCornerShape(50),
+                            color = Color(0xFF102D28),
+                            border = BorderStroke(1.dp, Color(0xFF1E5B45))
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.Psychology, null, tint = Color(0xFF00D084), modifier = Modifier.size(32.dp))
+                            }
+                        }
+                        Spacer(Modifier.width(22.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("Company Intelligence", color = Color(0xFFF4F7FA), fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
+                            Spacer(Modifier.height(7.dp))
+                            Text(
+                                "AI-powered insights, financials and key information about " + stock.name + ".",
+                                color = Color(0xFFA9BCD0), fontSize = 15.sp, lineHeight = 21.sp
+                            )
+                        }
+                        Text("›", color = Color(0xFFA9BCD0), fontSize = 42.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ApprovedCompanyHeader(
+    stock: Stock,
+    price: Double?,
+    change: Double?,
+    sector: String
+) {
+    Column(
+        Modifier.fillMaxWidth().background(Color(0xFF071B2D)).padding(start = 36.dp, end = 36.dp, top = 18.dp)
+    ) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = { }) {
+                Icon(Icons.Default.ArrowBack, "Back", tint = Color(0xFFF4F7FA), modifier = Modifier.size(30.dp))
+            }
+            Text("Company Intelligence", color = Color(0xFFF4F7FA), fontSize = 27.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
+            Box {
+                Icon(Icons.Default.NotificationsNone, "Notifications", tint = Color(0xFFF4F7FA), modifier = Modifier.size(30.dp))
+                Box(Modifier.align(Alignment.TopEnd).size(10.dp).clip(RoundedCornerShape(50)).background(Color(0xFFFF4650)))
+            }
+            Spacer(Modifier.width(18.dp))
+            Icon(Icons.Default.MoreVert, "More", tint = Color(0xFFF4F7FA), modifier = Modifier.size(29.dp))
+        }
+
+        Spacer(Modifier.height(20.dp))
+
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            CompanyLogo(stock.symbol, 105, stock.logoUrl)
+            Spacer(Modifier.width(28.dp))
+            Column(Modifier.weight(1f)) {
+                Text(stock.name, color = Color(0xFFF4F7FA), fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, maxLines = 2)
+                Spacer(Modifier.height(7.dp))
+                Text(stock.symbol + "  •  NSE", color = Color(0xFFA9BCD0), fontSize = 18.sp)
+                Spacer(Modifier.height(7.dp))
+                Text(sector, color = Color(0xFFA9BCD0), fontSize = 17.sp, maxLines = 2)
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(horizontalAlignment = Alignment.End) {
+                Text(price?.let(::currencyLabel) ?: "Unavailable", color = Color(0xFFF4F7FA), fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
+                if (change != null) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(if (change >= 0.0) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward, null, tint = if (change >= 0.0) Color(0xFF00D084) else Color(0xFFFF4D55), modifier = Modifier.size(21.dp))
+                        Text(String.format(Locale.US, "%+.2f%%", change), color = if (change >= 0.0) Color(0xFF00D084) else Color(0xFFFF4D55), fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
+                    }
+                }
+                Text("vs previous close", color = Color(0xFFA9BCD0), fontSize = 15.sp)
+            }
+        }
+        Spacer(Modifier.height(25.dp))
+    }
+}
+
+@Composable
+private fun ApprovedCompanyTabs() {
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).background(Color(0xFF071B2D)).padding(horizontal = 36.dp),
+        horizontalArrangement = Arrangement.spacedBy(22.dp)
+    ) {
+        listOf("Overview", "Financials", "News", "Analysis", "About").forEachIndexed { index, label ->
+            Surface(
+                onClick = { },
+                color = if (index == 0) Color(0xFF43E51B) else Color.Transparent,
+                shape = RoundedCornerShape(28.dp),
+                modifier = Modifier.height(54.dp)
+            ) {
+                Box(Modifier.padding(horizontal = if (index == 0) 27.dp else 4.dp), contentAlignment = Alignment.Center) {
+                    Text(label, color = if (index == 0) Color(0xFF061B10) else Color(0xFFA9BCD0), fontSize = 18.sp, fontWeight = if (index == 0) FontWeight.Bold else FontWeight.SemiBold)
+                }
+            }
+        }
+    }
+    HorizontalDivider(color = Color(0xFF12283B))
+}
+
+@Composable
+private fun ApprovedGlanceCard(
+    previousClose: Double?,
+    open: Double?,
+    dayHigh: Double?,
+    dayLow: Double?,
+    latest: Double?,
+    observedAt: String,
+    dailyChange: Double?,
+    sinceOpen: Double?
+) {
+    Surface(
+        Modifier.padding(horizontal = 36.dp).fillMaxWidth(),
+        color = Color(0xFF0A1F32),
+        shape = RoundedCornerShape(19.dp),
+        border = BorderStroke(1.dp, Color(0xFF17364F))
+    ) {
+        Column(Modifier.padding(horizontal = 30.dp, vertical = 25.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.ShowChart, null, tint = Color(0xFF19E7D0), modifier = Modifier.size(34.dp))
+                Spacer(Modifier.width(17.dp))
+                Text("Today at a glance", color = Color(0xFFF4F7FA), fontSize = 27.sp, fontWeight = FontWeight.ExtraBold)
+            }
+            Spacer(Modifier.height(27.dp))
+            Row(Modifier.fillMaxWidth()) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(28.dp)) {
+                    ApprovedMetric(Icons.Default.ShowChart, "Previous close", previousClose?.let(::currencyLabel) ?: "Unavailable")
+                    ApprovedMetric(Icons.Default.ArrowUpward, "Day high", dayHigh?.let(::currencyLabel) ?: "Unavailable")
+                    ApprovedMetric(Icons.Default.AccessTime, "Latest observation", latest?.let(::currencyLabel) ?: "Unavailable")
+                }
+                VerticalDivider(Modifier.padding(horizontal = 25.dp).height(265.dp), color = Color(0xFF17364F))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(28.dp)) {
+                    ApprovedMetric(Icons.Default.ShowChart, "Today's open", open?.let(::currencyLabel) ?: "Unavailable")
+                    ApprovedMetric(Icons.Default.ArrowDownward, "Day low", dayLow?.let(::currencyLabel) ?: "Unavailable")
+                    ApprovedMetric(Icons.Default.AccessTime, "Observed at", approvedObservedTime(observedAt))
+                }
+                VerticalDivider(Modifier.padding(horizontal = 25.dp).height(265.dp), color = Color(0xFF17364F))
+                Column(Modifier.weight(1f)) {
+                    ApprovedMovement(true, "Today's change", dailyChange?.let { String.format(Locale.US, "%+.2f%%", it) } ?: "Unavailable", previousClose?.let { "vs previous close (" + currencyLabel(it) + ")" } ?: "vs previous close")
+                    Spacer(Modifier.height(42.dp))
+                    ApprovedMovement(sinceOpen == null || sinceOpen >= 0.0, "Since open", sinceOpen?.let { String.format(Locale.US, "%+.2f%%", it) } ?: "Unavailable", if (open != null && latest != null) "(" + currencyLabel(open) + " → " + currencyLabel(latest) + ")" else "Open-to-latest movement unavailable")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ApprovedMetric(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    value: String
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, tint = Color(0xFFAFC2F0), modifier = Modifier.size(27.dp))
+        Spacer(Modifier.width(20.dp))
+        Column {
+            Text(label, color = Color(0xFFA9BCD0), fontSize = 17.sp)
+            Spacer(Modifier.height(8.dp))
+            Text(value, color = Color(0xFFF4F7FA), fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+@Composable
+private fun ApprovedMovement(
+    positive: Boolean,
+    label: String,
+    value: String,
+    detail: String
+) {
+    val color = if (positive) Color(0xFF00D084) else Color(0xFFFF4D55)
+    Row(verticalAlignment = Alignment.Top) {
+        Icon(if (positive) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward, null, tint = color, modifier = Modifier.size(34.dp))
+        Spacer(Modifier.width(17.dp))
+        Column {
+            Text(label, color = color, fontSize = 17.sp)
+            Spacer(Modifier.height(7.dp))
+            Text(value, color = color, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
+            Spacer(Modifier.height(4.dp))
+            Text(detail, color = Color(0xFFA9BCD0), fontSize = 14.sp, lineHeight = 19.sp)
+        }
+    }
+}
+
+@Composable
+private fun ApprovedChartCard(
+    points: List<MyStocksCache.HistoryPoint>,
+    previousClose: Double?,
+    latest: Double?,
+    loading: Boolean
+) {
+    Surface(
+        Modifier.padding(horizontal = 36.dp).fillMaxWidth(),
+        color = Color(0xFF0A1F32),
+        shape = RoundedCornerShape(19.dp),
+        border = BorderStroke(1.dp, Color(0xFF17364F))
+    ) {
+        Column(Modifier.padding(horizontal = 30.dp, vertical = 25.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.ShowChart, null, tint = Color(0xFF19E7D0), modifier = Modifier.size(31.dp))
+                    Spacer(Modifier.width(15.dp))
+                    Text("1D Intraday Chart", color = Color(0xFFF4F7FA), fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(13.dp).clip(RoundedCornerShape(50)).background(Color(0xFF00D084)))
+                    Spacer(Modifier.width(9.dp))
+                    Text("NSE session 09:30 – 15:00 EAT", color = Color(0xFFA9BCD0), fontSize = 14.sp)
+                }
+            }
+
+            Spacer(Modifier.height(17.dp))
+            if (loading && points.isEmpty()) {
+                Box(Modifier.fillMaxWidth().height(330.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = Color(0xFF00D084), strokeWidth = 2.dp)
+                }
+            } else {
+                ApprovedIntradayCanvas(points, previousClose, latest, Modifier.fillMaxWidth().height(330.dp))
+            }
+
+            Spacer(Modifier.height(14.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(32.dp)) {
+                ApprovedLegend(false, "NSE observations (actual data points)")
+                ApprovedLegend(true, "Previous close (" + (previousClose?.let(::currencyLabel) ?: "unavailable") + ")")
+            }
+            Spacer(Modifier.height(14.dp))
+            Surface(Modifier.fillMaxWidth(), color = Color(0xFF10283D), shape = RoundedCornerShape(17.dp), border = BorderStroke(1.dp, Color(0xFF17364F))) {
+                Row(Modifier.padding(horizontal = 18.dp, vertical = 15.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Info, null, tint = Color(0xFFAFC2F0), modifier = Modifier.size(27.dp))
+                    Spacer(Modifier.width(15.dp))
+                    Text(
+                        "The chart shows today's trading session using actual NSE data points.\nPrevious close (" + (previousClose?.let(::currencyLabel) ?: "unavailable") + ") is shown as a reference line, not a trading price.",
+                        color = Color(0xFFA9BCD0), fontSize = 13.sp, lineHeight = 19.sp, modifier = Modifier.weight(1f)
+                    )
+                    Icon(Icons.Default.Fullscreen, "Expand chart", tint = Color(0xFFAFC2F0), modifier = Modifier.size(25.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ApprovedLegend(dashed: Boolean, label: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Canvas(Modifier.width(38.dp).height(12.dp)) {
+            val y = size.height / 2f
+            if (dashed) {
+                var x = 0f
+                while (x < size.width) {
+                    drawLine(Color(0xFF637FF0), androidx.compose.ui.geometry.Offset(x, y), androidx.compose.ui.geometry.Offset(min(x + 9f, size.width), y), strokeWidth = 3f)
+                    x += 14f
+                }
+            } else {
+                drawLine(Color(0xFF00D084), androidx.compose.ui.geometry.Offset(0f, y), androidx.compose.ui.geometry.Offset(size.width, y), strokeWidth = 4f, cap = StrokeCap.Round)
+            }
+        }
+        Spacer(Modifier.width(9.dp))
+        Text(label, color = Color(0xFFA9BCD0), fontSize = 12.sp)
+    }
+}
+
+@Composable
+private fun ApprovedIntradayCanvas(
+    points: List<MyStocksCache.HistoryPoint>,
+    previousClose: Double?,
+    latest: Double?,
+    modifier: Modifier
+) {
+    Canvas(modifier) {
+        val left = 50f
+        val right = 76f
+        val top = 18f
+        val bottom = 50f
+        val plotWidth = max(1f, size.width - left - right)
+        val plotHeight = max(1f, size.height - top - bottom)
+        val values = (points.map { it.close } + listOfNotNull(previousClose)).filter { it.isFinite() && it > 0.0 }
+        if (values.isEmpty()) return@Canvas
+
+        val minValue = values.minOrNull() ?: 0.0
+        val maxValue = values.maxOrNull() ?: 1.0
+        val pad = max(0.05, (maxValue - minValue) * 0.08)
+        val yMin = minValue - pad
+        val yMax = maxValue + pad
+        val range = max(0.0001, yMax - yMin)
+
+        fun xAt(i: Int) = left + if (points.size <= 1) 0f else plotWidth * i / points.lastIndex.toFloat()
+        fun yAt(v: Double) = top + plotHeight - (((v - yMin) / range).toFloat() * plotHeight)
+
+        repeat(5) { i ->
+            val y = top + plotHeight * i / 4f
+            drawLine(Color(0xFF17364F), androidx.compose.ui.geometry.Offset(left, y), androidx.compose.ui.geometry.Offset(left + plotWidth, y), strokeWidth = 1f)
+        }
+
+        previousClose?.takeIf { it.isFinite() && it > 0.0 }?.let {
+            val y = yAt(it)
+            var x = left
+            while (x < left + plotWidth) {
+                drawLine(Color(0xFF637FF0), androidx.compose.ui.geometry.Offset(x, y), androidx.compose.ui.geometry.Offset(min(x + 10f, left + plotWidth), y), strokeWidth = 3f)
+                x += 16f
+            }
+        }
+
+        if (points.isNotEmpty()) {
+            val line = Path()
+            points.forEachIndexed { i, p ->
+                val x = xAt(i); val y = yAt(p.close)
+                if (i == 0) line.moveTo(x, y) else line.lineTo(x, y)
+            }
+            val fill = Path().apply {
+                moveTo(xAt(0), top + plotHeight)
+                points.forEachIndexed { i, p -> lineTo(xAt(i), yAt(p.close)) }
+                lineTo(xAt(points.lastIndex), top + plotHeight)
+                close()
+            }
+            drawPath(fill, Color(0xFF00D084).copy(alpha = .11f))
+            drawPath(line, Color(0xFF00D084), style = Stroke(width = 4.2f, cap = StrokeCap.Round))
+            val last = points.last()
+            val lx = xAt(points.lastIndex); val ly = yAt(last.close)
+            drawCircle(Color(0xFF00D084), 6.5f, androidx.compose.ui.geometry.Offset(lx, ly))
+        }
+
+        val scale = (0 until 5).map { i -> yMax - (yMax - yMin) * i / 4 }
+        scale.forEachIndexed { i, value ->
+            val y = top + plotHeight * i / 4f
+            drawContext.canvas.nativeCanvas.drawText(
+                String.format(Locale.US, "%.0f", value),
+                left - 10f,
+                y + 5f,
+                android.graphics.Paint().apply {
+                    isAntiAlias = true
+                    color = android.graphics.Color.rgb(169,188,208)
+                    textSize = 14f
+                    textAlign = android.graphics.Paint.Align.RIGHT
+                }
+            )
+        }
+
+        if (points.size > 1) {
+            val count = min(6, points.size)
+            repeat(count) { i ->
+                val index = (points.lastIndex.toDouble() * i / (count - 1)).toInt()
+                val x = xAt(index)
+                drawContext.canvas.nativeCanvas.drawText(
+                    approvedChartTime(points[index].date),
+                    x,
+                    size.height - 12f,
+                    android.graphics.Paint().apply {
+                        isAntiAlias = true
+                        color = android.graphics.Color.rgb(169,188,208)
+                        textSize = 14f
+                        textAlign = android.graphics.Paint.Align.CENTER
+                    }
+                )
+            }
+        }
+
+        if (points.isNotEmpty()) {
+            val p = points.last()
+            val bubbleLeft = left + plotWidth + 8f
+            val bubbleTop = max(top, yAt(p.close) - 27f)
+            drawRoundRect(Color(0xFF00D084), androidx.compose.ui.geometry.Offset(bubbleLeft, bubbleTop), androidx.compose.ui.geometry.Size(right - 14f, 52f), androidx.compose.ui.geometry.CornerRadius(10f))
+            drawContext.canvas.nativeCanvas.drawText(
+                String.format(Locale.US, "%.2f", p.close),
+                bubbleLeft + (right - 14f) / 2f,
+                bubbleTop + 20f,
+                android.graphics.Paint().apply {
+                    isAntiAlias = true
+                    color = android.graphics.Color.rgb(4,35,24)
+                    textSize = 15f
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                    textAlign = android.graphics.Paint.Align.CENTER
+                }
+            )
+            drawContext.canvas.nativeCanvas.drawText(
+                approvedChartTime(p.date),
+                bubbleLeft + (right - 14f) / 2f,
+                bubbleTop + 40f,
+                android.graphics.Paint().apply {
+                    isAntiAlias = true
+                    color = android.graphics.Color.rgb(4,35,24)
+                    textSize = 12f
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                    textAlign = android.graphics.Paint.Align.CENTER
+                }
+            )
+        }
+    }
+}
+
+private fun approvedObservedTime(raw: String): String {
+    if (raw.isBlank()) return "Unavailable"
+    return runCatching {
+        Instant.parse(raw).atZone(ZoneId.of("Africa/Nairobi"))
+            .format(DateTimeFormatter.ofPattern("h:mm a 'EAT'", Locale.US))
+    }.getOrElse { raw.replace("T", " ").removeSuffix("Z").take(16) }
+}
+
+private fun approvedChartTime(raw: String): String {
+    if (raw.isBlank()) return "—"
+    return runCatching {
+        Instant.parse(raw).atZone(ZoneId.of("Africa/Nairobi"))
+            .format(DateTimeFormatter.ofPattern("HH:mm", Locale.US))
+    }.getOrElse { raw.substringAfter("T", raw).take(5) }
+}
+
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, onWatchToggle: (() -> Unit)? = null) {
-    val periods = listOf("1D", "1W", "1M", "3M", "6M", "1Y", "3Y", "5Y", "NOW")
-    var period by rememberSaveable(s.symbol) { mutableStateOf("1D") }
-    var history by remember(s.symbol) {
-        mutableStateOf(s.history.map { MyStocksCache.HistoryPoint(it) })
-    }
+fun CompanyIntelligence(
+    s: Stock,
+    back: () -> Unit,
+    watched: Boolean = false,
+    onWatchToggle: (() -> Unit)? = null
+) {
     var historyResult by remember(s.symbol) { mutableStateOf(MyStocksCache.HistoryResult()) }
     var marketStatus by remember(s.symbol) { mutableStateOf(MyStocksCache.MarketStatus()) }
-    var historyLoading by remember(s.symbol) { mutableStateOf(false) }
-    var monthHistory by remember(s.symbol) { mutableStateOf(emptyList<Double>()) }
     var intelligence by remember(s.symbol) { mutableStateOf(CompanyIntelligenceCache.Result()) }
-    var intelligenceLoading by remember(s.symbol) { mutableStateOf(true) }
-    var news by remember(s.symbol) { mutableStateOf(emptyList<NewsItem>()) }
-    var newsLoading by remember(s.symbol) { mutableStateOf(true) }
-    val analystScope = rememberCoroutineScope()
-    var analystQuestion by rememberSaveable(s.symbol) { mutableStateOf("Explain the latest company performance using only the available evidence.") }
-    var analystResult by remember(s.symbol) { mutableStateOf(AnalystCache.Result()) }
-    var analystLoading by remember(s.symbol) { mutableStateOf(false) }
-    var companyStoryResult by remember(s.symbol) { mutableStateOf(AnalystCache.Result()) }
-    var companyStoryLoading by remember(s.symbol) { mutableStateOf(false) }
+    var historyLoading by remember(s.symbol) { mutableStateOf(true) }
+    val lastMarketRefreshMs = MarketRefreshController.state.value.lastSuccessfulRefreshMs
 
     LaunchedEffect(s.symbol) {
-        intelligenceLoading = true
         intelligence = CompanyIntelligenceCache.load(s.symbol)
-        intelligenceLoading = false
-    }
-
-    LaunchedEffect(s.symbol) {
-        newsLoading = true
-        news = NewsCache.loadCompanyNews(s.symbol).items
-        newsLoading = false
-    }
-
-    LaunchedEffect(s.symbol) {
-        monthHistory = MyStocksCache.loadHistory(s.symbol, "1m")
     }
 
     LaunchedEffect(s.symbol) {
@@ -440,779 +884,55 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
         }
     }
 
-    val lastMarketRefreshMs = MarketRefreshController.state.value.lastSuccessfulRefreshMs
-    LaunchedEffect(s.symbol, period, lastMarketRefreshMs) {
+    LaunchedEffect(s.symbol, lastMarketRefreshMs) {
         historyLoading = true
-        // NOW is a view of the latest available intraday session data.
-        // It intentionally reuses the verified 1D endpoint; no live price is fabricated.
-        // The existing 15-minute refresh timestamp also forces a reload when a newer
-        // observation arrives, even if the price itself has not changed.
-        val requestedPeriod = if (period == "NOW") "1D" else period
-        val live = MyStocksCache.loadHistoryDetails(s.symbol, requestedPeriod)
-        historyResult = live
-        history = live.points
+        historyResult = MyStocksCache.loadHistoryDetails(s.symbol, "1D")
         historyLoading = false
     }
 
     val profile = intelligence.profile
-    // For 1D/NOW, use the same authoritative daily move as the headline:
-    // latest available quote versus the previous trading-session close.
-    // The plotted points remain the actual intraday 15-minute price path.
-    val selectedPeriodReturn = if (period == "1D" || period == "NOW") {
-        s.change.takeIf { s.changeAvailable && it.isFinite() && s.dataOrigin == "backend" }
-            ?: historyResult.sessionChangePct
-            ?: historyResult.points.takeIf { it.size >= 2 }?.let { percentReturn(it.map { point -> point.close }) }
-    } else {
-        history.takeIf { it.size >= 2 }?.let { percentReturn(it.map { point -> point.close }) }
+    val points = historyResult.points.filter { it.close.isFinite() && it.close > 0.0 }
+    val previousClose = s.previousClose?.takeIf { it.isFinite() && it > 0.0 }
+    val latest = historyResult.sessionClose?.takeIf { it.isFinite() && it > 0.0 }
+        ?: points.lastOrNull()?.close
+        ?: s.price.takeIf { it.isFinite() && it > 0.0 }
+    val open = historyResult.sessionOpen?.takeIf { it.isFinite() && it > 0.0 }
+        ?: points.firstOrNull()?.close
+    val dayHigh = points.maxOfOrNull { it.close }
+    val dayLow = points.minOfOrNull { it.close }
+    val observedAt = historyResult.sessionCloseAt.ifBlank {
+        historyResult.observedAt
+    }.ifBlank {
+        points.lastOrNull()?.date.orEmpty()
     }
-    val latestFinancialPeriod = intelligence.financialHistory.lastOrNull()?.period.orEmpty()
-    val intelligenceView = CompanyIntelligenceEngine.build(s, intelligence, monthHistory, news)
-    val hasSessionNavigationItem = period == "1D" || period == "NOW"
-    val listState = rememberLazyListState()
-    var primarySection by rememberSaveable(s.symbol) { mutableStateOf(CompanyIntelligenceSection.INTELLIGENCE) }
-    var metricsSection by rememberSaveable(s.symbol) { mutableStateOf(CompanyIntelligenceSection.PERFORMANCE) }
-    var researchSection by rememberSaveable(s.symbol) { mutableStateOf(CompanyIntelligenceSection.NEWS) }
 
-    LazyColumn(
-        state = listState,
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        item {
-            CompanyOverviewCard(
-                stock = s,
-                marketStatus = marketStatus,
-                watched = watched,
-                onBack = back,
-                onWatchToggle = onWatchToggle
-            )
-        }
+    val dailyChange = s.change.takeIf {
+        s.changeAvailable && it.isFinite() && s.dataOrigin == "backend"
+    } ?: if (previousClose != null && latest != null) {
+        ((latest - previousClose) / previousClose) * 100.0
+    } else null
 
-        item {
-            CompanySectionNavigation(
-                labels = listOf(CompanyIntelligenceSection.ABOUT, CompanyIntelligenceSection.INTELLIGENCE),
-                selected = primarySection,
-                onSelected = { primarySection = it }
-            )
-        }
+    val sinceOpen = if (open != null && latest != null && open > 0.0) {
+        ((latest - open) / open) * 100.0
+    } else null
 
-        if (primarySection == CompanyIntelligenceSection.ABOUT) {
-            item { SectionTitle("Business", "What does this company actually do?", Icons.Default.Business) }
-            item {
-                IntelligenceCard {
-                    if (profile.description.isNotBlank()) Text(profile.description, fontSize = 12.sp, lineHeight = 18.sp, color = IntelligenceText)
-                    else Text("Business description is not available from the current company-data response.", color = IntelligenceMuted, fontSize = 11.sp)
-                    Spacer(Modifier.height(10.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(Modifier.weight(1f)) { MiniFact("Sector", profile.sector.ifBlank { "Not available" }) }
-                        Box(Modifier.weight(1f)) { MiniFact("HQ", profile.headquarters.ifBlank { "Not available" }) }
-                    }
-                }
-            }
-        } else {
-            item {
-                Card(Modifier.fillMaxWidth(), RoundedCornerShape(19.dp), colors = CardDefaults.cardColors(containerColor = IntelligenceDark)) {
-                    Column(Modifier.padding(17.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Surface(Modifier.size(38.dp), RoundedCornerShape(12.dp), Color.White.copy(alpha = .12f)) {
-                                Icon(Icons.Default.Psychology, null, tint = Color(0xFF8BE0B3), modifier = Modifier.padding(8.dp))
-                            }
-                            Spacer(Modifier.width(10.dp))
-                            Column {
-                                Text("Intelligence", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
-                                Text("Evidence first • no BUY/SELL instruction", color = Color(0xFFBFE8D0), fontSize = 9.sp)
-                            }
-                        }
-                        Spacer(Modifier.height(11.dp))
-                        if (intelligenceLoading) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Color(0xFF8BE0B3))
-                                Spacer(Modifier.width(9.dp))
-                                Text("Building the company evidence view…", color = Color.White.copy(alpha = .82f), fontSize = 10.sp)
-                            }
-                        } else {
-                            Text(intelligenceView.summary, color = Color.White, fontSize = 11.sp, lineHeight = 17.sp)
-                        }
-                    }
-                }
-            }
-        }
-
-        if (primarySection == CompanyIntelligenceSection.INTELLIGENCE) {
-        item {
-            Card(Modifier.fillMaxWidth(), RoundedCornerShape(19.dp), colors = CardDefaults.cardColors(containerColor = IntelligenceDark)) {
-                Column(Modifier.padding(17.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(Modifier.size(34.dp), RoundedCornerShape(11.dp), Color.White.copy(alpha = .12f)) {
-                            Icon(Icons.Default.Psychology, contentDescription = null, tint = Color(0xFF8BE0B3), modifier = Modifier.padding(7.dp))
-                        }
-                        Spacer(Modifier.width(9.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text("NSE WATCHER ANALYST", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
-                            Text("Ask the evidence, not the market", color = Color(0xFFBFE8D0), fontSize = 9.sp)
-                        }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Text("Uses the company evidence available to NSE Watcher. It explains the data; it does not give BUY/SELL instructions.", color = Color.White.copy(alpha = .78f), fontSize = 8.sp, lineHeight = 12.sp)
-                    Button(
-                        onClick = {
-                            analystScope.launch {
-                                companyStoryLoading = true
-                                companyStoryResult = AnalystCache.story(s.symbol)
-                                companyStoryLoading = false
-                            }
-                        },
-                        enabled = !companyStoryLoading,
-                        colors = ButtonDefaults.buttonColors(containerColor = IntelligenceGreen),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 7.dp)
-                    ) {
-                        if (companyStoryLoading) CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp, color = Color.White)
-                        else Icon(Icons.Default.AutoStories, null, Modifier.size(14.dp))
-                        Spacer(Modifier.width(5.dp))
-                        Text(if (companyStoryLoading) "Building story…" else "Company Story", fontSize = 10.sp)
-                    }
-                    if (companyStoryResult.story != null) {
-                        val story = companyStoryResult.story!!
-                        Spacer(Modifier.height(10.dp))
-                        Surface(Modifier.fillMaxWidth(), color = Color.White.copy(alpha = .07f), shape = RoundedCornerShape(12.dp)) {
-                            Column(Modifier.padding(10.dp)) {
-                                if (story.title.isNotBlank()) Text(story.title, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                if (story.business.isNotBlank()) { Spacer(Modifier.height(5.dp)); Text("What the company does", color = Color(0xFFBFE8D0), fontSize = 8.sp, fontWeight = FontWeight.Bold); Text(story.business, color = Color.White.copy(alpha = .86f), fontSize = 9.sp, lineHeight = 13.sp) }
-                                if (story.performance.isNotBlank()) { Spacer(Modifier.height(6.dp)); Text("Performance", color = Color(0xFFBFE8D0), fontSize = 8.sp, fontWeight = FontWeight.Bold); Text(story.performance, color = Color.White.copy(alpha = .86f), fontSize = 9.sp, lineHeight = 13.sp) }
-                                if (story.changes.isNotEmpty()) { Spacer(Modifier.height(6.dp)); Text("What changed", color = Color(0xFFBFE8D0), fontSize = 8.sp, fontWeight = FontWeight.Bold); story.changes.take(4).forEach { Text("• $it", color = Color.White.copy(alpha = .82f), fontSize = 8.sp, lineHeight = 12.sp) } }
-                                if (story.events.isNotEmpty()) { Spacer(Modifier.height(6.dp)); Text("Notable events", color = Color(0xFFBFE8D0), fontSize = 8.sp, fontWeight = FontWeight.Bold); story.events.take(5).forEach { Text("• $it", color = Color.White.copy(alpha = .82f), fontSize = 8.sp, lineHeight = 12.sp) } }
-                                if (story.interpretation.isNotBlank()) { Spacer(Modifier.height(6.dp)); Text("What the evidence may mean", color = Color(0xFFBFE8D0), fontSize = 8.sp, fontWeight = FontWeight.Bold); Text(story.interpretation, color = Color.White.copy(alpha = .82f), fontSize = 9.sp, lineHeight = 13.sp) }
-                                if (story.unknowns.isNotEmpty()) { Spacer(Modifier.height(6.dp)); Text("Still unknown", color = Color(0xFFBFE8D0), fontSize = 8.sp, fontWeight = FontWeight.Bold); story.unknowns.take(4).forEach { Text("• $it", color = Color.White.copy(alpha = .72f), fontSize = 8.sp, lineHeight = 12.sp) } }
-                                if (story.evidenceIds.isNotEmpty()) { Spacer(Modifier.height(5.dp)); Text("Evidence " + story.evidenceIds.joinToString(" · "), color = Color.White.copy(alpha = .55f), fontSize = 7.sp) }
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(9.dp))
-                    OutlinedTextField(
-                        value = analystQuestion,
-                        onValueChange = { analystQuestion = it.take(1200) },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 2,
-                        maxLines = 4,
-                        textStyle = LocalTextStyle.current.copy(fontSize = 10.sp),
-                        colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = Color(0xFF8BE0B3), unfocusedBorderColor = Color.White.copy(alpha = .25f), cursorColor = Color(0xFF8BE0B3)),
-                        placeholder = { Text("Ask about performance, growth, valuation or evidence…", color = Color.White.copy(alpha = .45f), fontSize = 9.sp) }
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Button(
-                        onClick = {
-                            analystScope.launch {
-                                analystLoading = true
-                                analystResult = AnalystCache.ask(s.symbol, analystQuestion)
-                                analystLoading = false
-                            }
-                        },
-                        enabled = !analystLoading && analystQuestion.isNotBlank(),
-                        colors = ButtonDefaults.buttonColors(containerColor = IntelligenceGreen),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 7.dp)
-                    ) {
-                        if (analystLoading) {
-                            CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp, color = Color.White)
-                            Spacer(Modifier.width(6.dp))
-                            Text("Analysing…", fontSize = 10.sp)
-                        } else {
-                            Icon(Icons.Default.Psychology, null, Modifier.size(14.dp))
-                            Spacer(Modifier.width(5.dp))
-                            Text("Ask Analyst", fontSize = 10.sp)
-                        }
-                    }
-                    if (analystResult.message.isNotBlank() || analystResult.answer.isNotBlank() || analystResult.error.isNotBlank()) {
-                        Spacer(Modifier.height(10.dp))
-                        when {
-                            analystResult.error.isNotBlank() -> Text("Analyst unavailable: " + analystResult.error, color = Color(0xFFFFC4C4), fontSize = 9.sp)
-                            analystResult.message.isNotBlank() && analystResult.answer.isBlank() -> Text(analystResult.message, color = Color.White.copy(alpha = .82f), fontSize = 9.sp, lineHeight = 14.sp)
-                            else -> {
-                                val analysis = analystResult.analysis
-                                if (analysis == null) {
-                                    Text(analystResult.answer, color = Color.White, fontSize = 10.sp, lineHeight = 15.sp)
-                                } else {
-                                    if (analysis.headline.isNotBlank()) {
-                                        Text(analysis.headline, color = Color.White, fontSize = 12.sp, lineHeight = 17.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                    if (analysis.summary.isNotBlank()) {
-                                        Spacer(Modifier.height(5.dp))
-                                        Text(analysis.summary, color = Color.White.copy(alpha = .88f), fontSize = 10.sp, lineHeight = 15.sp)
-                                    }
-                                    analysis.signals.take(4).forEach { signal ->
-                                        Spacer(Modifier.height(7.dp))
-                                        Surface(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            color = Color.White.copy(alpha = .08f),
-                                            shape = RoundedCornerShape(10.dp)
-                                        ) {
-                                            Column(Modifier.padding(9.dp)) {
-                                                Text(signal.title, color = Color(0xFFBFE8D0), fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                                                if (signal.detail.isNotBlank()) {
-                                                    Spacer(Modifier.height(2.dp))
-                                                    Text(signal.detail, color = Color.White.copy(alpha = .86f), fontSize = 9.sp, lineHeight = 13.sp)
-                                                }
-                                                if (signal.evidenceIds.isNotEmpty()) {
-                                                    Spacer(Modifier.height(3.dp))
-                                                    Text(
-                                                        "Evidence " + signal.evidenceIds.joinToString(" · "),
-                                                        color = Color.White.copy(alpha = .58f),
-                                                        fontSize = 7.sp
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-                                    if (analysis.interpretation.isNotBlank()) {
-                                        Spacer(Modifier.height(7.dp))
-                                        Text("What it may mean", color = Color(0xFFBFE8D0), fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                                        Spacer(Modifier.height(2.dp))
-                                        Text(analysis.interpretation, color = Color.White.copy(alpha = .82f), fontSize = 9.sp, lineHeight = 13.sp)
-                                    }
-                                    if (analysis.unknowns.isNotEmpty()) {
-                                        Spacer(Modifier.height(7.dp))
-                                        Text("Still unknown", color = Color(0xFFBFE8D0), fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                                        analysis.unknowns.take(4).forEach { unknown ->
-                                            Text("• " + unknown, color = Color.White.copy(alpha = .72f), fontSize = 8.sp, lineHeight = 12.sp)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-        }
-        }
-
-
-
-        item {
-            CompanySectionNavigation(
-                labels = listOf(
-                    CompanyIntelligenceSection.PERFORMANCE,
-                    CompanyIntelligenceSection.FINANCIALS,
-                    CompanyIntelligenceSection.VALUATION,
-                    CompanyIntelligenceSection.DIVIDENDS
-                ),
-                selected = metricsSection,
-                onSelected = { metricsSection = it }
-            )
-        }
-
-        if (metricsSection == CompanyIntelligenceSection.FINANCIALS) {
-        item {
-            IntelligenceCard {
-                Text(
-                    financialPeriodLabel(profile.financialPeriod.ifBlank { latestFinancialPeriod }),
-                    color = IntelligenceMuted,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-                SourceDateLine("Provider data updated", profile.financialProviderUpdatedAt, profile.financialPageCheckedAt)
-                Spacer(Modifier.height(8.dp))
-                MetricGrid(
-                    metrics = listOf(
-                        "Revenue" to formatFinancialValue(profile.revenue, profile.financialUnit),
-                        "Profit" to formatFinancialValue(profile.profit, profile.financialUnit),
-                        "EPS (Earnings Per Share)" to formatMetricValue("EPS", profile.eps),
-                        "Net margin" to formatMetricValue("Net margin", profile.margin)
-                    ),
-                    fieldSources = intelligence.fieldSources,
-                    fieldQuality = intelligence.fieldQuality
-                )
-                Spacer(Modifier.height(9.dp))
-                BeginnerMetricGuide(
-                    title = "How to read these figures",
-                    items = listOf(
-                        "Revenue" to "Money the company reported from its business activities for the stated period.",
-                        "Profit" to "Reported earnings left after the company's expenses for the stated period.",
-                        "EPS" to "Reported earnings expressed per share.",
-                        "Net margin" to "The share of reported revenue that remained as profit."
-                    )
-                )
-            }
-        }
-
-        }
-
-        if (metricsSection == CompanyIntelligenceSection.PERFORMANCE) {
-        item {
-            IntelligenceCard {
-                MetricGrid(
-                    metrics = listOf(
-                        "Revenue growth (YoY)" to formatMetricValue("Revenue growth", profile.revenueGrowth),
-                        "Profit growth (YoY)" to formatMetricValue("Profit growth", profile.profitGrowth),
-                        "EPS growth (YoY)" to formatMetricValue("EPS growth", profile.epsGrowth)
-                    ),
-                    fieldSources = intelligence.fieldSources,
-                    fieldQuality = intelligence.fieldQuality
-                )
-                Spacer(Modifier.height(8.dp))
-                Text("Growth compares the latest reported annual figures with the previous comparable annual period.", color = IntelligenceMuted, fontSize = 9.sp)
-                Spacer(Modifier.height(9.dp))
-                BeginnerMetricGuide(
-                    title = "What growth means",
-                    items = listOf(
-                        "Revenue growth" to "How reported annual revenue changed versus the previous comparable annual period.",
-                        "Profit growth" to "How reported annual profit changed versus the previous comparable annual period.",
-                        "EPS growth" to "How reported earnings per share changed versus the previous comparable annual period."
-                    )
-                )
-            }
-        }
-
-        }
-
-        if (metricsSection == CompanyIntelligenceSection.VALUATION) {
-        item {
-            IntelligenceCard {
-                if (profile.ratioBasis.equals("Current", ignoreCase = true)) {
-                    val basis = profile.ratioPeriod.takeIf { it.isNotBlank() }?.let { "Current ratios • period ending $it" }
-                        ?: "Current ratios"
-                    Text(basis, color = IntelligenceMuted, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
-                    SourceDateLine("Provider data updated", profile.ratioProviderUpdatedAt, profile.ratioPageCheckedAt)
-                    Spacer(Modifier.height(8.dp))
-                } else {
-                    Text("Current ratio data is unavailable from the structured ratio response.", color = IntelligenceMuted, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(8.dp))
-                }
-                MetricGrid(
-                    metrics = listOf(
-                        "P/E (Price-to-Earnings)" to formatMetricValue("P/E", profile.pe),
-                        "P/B (Price-to-Book)" to formatMetricValue("P/B", profile.pb),
-                        "ROE (Return on Equity)" to formatMetricValue("ROE", profile.roe),
-                        "Debt / Equity" to formatMetricValue("Debt / Equity", profile.debtToEquity),
-                        "Dividend yield" to formatMetricValue("Dividend yield", profile.dividendYield),
-                        "Market cap" to formatMarketCap(profile.marketCap)
-                    ),
-                    fieldSources = intelligence.fieldSources,
-                    fieldQuality = intelligence.fieldQuality
-                )
-                Spacer(Modifier.height(8.dp))
-                Text("These ratios are the source's current snapshot; they are not FY 2025 historical ratio values.", color = IntelligenceMuted, fontSize = 9.sp)
-                Spacer(Modifier.height(9.dp))
-                BeginnerMetricGuide(
-                    title = "How to read valuation & ratios",
-                    items = listOf(
-                        "P/E" to "Compares the share price with reported earnings per share.",
-                        "P/B" to "Compares the market value of shares with reported book value.",
-                        "ROE" to "Shows reported profit relative to shareholders' equity.",
-                        "Debt / Equity" to "Shows debt relative to shareholders' equity; compare it over time and with peers.",
-                        "Dividend yield" to "Shows the dividend relative to the current share price."
-                    )
-                )
-            }
-        }
-
-        }
-
-        if (metricsSection == CompanyIntelligenceSection.DIVIDENDS) {
-        item {
-            IntelligenceCard {
-                Text("Dividend snapshot", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = IntelligenceText)
-                Spacer(Modifier.height(7.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box(Modifier.weight(1f)) {
-                        MiniFact("Dividend yield", formatMetricValue("Dividend yield", profile.dividendYield))
-                    }
-                    Box(Modifier.weight(1f)) {
-                        MiniFact("History records", intelligence.dividends.size.toString())
-                    }
-                }
-                Spacer(Modifier.height(7.dp))
-                Text(
-                    "Dividend events are shown from the available provider history. Past payments do not guarantee future dividends.",
-                    color = IntelligenceMuted,
-                    fontSize = 9.sp,
-                    lineHeight = 13.sp
-                )
-            }
-        }
-        item {
-            IntelligenceCard {
-                if (intelligence.dividends.isEmpty()) {
-                    Text("No dividend history was returned by the current provider response.", color = IntelligenceMuted, fontSize = 11.sp)
-                } else {
-                    intelligence.dividends.take(5).forEachIndexed { index, dividend ->
-                        Row(Modifier.fillMaxWidth().padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Surface(Modifier.size(34.dp), RoundedCornerShape(10.dp), IntelligenceLight) { Icon(Icons.Default.Payments, null, tint = IntelligenceGreen, modifier = Modifier.padding(8.dp)) }
-                            Spacer(Modifier.width(9.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(if (dividend.amount.isNotBlank()) "KSh ${dividend.amount}" else "Dividend amount not supplied", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                                Text(
-                                    buildString {
-                                        if (dividend.exDate.isNotBlank()) append("Ex-date: " + dividend.exDate)
-                                        if (dividend.paymentDate.isNotBlank()) {
-                                            if (isNotEmpty()) append(" • ")
-                                            append("Payment: " + dividend.paymentDate)
-                                        }
-                                        if (isEmpty()) append("Dates not supplied")
-                                    },
-                                    color = IntelligenceMuted,
-                                    fontSize = 9.sp
-                                )
-                            }
-                            if (dividend.status.isNotBlank()) Text(dividend.status, color = IntelligenceMuted, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                        }
-                        if (index < intelligence.dividends.take(5).lastIndex) HorizontalDivider(color = IntelligenceBorder)
-                    }
-                }
-            }
-        }
-
-        }
-
-        if (metricsSection == CompanyIntelligenceSection.PERFORMANCE) {
-                item {
-            IntelligenceCard {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            if (s.observedAt.isNotBlank() && s.dataOrigin == "backend" && s.price.isFinite()) currencyLabel(s.price) else "Price unavailable",
-                            fontSize = 28.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = IntelligenceText
-                        )
-                        Text(
-                            if (s.observedAt.isNotBlank() && s.dataOrigin == "backend") marketObservationLabel(s) else "NSE latest observation unavailable",
-                            color = IntelligenceMuted,
-                            fontSize = 9.sp
-                        )
-                    }
-                    if ((period == "1D" || period == "NOW") && marketStatus.isKnown && !marketStatus.isOpen) {
-                        Text(
-                            "MARKET CLOSED",
-                            color = IntelligenceMuted,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 11.sp,
-                            textAlign = TextAlign.End
-                        )
-                    } else {
-                        selectedPeriodReturn?.let { periodReturn ->
-                            Text(
-                                formatPeriodReturn(period, periodReturn),
-                                color = if (periodReturn >= 0) IntelligenceGreen else IntelligenceRed,
-                                fontWeight = FontWeight.ExtraBold,
-                                fontSize = 13.sp,
-                                textAlign = TextAlign.End
-                            )
-                        }
-                    }
-                }
-                Spacer(Modifier.height(14.dp))
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    periods.forEach { value ->
-                        FilterChip(
-                            selected = period == value,
-                            onClick = { period = value },
-                            label = { Text(value, fontSize = 9.sp) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = IntelligenceGreen,
-                                selectedLabelColor = Color.White,
-                                selectedLeadingIconColor = Color.White
-                            ),
-                            border = FilterChipDefaults.filterChipBorder(
-                                enabled = true,
-                                selected = period == value,
-                                borderColor = IntelligenceMuted.copy(alpha = 0.65f),
-                                selectedBorderColor = IntelligenceGreen
-                            )
-                        )
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    periodDescription(period),
-                    color = IntelligenceText,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center
-                )
-                if (period == "NOW") {
-                    val latestTimestamp = historyResult.sessionCloseAt
-                        .ifBlank { historyResult.lastDate }
-                        .ifBlank { historyResult.observedAt }
-                    Text(
-                        if (latestTimestamp.isNotBlank()) {
-                            "Latest observation • " + formatChartTimestamp(latestTimestamp) + " • 15 min delayed"
-                        } else {
-                            "Latest available intraday observation • 15 min delayed"
-                        },
-                        color = IntelligenceMuted,
-                        fontSize = 8.sp,
-                        modifier = Modifier.fillMaxWidth(),
-                        textAlign = TextAlign.Center
-                    )
-                }
-                Spacer(Modifier.height(8.dp))
-                if (historyLoading) {
-                    IntelligenceLoader("Loading $period market history", "Checking historical NSE data…")
-                } else if (history.size >= 2) {
-                    IntelligenceChart(
-                        points = history,
-                        period = if (period == "NOW") "1D" else period,
-                        tint = if ((selectedPeriodReturn ?: s.change) >= 0) IntelligenceGreen else IntelligenceRed,
-                        previousClose = s.previousClose
-                    )
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("${history.size} data points", color = IntelligenceMuted, fontSize = 8.sp)
-                        if ((period == "1D" || period == "NOW") && marketStatus.isKnown && !marketStatus.isOpen) {
-                            Text("Market closed", color = IntelligenceMuted, fontWeight = FontWeight.Bold, fontSize = 8.sp)
-                        } else {
-                            selectedPeriodReturn?.let { Text(formatPeriodReturn(period, it), color = if (it >= 0) IntelligenceGreen else IntelligenceRed, fontWeight = FontWeight.Bold, fontSize = 8.sp) }
-                        }
-                    }
-                } else {
-                    Text("Historical market data is not available for this period.", color = IntelligenceMuted, fontSize = 10.sp)
-                }
-            }
-        }
-
-        if (period == "1D" || period == "NOW") {
-            item {
-                TodayAtAGlance(
-                    stock = s,
-                    historyResult = historyResult,
-                    marketStatus = marketStatus
-                )
-            }
-        }
-
-        item { WhyStockMovingSection(s.symbol) }
-
-        }
-
-        item {
-            CompanySectionNavigation(
-                labels = listOf(
-                    CompanyIntelligenceSection.NEWS,
-                    CompanyIntelligenceSection.EVIDENCE,
-                    CompanyIntelligenceSection.ANALYSIS
-                ),
-                selected = researchSection,
-                onSelected = { researchSection = it }
-            )
-        }
-
-        if (researchSection == CompanyIntelligenceSection.NEWS) {
-            item { CompanyNewsSection(news = news, loading = newsLoading) }
-        }
-
-        if (researchSection == CompanyIntelligenceSection.EVIDENCE) {
-                item {
-            IntelligenceCard {
-                if (intelligenceView.evidenceRecords.isEmpty()) {
-                    Text("No normalized evidence records are available from the current response.", color = IntelligenceMuted, fontSize = 10.sp)
-                } else {
-                    intelligenceView.evidenceRecords.take(8).forEachIndexed { index, evidence ->
-                        Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(evidence.type.name.replace('_', ' '), color = IntelligenceGreen, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                                Spacer(Modifier.width(7.dp))
-                                Text(evidence.source, color = IntelligenceMuted, fontSize = 8.sp, maxLines = 1)
-                            }
-                            Spacer(Modifier.height(3.dp))
-                            Text(evidence.claim, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 3)
-                            evidence.value?.takeIf { it.isNotBlank() }?.let { Text(it, color = IntelligenceMuted, fontSize = 9.sp, maxLines = 2) }
-                            (evidence.publishedAt ?: evidence.observedAt)?.takeIf { it.isNotBlank() }?.let { Text(it.take(19), color = IntelligenceMuted, fontSize = 8.sp) }
-                            evidence.sourceUrl?.takeIf { it.isNotBlank() }?.let { Text("Source available", color = IntelligenceGreen, fontSize = 8.sp, fontWeight = FontWeight.SemiBold) }
-                        }
-                        if (index < intelligenceView.evidenceRecords.take(8).lastIndex) HorizontalDivider(color = IntelligenceBorder)
-                    }
-                    if (intelligenceView.evidenceRecords.size > 8) {
-                        Spacer(Modifier.height(4.dp))
-                        Text("+${intelligenceView.evidenceRecords.size - 8} more evidence records", color = IntelligenceMuted, fontSize = 8.sp)
-                    }
-                }
-            }
-        }
-
-        }
-
-        if (researchSection == CompanyIntelligenceSection.ANALYSIS) {
-        item { SectionTitle("Risks to investigate", "Questions raised by the available evidence", Icons.Default.Warning) }
-        item {
-            IntelligenceCard {
-                if (intelligenceView.risks.isEmpty()) {
-                    Text("No automatic watchpoint was generated from the currently available evidence. This does not mean the company has no risks.", color = IntelligenceMuted, fontSize = 10.sp)
-                } else {
-                    intelligenceView.risks.forEach { Watchpoint(it) }
-                }
-            }
-        }
-
-        item { SectionTitle("Intelligence signals", "Deterministic evidence signals — no invented conclusions", Icons.Default.Insights) }
-        item {
-            IntelligenceCard {
-                Text("Evidence coverage: ${intelligenceView.evidenceCoverage}", color = IntelligenceGreen, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold)
-                Spacer(Modifier.height(6.dp))
-                Text("Coverage: ${intelligenceView.quality.state} • ${intelligenceView.quality.availableCount}/5 evidence areas", color = IntelligenceMuted, fontSize = 9.sp)
-                Spacer(Modifier.height(10.dp))
-                SignalGroup("SUPPORTING", IntelligenceGreen, intelligenceView.signals.filter { it.type == CompanyIntelligenceEngine.SignalType.SUPPORTING }.map { it.text })
-                SignalGroup("CAUTION", IntelligenceRed, intelligenceView.signals.filter { it.type == CompanyIntelligenceEngine.SignalType.CAUTION }.map { it.text })
-                SignalGroup("UNKNOWN / NEEDS EVIDENCE", IntelligenceMuted, intelligenceView.unknowns)
-            }
-        }
-
-        item { SectionTitle("Bull / Bear / Unknown", "A balanced view of the available evidence", Icons.Default.CompareArrows) }
-        item {
-            IntelligenceCard {
-                EvidencePerspective("Supporting case", IntelligenceGreen, buildList {
-                    if (profile.revenueGrowth.isNotBlank()) add("Revenue growth: ${profile.revenueGrowth}")
-                    if (profile.profitGrowth.isNotBlank()) add("Profit growth: ${profile.profitGrowth}")
-                    if (profile.roe.isNotBlank()) add("ROE: ${profile.roe}")
-                    if (intelligence.dividends.isNotEmpty()) add("Dividend history is available for review")
-                })
-                EvidencePerspective("Counter-evidence", IntelligenceRed, buildList {
-                    if (s.change < 0) add("Today's price change: ${String.format(Locale.US, "%+.2f%%", s.change)}")
-                    if (profile.revenueGrowth.toDoubleOrNull()?.let { it < 0 } == true) add("Revenue growth is negative")
-                    if (profile.profitGrowth.toDoubleOrNull()?.let { it < 0 } == true) add("Profit growth is negative")
-                    if (profile.eps.toDoubleOrNull()?.let { it < 0 } == true) add("EPS is negative")
-                })
-                EvidencePerspective("Unknown / investigate", IntelligenceMuted, buildList {
-                    if (profile.pe.isBlank()) add("P/E not available")
-                    if (profile.pb.isBlank()) add("P/B not available")
-                    if (profile.debtToEquity.isBlank()) add("Debt/equity not available")
-                    if (news.isEmpty()) add("Recent events need verification from issuer/NSE sources")
-                })
-            }
-        }
-
-        item { SectionTitle("Company timeline", "Recent intelligence events in context", Icons.Default.Timeline) }
-        item {
-            IntelligenceCard {
-                if (news.isEmpty()) {
-                    Text("The timeline will populate when dated company intelligence is available.", color = IntelligenceMuted, fontSize = 10.sp)
-                } else {
-                    news.take(8).forEachIndexed { index, item ->
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Surface(Modifier.size(10.dp), RoundedCornerShape(50), color = IntelligenceGreen) {}
-                                if (index < news.take(8).lastIndex) Box(Modifier.width(1.dp).height(42.dp).background(IntelligenceBorder))
-                            }
-                            Spacer(Modifier.width(10.dp))
-                            Column(Modifier.weight(1f).padding(bottom = 8.dp)) {
-                                Text(item.publishedAt.take(10).ifBlank { "Recent" }, color = IntelligenceMuted, fontSize = 8.sp)
-                                Text(item.title, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 3)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        item { SectionTitle("Ask NSE Watcher", "Questions to investigate before making your own decision", Icons.Default.Psychology) }
-        item {
-            IntelligenceCard {
-                Text("Use these prompts as an analyst checklist. AI answers will be connected to the sourced evidence layer after the intelligence data pipeline is complete.", color = IntelligenceMuted, fontSize = 10.sp, lineHeight = 15.sp)
-                Spacer(Modifier.height(9.dp))
-                listOf(
-                    "Why did ${s.symbol} move recently?",
-                    "Explain ${s.name} like I'm a beginner.",
-                    "What changed in the latest company information?",
-                    "What are the biggest risks I should investigate?",
-                    "What evidence supports the current picture?"
-                ).forEach { prompt ->
-                    Surface(Modifier.fillMaxWidth().padding(vertical = 3.dp), RoundedCornerShape(12.dp), color = IntelligenceLight) {
-                        Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.QuestionMark, null, tint = IntelligenceGreen, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text(prompt, fontSize = 10.sp, color = IntelligenceText)
-                        }
-                    }
-                }
-            }
-        }
-
-        item { SectionTitle("Beginner guide", "Understand the numbers before interpreting them", Icons.Default.School) }
-        item {
-            IntelligenceCard {
-                listOf(
-                    "P/E" to "Price compared with earnings per share. Compare it with the company's history and sector, not in isolation.",
-                    "ROE" to "Return on equity. It describes how efficiently reported profit is generated from shareholders' equity.",
-                    "EPS" to "Earnings per share. It shows the portion of reported earnings attributable to each share.",
-                    "Dividend yield" to "Dividend relative to the share price. A higher yield is not automatically a better investment.",
-                    "Debt / equity" to "A leverage measure comparing debt with shareholders' equity. Compare it over time and with peers."
-                ).forEach { (term, explanation) ->
-                    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-                        Text(term, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = IntelligenceGreen)
-                        Text(explanation, fontSize = 9.sp, lineHeight = 14.sp, color = IntelligenceText)
-                    }
-                    HorizontalDivider(color = IntelligenceBorder)
-                }
-            }
-        }
-
-        item { SectionTitle("What to investigate next", "A practical research checklist", Icons.Default.Checklist) }
-        item {
-            IntelligenceCard {
-                listOf(
-                    "Read the latest results and compare revenue, profit and EPS with prior periods.",
-                    "Check the latest issuer and NSE announcements for material events.",
-                    "Compare valuation measures with the company's own history and relevant peers.",
-                    "Review dividend consistency, payout dates and sustainability.",
-                    "Look at the price chart alongside company events instead of treating price movement as an explanation."
-                ).forEach { Watchpoint(it) }
-            }
-        }
-
-        }
-
-        if (researchSection == CompanyIntelligenceSection.EVIDENCE) {
-        item {
-            IntelligenceCard {
-                EvidenceRow("Coverage", "${intelligenceView.quality.state} • ${intelligenceView.quality.availableCount}/5 areas")
-                EvidenceRow("Evidence", "${intelligenceView.quality.evidenceCount} sourced claims returned")
-                EvidenceRow("Evidence coverage", intelligenceView.evidenceCoverage)
-            }
-        }
-
-        item {
-            IntelligenceCard {
-                EvidenceRow("Market price", "${s.source.ifBlank { "Market source unavailable" }} • ${when (s.freshnessMode) { "STALE" -> "stale observation"; "CURRENT_SESSION" -> "current session"; "END_OF_DAY" -> "end-of-day observation"; else -> "freshness unknown" }}")
-                EvidenceRow("Company profile", if (intelligenceLoading) "Loading source data…" else "Field-level sources shown below")
-                EvidenceRow("Dividends", if (intelligence.dividends.isNotEmpty()) "Source recorded per dividend event" else "Not available")
-                EvidenceRow("News & actions", "MyStocks Africa company intelligence feed")
-                if (intelligence.fetchedAt.isNotBlank()) EvidenceRow("App fetch time", intelligence.fetchedAt)
-                Spacer(Modifier.height(6.dp))
-                Text("NSE Watcher separates sourced facts from interpretation. Verify material announcements against the issuer or NSE before acting.", color = IntelligenceMuted, fontSize = 9.sp)
-            }
-        }
-
-        item {
-            IntelligenceCard {
-                Text("Data quality & sources", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = IntelligenceText)
-                Spacer(Modifier.height(6.dp))
-                val materialFields = listOf(
-                    "revenue" to "Revenue", "profit" to "Profit", "eps" to "EPS",
-                    "roe" to "ROE", "margin" to "Net margin", "debtToEquity" to "Debt / equity",
-                    "pe" to "P/E", "pb" to "P/B", "dividendYield" to "Dividend yield",
-                    "marketCap" to "Market capitalization"
-                )
-                materialFields.forEach { (key, label) ->
-                    val quality = intelligence.fieldQuality[key] ?: "UNKNOWN"
-                    val sources = intelligence.fieldSources[key].orEmpty().joinToString(" + ")
-                    EvidenceRow(label, "$quality${if (sources.isNotBlank()) " • $sources" else ""}")
-                }
-                if (intelligence.conflicts.isNotEmpty()) {
-                    Spacer(Modifier.height(6.dp))
-                    Text("Conflicting source values", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = IntelligenceRed)
-                    intelligence.conflicts.entries.forEach { (field, values) ->
-                        val label = materialFields.firstOrNull { it.first == field }?.second ?: field
-                        EvidenceRow(label, values.joinToString(" vs ") { "${it.first}: ${it.second}" })
-                    }
-                }
-                Text("CONFLICT means two available providers returned different values. NSE Watcher does not silently treat one as verified.", color = IntelligenceMuted, fontSize = 9.sp)
-            }
-        }
-
-        item {
-            Text("NSE Watcher is an analysis and education product. It does not execute real trades or guarantee returns.", color = IntelligenceMuted, fontSize = 9.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp))
-        }
-    }
-}
+    // The approved reference is an overview layout. Keep the existing company
+    // data path, but do not reintroduce the previous dense intelligence dashboard.
+    // The other existing intelligence sections remain available in the codebase
+    // for the next targeted redesign pass.
+    ApprovedCompanyOverview(
+        stock = s.copy(name = s.name.ifBlank { profile.name.ifBlank { s.symbol } }),
+        previousClose = previousClose,
+        open = open,
+        dayHigh = dayHigh,
+        dayLow = dayLow,
+        latest = latest,
+        observedAt = observedAt,
+        dailyChange = dailyChange,
+        sinceOpen = sinceOpen,
+        points = points,
+        loading = historyLoading
+    )
 }
 
 
