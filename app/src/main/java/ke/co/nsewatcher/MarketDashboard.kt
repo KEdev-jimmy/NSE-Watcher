@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.painterResource
 import coil3.compose.AsyncImage
 import ke.co.nsewatcher.data.MyStocksCache
 import kotlinx.coroutines.async
@@ -35,7 +36,7 @@ private val MarketGreen = Color(0xFF12E889)
 private val MarketBlue = Color(0xFF9DB6E0)
 private val MarketWhite = Color(0xFFF7FAFF)
 private val MarketBorder = Color(0xFF1B3654)
-private const val NairobiSkyline = "https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/Nairobi_City_County_Skyline.jpg/1280px-Nairobi_City_County_Skyline.jpg"
+
 
 private val MarketLogoAliases = mapOf(
     "SCOM" to "scom", "KCB" to "kcb", "EQTY" to "eqty", "ABSA" to "absa", "BOC" to "boc",
@@ -104,13 +105,13 @@ fun MarketDashboard(stockFeed: List<Stock>) {
                         .clip(RoundedCornerShape(22.dp))
                 ) {
                     AsyncImage(
-                        model = NairobiSkyline,
+                        painter = painterResource(id = R.drawable.nairobi_city_county_skyline),
                         contentDescription = "Nairobi skyline",
                         modifier = Modifier.fillMaxSize(),
                         contentScale = androidx.compose.ui.layout.ContentScale.Crop
                     )
-                    Box(Modifier.fillMaxSize().background(Color(0xD9061320)))
-                    Box(Modifier.fillMaxSize().background(Color(0x4500A859)))
+                    Box(Modifier.fillMaxSize().background(Color(0x6613263A)))
+                    Box(Modifier.fillMaxSize().background(Color(0x2500A859)))
                     Column(
                         Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 18.dp),
                         verticalArrangement = Arrangement.Bottom
