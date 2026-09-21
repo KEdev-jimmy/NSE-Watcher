@@ -7,6 +7,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -179,7 +180,7 @@ fun NSEWatcherOpeningScreen(
                     val centerY = size.height / 2f
                     drawLine(
                         color = SplashGreen.copy(alpha = 0.28f),
-                        start = androidx.compose.ui.geometry.Offset.Zero.x.let { androidx.compose.ui.geometry.Offset(it, centerY) },
+                        start = androidx.compose.ui.geometry.Offset(0f, centerY),
                         end = androidx.compose.ui.geometry.Offset(size.width, centerY),
                         strokeWidth = 1.4.dp.toPx(),
                         cap = StrokeCap.Round
