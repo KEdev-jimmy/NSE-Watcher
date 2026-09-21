@@ -156,12 +156,8 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
     }
 
     val profile = intelligence.profile
-    // For 1D/NOW, the headline daily move is the authoritative performance
-    // measure: latest available price versus the previous trading session close.
-    // The chart itself remains the actual intraday 15-minute price path.
     val selectedPeriodReturn = if (period == "1D" || period == "NOW") {
-        s.change.takeIf { s.changeAvailable && it.isFinite() && s.dataOrigin == "backend" }
-            ?: historyResult.sessionChangePct
+        historyResult.sessionChangePct
             ?: historyResult.points.takeIf { it.size >= 2 }?.let { percentReturn(it.map { point -> point.close }) }
     } else {
         history.takeIf { it.size >= 2 }?.let { percentReturn(it.map { point -> point.close }) }
@@ -1202,3 +1198,554 @@ private fun IntelligenceChart(
                                 val oldZoom = zoomX
                                 val newZoom = (oldZoom * zoom).coerceIn(1f, 6f)
                                 val scaleRatio = newZoom / oldZoom
+
+                                // Keep the data point under the pinch centre anchored while zooming.
+                                val anchoredPan = centroid.x - (centroid.x - panX) * scaleRatio
+                                val candidatePan = anchoredPan + pan.x
+                                val maxPan = (plotWidthPx * (newZoom - 1f)).coerceAtLeast(0f)
+
+                                zoomX = newZoom
+                                panX = candidatePan.coerceIn(-maxPan, 0f)
+                            }
+                        }
+                ) {
+                    Canvas(Modifier.fillMaxSize()) {
+                        val contentWidth = size.width * zoomX
+
+                        // Keep the chart horizontally interactive while the price axis stays fixed.
+                        clipRect(left = 0f, top = 0f, right = size.width, bottom = size.height) {
+                            val line = Path()
+                            val area = Path()
+
+                            valid.forEachIndexed { index, point ->
+                                val x = panX + contentWidth * index / valid.lastIndex.coerceAtLeast(1)
+                                val y = size.height - (((point.close - bottom) / chartRange).toFloat() * size.height)
+
+                                if (index == 0) {
+                                    line.moveTo(x, y)
+                                    area.moveTo(x, size.height)
+                                    area.lineTo(x, y)
+                                } else {
+                                    line.lineTo(x, y)
+                                    area.lineTo(x, y)
+                                }
+                            }
+
+                            area.lineTo(panX + contentWidth, size.height)
+                            area.close()
+
+                            drawPath(
+                                area,
+                                Brush.verticalGradient(
+                                    listOf(tint.copy(alpha = 0.34f), tint.copy(alpha = 0.03f)),
+                                    startY = 0f,
+                                    endY = size.height
+                                )
+                            )
+                            drawPath(line, tint, style = Stroke(width = 3.5f, cap = StrokeCap.Round))
+                        }
+                    }
+                }
+            }
+
+            // The X-axis uses the same transformed positions as the line, so labels stay
+            // attached to their actual observations while the user pans/zooms.
+            Row(Modifier.fillMaxWidth()) {
+                Spacer(Modifier.width(42.dp))
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .height(22.dp)
+                        .clipToBounds()
+                ) {
+                    labels.forEach { label ->
+                        val xPx = panX + plotWidthPx * zoomX * label.index / valid.lastIndex.coerceAtLeast(1)
+                        val labelWidthPx = with(density) {
+                            (label.text.length.coerceAtLeast(3) * 4.5f).dp.toPx()
+                        }
+                        val clampedX = when {
+                            label.index == 0 -> xPx.coerceAtLeast(labelWidthPx / 2f)
+                            label.index == valid.lastIndex -> xPx.coerceAtMost(plotWidthPx - labelWidthPx / 2f)
+                            else -> xPx
+                        }
+                        Text(
+                            label.text,
+                            color = IntelligenceMuted,
+                            fontSize = 8.sp,
+                            maxLines = 1,
+                            modifier = Modifier.offset {
+                                androidx.compose.ui.unit.IntOffset(
+                                    (clampedX - labelWidthPx / 2f).toInt(),
+                                    0
+                                )
+                            }
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(4.dp))
+            Text(
+                chartAxisDescription(period),
+                color = IntelligenceMuted,
+                fontSize = 8.sp,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
+
+            if (zoomX > 1.01f) {
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    "Pinch to zoom • drag horizontally to inspect the timeline",
+                    color = IntelligenceMuted,
+                    fontSize = 7.sp,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SessionAtGlance(
+    stock: Stock,
+    historyResult: MyStocksCache.HistoryResult,
+    marketStatus: MyStocksCache.MarketStatus
+) {
+    val open = historyResult.sessionOpen
+    val latest = historyResult.sessionClose
+    val hasSession = latest != null && latest > 0.0
+    val sessionDate = historyResult.sessionCloseAt.takeIf { it.isNotBlank() }?.let(::formatChartTimestampDate)
+    val observed = historyResult.sessionCloseAt
+        .takeIf { it.isNotBlank() }
+        ?.let(::formatChartTimestamp)
+        ?: historyResult.observedAt.takeIf { it.isNotBlank() }?.let(::formatChartTimestamp)
+    val nextOpen = marketStatus.nextOpen.takeIf { it.isNotBlank() }?.let(::formatChartTimestamp)
+    val known = marketStatus.isKnown
+    val openSession = known && marketStatus.isOpen
+
+    SectionTitle(
+        "Market status",
+        when {
+            openSession -> "NSE session • latest available data"
+            known -> "Market is closed"
+            else -> "Session status is currently unavailable"
+        },
+        Icons.Default.Schedule
+    )
+
+    IntelligenceCard {
+        when {
+            !known -> {
+                Text(
+                    "Market status is currently unavailable. No current-session state is inferred.",
+                    color = IntelligenceMuted,
+                    fontSize = 10.sp
+                )
+            }
+            !hasSession -> {
+                Text(
+                    if (openSession) {
+                        "The latest NSE session observation is not available."
+                    } else {
+                        "The last completed NSE session close is not available."
+                    },
+                    color = IntelligenceMuted,
+                    fontSize = 10.sp
+                )
+                nextOpen?.let {
+                    Spacer(Modifier.height(6.dp))
+                    Text("Next regular session: $it", color = IntelligenceMuted, fontSize = 8.sp)
+                }
+            }
+            openSession -> {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    open?.takeIf { it > 0.0 }?.let {
+                        Box(Modifier.weight(1f)) {
+                            MiniFact("OPEN", String.format(Locale.US, "KSh %.2f", it))
+                        }
+                    }
+                    Box(Modifier.weight(1f)) {
+                        MiniFact("LATEST", String.format(Locale.US, "KSh %.2f", latest))
+                    }
+                }
+                Spacer(Modifier.height(9.dp))
+                observed?.let {
+                    Text("Latest observation: $it", color = IntelligenceMuted, fontSize = 8.sp)
+                }
+                if (stock.changeAvailable && stock.change.isFinite()) {
+                    Text(
+                        "Today's move ${String.format(Locale.US, "%+.2f%%", stock.change)} vs previous close",
+                        color = if (stock.change >= 0.0) IntelligenceGreen else IntelligenceRed,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Text(
+                    "Market open • price data is exchange-supplied.",
+                    color = IntelligenceMuted,
+                    fontSize = 8.sp
+                )
+            }
+            else -> {
+                Text(
+                    "MARKET CLOSED",
+                    color = IntelligenceText,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                sessionDate?.let {
+                    Text("Closed: $it", color = IntelligenceMuted, fontSize = 9.sp)
+                }
+                observed?.let {
+                    Text("Latest available observation: $it • 15 min delayed", color = IntelligenceMuted, fontSize = 8.sp)
+                }
+                Text(
+                    "Latest available price ${String.format(Locale.US, "KSh %.2f", latest)}",
+                    color = IntelligenceText,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                if (stock.changeAvailable && stock.change.isFinite()) {
+                    Text(
+                        "Today's move ${String.format(Locale.US, "%+.2f%%", stock.change)} vs previous close",
+                        color = if (stock.change >= 0.0) IntelligenceGreen else IntelligenceRed,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                nextOpen?.let {
+                    Spacer(Modifier.height(6.dp))
+                    Text("Next regular session: $it", color = IntelligenceMuted, fontSize = 8.sp)
+                }
+            }
+        }
+    }
+}
+private fun formatHeaderUnavailable(
+    marketStatus: MyStocksCache.MarketStatus,
+    historyResult: MyStocksCache.HistoryResult
+): String {
+    val timestamp = historyResult.sessionCloseAt
+        .ifBlank { historyResult.lastDate }
+        .ifBlank { historyResult.observedAt }
+        .takeIf { it.isNotBlank() }
+        ?.let(::formatCompactChartTimestamp)
+
+    val state = when {
+        !marketStatus.isKnown -> "STATUS UNKNOWN"
+        marketStatus.isOpen -> "LATEST"
+        else -> "CLOSE"
+    }
+
+    return buildString {
+        append("Change unavailable")
+        timestamp?.let {
+            append(" • ")
+            append(it)
+            append(" EAT")
+        }
+        append(" • ")
+        append(state)
+    }
+}
+
+private fun formatHeaderChange(
+    change: Double,
+    marketStatus: MyStocksCache.MarketStatus,
+    historyResult: MyStocksCache.HistoryResult
+): String {
+    if (marketStatus.isKnown && !marketStatus.isOpen) {
+        val closedAt = historyResult.sessionCloseAt
+            .ifBlank { historyResult.lastDate }
+            .ifBlank { historyResult.observedAt }
+            .takeIf { it.isNotBlank() }
+            ?.let(::formatCompactChartTimestamp)
+        return if (closedAt != null) {
+            "MARKET CLOSED • Latest available observation ${closedAt} EAT"
+        } else {
+            "MARKET CLOSED"
+        }
+    }
+
+    val timestamp = historyResult.sessionCloseAt
+        .ifBlank { historyResult.lastDate }
+        .ifBlank { historyResult.observedAt }
+        .takeIf { it.isNotBlank() }
+        ?.let(::formatCompactChartTimestamp)
+
+    val state = if (!marketStatus.isKnown) "STATUS UNKNOWN" else "LATEST"
+
+    return buildString {
+        append(String.format(Locale.US, "%+.2f%%", change))
+        timestamp?.let {
+            append(" • ")
+            append(it)
+            append(" EAT")
+        }
+        append(" • ")
+        append(state)
+    }
+}
+
+private fun formatChartTimestamp(raw: String): String = runCatching {
+    Instant.parse(raw).atZone(ZoneId.of("Africa/Nairobi")).format(DateTimeFormatter.ofPattern("dd MMM yy • h:mm a", Locale.US)) + " EAT"
+}.getOrElse { raw.take(19) }
+
+private fun formatCompactChartTimestamp(raw: String): String = runCatching {
+    Instant.parse(raw).atZone(ZoneId.of("Africa/Nairobi")).format(DateTimeFormatter.ofPattern("dd MMM yy • h:mm a", Locale.US))
+}.getOrElse { raw.take(19) }
+
+private fun formatChartTimestampDate(raw: String): String = runCatching {
+    Instant.parse(raw).atZone(ZoneId.of("Africa/Nairobi")).format(DateTimeFormatter.ofPattern("EEE, dd MMM yy", Locale.US))
+}.getOrElse { raw.take(10) }
+
+private data class ChartLabel(val index: Int, val text: String)
+
+private fun chartAxisLabels(
+    points: List<MyStocksCache.HistoryPoint>,
+    period: String,
+    zoomX: Float = 1f
+): List<ChartLabel> {
+    val dated = points.mapIndexedNotNull { index, point ->
+        parseChartDate(point.date)?.let { ChartLabel(index, formatChartDate(it, period)) }
+    }
+    if (dated.size < 2) return fallbackChartLabels(period).mapIndexed { index, text -> ChartLabel(index, text) }
+
+    // At normal scale keep the chart calm. As the user zooms in, reveal more
+    // real observations rather than fabricating intermediate points.
+    val baseCount = when (period) {
+        "1D" -> 5
+        "1W" -> 5
+        "1M" -> 5
+        "3M", "6M" -> 4
+        "1Y" -> 6
+        "3Y", "5Y" -> 4
+        else -> 5
+    }
+
+    val unique = dated.distinctBy { it.text }
+    if (unique.size < 2) {
+        return listOf(
+            dated.firstOrNull() ?: ChartLabel(0, fallbackChartLabels(period).first()),
+            dated.lastOrNull() ?: ChartLabel(points.lastIndex, fallbackChartLabels(period).last())
+        ).distinctBy { it.index }
+    }
+    val maxLabelCount = unique.size.coerceAtMost(12)
+    val targetCount = (baseCount * zoomX).toInt().coerceIn(2, maxLabelCount)
+    return evenlySpacedLabels(unique, targetCount)
+}
+
+private fun evenlySpacedLabels(labels: List<ChartLabel>, count: Int): List<ChartLabel> {
+    if (labels.size <= 1) return labels
+    if (count >= labels.size) return labels
+    return (0 until count).map { i ->
+        val index = kotlin.math.round(
+            i * (labels.lastIndex.toDouble() / (count - 1).coerceAtLeast(1))
+        ).toInt()
+        labels[index]
+    }.distinctBy { it.text }
+}
+
+private fun parseChartDate(raw: String): java.time.LocalDateTime? {
+    val value = raw.trim()
+    if (value.isBlank()) return null
+
+    return runCatching {
+        Instant.parse(value).atZone(ZoneId.of("Africa/Nairobi")).toLocalDateTime()
+    }.getOrElse {
+        runCatching { LocalDate.parse(value).atStartOfDay() }.getOrNull()
+    }
+}
+
+private fun formatChartDate(
+    dateTime: java.time.LocalDateTime,
+    period: String
+): String = when (period) {
+    "1D" -> dateTime.format(DateTimeFormatter.ofPattern("HH:mm", Locale.US))
+    "1W" -> dateTime.format(DateTimeFormatter.ofPattern("EEE dd", Locale.US))
+    "1M" -> dateTime.format(DateTimeFormatter.ofPattern("dd MMM", Locale.US))
+    "3M", "6M", "1Y" -> dateTime.format(DateTimeFormatter.ofPattern("MMM", Locale.US))
+    "3Y", "5Y" -> dateTime.format(DateTimeFormatter.ofPattern("yyyy", Locale.US))
+    else -> dateTime.format(DateTimeFormatter.ofPattern("dd MMM", Locale.US))
+}
+
+private fun chartAxisDescription(period: String): String = when (period) {
+    "1D" -> "Time • Nairobi trading session"
+    "1W" -> "Trading days"
+    "1M" -> "Trading dates"
+    "3M", "6M" -> "Months across the selected period"
+    "1Y" -> "Months across the selected year"
+    "3Y", "5Y" -> "Years across the selected period"
+    else -> "Time"
+}
+
+private fun fallbackChartLabels(period: String): List<String> = when (period) {
+    "1D" -> listOf("Open", "Mid", "Latest")
+    "1W" -> listOf("Start", "Mid", "Now")
+    "1M" -> listOf("Start", "Mid", "Now")
+    "3M", "6M" -> listOf("Start", "Mid", "Now")
+    "1Y" -> listOf("Start", "Mid", "Now")
+    "3Y", "5Y" -> listOf("Start", "Mid", "Now")
+    else -> listOf("Start", "Now")
+}
+
+@Composable
+private fun CompanyLogo(symbol: String, size: Int, logoUrl: String? = null) {
+    val model = logoUrl?.takeIf { it.isNotBlank() } ?: "https://mystocks.africa/logos/${symbol.lowercase(Locale.US)}-ke.svg"
+    Surface(Modifier.size(size.dp).clip(RoundedCornerShape(12.dp)), RoundedCornerShape(12.dp), IntelligenceLight) {
+        Box(Modifier.fillMaxSize(), Alignment.Center) {
+            AsyncImage(model = model, contentDescription = symbol, modifier = Modifier.fillMaxSize().padding(6.dp), contentScale = ContentScale.Fit)
+            Text(symbol.take(3), color = IntelligenceGreen, fontWeight = FontWeight.ExtraBold, fontSize = 7.sp)
+        }
+    }
+}
+
+@Composable
+private fun BeginnerMetricGuide(
+    title: String,
+    items: List<Pair<String, String>>
+) {
+    Surface(
+        Modifier.fillMaxWidth(),
+        RoundedCornerShape(12.dp),
+        color = IntelligenceLight,
+        border = BorderStroke(1.dp, IntelligenceBorder)
+    ) {
+        Column(Modifier.padding(11.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.School, contentDescription = null, tint = IntelligenceGreen, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(7.dp))
+                Text(title, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, color = IntelligenceText)
+            }
+            Spacer(Modifier.height(5.dp))
+            items.forEachIndexed { index, (term, explanation) ->
+                Column(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+                    Text(term, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = IntelligenceGreen)
+                    Text(explanation, fontSize = 8.sp, lineHeight = 12.sp, color = IntelligenceText)
+                }
+                if (index < items.lastIndex) HorizontalDivider(color = IntelligenceBorder)
+            }
+        }
+    }
+}
+
+private fun currencyLabel(value: Double): String = String.format(Locale.US, "KSh %.2f", value)
+
+private fun priceAxis(value: Double): String = String.format(Locale.US, "%.2f", value)
+
+private fun valueOrMissing(value: String): String = value.trim().takeIf { it.isNotBlank() } ?: "Not available"
+
+private fun formatFinancialValue(value: String, unit: String): String {
+    val clean = value.trim()
+    if (clean.isBlank()) return "Not available"
+    if (!unit.equals("Millions KES", ignoreCase = true)) {
+        return clean
+    }
+    val millions = clean.replace(",", "").toDoubleOrNull() ?: return clean
+    return if (millions >= 1000.0) {
+        String.format(Locale.US, "KSh %.2fB", millions / 1000.0)
+    } else {
+        String.format(Locale.US, "KSh %,.2fM", millions)
+    }
+}
+
+private fun formatMetricValue(label: String, value: String): String {
+    val clean = value.trim()
+    if (clean.isBlank() || clean == "-" || clean.equals("n/a", ignoreCase = true)) return "Not available"
+    val numeric = clean.removeSuffix("%").replace(",", "").toDoubleOrNull() ?: return clean
+    return when (label) {
+        "EPS", "EPS (Earnings Per Share)" -> String.format(Locale.US, "KSh %.2f / share", numeric)
+        "Revenue growth", "Profit growth", "EPS growth" ->
+            String.format(Locale.US, "%+.2f%%", numeric)
+        "ROE", "Net margin", "Dividend yield" ->
+            String.format(Locale.US, "%.2f%%", numeric)
+        "P/E", "P/B", "Debt / Equity" -> String.format(Locale.US, "%.2f×", numeric)
+        else -> clean
+    }
+}
+
+private fun formatMarketCap(value: String): String {
+    val clean = value.trim()
+    if (clean.isBlank()) return "Not available"
+    val absoluteKsh = clean.replace(",", "").toDoubleOrNull() ?: return clean
+    return when {
+        absoluteKsh >= 1_000_000_000_000.0 -> String.format(Locale.US, "KSh %.2fT", absoluteKsh / 1_000_000_000_000.0)
+        absoluteKsh >= 1_000_000_000.0 -> String.format(Locale.US, "KSh %.2fB", absoluteKsh / 1_000_000_000.0)
+        absoluteKsh >= 1_000_000.0 -> String.format(Locale.US, "KSh %.2fM", absoluteKsh / 1_000_000.0)
+        else -> String.format(Locale.US, "KSh %,.0f", absoluteKsh)
+    }
+}
+
+@Composable
+private fun SourceDateLine(label: String, providerUpdatedAt: String, pageCheckedAt: String) {
+    if (providerUpdatedAt.isBlank() && pageCheckedAt.isBlank()) return
+    Column(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+        providerUpdatedAt.takeIf { it.isNotBlank() }?.let {
+            Text("$label: ${formatSourceDate(it)}", color = IntelligenceMuted, fontSize = 8.sp)
+        }
+        pageCheckedAt.takeIf { it.isNotBlank() }?.let {
+            Text("Source page checked: ${formatSourceDate(it)}", color = IntelligenceMuted, fontSize = 8.sp)
+        }
+    }
+}
+
+private fun formatSourceDate(raw: String): String = runCatching {
+    LocalDate.parse(raw).format(DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.US))
+}.getOrElse { raw }
+
+private fun financialPeriodLabel(period: String): String {
+    val clean = period.trim()
+    if (clean.isBlank()) return "Annual figures • Latest reported period"
+    if (clean.contains("FY ", ignoreCase = true)) {
+        val parts = clean.split(" • ", limit = 2)
+        return if (parts.size == 2) {
+            "Annual figures • ${parts[0]} • year ended ${parts[1]}"
+        } else {
+            "Annual figures • ${parts[0]}"
+        }
+    }
+    return "Annual figures • $clean"
+}
+
+private fun periodDescription(period: String): String = when (period) {
+    "1D" -> "Today's Nairobi trading session"
+    "1W" -> "Past 1 week"
+    "1M" -> "Past 1 month"
+    "3M" -> "Past 3 months"
+    "6M" -> "Past 6 months"
+    "1Y" -> "Past 1 year"
+    "3Y" -> "Past 3 years"
+    "5Y" -> "Past 5 years"
+    "NOW" -> "Latest available intraday data"
+    else -> period
+}
+
+private fun formatPeriodReturn(period: String, value: Double): String {
+    val label = when (period) {
+        "1D" -> "session"
+        "1W" -> "1 week"
+        "1M" -> "1 month"
+        "3M" -> "3 months"
+        "6M" -> "6 months"
+        "1Y" -> "1 year"
+        "3Y" -> "3 years"
+        "5Y" -> "5 years"
+        "NOW" -> "latest session"
+        else -> period
+    }
+    return String.format(Locale.US, "%+.2f%% $label", value)
+}
+
+private fun percentReturn(values: List<Double>): Double? {
+    val valid = values.filter { it.isFinite() && it > 0.0 }
+    if (valid.size < 2) return null
+    val first = valid.first()
+    return ((valid.last() - first) / first) * 100.0
+}
+
+private fun formatSigned(value: Double): String = String.format(Locale.US, "%+.1f%%", value)
