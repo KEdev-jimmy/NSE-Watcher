@@ -749,16 +749,6 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
             }
         }
 
-        if (period == "1D" || period == "NOW") {
-            item {
-                SessionAtGlance(
-                    stock = s,
-                    historyResult = historyResult,
-                    marketStatus = marketStatus
-                )
-            }
-        }
-
         item { WhyStockMovingSection(s.symbol) }
 
         }
