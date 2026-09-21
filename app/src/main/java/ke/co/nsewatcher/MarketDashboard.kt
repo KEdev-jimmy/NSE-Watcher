@@ -106,12 +106,6 @@ fun MarketDashboard(stockFeed: List<Stock>) {
                         .height(190.dp)
                         .clip(RoundedCornerShape(22.dp))
                 ) {
-                    AsyncImage(
-                        painter = painterResource(id = R.drawable.nairobi_city_county_skyline),
-                        contentDescription = "Nairobi skyline",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                    )
                     Box(Modifier.fillMaxSize().background(Color(0x6613263A)))
                     Box(Modifier.fillMaxSize().background(Color(0x2500A859)))
                     Column(
