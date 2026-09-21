@@ -1402,7 +1402,7 @@ private fun SessionAtGlance(
                     Text("Closed: $it", color = IntelligenceMuted, fontSize = 9.sp)
                 }
                 observed?.let {
-                    Text("Close observation: $it", color = IntelligenceMuted, fontSize = 8.sp)
+                    Text("Latest available observation: $it • 15 min delayed", color = IntelligenceMuted, fontSize = 8.sp)
                 }
                 Text(
                     "Latest available price ${String.format(Locale.US, "KSh %.2f", latest)}",
@@ -1466,7 +1466,7 @@ private fun formatHeaderChange(
             .takeIf { it.isNotBlank() }
             ?.let(::formatCompactChartTimestamp)
         return if (closedAt != null) {
-            "MARKET CLOSED • Closed ${closedAt} EAT"
+            "MARKET CLOSED • Latest available observation ${closedAt} EAT"
         } else {
             "MARKET CLOSED"
         }
