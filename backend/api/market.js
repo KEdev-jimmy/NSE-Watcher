@@ -26,6 +26,27 @@ async function mystocks(path) {
   return data;
 }
 
+async function loadAllNseCompanies() {
+  const pageSize = 200;
+  const companies = [];
+  let cursor = '';
+  const seenCursors = new Set();
+
+  while (true) {
+    const suffix = cursor ? `&cursor=${encodeURIComponent(cursor)}` : '';
+    const page = await mystocks(`/companies?exchange=NSE&limit=${pageSize}${suffix}`);
+    const pageCompanies = Array.isArray(page?.companies) ? page.companies : [];
+    companies.push(...pageCompanies);
+
+    if (!page?.hasMore || !page?.nextCursor || seenCursors.has(page.nextCursor)) {
+      return { ...page, companies, count: companies.length, hasMore: false, nextCursor: null };
+    }
+
+    seenCursors.add(page.nextCursor);
+    cursor = page.nextCursor;
+  }
+}
+
 async function loadAllNseStocks() {
   const pageSize = 200;
   const stocks = [];
@@ -195,6 +216,14 @@ module.exports = async (req, res) => {
         nextOpen: exchangeData?.nextOpen || exchangeData?.nextSessionOpen || null,
         nextClose: exchangeData?.nextClose || exchangeData?.nextSessionClose || null,
         data,
+      });
+    }
+    if (action === 'companies') {
+      const data = await loadAllNseCompanies();
+      return json(res, 200, {
+        source: 'MyStocks Africa',
+        fetchedAt: new Date().toISOString(),
+        data
       });
     }
     if (action === 'stocks') {
