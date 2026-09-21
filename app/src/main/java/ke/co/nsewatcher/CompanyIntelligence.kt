@@ -616,9 +616,9 @@ private fun ApprovedMetric(
         Icon(icon, null, tint = Color(0xFFAFC2F0), modifier = Modifier.size(27.dp))
         Spacer(Modifier.width(20.dp))
         Column {
-            Text(label, color = Color(0xFFA9BCD0), fontSize = 17.sp)
+            Text(label, color = Color(0xFFA9BCD0), fontSize = if (phone) 12.sp else 17.sp)
             Spacer(Modifier.height(8.dp))
-            Text(value, color = Color(0xFFF4F7FA), fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
+            Text(value, color = Color(0xFFF4F7FA), fontSize = if (phone) 12.sp else 22.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -1269,13 +1269,13 @@ private fun EvidencePerspective(title: String, tint: Color, items: List<String>)
 
 @Composable
 private fun IntelligenceCard(content: @Composable ColumnScope.() -> Unit) {
-    Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), border = BorderStroke(1.dp, IntelligenceBorder)) { Column(Modifier.padding(14.dp), content = content) }
+    Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFF0A1F32)), border = BorderStroke(1.dp, Color(0xFF17364F))) { Column(Modifier.padding(14.dp), content = content) }
 }
 
 @Composable
 private fun SectionTitle(title: String, subtitle: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {
     Row(Modifier.fillMaxWidth().padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-        Surface(Modifier.size(34.dp), RoundedCornerShape(10.dp), IntelligenceLight) { Icon(icon, null, tint = IntelligenceGreen, modifier = Modifier.padding(7.dp)) }
+        Surface(Modifier.size(34.dp), RoundedCornerShape(10.dp), Color(0xFF10283D), border = BorderStroke(1.dp, Color(0xFF17364F))) { Icon(icon, null, tint = IntelligenceGreen, modifier = Modifier.padding(7.dp)) }
         Spacer(Modifier.width(9.dp))
         Column {
             Text(title, fontWeight = FontWeight.ExtraBold, fontSize = 17.sp, color = IntelligenceText)
@@ -1346,7 +1346,7 @@ private fun MetricGrid(
 
 @Composable
 private fun MiniFact(label: String, value: String) {
-    Surface(Modifier.fillMaxWidth(), RoundedCornerShape(12.dp), color = IntelligenceLight) {
+    Surface(Modifier.fillMaxWidth(), RoundedCornerShape(12.dp), color = Color(0xFF10283D), border = BorderStroke(1.dp, Color(0xFF17364F))) {
         Column(Modifier.padding(9.dp)) { Text(label, color = IntelligenceMuted, fontSize = 8.sp); Text(value, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 2) }
     }
 }
