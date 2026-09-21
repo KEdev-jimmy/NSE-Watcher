@@ -55,6 +55,96 @@ private val IntelligenceBorder = Color(0xFFE1EAE5)
 private val IntelligenceRed = Color(0xFFE04444)
 
 @Composable
+private fun CompanyOverviewCard(
+    stock: Stock,
+    marketStatus: MyStocksCache.MarketStatus,
+    historyResult: MyStocksCache.HistoryResult,
+    watched: Boolean,
+    onBack: () -> Unit,
+    onWatchToggle: (() -> Unit)?
+) {
+    val hasPrice = stock.observedAt.isNotBlank() && stock.dataOrigin == "backend" && stock.price.isFinite()
+    val hasChange = stock.changeAvailable && stock.change.isFinite() && stock.dataOrigin == "backend"
+    val change = stock.change
+    val changeColor = if (hasChange) {
+        if (change >= 0.0) IntelligenceGreen else IntelligenceRed
+    } else IntelligenceMuted
+
+    IntelligenceCard {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack, modifier = Modifier.size(36.dp)) {
+                Icon(Icons.Default.ArrowBack, "Back", tint = IntelligenceText)
+            }
+            CompanyLogo(stock.symbol, 42, stock.logoUrl)
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(stock.name, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = IntelligenceText, maxLines = 2)
+                Text(stock.symbol + " • NSE", fontSize = 9.sp, color = IntelligenceMuted)
+            }
+            if (onWatchToggle != null) {
+                IconButton(onClick = onWatchToggle, modifier = Modifier.size(36.dp)) {
+                    Icon(
+                        if (watched) Icons.Default.Star else Icons.Default.StarBorder,
+                        contentDescription = if (watched) "Remove from watchlist" else "Add to watchlist",
+                        tint = if (watched) IntelligenceGreen else IntelligenceMuted
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+        HorizontalDivider(color = IntelligenceBorder)
+        Spacer(Modifier.height(12.dp))
+
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+            Column(Modifier.weight(1f)) {
+                Text("LATEST NSE OBSERVATION", color = IntelligenceMuted, fontSize = 8.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 0.5.sp)
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    if (hasPrice) String.format(Locale.US, "KSh %.2f", stock.price) else "Price unavailable",
+                    color = if (hasPrice) IntelligenceText else IntelligenceMuted,
+                    fontSize = 25.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            }
+            if (hasChange) {
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(String.format(Locale.US, "%+.2f%%", change), color = changeColor, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
+                    Text("vs previous close", color = IntelligenceMuted, fontSize = 8.sp)
+                }
+            }
+        }
+
+        Spacer(Modifier.height(9.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            Box(Modifier.weight(1f)) {
+                MiniFact("STATUS", when {
+                    !marketStatus.isKnown -> "Unknown"
+                    marketStatus.isOpen -> "Market open"
+                    else -> "Market closed"
+                })
+            }
+            Box(Modifier.weight(1f)) {
+                MiniFact(
+                    "OBSERVATION",
+                    if (stock.observedAt.isNotBlank()) formatCompactChartTimestamp(stock.observedAt) + " EAT" else "Unavailable"
+                )
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+        Text(
+            if (hasPrice) marketObservationLabel(stock) else "Latest NSE observation unavailable from the market feed",
+            color = IntelligenceMuted,
+            fontSize = 8.sp,
+            lineHeight = 12.sp
+        )
+        Spacer(Modifier.height(4.dp))
+        Text("Exchange-supplied NSE data • analysis only • no real trading", color = IntelligenceMuted, fontSize = 7.sp)
+    }
+}
+
+@Composable
 private fun CompanyNewsSection(
     news: List<NewsItem>,
     loading: Boolean
@@ -390,91 +480,14 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = back) { Icon(Icons.Default.ArrowBack, "Back") }
-                CompanyLogo(s.symbol, 46, s.logoUrl)
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(s.name, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = IntelligenceText)
-                    Text("${s.symbol} • NSE", fontSize = 10.sp, color = IntelligenceMuted)
-                }
-                if (onWatchToggle != null) {
-                    OutlinedButton(
-                        onClick = onWatchToggle,
-                        shape = RoundedCornerShape(20.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 5.dp)
-                    ) {
-                        Icon(
-                            if (watched) Icons.Default.Star else Icons.Default.StarBorder,
-                            contentDescription = if (watched) "Remove from watchlist" else "Add to watchlist",
-                            modifier = Modifier.size(17.dp)
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text(if (watched) "Watching" else "Watch", fontSize = 11.sp)
-                    }
-                }
-            }
-        }
-
-        item {
-            Card(
-                Modifier.fillMaxWidth(),
-                RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = IntelligenceLight)
-            ) {
-                Column(Modifier.padding(17.dp)) {
-                    Text("NSE DATA • LATEST AVAILABLE", color = IntelligenceMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    if (s.observedAt.isNotBlank() && s.dataOrigin == "backend" && s.price.isFinite()) {
-                        Text(
-                            String.format(Locale.US, "KSh %.2f", s.price),
-                            fontSize = 30.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = IntelligenceText
-                        )
-                    } else {
-                        Text(
-                            "Price unavailable",
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = IntelligenceMuted
-                        )
-                    }
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        if (s.observedAt.isNotBlank() && s.dataOrigin == "backend") {
-                            marketObservationLabel(s)
-                        } else {
-                            "Latest NSE observation unavailable from the market feed"
-                        },
-                        color = IntelligenceMuted,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 9.sp,
-                        maxLines = 2
-                    )
-                    Spacer(Modifier.height(3.dp))
-                    Text(
-                        if (s.changeAvailable && s.change.isFinite() && s.dataOrigin == "backend") {
-                            formatHeaderChange(s.change, marketStatus, historyResult)
-                        } else {
-                            formatHeaderUnavailable(marketStatus, historyResult)
-                        },
-                        color = if (s.changeAvailable && s.change.isFinite()) {
-                            if (s.change >= 0) IntelligenceGreen else IntelligenceRed
-                        } else {
-                            IntelligenceMuted
-                        },
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 9.sp,
-                        maxLines = 1
-                    )
-                    Spacer(Modifier.height(5.dp))
-                    Text(
-                        "Exchange-supplied NSE data • analysis only • no real trading",
-                        color = IntelligenceMuted,
-                        fontSize = 8.sp
-                    )
-                }
-            }
+            CompanyOverviewCard(
+                stock = s,
+                marketStatus = marketStatus,
+                historyResult = historyResult,
+                watched = watched,
+                onBack = back,
+                onWatchToggle = onWatchToggle
+            )
         }
 
         item {
