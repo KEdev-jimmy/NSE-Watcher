@@ -921,7 +921,11 @@ fun CompanyIntelligence(
 
     val profile = intelligence.profile
     val points = historyResult.points.filter { it.close.isFinite() && it.close > 0.0 }
-    val previousClose = s.previousClose?.takeIf { it.isFinite() && it > 0.0 }
+    // Use the actual previous trading session close from the chart API first.
+    // The quote feed can mirror today's close in its previousClose field, so it
+    // must not be trusted as the UI's historical previous-close reference.
+    val previousClose = historyResult.previousSessionClose?.takeIf { it.isFinite() && it > 0.0 }
+        ?: s.previousClose?.takeIf { it.isFinite() && it > 0.0 }
     val latest = historyResult.sessionClose?.takeIf { it.isFinite() && it > 0.0 }
         ?: points.lastOrNull()?.close
         ?: s.price.takeIf { it.isFinite() && it > 0.0 }
@@ -938,7 +942,8 @@ fun CompanyIntelligence(
     // Today's change is authoritative provider data already normalized by
     // MyStocksCache from the API's changePct field. Do not recalculate it
     // from prices in the UI. If the API does not provide it, show it as unavailable.
-    val dailyChange = s.change.takeIf { it.isFinite() }
+    val dailyChange = historyResult.dailyChangePct?.takeIf { it.isFinite() }
+        ?: s.change.takeIf { it.isFinite() }
 
     // "Since open today" is intentionally kept separate: it is a different
     // metric from the provider's close-to-close daily change.
