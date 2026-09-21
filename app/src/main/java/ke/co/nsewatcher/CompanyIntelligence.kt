@@ -403,8 +403,7 @@ private fun CompanySectionNavigation(
 @Composable
 fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, onWatchToggle: (() -> Unit)? = null) {
     val periods = listOf("1D", "1W", "1M", "3M", "6M", "1Y", "3Y", "5Y", "NOW")
-    var period by rememberSaveable(s.symbol) { mutableStateOf("1D")         }
-    }
+    var period by rememberSaveable(s.symbol) { mutableStateOf("1D") }
     var history by remember(s.symbol) {
         mutableStateOf(s.history.map { MyStocksCache.HistoryPoint(it) })
     }
@@ -473,7 +472,6 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
     }
     val latestFinancialPeriod = intelligence.financialHistory.lastOrNull()?.period.orEmpty()
     val intelligenceView = CompanyIntelligenceEngine.build(s, intelligence, monthHistory, news)
-    val hasSessionNavigationItem = period == "1D" || period == "NOW"
     val listState = rememberLazyListState()
     var primarySection by rememberSaveable(s.symbol) { mutableStateOf(CompanyIntelligenceSection.INTELLIGENCE) }
     var metricsSection by rememberSaveable(s.symbol) { mutableStateOf(CompanyIntelligenceSection.PERFORMANCE) }
