@@ -172,6 +172,7 @@ private fun App(pickAvatar:()->Unit) {
         if (!autoRefresh) return@LaunchedEffect
         while (isActive) {
             delay(MarketRefreshController.REFRESH_INTERVAL_MS)
+            startupMarketStatus = MyStocksCache.loadMarketStatus()
             MyStocksCache.loadStocks().takeIf { it.isNotEmpty() }?.let { refreshed ->
                 liveStocks.value = refreshed
                 // Use the latest selected company without restarting the 15-minute timer
