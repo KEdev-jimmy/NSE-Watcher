@@ -156,8 +156,12 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
     }
 
     val profile = intelligence.profile
+    // For 1D/NOW, use the same authoritative daily move as the headline:
+    // latest available quote versus the previous trading-session close.
+    // The plotted points remain the actual intraday 15-minute price path.
     val selectedPeriodReturn = if (period == "1D" || period == "NOW") {
-        historyResult.sessionChangePct
+        s.change.takeIf { s.changeAvailable && it.isFinite() && s.dataOrigin == "backend" }
+            ?: historyResult.sessionChangePct
             ?: historyResult.points.takeIf { it.size >= 2 }?.let { percentReturn(it.map { point -> point.close }) }
     } else {
         history.takeIf { it.size >= 2 }?.let { percentReturn(it.map { point -> point.close }) }
