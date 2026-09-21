@@ -5,8 +5,11 @@ import androidx.compose.runtime.mutableStateOf
 import java.util.concurrent.TimeUnit
 
 object MarketRefreshController {
-    // MyStocks documents a 15-minute refresh target for the delayed NSE feed. Do not poll faster.
+    // Stock prices use the provider's 15-minute delayed feed and must not be polled faster.
     const val REFRESH_INTERVAL_MS = 15 * 60 * 1000L
+    // Market session state is separate from quote cadence. Poll status frequently so
+    // an app left open can recognize the 09:30 Nairobi continuous-session start promptly.
+    const val STATUS_POLL_INTERVAL_MS = 30 * 1000L
     const val PROVIDER_DELAY_MINUTES = 15
     data class State(
         val lastSuccessfulRefreshMs: Long? = null,
