@@ -2315,5 +2315,5 @@ Implemented as one coherent batch from `c7726e9407024c394292b76c610fa51b33863c8a
   - **Settings/utility screens:** no skyline.
 - Attribution added to the About page: Antony Trivet, Creative Commons BY-SA 4.0.
 - Active files: HomeDashboard.kt, DesignActivity.kt, MarketDashboard.kt, NewsDashboard.kt.
-- The previous companies_city_background.xml was a vector approximation and is no longer used by the Companies hero. It remains in the repository as an unused legacy asset unless removed in a cleanup pass.
+- The previous companies_city_background.xml was a vector approximation and has now been removed; Companies uses the approved real photograph.
 - CI/runtime verification is required before treating this photo integration as complete.
