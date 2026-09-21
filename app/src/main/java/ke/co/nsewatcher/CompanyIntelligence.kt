@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -44,6 +45,8 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlin.math.max
+import kotlin.math.min
 import kotlinx.coroutines.launch
 
 private val IntelligenceGreen = Color(0xFF00A859)
@@ -445,11 +448,11 @@ private fun ApprovedCompanyOverview(
 
             item {
                 Surface(
-                    Modifier.padding(horizontal = 36.dp).fillMaxWidth(),
+                    onClick = { },
+                    modifier = Modifier.padding(horizontal = 36.dp).fillMaxWidth(),
                     color = Color(0xFF0A1F32),
                     shape = RoundedCornerShape(18.dp),
-                    border = BorderStroke(1.dp, Color(0xFF17364F)),
-                    onClick = { }
+                    border = BorderStroke(1.dp, Color(0xFF17364F))
                 ) {
                     Row(
                         Modifier.padding(horizontal = 26.dp, vertical = 24.dp),
