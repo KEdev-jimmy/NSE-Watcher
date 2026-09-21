@@ -1155,17 +1155,22 @@ private fun IntelligenceChart(
     tint: Color,
     previousClose: Double? = null
 ) {
-    // Plot only actual exchange observations. Previous close is a reference level,
-    // not a synthetic price observation at today's open.
-    val valid = points.filter { it.close.isFinite() && it.close > 0.0 }
-    if (valid.size < 2) return
+    val actualValid = points.filter { it.close.isFinite() && it.close > 0.0 }
+    if (actualValid.size < 2) return
 
-    val referenceClose = previousClose?.takeIf { it.isFinite() && it > 0.0 }
-    val minPrice = listOfNotNull(valid.minOfOrNull { it.close }, referenceClose).minOrNull() ?: return
-    val maxPrice = listOfNotNull(valid.maxOfOrNull { it.close }, referenceClose).maxOrNull() ?: return
-    val range = (maxPrice - minPrice).takeIf { it > 0.0 } ?: (maxPrice * 0.01).coerceAtLeast(1.0)
-    val top = maxPrice + range * 0.08
-    val bottom = (minPrice - range * 0.08).coerceAtLeast(0.0)
+    // For 1D, anchor the visual at the previous trading-session close.
+    // The remaining points are untouched, exchange-supplied intraday observations.
+    val valid = if (period == "1D" && previousClose != null && previousClose.isFinite() && previousClose > 0.0) {
+        listOf(MyStocksCache.HistoryPoint(previousClose, actualValid.first().date)) + actualValid
+    } else {
+        actualValid
+    }
+
+    val min = valid.minOf { it.close }
+    val max = valid.maxOf { it.close }
+    val range = (max - min).takeIf { it > 0.0 } ?: (max * 0.01).coerceAtLeast(1.0)
+    val top = max + range * 0.08
+    val bottom = (min - range * 0.08).coerceAtLeast(0.0)
     val chartRange = (top - bottom).coerceAtLeast(0.0001)
     val mid = (top + bottom) / 2.0
 
@@ -1207,9 +1212,12 @@ private fun IntelligenceChart(
                                 val oldZoom = zoomX
                                 val newZoom = (oldZoom * zoom).coerceIn(1f, 6f)
                                 val scaleRatio = newZoom / oldZoom
+
+                                // Keep the data point under the pinch centre anchored while zooming.
                                 val anchoredPan = centroid.x - (centroid.x - panX) * scaleRatio
                                 val candidatePan = anchoredPan + pan.x
                                 val maxPan = (plotWidthPx * (newZoom - 1f)).coerceAtLeast(0f)
+
                                 zoomX = newZoom
                                 panX = candidatePan.coerceIn(-maxPan, 0f)
                             }
@@ -1218,6 +1226,7 @@ private fun IntelligenceChart(
                     Canvas(Modifier.fillMaxSize()) {
                         val contentWidth = size.width * zoomX
 
+                        // Keep the chart horizontally interactive while the price axis stays fixed.
                         clipRect(left = 0f, top = 0f, right = size.width, bottom = size.height) {
                             val line = Path()
                             val area = Path()
@@ -1248,22 +1257,13 @@ private fun IntelligenceChart(
                                 )
                             )
                             drawPath(line, tint, style = Stroke(width = 3.5f, cap = StrokeCap.Round))
-
-                            referenceClose?.let { close ->
-                                val y = size.height - (((close - bottom) / chartRange).toFloat() * size.height)
-                                drawLine(
-                                    color = IntelligenceMuted.copy(alpha = 0.65f),
-                                    start = androidx.compose.ui.geometry.Offset(0f, y),
-                                    end = androidx.compose.ui.geometry.Offset(size.width, y),
-                                    strokeWidth = 1.5f,
-                                    pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 8f))
-                                )
-                            }
                         }
                     }
                 }
             }
 
+            // The X-axis uses the same transformed positions as the line, so labels stay
+            // attached to their actual observations while the user pans/zooms.
             Row(Modifier.fillMaxWidth()) {
                 Spacer(Modifier.width(42.dp))
                 Box(
@@ -1299,14 +1299,29 @@ private fun IntelligenceChart(
             }
 
             Spacer(Modifier.height(4.dp))
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Spacer(Modifier.width(42.dp))
-                Box(Modifier.size(18.dp, 1.dp).background(IntelligenceMuted))
-                Spacer(Modifier.width(5.dp))
-                Text("Previous close", color = IntelligenceMuted,@Composable
+            Text(
+                chartAxisDescription(period),
+                color = IntelligenceMuted,
+                fontSize = 8.sp,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
+
+            if (zoomX > 1.01f) {
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    "Pinch to zoom • drag horizontally to inspect the timeline",
+                    color = IntelligenceMuted,
+                    fontSize = 7.sp,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun SessionAtGlance(
     stock: Stock,
     historyResult: MyStocksCache.HistoryResult,
@@ -1449,27 +1464,6 @@ private fun SessionAtGlance(
                         fontSize = 8.sp,
                         lineHeight = 12.sp
                     )
-                }
-            }
-        }
-    }
-}
-                       color = if (it >= 0.0) IntelligenceGreen else IntelligenceRed,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                if (stock.changeAvailable && stock.change.isFinite()) {
-                    Text(
-                        "Daily move ${String.format(Locale.US, "%+.2f%%", stock.change)} vs previous close",
-                        color = if (stock.change >= 0.0) IntelligenceGreen else IntelligenceRed,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                nextOpen?.let {
-                    Spacer(Modifier.height(6.dp))
-                    Text("Next regular session: $it", color = IntelligenceMuted, fontSize = 8.sp)
                 }
             }
         }
