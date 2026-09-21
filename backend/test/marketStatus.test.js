@@ -10,6 +10,24 @@ test('missing provider status is UNKNOWN, never CLOSED', () => {
   );
 });
 
+test('NSE exchange-map response is parsed instead of becoming UNKNOWN', () => {
+  assert.deepEqual(
+    normalizeMarketStatus({
+      anyOpen: true,
+      exchanges: {
+        NSE: {
+          name: 'Nairobi Securities Exchange',
+          isOpen: true,
+          status: 'OPEN',
+          nextOpen: '2026-09-22T06:00:00.000Z',
+          nextClose: '2026-09-21T12:00:00.000Z'
+        }
+      }
+    }),
+    { isOpen: true, status: 'OPEN', isKnown: true }
+  );
+});
+
 test('explicit provider isOpen=false is a known CLOSED state', () => {
   assert.deepEqual(
     normalizeMarketStatus({ isOpen: false }),
