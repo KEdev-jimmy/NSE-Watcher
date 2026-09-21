@@ -587,7 +587,7 @@ private fun ApprovedGlanceCard(
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(28.dp)) {
                     ApprovedMetric(Icons.Default.ShowChart, "Previous close", previousClose?.let(::currencyLabel) ?: "Unavailable")
                     ApprovedMetric(Icons.Default.ArrowUpward, "Day high", dayHigh?.let(::currencyLabel) ?: "Unavailable")
-                    ApprovedMetric(Icons.Default.AccessTime, "Latest observation", latest?.let(::currencyLabel) ?: "Unavailable")
+                    ApprovedMetric(Icons.Default.AccessTime, "Today's close", latest?.let(::currencyLabel) ?: "Unavailable")
                 }
                 VerticalDivider(Modifier.padding(horizontal = 25.dp).height(265.dp), color = Color(0xFF17364F))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(28.dp)) {
@@ -599,7 +599,7 @@ private fun ApprovedGlanceCard(
                 Column(Modifier.weight(1f)) {
                     ApprovedMovement(dailyChange?.let { it >= 0.0 }, "Today's change", dailyChange?.let { String.format(Locale.US, "%+.2f%%", it) } ?: "Unavailable", previousClose?.let { "vs previous close (" + currencyLabel(it) + ")" } ?: "vs previous close")
                     Spacer(Modifier.height(42.dp))
-                    ApprovedMovement(sinceOpen?.let { it >= 0.0 }, "Since open", sinceOpen?.let { String.format(Locale.US, "%+.2f%%", it) } ?: "Unavailable", if (open != null && latest != null) "(" + currencyLabel(open) + " → " + currencyLabel(latest) + ")" else "Open-to-latest movement unavailable")
+                    ApprovedMovement(sinceOpen?.let { it >= 0.0 }, "Since open today", sinceOpen?.let { String.format(Locale.US, "%+.2f%%", it) } ?: "Unavailable", if (open != null && latest != null) "(" + currencyLabel(open) + " → " + currencyLabel(latest) + ")" else "Open-to-latest movement unavailable")
                 }
             }
         }
@@ -935,9 +935,11 @@ fun CompanyIntelligence(
         points.lastOrNull()?.date.orEmpty()
     }
 
-    val dailyChange = s.change.takeIf {
-        s.changeAvailable && it.isFinite() && s.dataOrigin == "backend"
-    } ?: if (previousClose != null && latest != null) {
+    // Company Intelligence must calculate today's move from the actual
+    // close-to-close pair shown on this page: yesterday's verified previous close
+    // versus today's latest/session close. Do not reuse the quote endpoint's
+    // pre-calculated change because it can refer to a different observation time.
+    val dailyChange = if (previousClose != null && latest != null && previousClose > 0.0) {
         ((latest - previousClose) / previousClose) * 100.0
     } else null
 
