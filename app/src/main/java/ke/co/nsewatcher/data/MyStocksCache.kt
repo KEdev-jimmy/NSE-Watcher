@@ -9,11 +9,11 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 object MyStocksCache {
-    private const val BACKEND_STOCKS_URL = "https://nse-watcher.vercel.app/api/market?action=stocks"
-    private const val BACKEND_COMPANIES_URL = "https://nse-watcher.vercel.app/api/market?action=companies"
-    private const val BACKEND_STATUS_URL = "https://nse-watcher.vercel.app/api/market?action=status"
-    private const val BACKEND_INDICES_URL = "https://nse-watcher.vercel.app/api/market?action=indices"
-    private const val BACKEND_CHART_URL = "https://nse-watcher.vercel.app/api/market?action=chart"
+    private const val BACKEND_STOCKS_URL = "https://nse-watcher.jameswaweru399.workers.dev/api/market?action=stocks"
+    private const val BACKEND_COMPANIES_URL = "https://nse-watcher.jameswaweru399.workers.dev/api/market?action=companies"
+    private const val BACKEND_STATUS_URL = "https://nse-watcher.jameswaweru399.workers.dev/api/market?action=status"
+    private const val BACKEND_INDICES_URL = "https://nse-watcher.jameswaweru399.workers.dev/api/market?action=indices"
+    private const val BACKEND_CHART_URL = "https://nse-watcher.jameswaweru399.workers.dev/api/market?action=chart"
 
     private val chartSymbols = setOf("SCOM", "KCB", "EQTY", "ABSA", "COOP", "EABL", "KPLC")
 
