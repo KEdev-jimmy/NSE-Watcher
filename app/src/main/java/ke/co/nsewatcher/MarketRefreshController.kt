@@ -5,7 +5,9 @@ import androidx.compose.runtime.mutableStateOf
 import java.util.concurrent.TimeUnit
 
 object MarketRefreshController {
+    // MyStocks documents a 15-minute refresh target for the delayed NSE feed. Do not poll faster.
     const val REFRESH_INTERVAL_MS = 15 * 60 * 1000L
+    const val PROVIDER_DELAY_MINUTES = 15
     data class State(
         val lastSuccessfulRefreshMs: Long? = null,
         val refreshInProgress: Boolean = false,
