@@ -585,9 +585,9 @@ private fun ApprovedGlanceCard(
             Spacer(Modifier.height(27.dp))
             Row(Modifier.fillMaxWidth()) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(28.dp)) {
-                    ApprovedMetric(Icons.Default.ShowChart, "Previous close", previousClose?.let(::currencyLabel) ?: "Unavailable", phone = phone)
-                    ApprovedMetric(Icons.Default.ArrowUpward, "Day high", high?.let(::currencyLabel) ?: "Unavailable", phone = phone)
-                    ApprovedMetric(Icons.Default.AccessTime, "Latest observation", latest?.let(::currencyLabel) ?: "Unavailable", phone = phone)
+                    ApprovedMetric(Icons.Default.ShowChart, "Previous close", previousClose?.let(::currencyLabel) ?: "Unavailable")
+                    ApprovedMetric(Icons.Default.ArrowUpward, "Day high", dayHigh?.let(::currencyLabel) ?: "Unavailable")
+                    ApprovedMetric(Icons.Default.AccessTime, "Latest observation", latest?.let(::currencyLabel) ?: "Unavailable")
                 }
                 VerticalDivider(Modifier.padding(horizontal = 25.dp).height(265.dp), color = Color(0xFF17364F))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(28.dp)) {
