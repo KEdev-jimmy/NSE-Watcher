@@ -935,14 +935,13 @@ fun CompanyIntelligence(
         points.lastOrNull()?.date.orEmpty()
     }
 
-    // Company Intelligence must calculate today's move from the actual
-    // close-to-close pair shown on this page: yesterday's verified previous close
-    // versus today's latest/session close. Do not reuse the quote endpoint's
-    // pre-calculated change because it can refer to a different observation time.
-    val dailyChange = if (previousClose != null && latest != null && previousClose > 0.0) {
-        ((latest - previousClose) / previousClose) * 100.0
-    } else null
+    // Today's change is authoritative provider data already normalized by
+    // MyStocksCache from the API's changePct field. Do not recalculate it
+    // from prices in the UI. If the API does not provide it, show it as unavailable.
+    val dailyChange = s.change.takeIf { it.isFinite() }
 
+    // "Since open today" is intentionally kept separate: it is a different
+    // metric from the provider's close-to-close daily change.
     val sinceOpen = if (open != null && latest != null && open > 0.0) {
         ((latest - open) / open) * 100.0
     } else null
