@@ -215,7 +215,17 @@ fun MarketDashboard(stockFeed: List<Stock>) {
 private fun MarketFreshnessStrip(stocks: List<Stock>, marketStatus: MyStocksCache.MarketStatus) {
     val valid = stocks.filter { it.price.isFinite() && it.price > 0.0 }
     val source = valid.map { it.source.trim() }.firstOrNull { it.isNotBlank() } ?: "Market source unavailable"
-    val newestObservedAt = valid.mapNotNull { it.observedAt.takeIf(String::isNotBlank)?.let(::parseObservationTime) }.maxOrNull()\n    val ageMinutes = newestObservedAt?.let { ((System.currentTimeMillis() - it.toEpochMilli()).coerceAtLeast(0L) / 60_000L) }\n    val freshness = when {\n        valid.isEmpty() -> "Data unavailable"\n        !marketStatus.isKnown -> "Freshness unknown"\n        !marketStatus.isOpen -> "Previous session"\n        newestObservedAt == null -> "Freshness unknown"\n        ageMinutes != null && ageMinutes > 30 -> "Stale • \${ageMinutes}m old"\n        ageMinutes != null -> "Delayed • \${ageMinutes}m old"\n        else -> "Freshness unknown"\n    }
+    val newestObservedAt = valid.mapNotNull { it.observedAt.takeIf(String::isNotBlank)?.let(::parseObservationTime) }.maxOrNull()
+    val ageMinutes = newestObservedAt?.let { ((System.currentTimeMillis() - it.toEpochMilli()).coerceAtLeast(0L) / 60_000L) }
+    val freshness = when {
+        valid.isEmpty() -> "Data unavailable"
+        !marketStatus.isKnown -> "Freshness unknown"
+        !marketStatus.isOpen -> "Previous session"
+        newestObservedAt == null -> "Freshness unknown"
+        ageMinutes != null && ageMinutes > 30 -> "Stale • ${ageMinutes}m old"
+        ageMinutes != null -> "Delayed • ${ageMinutes}m old"
+        else -> "Freshness unknown"
+    }
     Surface(
         Modifier.fillMaxWidth(), RoundedCornerShape(12.dp),
         color = MarketCard,
