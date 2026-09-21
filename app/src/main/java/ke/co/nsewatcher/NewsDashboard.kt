@@ -40,7 +40,7 @@ private val NewsMuted = Color(0xFF6C7A72)
 private val NewsBorder = Color(0xFFE1EAE5)
 private val TrendingRed = Color(0xFFE53935)
 private val TrendingRedLight = Color(0xFFFFE5E5)
-private const val NewsSkyline = "https://upload.wikimedia.org/wikipedia/commons/8/80/Nairobi_Skyline_from_West.jpg"
+private const val NewsSkyline = "https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/Nairobi_City_County_Skyline.jpg/1280px-Nairobi_City_County_Skyline.jpg"
 
 private data class NewsMeta(val symbol: String, val company: String, val logo: String, val label: String)
 
