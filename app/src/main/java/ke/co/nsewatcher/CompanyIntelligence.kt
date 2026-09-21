@@ -749,6 +749,16 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
             }
         }
 
+        if (period == "1D" || period == "NOW") {
+            item {
+                TodayAtAGlance(
+                    stock = s,
+                    historyResult = historyResult,
+                    marketStatus = marketStatus
+                )
+            }
+        }
+
         item { WhyStockMovingSection(s.symbol) }
 
         }
@@ -1393,6 +1403,155 @@ private fun formatHeaderChange(
         }
         append(" • ")
         append(state)
+    }
+}
+
+@Composable
+private fun TodayAtAGlance(
+    stock: Stock,
+    historyResult: MyStocksCache.HistoryResult,
+    marketStatus: MyStocksCache.MarketStatus
+) {
+    val open = historyResult.sessionOpen
+    val latest = historyResult.sessionClose
+    val actualPoints = historyResult.points.filter { it.close.isFinite() && it.close > 0.0 }
+    val dayHigh = actualPoints.maxOfOrNull { it.close }
+    val dayLow = actualPoints.minOfOrNull { it.close }
+    val hasSession = latest != null && latest > 0.0
+    val observedRaw = historyResult.sessionCloseAt
+        .takeIf { it.isNotBlank() }
+        ?: historyResult.observedAt.takeIf { it.isNotBlank() }
+    val observed = observedRaw?.let(::formatChartTimestamp)
+    val sessionDate = observedRaw?.let(::formatChartTimestampDate)
+    val nextOpen = marketStatus.nextOpen.takeIf { it.isNotBlank() }?.let(::formatChartTimestamp)
+    val known = marketStatus.isKnown
+    val openSession = known && marketStatus.isOpen
+
+    SectionTitle(
+        "Today at a glance",
+        when {
+            openSession -> "NSE session • latest available data"
+            known -> "NSE session • latest available observation"
+            else -> "NSE session status is currently unavailable"
+        },
+        Icons.Default.Schedule
+    )
+
+    IntelligenceCard {
+        when {
+            !known -> {
+                Text(
+                    "Market status is currently unavailable. No current-session state is inferred.",
+                    color = IntelligenceMuted,
+                    fontSize = 10.sp
+                )
+            }
+            !hasSession -> {
+                Text(
+                    "Today's intraday price summary is not available from the current market feed.",
+                    color = IntelligenceMuted,
+                    fontSize = 10.sp
+                )
+                nextOpen?.let {
+                    Spacer(Modifier.height(6.dp))
+                    Text("Next regular session: " + it, color = IntelligenceMuted, fontSize = 8.sp)
+                }
+            }
+            else -> {
+                val intradayMove = if (open != null && open > 0.0 && latest != null) {
+                    ((latest - open) / open) * 100.0
+                } else null
+
+                val dailyMove = stock.change.takeIf {
+                    stock.changeAvailable && it.isFinite() && stock.dataOrigin == "backend"
+                } ?: stock.previousClose?.takeIf { it > 0.0 }?.let { previous ->
+                    latest?.takeIf { it > 0.0 }?.let { current ->
+                        ((current - previous) / previous) * 100.0
+                    }
+                }
+
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    stock.previousClose?.takeIf { it > 0.0 }?.let {
+                        Box(Modifier.weight(1f)) { MiniFact("PREVIOUS CLOSE", currencyLabel(it)) }
+                    }
+                    open?.takeIf { it > 0.0 }?.let {
+                        Box(Modifier.weight(1f)) { MiniFact("TODAY'S OPEN", currencyLabel(it)) }
+                    }
+                    dayHigh?.let {
+                        Box(Modifier.weight(1f)) { MiniFact("DAY HIGH", currencyLabel(it)) }
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    dayLow?.let {
+                        Box(Modifier.weight(1f)) { MiniFact("DAY LOW", currencyLabel(it)) }
+                    }
+                    latest?.takeIf { it > 0.0 }?.let {
+                        Box(Modifier.weight(1f)) { MiniFact("LATEST OBSERVATION", currencyLabel(it)) }
+                    }
+                    observed?.let {
+                        Box(Modifier.weight(1f)) { MiniFact("OBSERVED AT", it.removeSuffix(" EAT")) }
+                    }
+                }
+
+                Spacer(Modifier.height(9.dp))
+
+                if (!openSession) {
+                    Text(
+                        "MARKET CLOSED",
+                        color = IntelligenceText,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    sessionDate?.let {
+                        Text("Today's NSE session • " + it, color = IntelligenceMuted, fontSize = 8.sp)
+                    }
+                }
+
+                dailyMove?.let {
+                    Text(
+                        "Today's change " + String.format(Locale.US, "%+.2f%%", it) + " vs previous close",
+                        color = if (it >= 0.0) IntelligenceGreen else IntelligenceRed,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
+
+                intradayMove?.let {
+                    Text(
+                        "Since open " + String.format(Locale.US, "%+.2f%%", it),
+                        color = if (it >= 0.0) IntelligenceGreen else IntelligenceRed,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                observed?.let {
+                    Text(
+                        "Latest observation: " + it + " • exchange-supplied • 15 min delayed",
+                        color = IntelligenceMuted,
+                        fontSize = 8.sp
+                    )
+                }
+
+                if (!openSession) {
+                    Text(
+                        "The feed is showing the latest available observation; it is not labelled as a final close unless the source confirms one.",
+                        color = IntelligenceMuted,
+                        fontSize = 8.sp,
+                        lineHeight = 12.sp
+                    )
+                }
+            }
+        }
     }
 }
 
