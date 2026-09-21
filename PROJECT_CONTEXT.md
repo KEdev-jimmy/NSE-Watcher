@@ -2299,3 +2299,21 @@ Implemented as one coherent batch from `c7726e9407024c394292b76c610fa51b33863c8a
 - No Home/data logic was intentionally changed in this visual batch.
 - CI must be checked for the new commits before calling the visual redesign verified. Runtime appearance should be checked on the APK because system splash rendering and Compose layout can differ by device/API level.
 \n
+
+# 2026-09-21 — Approved Nairobi Skyline Photo Integration
+
+- Approved real Nairobi skyline photograph: **Nairobi City County Skyline.jpg**, photographed by Antony Trivet.
+- Source: Wikimedia Commons. Original is a real photograph, not an illustration; source lists 8,256 × 5,504 resolution and CC BY-SA 4.0 licensing.
+- App uses the 1,280px Wikimedia thumbnail URL for a practical mobile background while preserving the real photograph.
+- Visual placement follows the approved rule:
+  - **Home:** subtle skyline hero background behind the market snapshot, with dark/green overlays so data remains readable.
+  - **Companies:** strongest skyline treatment in the existing green hero area; replaced the previous vector/drawn city background with the real photograph.
+  - **Market:** subtle skyline hero/header with dark navy + green overlays.
+  - **News:** controlled use only on the featured-story hero, not behind the whole news feed.
+  - **Company detail:** no skyline background.
+  - **Opening/splash:** no photographic skyline; retain the approved premium two-stage opening.
+  - **Settings/utility screens:** no skyline.
+- Attribution added to the About page: Antony Trivet, Creative Commons BY-SA 4.0.
+- Active files: HomeDashboard.kt, DesignActivity.kt, MarketDashboard.kt, NewsDashboard.kt.
+- The previous companies_city_background.xml was a vector approximation and is no longer used by the Companies hero. It remains in the repository as an unused legacy asset unless removed in a cleanup pass.
+- CI/runtime verification is required before treating this photo integration as complete.
