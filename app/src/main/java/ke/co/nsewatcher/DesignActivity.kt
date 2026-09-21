@@ -76,6 +76,16 @@ private const val PREFS = "nse_watcher_preferences"
 
 private fun formatPrice(value: Double): String = "KSh " + String.format(Locale.US, "%,.2f", value)
 private fun formatShares(value: Long): String = String.format(Locale.US, "%,d", value)
+private fun marketObservationShort(stock: Stock): String {
+    if (stock.observedAt.isBlank()) return "Latest NSE observation unavailable"
+    val delay = stock.delayMinutes ?: 15
+    val observed = runCatching {
+        java.time.Instant.parse(stock.observedAt)
+            .atZone(java.time.ZoneId.of("Africa/Nairobi"))
+            .format(java.time.format.DateTimeFormatter.ofPattern("dd MMM, HH:mm", Locale.US))
+    }.getOrDefault(stock.observedAt.replace("T", " ").removeSuffix("Z").take(16))
+    return "As of $observed EAT • $delay-min delayed"
+}
 
 data class Stock(val symbol:String,val name:String,val price:Double,val change:Double,val history:List<Double>,val logoUrl:String?=null,val sector:String="Other",val volume:Long=0L,val changeAvailable:Boolean=true,val volumeAvailable:Boolean=true,val source:String="",val observedAt:String="",val freshnessMode:String="UNKNOWN",val dataOrigin:String="unknown",val averageVolume:Long=0L,val averageVolumeAvailable:Boolean=false,val previousClose:Double?=null,val delayMinutes:Int?=null)
 
@@ -281,7 +291,7 @@ private fun Companies(open:(Stock)->Unit, openWatchlist:()->Unit, openCompare:()
                     Column(Modifier.padding(horizontal=12.dp)){
                         filtered.forEachIndexed{index,s->
                             Row(Modifier.fillMaxWidth().clickable{open(s)}.padding(vertical=10.dp),verticalAlignment=Alignment.CenterVertically){
-                                Logo(s.symbol,40,s.logoUrl);Spacer(Modifier.width(10.dp));Column(Modifier.weight(1f)){Text(s.name,color=TextDark,fontWeight=FontWeight.ExtraBold,fontSize=12.sp);Text(s.symbol,color=Muted,fontSize=10.sp)};Column(horizontalAlignment=Alignment.End){Text(String.format(Locale.US,"KSh %.2f",s.price),color=TextDark,fontWeight=FontWeight.Bold,fontSize=11.sp);if(s.changeAvailable){Text(String.format(Locale.US,"%+.1f%%",s.change),color=if(s.change>=0)Green else Red,fontWeight=FontWeight.Bold,fontSize=10.sp)}else{Text("Daily change unavailable",color=Muted,fontWeight=FontWeight.Bold,fontSize=9.sp)}}
+                                Logo(s.symbol,40,s.logoUrl);Spacer(Modifier.width(10.dp));Column(Modifier.weight(1f)){Text(s.name,color=TextDark,fontWeight=FontWeight.ExtraBold,fontSize=12.sp);Text(s.symbol,color=Muted,fontSize=10.sp);Text(marketObservationShort(s),color=Muted,fontSize=7.sp)};Column(horizontalAlignment=Alignment.End){Text(if(s.price.isFinite()) String.format(Locale.US,"KSh %.2f",s.price) else "Price unavailable",color=TextDark,fontWeight=FontWeight.Bold,fontSize=11.sp);if(s.changeAvailable && s.change.isFinite()){Text(String.format(Locale.US,"%+.1f%%",s.change),color=if(s.change>=0)Green else Red,fontWeight=FontWeight.Bold,fontSize=10.sp)}else{Text("Daily change unavailable",color=Muted,fontWeight=FontWeight.Bold,fontSize=9.sp)}}
                             }
                             if(index<filtered.lastIndex)HorizontalDivider(color=Border)
                         }
@@ -334,7 +344,8 @@ private fun Watchlist(open: (Stock) -> Unit, back: () -> Unit) {
                             Column(Modifier.weight(1f)) {
                                 Text(stock.name, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
                                 Text(stock.symbol, color = Muted, fontSize = 9.sp)
-                                Text(String.format(Locale.US, "KSh %.2f", stock.price), color = TextDark, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                Text(if (stock.price.isFinite()) String.format(Locale.US, "KSh %.2f", stock.price) else "Price unavailable", color = TextDark, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                Text(marketObservationShort(stock), color = Muted, fontSize = 7.sp)
                             }
                             Column(horizontalAlignment = Alignment.End) {
                                 if (stock.changeAvailable) {
@@ -967,7 +978,7 @@ private fun Paper() {
                             Row(Modifier.fillMaxWidth().clickable { selectedStock = stock; side = "BUY" }.padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Logo(stock.symbol, 36, stock.logoUrl); Spacer(Modifier.width(8.dp))
                                 Column(Modifier.weight(1f)) { Text(stock.symbol, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp); Text(stock.name, color = Muted, fontSize = 8.sp, maxLines = 1) }
-                                Column(horizontalAlignment = Alignment.End) { Text(formatPrice(stock.price), fontWeight = FontWeight.Bold, fontSize = 10.sp); Text((if (stock.change >= 0) "+" else "") + String.format(Locale.US, "%.2f%%", stock.change), color = if (stock.change >= 0) Green else Red, fontSize = 8.sp, fontWeight = FontWeight.Bold) }
+                                Column(horizontalAlignment = Alignment.End) { Text(if (stock.price.isFinite()) formatPrice(stock.price) else "Price unavailable", fontWeight = FontWeight.Bold, fontSize = 10.sp); if (stock.changeAvailable && stock.change.isFinite()) Text((if (stock.change >= 0) "+" else "") + String.format(Locale.US, "%.2f%%", stock.change), color = if (stock.change >= 0) Green else Red, fontSize = 8.sp, fontWeight = FontWeight.Bold) else Text("Daily change unavailable", color = Muted, fontSize = 8.sp) }
                             }
                             HorizontalDivider(color = Border)
                         }
