@@ -232,7 +232,15 @@ object MyStocksCache {
             val root = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
             val dataObject = root.optJSONObject("data")
             val rawContent = root.optString("content")
-            val payload = when { dataObject != null -> dataObject; rawContent.isNotBlank() -> JSONObject(rawContent); else -> root }
+            // The backend market endpoint wraps the provider response as { data: { stocks: [...] } }.
+            // Accept that envelope as well as the direct provider { stocks: [...] } shape.
+            val payload = when {
+                dataObject?.optJSONArray("stocks") != null -> dataObject
+                dataObject?.optJSONObject("data")?.optJSONArray("stocks") != null -> dataObject.optJSONObject("data")!!
+                rawContent.isNotBlank() -> JSONObject(rawContent)
+                root.optJSONArray("stocks") != null -> root
+                else -> dataObject ?: root
+            }
             val array = payload.optJSONArray("stocks") ?: return@runCatching emptyList()
             buildList {
                 for (i in 0 until array.length()) {
