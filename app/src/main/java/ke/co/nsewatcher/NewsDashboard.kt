@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -40,7 +41,7 @@ private val NewsMuted = Color(0xFF6C7A72)
 private val NewsBorder = Color(0xFFE1EAE5)
 private val TrendingRed = Color(0xFFE53935)
 private val TrendingRedLight = Color(0xFFFFE5E5)
-private const val NewsSkyline = "https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/Nairobi_City_County_Skyline.jpg/1280px-Nairobi_City_County_Skyline.jpg"
+
 
 private data class NewsMeta(val symbol: String, val company: String, val logo: String, val label: String)
 
@@ -224,12 +225,12 @@ private fun NewsDashboardFeatured(item: NewsItem, open: (NewsItem) -> Unit) {
     Card(Modifier.fillMaxWidth().height(200.dp).clickable { open(item) }, RoundedCornerShape(19.dp)) {
         Box(Modifier.fillMaxSize()) {
             AsyncImage(
-                model = NewsSkyline,
+                painter = painterResource(id = R.drawable.nairobi_city_county_skyline),
                 contentDescription = "Nairobi skyline",
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
             )
-            Box(Modifier.fillMaxSize().background(Color(0xA9083C27)))
+            Box(Modifier.fillMaxSize().background(Color(0x66083C27)))
             Column(
                 Modifier.fillMaxSize().padding(horizontal = 13.dp, vertical = 13.dp),
                 verticalArrangement = Arrangement.Center
