@@ -585,9 +585,9 @@ private fun ApprovedGlanceCard(
             Spacer(Modifier.height(27.dp))
             Row(Modifier.fillMaxWidth()) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(28.dp)) {
-                    ApprovedMetric(Icons.Default.ShowChart, "Previous close", previousClose?.let(::currencyLabel) ?: "Unavailable", phone = true)
-                    ApprovedMetric(Icons.Default.ArrowUpward, "Day high", high?.let(::currencyLabel) ?: "Unavailable", phone = true)
-                    ApprovedMetric(Icons.Default.AccessTime, "Latest observation", latest?.let(::currencyLabel) ?: "Unavailable", phone = true)
+                    ApprovedMetric(Icons.Default.ShowChart, "Previous close", previousClose?.let(::currencyLabel) ?: "Unavailable", phone = phone)
+                    ApprovedMetric(Icons.Default.ArrowUpward, "Day high", high?.let(::currencyLabel) ?: "Unavailable", phone = phone)
+                    ApprovedMetric(Icons.Default.AccessTime, "Latest observation", latest?.let(::currencyLabel) ?: "Unavailable", phone = phone)
                 }
                 VerticalDivider(Modifier.padding(horizontal = 25.dp).height(265.dp), color = Color(0xFF17364F))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(28.dp)) {
@@ -629,7 +629,8 @@ private fun ApprovedMovement(
     positive: Boolean?,
     label: String,
     value: String,
-    detail: String
+    detail: String,
+    phone: Boolean = false
 ) {
     val color = when (positive) {
         true -> Color(0xFF00D084)
@@ -645,15 +646,15 @@ private fun ApprovedMovement(
             },
             null,
             tint = color,
-            modifier = Modifier.size(34.dp)
+            modifier = Modifier.size(if (phone) 22.dp else 34.dp)
         )
-        Spacer(Modifier.width(17.dp))
+        Spacer(Modifier.width(if (phone) 8.dp else 17.dp))
         Column {
-            Text(label, color = color, fontSize = 12.sp)
-            Spacer(Modifier.height(4.dp))
-            Text(value, color = color, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
-            Spacer(Modifier.height(4.dp))
-            Text(detail, color = Color(0xFFA9BCD0), fontSize = 14.sp, lineHeight = 19.sp)
+            Text(label, color = color, fontSize = if (phone) 12.sp else 17.sp)
+            Spacer(Modifier.height(if (phone) 3.dp else 7.dp))
+            Text(value, color = color, fontSize = if (phone) 14.sp else 24.sp, fontWeight = FontWeight.ExtraBold)
+            Spacer(Modifier.height(if (phone) 3.dp else 7.dp))
+            Text(detail, color = Color(0xFFA9BCD0), fontSize = if (phone) 10.sp else 14.sp, lineHeight = if (phone) 14.sp else 19.sp)
         }
     }
 }
@@ -1188,9 +1189,9 @@ private fun MobileGlanceCard(
                     ApprovedMetric(Icons.Default.AccessTime, "Latest observation", latest?.let(::currencyLabel) ?: "Unavailable")
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(if (phone) 17.dp else 25.dp)) {
-                    ApprovedMetric(Icons.Default.ShowChart, "Today's open", open?.let(::currencyLabel) ?: "Unavailable", phone = true)
-                    ApprovedMetric(Icons.Default.ArrowDownward, "Day low", low?.let(::currencyLabel) ?: "Unavailable", phone = true)
-                    ApprovedMetric(Icons.Default.AccessTime, "Observed at", approvedObservedTime(observedAt), phone = true)
+                    ApprovedMetric(Icons.Default.ShowChart, "Today's open", open?.let(::currencyLabel) ?: "Unavailable", phone = phone)
+                    ApprovedMetric(Icons.Default.ArrowDownward, "Day low", low?.let(::currencyLabel) ?: "Unavailable", phone = phone)
+                    ApprovedMetric(Icons.Default.AccessTime, "Observed at", approvedObservedTime(observedAt), phone = phone)
                 }
             }
             Spacer(Modifier.height(if (phone) 15.dp else 22.dp))
@@ -1199,11 +1200,11 @@ private fun MobileGlanceCard(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Box(Modifier.weight(1f)) {
                     ApprovedMovement(dailyChange?.let { it >= 0 }, "Today's change", dailyChange?.let { String.format(Locale.US, "%+.2f%%", it) } ?: "Unavailable",
-                        previousClose?.let { "vs previous close (" + currencyLabel(it) + ")" } ?: "vs previous close")
+                        previousClose?.let { "vs previous close (" + currencyLabel(it) + ")" } ?: "vs previous close", phone = phone)
                 }
                 Box(Modifier.weight(1f)) {
                     ApprovedMovement(sinceOpen?.let { it >= 0 }, "Since open", sinceOpen?.let { String.format(Locale.US, "%+.2f%%", it) } ?: "Unavailable",
-                        if (open != null && latest != null) "(" + currencyLabel(open) + " → " + currencyLabel(latest) + ")" else "Open-to-latest unavailable")
+                        if (open != null && latest != null) "(" + currencyLabel(open) + " → " + currencyLabel(latest) + ")" else "Open-to-latest unavailable", phone = phone)
                 }
             }
         }
