@@ -10,6 +10,7 @@ import java.net.URL
 
 object MyStocksCache {
     private const val BACKEND_STOCKS_URL = "https://nse-watcher.vercel.app/api/market?action=stocks"
+    private const val BACKEND_COMPANIES_URL = "https://nse-watcher.vercel.app/api/market?action=companies"
     private const val BACKEND_STATUS_URL = "https://nse-watcher.vercel.app/api/market?action=status"
     private const val BACKEND_INDICES_URL = "https://nse-watcher.vercel.app/api/market?action=indices"
     private const val BACKEND_CHART_URL = "https://nse-watcher.vercel.app/api/market?action=chart"
@@ -128,6 +129,55 @@ object MyStocksCache {
                 )
             } finally { connection.disconnect() }
         }.getOrDefault(MarketStatus())
+    }
+
+    suspend fun loadCompanies(): List<Stock> = withContext(Dispatchers.IO) {
+        runCatching {
+            val connection = (URL(BACKEND_COMPANIES_URL).openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"; connectTimeout = 8_000; readTimeout = 8_000
+                setRequestProperty("Accept", "application/json")
+            }
+            try {
+                if (connection.responseCode !in 200..299) return@runCatching emptyList()
+                val root = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
+                val dataObject = root.optJSONObject("data")
+                val payload = when {
+                    dataObject?.optJSONArray("companies") != null -> dataObject
+                    dataObject?.optJSONObject("data")?.optJSONArray("companies") != null -> dataObject.optJSONObject("data")!!
+                    root.optJSONArray("companies") != null -> root
+                    else -> dataObject ?: root
+                }
+                val array = payload.optJSONArray("companies") ?: return@runCatching emptyList()
+                buildList {
+                    for (i in 0 until array.length()) {
+                        val item = array.optJSONObject(i) ?: continue
+                        val qualified = item.optString("symbol", "").trim()
+                        val name = item.optString("name", "").trim()
+                        if (qualified.isBlank() || name.isBlank()) continue
+                        val symbol = qualified.substringBefore('.')
+                        val sector = item.optString("sector", "Other").ifBlank { "Other" }
+                        val logoUrl = item.optString("logoUrl", "").takeIf { it.isNotBlank() }
+                        // Company discovery is deliberately independent of the delayed quote feed.
+                        // Price remains unavailable until a verified quote is loaded.
+                        add(
+                            Stock(
+                                symbol = symbol,
+                                name = name,
+                                price = Double.NaN,
+                                change = Double.NaN,
+                                history = emptyList(),
+                                logoUrl = logoUrl,
+                                sector = sector,
+                                changeAvailable = false,
+                                volumeAvailable = false,
+                                source = "MyStocks Africa company catalogue",
+                                dataOrigin = "company_catalog"
+                            )
+                        )
+                    }
+                }
+            } finally { connection.disconnect() }
+        }.getOrDefault(emptyList())
     }
 
     suspend fun loadStocks(): List<Stock> = withContext(Dispatchers.IO) {
