@@ -13,7 +13,6 @@ object MyStocksCache {
     private const val BACKEND_STATUS_URL = "https://nse-watcher.vercel.app/api/market?action=status"
     private const val BACKEND_INDICES_URL = "https://nse-watcher.vercel.app/api/market?action=indices"
     private const val BACKEND_CHART_URL = "https://nse-watcher.vercel.app/api/market?action=chart"
-    private const val FALLBACK_URL = "https://raw.githubusercontent.com/KEdev-jimmy/NSE-Watcher/main/data/mystocks/stocks.json"
 
     private val chartSymbols = setOf("SCOM", "KCB", "EQTY", "ABSA", "COOP", "EABL", "KPLC")
 
@@ -136,36 +135,17 @@ object MyStocksCache {
         try {
             val marketStatus = loadMarketStatus()
             val marketOpen = marketStatus.isOpen.takeIf { marketStatus.isKnown }
-            val backend = loadFromUrl(BACKEND_STOCKS_URL, "backend", marketOpen)
-            // Never silently substitute the static catalogue while the Nairobi
-            // continuous market is open. A fallback price can make a live market
-            // look frozen and can turn missing change data into misleading 0.00%.
-            // During a known closed session the catalogue remains useful for
-            // browsing, but it is explicitly marked as fallback data.
-            val base = when {
-                backend.isNotEmpty() -> backend
-                marketOpen == true -> emptyList()
-                else -> loadFromUrl(FALLBACK_URL, "fallback", marketOpen)
-            }
+            val base = loadFromUrl(BACKEND_STOCKS_URL, "backend", marketOpen)
+            // The market-data invariant is deliberately strict:
+            // every displayed security price must come from the provider's latest
+            // available delayed observation. Never replace it with a static catalogue
+            // price or with a chart candle that can have a different observation time.
             if (base.isEmpty()) {
                 MarketRefreshController.markFailed()
                 return@withContext emptyList()
             }
-            val refreshed = base.map { stock ->
-                if (stock.symbol in chartSymbols) {
-                    val history = loadHistoryDetails(stock.symbol, "1D")
-                    if (history.prices.size >= 2) {
-                        val latest = history.sessionClose?.takeIf { it.isFinite() && it > 0.0 }
-                            ?: history.prices.last()
-                        // The stock quote feed remains the source of the daily change.
-                        // Do not derive "today" change from the first chart observation:
-                        // the 1D chart now contains only actual intraday observations.
-                        stock.copy(price = latest, history = history.prices)
-                    } else stock
-                } else stock
-            }
             MarketRefreshController.markSucceeded()
-            refreshed
+            base
         } catch (_: Exception) {
             MarketRefreshController.markFailed()
             emptyList()
@@ -288,7 +268,7 @@ object MyStocksCache {
                     // The quote endpoint does not provide a time series, so never synthesize
                     // a two-point series from previousClose/price. Company Intelligence loads
                     // sourced history through loadHistoryDetails() instead.
-                    add(Stock(symbol, name, price, changePct, emptyList(), item.optString("logoUrl").takeIf { it.isNotBlank() }, item.optString("sector", "Other").ifBlank { "Other" }, volume, changeAvailable, volumeAvailable, source, observedAt, freshnessMode, dataOrigin, averageVolume, averageVolumeAvailable, previousClose.takeIf { it.isFinite() && it > 0.0 }))
+                    add(Stock(symbol, name, price, changePct, emptyList(), item.optString("logoUrl").takeIf { it.isNotBlank() }, item.optString("sector", "Other").ifBlank { "Other" }, volume, changeAvailable, volumeAvailable, source, observedAt, freshnessMode, dataOrigin, averageVolume, averageVolumeAvailable, previousClose.takeIf { it.isFinite() && it > 0.0 }, item.optInt("delayMinutes", root.optInt("delayMinutes", 15)).takeIf { it >= 0 }))
                 }
             }
         } finally { connection.disconnect() }
