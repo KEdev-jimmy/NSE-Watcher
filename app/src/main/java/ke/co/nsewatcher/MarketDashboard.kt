@@ -62,6 +62,8 @@ fun MarketDashboard(stockFeed: List<Stock>) {
     val period = MarketPeriods.firstOrNull { it.first == periodLabel } ?: MarketPeriods[1]
     var performances by remember { mutableStateOf<List<PeriodPerformance>>(emptyList()) }
     var loading by remember(period.second, stockFeed) { mutableStateOf(true) }
+    var marketStatus by remember { mutableStateOf(MyStocksCache.MarketStatus()) }
+    LaunchedEffect(Unit) { marketStatus = MyStocksCache.loadMarketStatus() }
 
     LaunchedEffect(period.second, stockFeed) {
         loading = true
@@ -132,7 +134,7 @@ fun MarketDashboard(stockFeed: List<Stock>) {
             }
 
             item {
-                MarketFreshnessStrip(stockFeed)
+                MarketFreshnessStrip(stockFeed, marketStatus)
             }
 
             item {
@@ -210,15 +212,10 @@ fun MarketDashboard(stockFeed: List<Stock>) {
 }
 
 @Composable
-private fun MarketFreshnessStrip(stocks: List<Stock>) {
+private fun MarketFreshnessStrip(stocks: List<Stock>, marketStatus: MyStocksCache.MarketStatus) {
     val valid = stocks.filter { it.price.isFinite() && it.price > 0.0 }
     val source = valid.map { it.source.trim() }.firstOrNull { it.isNotBlank() } ?: "Market source unavailable"
-    val freshness = when {
-        valid.any { it.freshnessMode == "CURRENT_SESSION" } -> "Current session"
-        valid.any { it.freshnessMode == "END_OF_DAY" } -> "End-of-day observation"
-        valid.any { it.freshnessMode == "STALE" } -> "Previous session"
-        else -> "Freshness unknown"
-    }
+    val newestObservedAt = valid.mapNotNull { it.observedAt.takeIf(String::isNotBlank)?.let(::parseObservationTime) }.maxOrNull()\n    val ageMinutes = newestObservedAt?.let { ((System.currentTimeMillis() - it.toEpochMilli()).coerceAtLeast(0L) / 60_000L) }\n    val freshness = when {\n        valid.isEmpty() -> "Data unavailable"\n        !marketStatus.isKnown -> "Freshness unknown"\n        !marketStatus.isOpen -> "Previous session"\n        newestObservedAt == null -> "Freshness unknown"\n        ageMinutes != null && ageMinutes > 30 -> "Stale • \${ageMinutes}m old"\n        ageMinutes != null -> "Delayed • \${ageMinutes}m old"\n        else -> "Freshness unknown"\n    }
     Surface(
         Modifier.fillMaxWidth(), RoundedCornerShape(12.dp),
         color = MarketCard,
@@ -235,7 +232,7 @@ private fun MarketFreshnessStrip(stocks: List<Stock>) {
                 Text(valid.size.toString() + " valid quotes", color = MarketBlue, fontSize = 8.sp)
             }
             Text(
-                "Source: $source • Historical rankings use the connected market-data feed.",
+                "${if (!marketStatus.isKnown) "Market status unavailable" else if (marketStatus.isOpen) "Market OPEN • provider feed is 15-minute delayed" else "Market CLOSED"} • Source: $source${ageMinutes?.let { " • latest observation ${it}m ago" } ?: ""}",
                 color = MarketBlue,
                 fontSize = 7.sp,
                 modifier = Modifier.padding(start = 21.dp, top = 3.dp)
@@ -243,6 +240,9 @@ private fun MarketFreshnessStrip(stocks: List<Stock>) {
         }
     }
 }
+
+@Composable
+private fun parseObservationTime(value: String): java.time.Instant? = runCatching { java.time.Instant.parse(value) }.getOrNull()
 
 @Composable
 private fun MarketHistoricalLoader(periodLabel: String) {
