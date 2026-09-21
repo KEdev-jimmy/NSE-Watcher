@@ -788,8 +788,16 @@ private fun ApprovedIntradayCanvas(
         val visiblePoints = points.mapIndexedNotNull { index, point ->
             if (!point.close.isFinite() || point.close <= 0.0) null
             else {
-                val minute = approvedChartMinutes(point.date)?.toFloat()
+                val rawMinute = approvedChartMinutes(point.date)?.toFloat()
                     ?: (sessionStartMinutes + sessionSpanMinutes * index / max(1, points.lastIndex))
+                // Keep provider timestamps that fall just outside the regular
+                // NSE session visible at the chart boundary. Some feeds stamp
+                // the final observation slightly beyond 15:00 EAT, but it is
+                // still the session's closing observation.
+                val minute = rawMinute.coerceIn(
+                    sessionStartMinutes.toFloat(),
+                    sessionEndMinutes.toFloat()
+                )
                 Triple(index, point, minute)
             }
         }
@@ -936,7 +944,14 @@ private fun ApprovedIntradayCanvas(
 
         fun drawMarker(point: MyStocksCache.HistoryPoint?, label: String, tint: Color, alignLeft: Boolean) {
             if (point == null || !point.close.isFinite() || point.close <= 0.0) return
-            val minute = approvedChartMinutes(point.date)?.toFloat() ?: return
+            val rawMinute = approvedChartMinutes(point.date)?.toFloat() ?: return
+            // At the normal 1D view, keep the OPEN/CLOSE marker attached to
+            // the chart even when the provider timestamp sits just outside
+            // the 09:30–15:00 session window.
+            val minute = rawMinute.coerceIn(
+                sessionStartMinutes.toFloat(),
+                sessionEndMinutes.toFloat()
+            )
             if (minute < visibleStart || minute > visibleEnd) return
             val x = xAtMinute(minute)
             val y = yAt(point.close)
