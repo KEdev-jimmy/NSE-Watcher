@@ -794,10 +794,7 @@ private fun ApprovedIntradayCanvas(
                 // NSE session visible at the chart boundary. Some feeds stamp
                 // the final observation slightly beyond 15:00 EAT, but it is
                 // still the session's closing observation.
-                val minute = rawMinute.coerceIn(
-                    sessionStartMinutes.toFloat(),
-                    sessionEndMinutes.toFloat()
-                )
+                val minute = (rawMinute - sessionStartMinutes).coerceIn(0f, sessionSpanMinutes)
                 Triple(index, point, minute)
             }
         }
@@ -948,10 +945,7 @@ private fun ApprovedIntradayCanvas(
             // At the normal 1D view, keep the OPEN/CLOSE marker attached to
             // the chart even when the provider timestamp sits just outside
             // the 09:30–15:00 session window.
-            val minute = rawMinute.coerceIn(
-                sessionStartMinutes.toFloat(),
-                sessionEndMinutes.toFloat()
-            )
+            val minute = (rawMinute - sessionStartMinutes).coerceIn(0f, sessionSpanMinutes)
             if (minute < visibleStart || minute > visibleEnd) return
             val x = xAtMinute(minute)
             val y = yAt(point.close)
@@ -1417,7 +1411,14 @@ private fun MobileChartCard(
     points: List<MyStocksCache.HistoryPoint>, previousClose: Double?, latest: Double?, loading: Boolean,
     edge: androidx.compose.ui.unit.Dp, phone: Boolean
 ) {
-    Surface(Modifier.padding(horizontal = edge).fillMaxWidth(), color = Color(0xFF0A1F32), shape = RoundedCornerShape(18.dp), border = BorderStroke(1.dp, Color(0xFF17364F))) {
+    var chartMode by rememberSaveable { mutableStateOf("Axis") }
+
+    Surface(
+        Modifier.padding(horizontal = edge).fillMaxWidth(),
+        color = Color(0xFF0A1F32),
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, Color(0xFF17364F))
+    ) {
         Column(Modifier.padding(if (phone) 15.dp else 24.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.ShowChart, null, tint = Color(0xFF19E7D0), modifier = Modifier.size(if (phone) 27.dp else 31.dp))
@@ -1426,31 +1427,288 @@ private fun MobileChartCard(
                 Box(Modifier.size(9.dp).clip(RoundedCornerShape(50)).background(Color(0xFF00D084)))
             }
             Text("NSE session 09:30 – 15:00 EAT", color = Color(0xFFA9BCD0), fontSize = 9.sp, modifier = Modifier.padding(start = 36.dp))
+
             Spacer(Modifier.height(10.dp))
+
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                listOf("Axis", "Candles").forEach { mode ->
+                    val active = chartMode == mode
+                    Surface(
+                        onClick = { chartMode = mode },
+                        shape = RoundedCornerShape(10.dp),
+                        color = if (active) Color(0xFF43E51B) else Color(0xFF10283D),
+                        border = BorderStroke(1.dp, if (active) Color(0xFF43E51B) else Color(0xFF21445E)),
+                        modifier = Modifier.height(if (phone) 36.dp else 40.dp)
+                    ) {
+                        Box(
+                            Modifier.padding(horizontal = if (phone) 16.dp else 20.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                mode,
+                                color = if (active) Color(0xFF061B10) else Color(0xFFA9BCD0),
+                                fontSize = if (phone) 11.sp else 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.weight(1f))
+                Text(
+                    if (chartMode == "Candles") "OHLC" else "Price",
+                    color = Color(0xFFA9BCD0),
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
+
             if (loading && points.isEmpty()) {
                 Box(Modifier.fillMaxWidth().height(if (phone) 220.dp else 300.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = Color(0xFF00D084), strokeWidth = 2.dp)
                 }
+            } else if (points.isEmpty()) {
+                Box(Modifier.fillMaxWidth().height(if (phone) 220.dp else 300.dp), contentAlignment = Alignment.Center) {
+                    Text("Intraday chart data unavailable.", color = Color(0xFFA9BCD0), fontSize = 12.sp)
+                }
             } else {
-                ApprovedIntradayCanvas(points, previousClose, latest, Modifier.fillMaxWidth().height(if (phone) 230.dp else 320.dp))
+                if (chartMode == "Candles") {
+                    ApprovedCandlestickCanvas(
+                        points = points,
+                        previousClose = previousClose,
+                        modifier = Modifier.fillMaxWidth().height(if (phone) 230.dp else 320.dp)
+                    )
+                } else {
+                    ApprovedIntradayCanvas(
+                        points = points,
+                        previousClose = previousClose,
+                        latest = latest,
+                        modifier = Modifier.fillMaxWidth().height(if (phone) 230.dp else 320.dp)
+                    )
+                }
             }
+
             Spacer(Modifier.height(10.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                ApprovedLegend(false, "NSE observations")
-                ApprovedLegend(true, "Previous close")
+
+            if (chartMode == "Candles") {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    ApprovedLegend(false, "Bullish / bearish OHLC")
+                    ApprovedLegend(true, "Previous close")
+                }
+            } else {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    ApprovedLegend(false, "NSE observations")
+                    ApprovedLegend(true, "Previous close")
+                }
             }
+
             Spacer(Modifier.height(10.dp))
-            Surface(Modifier.fillMaxWidth(), color = Color(0xFF10283D), shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, Color(0xFF17364F))) {
+            Surface(
+                Modifier.fillMaxWidth(),
+                color = Color(0xFF10283D),
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, Color(0xFF17364F))
+            ) {
                 Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Info, null, tint = Color(0xFFAFC2F0), modifier = Modifier.size(22.dp))
                     Spacer(Modifier.width(9.dp))
-                    Text("Actual NSE observations are plotted. Previous close is a reference line, not a trading observation.", color = Color(0xFFA9BCD0), fontSize = 10.sp, lineHeight = 14.sp, modifier = Modifier.weight(1f))
+                    Text(
+                        if (chartMode == "Candles")
+                            "Candles use the actual OHLC observations returned for the NSE session. Previous close is a reference line."
+                        else
+                            "The axis chart uses actual NSE observations. Previous close is a reference line, not a trading observation.",
+                        color = Color(0xFFA9BCD0), fontSize = 10.sp, lineHeight = 14.sp,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
             }
         }
     }
 }
 
+
+@Composable
+private fun ApprovedCandlestickCanvas(
+    points: List<MyStocksCache.HistoryPoint>,
+    previousClose: Double?,
+    modifier: Modifier
+) {
+    var zoom by remember(points.size) { mutableFloatStateOf(1f) }
+    var viewportStartMinutes by remember(points.size) { mutableFloatStateOf(0f) }
+
+    val sessionStartMinutes = 9 * 60 + 30
+    val sessionSpanMinutes = 330f
+
+    fun clampViewport(nextZoom: Float, nextStart: Float): Float {
+        val span = sessionSpanMinutes / nextZoom.coerceIn(1f, 4f)
+        return nextStart.coerceIn(0f, max(0f, sessionSpanMinutes - span))
+    }
+
+    val gestureModifier = modifier
+        .clipToBounds()
+        .pointerInput(points.size) {
+            detectTransformGestures { centroid, pan, gestureZoom, _ ->
+                val oldZoom = zoom
+                val newZoom = (zoom * gestureZoom).coerceIn(1f, 4f)
+                val width = size.width.toFloat().coerceAtLeast(1f)
+                val currentSpan = sessionSpanMinutes / oldZoom
+                val anchor = viewportStartMinutes + (centroid.x / width).coerceIn(0f, 1f) * currentSpan
+                val newSpan = sessionSpanMinutes / newZoom
+                val desired = anchor - (centroid.x / width).coerceIn(0f, 1f) * newSpan - (pan.x / width) * newSpan
+                zoom = newZoom
+                viewportStartMinutes = clampViewport(newZoom, desired)
+            }
+        }
+
+    Canvas(gestureModifier) {
+        val left = 50f
+        val right = 104f
+        val top = 18f
+        val bottom = 50f
+        val plotWidth = max(1f, size.width - left - right)
+        val plotHeight = max(1f, size.height - top - bottom)
+        val visibleSpan = sessionSpanMinutes / zoom
+        val visibleStart = viewportStartMinutes
+        val visibleEnd = visibleStart + visibleSpan
+
+        val plotted = points.mapIndexedNotNull { index, point ->
+            val o = point.open
+            val h = point.high
+            val l = point.low
+            if (o == null || h == null || l == null ||
+                !o.isFinite() || !h.isFinite() || !l.isFinite() ||
+                o <= 0.0 || h <= 0.0 || l <= 0.0
+            ) null
+            else {
+                val raw = approvedChartMinutes(point.date)?.toFloat() ?: return@mapIndexedNotNull null
+                val minute = (raw - sessionStartMinutes).coerceIn(0f, sessionSpanMinutes)
+                Triple(index, point, minute)
+            }
+        }
+
+        val values = plotted.flatMap { listOf(it.second.open!!, it.second.high!!, it.second.low!!, it.second.close) } +
+            listOfNotNull(previousClose)
+        if (values.isEmpty()) return@Canvas
+
+        val minValue = values.minOrNull() ?: 0.0
+        val maxValue = values.maxOrNull() ?: 1.0
+        val pad = max(0.05, (maxValue - minValue) * 0.08)
+        val yMin = minValue - pad
+        val yMax = maxValue + pad
+        val range = max(0.0001, yMax - yMin)
+
+        fun xAt(minute: Float): Float =
+            left + ((minute - visibleStart) / visibleSpan).coerceIn(0f, 1f) * plotWidth
+        fun yAt(value: Double): Float =
+            top + plotHeight - (((value - yMin) / range).toFloat() * plotHeight)
+
+        repeat(6) { i ->
+            val y = top + plotHeight * i / 5f
+            drawLine(Color(0xFF17364F), androidx.compose.ui.geometry.Offset(left, y),
+                androidx.compose.ui.geometry.Offset(left + plotWidth, y), 1f)
+        }
+
+        val tickStep = when {
+            zoom >= 3f -> 15f
+            zoom >= 1.8f -> 30f
+            else -> 60f
+        }
+        var tick = kotlin.math.ceil(visibleStart / tickStep) * tickStep
+        while (tick <= visibleEnd + 0.1f) {
+            val x = xAt(tick)
+            drawLine(Color(0xFF102B40), androidx.compose.ui.geometry.Offset(x, top),
+                androidx.compose.ui.geometry.Offset(x, top + plotHeight), 1f)
+            tick += tickStep
+        }
+
+        previousClose?.takeIf { it.isFinite() && it > 0.0 }?.let {
+            val y = yAt(it)
+            var x = left
+            while (x < left + plotWidth) {
+                drawLine(Color(0xFF8B78FF), androidx.compose.ui.geometry.Offset(x, y),
+                    androidx.compose.ui.geometry.Offset(min(x + 10f, left + plotWidth), y), 3f)
+                x += 16f
+            }
+        }
+
+        val visible = plotted.filter { it.third >= visibleStart - 1f && it.third <= visibleEnd + 1f }
+        val candleWidth = (plotWidth / max(12f, visible.size * 1.35f)).coerceIn(5f, 16f)
+
+        visible.forEach { (_, p, minute) ->
+            val o = p.open ?: return@forEach
+            val h = p.high ?: return@forEach
+            val l = p.low ?: return@forEach
+            val close = p.close
+            val x = xAt(minute)
+            val up = close >= o
+            val tint = if (up) Color(0xFF00D084) else Color(0xFFFF5C5C)
+
+            drawLine(
+                tint,
+                androidx.compose.ui.geometry.Offset(x, yAt(h)),
+                androidx.compose.ui.geometry.Offset(x, yAt(l)),
+                strokeWidth = 2.2f
+            )
+
+            val bodyTop = min(yAt(o), yAt(close))
+            val bodyBottom = max(yAt(o), yAt(close))
+            val bodyHeight = max(3f, bodyBottom - bodyTop)
+            drawRoundRect(
+                color = tint,
+                topLeft = androidx.compose.ui.geometry.Offset(x - candleWidth / 2f, bodyTop),
+                size = androidx.compose.ui.geometry.Size(candleWidth, bodyHeight),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(2f)
+            )
+        }
+
+        val scale = (0 until 6).map { i -> yMax - (yMax - yMin) * i / 5 }
+        scale.forEachIndexed { i, value ->
+            val y = top + plotHeight * i / 5f
+            drawContext.canvas.nativeCanvas.drawText(
+                String.format(Locale.US, "%.0f", value),
+                left - 10f, y + 5f,
+                android.graphics.Paint().apply {
+                    isAntiAlias = true
+                    color = android.graphics.Color.rgb(169,188,208)
+                    textSize = 14f
+                    textAlign = android.graphics.Paint.Align.RIGHT
+                }
+            )
+        }
+
+        var labelTick = kotlin.math.ceil(visibleStart / tickStep) * tickStep
+        while (labelTick <= visibleEnd + 0.1f) {
+            drawContext.canvas.nativeCanvas.drawText(
+                approvedMinuteLabel(sessionStartMinutes + labelTick),
+                xAt(labelTick), size.height - 12f,
+                android.graphics.Paint().apply {
+                    isAntiAlias = true
+                    color = android.graphics.Color.rgb(169,188,208)
+                    textSize = 12f
+                    textAlign = android.graphics.Paint.Align.CENTER
+                }
+            )
+            labelTick += tickStep
+        }
+
+        drawContext.canvas.nativeCanvas.drawText(
+            if (zoom > 1.05f) "Zoom " + String.format(Locale.US, "%.1fx", zoom) + " • pinch / drag to explore"
+            else "Pinch to zoom • drag to explore the session",
+            left + plotWidth / 2f, 12f,
+            android.graphics.Paint().apply {
+                isAntiAlias = true
+                color = android.graphics.Color.rgb(169,188,208)
+                textSize = 10f
+                textAlign = android.graphics.Paint.Align.CENTER
+            }
+        )
+    }
+}
 
 @Composable
 private fun SignalGroup(title: String, tint: Color, items: List<String>) {
