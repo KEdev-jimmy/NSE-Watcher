@@ -24,21 +24,21 @@ test('NSE exchange-map response is parsed instead of becoming UNKNOWN', () => {
         }
       }
     }),
-    { isOpen: true, status: 'OPEN', isKnown: true }
+    { isOpen: true, status: 'OPEN', isKnown: true, nextOpen: '2026-09-22T06:00:00.000Z', nextClose: '2026-09-21T12:00:00.000Z' }
   );
 });
 
 test('explicit provider isOpen=false is a known CLOSED state', () => {
   assert.deepEqual(
     normalizeMarketStatus({ isOpen: false }),
-    { isOpen: false, status: 'CLOSED', isKnown: true }
+    { isOpen: false, status: 'CLOSED', isKnown: true, nextOpen: null, nextClose: null }
   );
 });
 
 test('explicit provider isOpen=true is a known OPEN state', () => {
   assert.deepEqual(
     normalizeMarketStatus({ isOpen: true }),
-    { isOpen: true, status: 'OPEN', isKnown: true }
+    { isOpen: true, status: 'OPEN', isKnown: true, nextOpen: null, nextClose: null }
   );
 });
 
