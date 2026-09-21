@@ -152,7 +152,7 @@ function normalizeMarketStatus(raw) {
   // present. If they conflict, surface UNKNOWN rather than inventing a state.
   if (hasExplicitIsOpen && (statusOpen || statusClosed)) {
     if ((explicitIsOpen && statusClosed) || (!explicitIsOpen && statusOpen)) {
-      return { isOpen: false, status: 'UNKNOWN', isKnown: false, nextOpen: exchange?.nextOpen || null, nextClose: exchange?.nextClose || null };
+      return { isOpen: false, status: 'UNKNOWN', isKnown: false };
     }
     return {
       isOpen: explicitIsOpen,
@@ -173,10 +173,10 @@ function normalizeMarketStatus(raw) {
     };
   }
 
-  if (statusOpen) return { isOpen: true, status: 'OPEN', isKnown: true, nextOpen: exchange?.nextOpen || null, nextClose: exchange?.nextClose || null };
-  if (statusClosed) return { isOpen: false, status: 'CLOSED', isKnown: true, nextOpen: exchange?.nextOpen || null, nextClose: exchange?.nextClose || null };
+  if (statusOpen) return { isOpen: true, status: 'OPEN', isKnown: true };
+  if (statusClosed) return { isOpen: false, status: 'CLOSED', isKnown: true };
 
-  return { isOpen: false, status: 'UNKNOWN', isKnown: false, nextOpen: exchange?.nextOpen || null, nextClose: exchange?.nextClose || null };
+  return { isOpen: false, status: 'UNKNOWN', isKnown: false };
 }
 
 module.exports = async (req, res) => {
@@ -186,13 +186,14 @@ module.exports = async (req, res) => {
     if (action === 'status') {
       const data = await mystocks('/market/status');
       const normalized = normalizeMarketStatus(data);
+      const exchangeData = data?.exchanges?.NSE ?? data?.data?.exchanges?.NSE ?? data?.NSE ?? data?.data?.NSE ?? data;
       return json(res, 200, {
         source: 'MyStocks Africa', delayMinutes: null, fetchedAt: new Date().toISOString(),
         isOpen: normalized.isOpen,
         status: normalized.status,
         isKnown: normalized.isKnown,
-        nextOpen: normalized.nextOpen || null,
-        nextClose: normalized.nextClose || null,
+        nextOpen: exchangeData?.nextOpen || exchangeData?.nextSessionOpen || null,
+        nextClose: exchangeData?.nextClose || exchangeData?.nextSessionClose || null,
         data,
       });
     }
