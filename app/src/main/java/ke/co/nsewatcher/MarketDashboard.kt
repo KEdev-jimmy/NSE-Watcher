@@ -251,7 +251,6 @@ private fun MarketFreshnessStrip(stocks: List<Stock>, marketStatus: MyStocksCach
     }
 }
 
-@Composable
 private fun parseObservationTime(value: String): java.time.Instant? = runCatching { java.time.Instant.parse(value) }.getOrNull()
 
 @Composable
