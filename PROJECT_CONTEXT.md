@@ -2368,3 +2368,23 @@ About now identifies:
 - The chart legend now distinguishes **Previous close** from **Actual NSE observations**.
 - This preserves the important distinction for KCB-style data: a stock can open above the previous close and later trade below its opening price while still being positive versus the previous close.
 - Build/CI verification for commit `9044f5ab499aa93e57bf72d12e3609d9e6190eda` is pending; do not treat this implementation as build-verified until the workflow result is checked.
+
+
+# 2026-09-21 — Company Intelligence Reference Redesign
+
+- Replaced the active Company Intelligence overview presentation with the user's approved reference image layout.
+- The new overview is a dark navy NSE-style page with:
+  - Company Intelligence header, back control, notification and overflow icons.
+  - Company identity block with real company name, symbol, NSE label, sector, logo, latest available price and daily change versus previous close.
+  - Reference-style tabs: Overview, Financials, News, Analysis, About.
+  - **Today at a glance** card using the existing real provider/session data: previous close, today's open, day high, day low, latest observation, observed-at time, today's change and since-open movement.
+  - **1D Intraday Chart** using only actual returned history observations, with previous close rendered only as a reference line.
+  - Chart legend and provenance note matching the approved design language.
+  - Compact **Company Intelligence** entry card at the bottom.
+- Existing backend/data paths were preserved: CompanyIntelligenceCache, MyStocks history details, market refresh state, real previous-close/session observations and company profile data remain the source of displayed values.
+- The previous dense Company Intelligence dashboard is no longer the active rendered overview. Its old helper/code remains in the file temporarily so this visual pass stays surgical; it should not be reintroduced into the active overview without an explicit redesign decision.
+- The header back action remains wired to the existing navigation callback.
+- Source commits:
+  - 711ca950e716b1971bb24bd0b8ac483282c3740c — initial reference-layout implementation.
+  - 91aab72de35c9960b146cdcfdf7d2cf04aecda5f — restored header back navigation and dynamic sector handling.
+- Android CI run #893 for the final source commit is currently in progress; do not call this source build verified until that run completes successfully and the APK is checked where appropriate.
