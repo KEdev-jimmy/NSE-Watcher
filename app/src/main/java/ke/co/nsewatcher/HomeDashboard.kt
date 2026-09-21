@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -41,7 +42,7 @@ private val HomeTextDark = Color(0xFF12352A)
 private val HomeMuted = Color(0xFF64756D)
 private val HomeBorder = Color(0xFFDDE9E3)
 private val HomeRed = Color(0xFFE94A4A)
-private const val NairobiSkyline = "https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/Nairobi_City_County_Skyline.jpg/1280px-Nairobi_City_County_Skyline.jpg"
+
 
 @Composable
 fun HomeDashboard(
@@ -104,9 +105,9 @@ fun HomeDashboard(
 @Composable
 private fun HomeHero(advancing: Int, declining: Int, unchanged: Int, reportedVolume: Long, marketStatus: MyStocksCache.MarketStatus) {
     Box(Modifier.fillMaxWidth().height(300.dp).clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))) {
-        AsyncImage(model = NairobiSkyline, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-        Box(Modifier.fillMaxSize().background(Color(0xE609241C)))
-        Box(Modifier.fillMaxSize().background(Color(0x4000A859)))
+        Image(painter = painterResource(id = R.drawable.nairobi_city_county_skyline), contentDescription = "Nairobi skyline", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        Box(Modifier.fillMaxSize().background(Color(0x55061A13)))
+        Box(Modifier.fillMaxSize().background(Color(0x2500A859)))
         Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(42.dp).clip(RoundedCornerShape(13.dp)).background(HomeGreen), contentAlignment = Alignment.Center) { Icon(Icons.Default.ShowChart, null, tint = Color.White, modifier = Modifier.size(24.dp)) }
