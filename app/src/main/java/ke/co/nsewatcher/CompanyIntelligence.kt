@@ -398,6 +398,8 @@ private fun CompanySectionNavigation(
 @Composable
 private fun ApprovedCompanyOverview(
     stock: Stock,
+    back: () -> Unit,
+    sector: String,
     previousClose: Double?,
     open: Double?,
     dayHigh: Double?,
@@ -421,7 +423,8 @@ private fun ApprovedCompanyOverview(
                     stock = stock,
                     price = latest,
                     change = dailyChange,
-                    sector = "Banking and Financial Services"
+                    sector = sector,
+                    back = back
                 )
             }
 
@@ -484,13 +487,14 @@ private fun ApprovedCompanyHeader(
     stock: Stock,
     price: Double?,
     change: Double?,
-    sector: String
+    sector: String,
+    back: () -> Unit
 ) {
     Column(
         Modifier.fillMaxWidth().background(Color(0xFF071B2D)).padding(start = 36.dp, end = 36.dp, top = 18.dp)
     ) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { }) {
+            IconButton(onClick = back) {
                 Icon(Icons.Default.ArrowBack, "Back", tint = Color(0xFFF4F7FA), modifier = Modifier.size(30.dp))
             }
             Text("Company Intelligence", color = Color(0xFFF4F7FA), fontSize = 27.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
@@ -921,7 +925,9 @@ fun CompanyIntelligence(
     // The other existing intelligence sections remain available in the codebase
     // for the next targeted redesign pass.
     ApprovedCompanyOverview(
-        stock = s.copy(name = s.name.ifBlank { profile.name.ifBlank { s.symbol } }),
+        stock = s,
+        back = back,
+        sector = profile.sector.ifBlank { "Banking and Financial Services" },
         previousClose = previousClose,
         open = open,
         dayHigh = dayHigh,
