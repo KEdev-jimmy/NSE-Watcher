@@ -1188,7 +1188,7 @@ private fun MobileGlanceCard(
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(if (phone) 17.dp else 25.dp)) {
                     ApprovedMetric(Icons.Default.ShowChart, "Previous close", previousClose?.let(::currencyLabel) ?: "Unavailable", phone = phone)
                     ApprovedMetric(Icons.Default.ArrowUpward, "Day high", high?.let(::currencyLabel) ?: "Unavailable", phone = phone)
-                    ApprovedMetric(Icons.Default.AccessTime, "Latest observation", latest?.let(::currencyLabel) ?: "Unavailable", phone = phone)
+                    ApprovedMetric(Icons.Default.AccessTime, "Today's close", latest?.let(::currencyLabel) ?: "Unavailable", phone = phone)
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(if (phone) 17.dp else 25.dp)) {
                     ApprovedMetric(Icons.Default.ShowChart, "Today's open", open?.let(::currencyLabel) ?: "Unavailable", phone = phone)
@@ -1205,7 +1205,7 @@ private fun MobileGlanceCard(
                         previousClose?.let { "vs previous close (" + currencyLabel(it) + ")" } ?: "vs previous close", phone = phone)
                 }
                 Box(Modifier.weight(1f)) {
-                    ApprovedMovement(sinceOpen?.let { it >= 0 }, "Since open", sinceOpen?.let { String.format(Locale.US, "%+.2f%%", it) } ?: "Unavailable",
+                    ApprovedMovement(sinceOpen?.let { it >= 0 }, "Since open today", sinceOpen?.let { String.format(Locale.US, "%+.2f%%", it) } ?: "Unavailable",
                         if (open != null && latest != null) "(" + currencyLabel(open) + " → " + currencyLabel(latest) + ")" else "Open-to-latest unavailable", phone = phone)
                 }
             }
