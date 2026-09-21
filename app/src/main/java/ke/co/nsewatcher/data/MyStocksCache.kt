@@ -88,16 +88,34 @@ object MyStocksCache {
             try {
                 if (connection.responseCode !in 200..299) return@runCatching MarketStatus()
                 val root = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
-                val rawStatus = root.optString("status", "").trim()
+                // Accept both our normalized backend shape and the provider's
+                // exchange-map shape. This keeps the Android client resilient
+                // during backend rollout and prevents a valid NSE OPEN response
+                // from becoming UNKNOWN.
+                val exchange = root.optJSONObject("exchanges")?.optJSONObject("NSE")
+                    ?: root.optJSONObject("data")?.optJSONObject("exchanges")?.optJSONObject("NSE")
+                    ?: root.optJSONObject("NSE")
+                    ?: root.optJSONObject("data")?.optJSONObject("NSE")
+                val statusSource = exchange ?: root
+                val rawStatus = statusSource.optString("status", "")
+                    .ifBlank { statusSource.optString("marketStatus", "") }
+                    .ifBlank { statusSource.optString("state", "") }
+                    .trim()
                 val status = when (rawStatus.uppercase()) {
                     "OPEN", "TRADING" -> "OPEN"
                     "CLOSED", "NOT_TRADING" -> "CLOSED"
                     else -> "UNKNOWN"
                 }
-                val hasExplicitIsOpen = root.has("isOpen") && !root.isNull("isOpen")
-                val explicitIsOpen = if (hasExplicitIsOpen) root.optBoolean("isOpen") else null
-                val isKnown = root.optBoolean("isKnown", false) &&
-                    status != "UNKNOWN"
+                val hasExplicitIsOpen = statusSource.has("isOpen") && !statusSource.isNull("isOpen")
+                val explicitIsOpen = if (hasExplicitIsOpen) statusSource.optBoolean("isOpen") else null
+                val normalizedKnown = root.optBoolean("isKnown", false)
+                val isKnown = if (exchange != null) {
+                    hasExplicitIsOpen && status != "UNKNOWN" &&
+                        ((explicitIsOpen == true && status == "OPEN") ||
+                         (explicitIsOpen == false && status == "CLOSED"))
+                } else {
+                    normalizedKnown && status != "UNKNOWN"
+                }
 
                 MarketStatus(
                     isOpen = when {
@@ -105,8 +123,8 @@ object MyStocksCache {
                         else -> false
                     },
                     status = if (isKnown) status else "UNKNOWN",
-                    nextOpen = root.optString("nextOpen", ""),
-                    nextClose = root.optString("nextClose", ""),
+                    nextOpen = statusSource.optString("nextOpen", ""),
+                    nextClose = statusSource.optString("nextClose", ""),
                     isKnown = isKnown
                 )
             } finally { connection.disconnect() }
