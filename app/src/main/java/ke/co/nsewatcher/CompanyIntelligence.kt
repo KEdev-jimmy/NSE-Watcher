@@ -170,7 +170,7 @@ private fun CompanyNewsSection(
                     Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Surface(Modifier.size(42.dp), RoundedCornerShape(12.dp), color = IntelligenceLight) {
+                    Surface(Modifier.size(42.dp), RoundedCornerShape(12.dp), color = Color(0xFF10283D)) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(Icons.Default.Newspaper, null, tint = IntelligenceGreen)
                         }
@@ -181,7 +181,7 @@ private fun CompanyNewsSection(
                         Spacer(Modifier.height(3.dp))
                         Text(
                             "No articles or corporate events were returned by the current feed.",
-                            color = IntelligenceMuted,
+                            color = Color(0xFFA9BCD0),
                             fontSize = 9.sp,
                             lineHeight = 13.sp
                         )
@@ -215,7 +215,7 @@ private fun CompanyNewsSection(
                         Surface(
                             Modifier.fillMaxWidth().height(74.dp),
                             RoundedCornerShape(14.dp),
-                            color = IntelligenceLight
+                            color = Color(0xFF10283D)
                         ) {
                             Row(
                                 Modifier.fillMaxSize().padding(horizontal = 14.dp),
@@ -223,7 +223,7 @@ private fun CompanyNewsSection(
                             ) {
                                 Icon(Icons.Default.Newspaper, null, tint = IntelligenceGreen, modifier = Modifier.size(30.dp))
                                 Spacer(Modifier.width(10.dp))
-                                Text("Company intelligence update", color = IntelligenceDark, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                Text("Company intelligence update", color = Color(0xFFF4F7FA), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                         Spacer(Modifier.height(10.dp))
@@ -237,12 +237,12 @@ private fun CompanyNewsSection(
                             fontWeight = FontWeight.ExtraBold
                         )
                         Spacer(Modifier.width(7.dp))
-                        Text(formatCompanyNewsDate(featured.publishedAt), color = IntelligenceMuted, fontSize = 8.sp)
+                        Text(formatCompanyNewsDate(featured.publishedAt), color = Color(0xFFA9BCD0), fontSize = 8.sp)
                     }
                     Spacer(Modifier.height(5.dp))
                     Text(
                         featured.title,
-                        color = IntelligenceText,
+                        color = Color(0xFFF4F7FA),
                         fontSize = 15.sp,
                         lineHeight = 19.sp,
                         fontWeight = FontWeight.ExtraBold,
@@ -252,7 +252,7 @@ private fun CompanyNewsSection(
                         Spacer(Modifier.height(6.dp))
                         Text(
                             featured.summary,
-                            color = IntelligenceMuted,
+                            color = Color(0xFFA9BCD0),
                             fontSize = 9.sp,
                             lineHeight = 14.sp,
                             maxLines = 3
@@ -278,8 +278,8 @@ private fun CompanyNewsSection(
                         enabled = article.url.isNotBlank(),
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp),
-                        color = Color.White,
-                        border = BorderStroke(1.dp, IntelligenceBorder)
+                        color = Color(0xFF0A1F32),
+                        border = BorderStroke(1.dp, Color(0xFF17364F))
                     ) {
                         Row(Modifier.fillMaxWidth().padding(11.dp), verticalAlignment = Alignment.Top) {
                             if (article.imageUrl.isNotBlank()) {
@@ -290,7 +290,7 @@ private fun CompanyNewsSection(
                                     contentScale = ContentScale.Crop
                                 )
                             } else {
-                                Surface(Modifier.size(72.dp), RoundedCornerShape(10.dp), color = IntelligenceLight) {
+                                Surface(Modifier.size(72.dp), RoundedCornerShape(10.dp), color = Color(0xFF10283D)) {
                                     Box(contentAlignment = Alignment.Center) {
                                         Icon(Icons.Default.Article, null, tint = IntelligenceGreen)
                                     }
@@ -307,12 +307,12 @@ private fun CompanyNewsSection(
                                         maxLines = 1
                                     )
                                     Spacer(Modifier.width(6.dp))
-                                    Text(formatCompanyNewsDate(article.publishedAt), color = IntelligenceMuted, fontSize = 7.sp, maxLines = 1)
+                                    Text(formatCompanyNewsDate(article.publishedAt), color = Color(0xFFA9BCD0), fontSize = 7.sp, maxLines = 1)
                                 }
                                 Spacer(Modifier.height(4.dp))
                                 Text(
                                     article.title,
-                                    color = IntelligenceText,
+                                    color = Color(0xFFF4F7FA),
                                     fontSize = 10.sp,
                                     lineHeight = 14.sp,
                                     fontWeight = FontWeight.Bold,
@@ -320,11 +320,11 @@ private fun CompanyNewsSection(
                                 )
                                 if (article.source.isNotBlank()) {
                                     Spacer(Modifier.height(4.dp))
-                                    Text(article.source, color = IntelligenceMuted, fontSize = 7.sp, maxLines = 1)
+                                    Text(article.source, color = Color(0xFFA9BCD0), fontSize = 7.sp, maxLines = 1)
                                 }
                             }
                             if (article.url.isNotBlank()) {
-                                Icon(Icons.Default.OpenInNew, contentDescription = "Open article", tint = IntelligenceMuted, modifier = Modifier.size(15.dp))
+                                Icon(Icons.Default.OpenInNew, contentDescription = "Open article", tint = Color(0xFFA9BCD0), modifier = Modifier.size(15.dp))
                             }
                         }
                     }
@@ -334,7 +334,7 @@ private fun CompanyNewsSection(
                     Spacer(Modifier.height(7.dp))
                     Text(
                         "+\${news.size - 5} more stories available in the company news feed",
-                        color = IntelligenceMuted,
+                        color = Color(0xFFA9BCD0),
                         fontSize = 8.sp,
                         modifier = Modifier.fillMaxWidth(),
                         textAlign = TextAlign.Center
@@ -1177,7 +1177,7 @@ private fun MobileGlanceCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.ShowChart, null, tint = Color(0xFF19E7D0), modifier = Modifier.size(if (phone) 27.dp else 33.dp))
                 Spacer(Modifier.width(10.dp))
-                Text("Today at a glance", color = Color.White, fontSize = if (phone) 20.sp else 26.sp, fontWeight = FontWeight.ExtraBold)
+                Text("Today at a glance", color = Color.White, fontSize = if (phone) 18.sp else 26.sp, fontWeight = FontWeight.ExtraBold)
             }
             Spacer(Modifier.height(if (phone) 18.dp else 25.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(if (phone) 8.dp else 22.dp)) {
@@ -1318,18 +1318,18 @@ private fun MetricGrid(
                         sources.size == 1 -> sources.first().removePrefix("StockAnalysis / ").removeSuffix(" Market Intelligence")
                         else -> "Source unavailable"
                     }
-                    Surface(Modifier.weight(1f), RoundedCornerShape(13.dp), color = IntelligenceLight) {
+                    Surface(Modifier.weight(1f), RoundedCornerShape(13.dp), color = Color(0xFF10283D), border = BorderStroke(1.dp, Color(0xFF17364F))) {
                         Column(Modifier.padding(10.dp)) {
-                            Text(label, color = IntelligenceMuted, fontSize = 8.sp)
-                            Text(value, color = IntelligenceText, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+                            Text(label, color = Color(0xFFA9BCD0), fontSize = 8.sp)
+                            Text(value, color = Color(0xFFF4F7FA), fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
                             Spacer(Modifier.height(4.dp))
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
-                                color = IntelligenceLight.copy(alpha = 0.7f)
+                                color = Color(0xFF17364F)
                             ) {
                                 Text(
                                     provenance,
-                                    color = if (quality == "CONFLICT") IntelligenceRed else IntelligenceMuted,
+                                    color = if (quality == "CONFLICT") IntelligenceRed else Color(0xFFA9BCD0),
                                     fontSize = 7.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     maxLines = 1
