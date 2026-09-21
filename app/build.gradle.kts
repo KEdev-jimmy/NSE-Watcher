@@ -1,3 +1,5 @@
+import java.net.URI
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -72,7 +74,7 @@ val downloadNairobiSkyline by tasks.registering {
         val target = outputFile.get().asFile
         if (!target.exists() || target.length() < 10_000L) {
             target.parentFile.mkdirs()
-            val source = java.net.URI(
+            val source = URI(
                 "https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/Nairobi_City_County_Skyline.jpg/1280px-Nairobi_City_County_Skyline.jpg"
             ).toURL()
 
