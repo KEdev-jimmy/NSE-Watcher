@@ -730,9 +730,10 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
                     IntelligenceLoader("Loading $period market history", "Checking historical NSE data…")
                 } else if (history.size >= 2) {
                     IntelligenceChart(
-                        history,
-                        if (period == "NOW") "1D" else period,
-                        if ((selectedPeriodReturn ?: s.change) >= 0) IntelligenceGreen else IntelligenceRed
+                        points = history,
+                        period = if (period == "NOW") "1D" else period,
+                        tint = if ((selectedPeriodReturn ?: s.change) >= 0) IntelligenceGreen else IntelligenceRed,
+                        previousClose = s.previousClose
                     )
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text("${history.size} data points", color = IntelligenceMuted, fontSize = 8.sp)
@@ -1151,10 +1152,19 @@ private fun IntelligenceLoader(title: String, subtitle: String) {
 private fun IntelligenceChart(
     points: List<MyStocksCache.HistoryPoint>,
     period: String,
-    tint: Color
+    tint: Color,
+    previousClose: Double? = null
 ) {
-    val valid = points.filter { it.close.isFinite() && it.close > 0.0 }
-    if (valid.size < 2) return
+    val actualValid = points.filter { it.close.isFinite() && it.close > 0.0 }
+    if (actualValid.size < 2) return
+
+    // For 1D, anchor the visual at the previous trading-session close.
+    // The remaining points are untouched, exchange-supplied intraday observations.
+    val valid = if (period == "1D" && previousClose != null && previousClose.isFinite() && previousClose > 0.0) {
+        listOf(MyStocksCache.HistoryPoint(previousClose, actualValid.first().date)) + actualValid
+    } else {
+        actualValid
+    }
 
     val min = valid.minOf { it.close }
     val max = valid.maxOf { it.close }
@@ -1368,6 +1378,11 @@ private fun SessionAtGlance(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    stock.previousClose?.takeIf { it > 0.0 }?.let {
+                        Box(Modifier.weight(1f)) {
+                            MiniFact("PREVIOUS CLOSE", String.format(Locale.US, "KSh %.2f", it))
+                        }
+                    }
                     open?.takeIf { it > 0.0 }?.let {
                         Box(Modifier.weight(1f)) {
                             MiniFact("OPEN", String.format(Locale.US, "KSh %.2f", it))
@@ -1403,13 +1418,13 @@ private fun SessionAtGlance(
                     fontWeight = FontWeight.ExtraBold
                 )
                 sessionDate?.let {
-                    Text("Closed: $it", color = IntelligenceMuted, fontSize = 9.sp)
+                    Text("Last completed NSE trading session • $it", color = IntelligenceMuted, fontSize = 9.sp)
                 }
                 observed?.let {
                     Text("Latest available observation: $it • 15 min delayed", color = IntelligenceMuted, fontSize = 8.sp)
                 }
                 Text(
-                    "Latest available price ${String.format(Locale.US, "KSh %.2f", latest)}",
+                    "Latest available session price ${String.format(Locale.US, "KSh %.2f", latest)}",
                     color = IntelligenceText,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.ExtraBold
