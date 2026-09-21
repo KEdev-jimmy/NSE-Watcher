@@ -224,12 +224,6 @@ private fun NewsDashboardFeatured(item: NewsItem, open: (NewsItem) -> Unit) {
     val meta = dashboardNewsMeta(item)
     Card(Modifier.fillMaxWidth().height(200.dp).clickable { open(item) }, RoundedCornerShape(19.dp)) {
         Box(Modifier.fillMaxSize()) {
-            AsyncImage(
-                painter = painterResource(id = R.drawable.nairobi_city_county_skyline),
-                contentDescription = "Nairobi skyline",
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
             Box(Modifier.fillMaxSize().background(Color(0x66083C27)))
             Column(
                 Modifier.fillMaxSize().padding(horizontal = 13.dp, vertical = 13.dp),
