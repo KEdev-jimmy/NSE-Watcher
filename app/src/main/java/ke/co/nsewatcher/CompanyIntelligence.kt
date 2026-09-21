@@ -890,11 +890,18 @@ fun CompanyIntelligence(
     var historyResult by remember(s.symbol) { mutableStateOf(MyStocksCache.HistoryResult()) }
     var marketStatus by remember(s.symbol) { mutableStateOf(MyStocksCache.MarketStatus()) }
     var intelligence by remember(s.symbol) { mutableStateOf(CompanyIntelligenceCache.Result()) }
+    var companyNews by remember(s.symbol) { mutableStateOf<List<NewsItem>>(emptyList()) }
+    var newsLoading by remember(s.symbol) { mutableStateOf(false) }
     var historyLoading by remember(s.symbol) { mutableStateOf(true) }
     val lastMarketRefreshMs = MarketRefreshController.state.value.lastSuccessfulRefreshMs
 
     LaunchedEffect(s.symbol) {
         intelligence = CompanyIntelligenceCache.load(s.symbol)
+    }
+    LaunchedEffect(s.symbol) {
+        newsLoading = true
+        companyNews = NewsCache.loadCompanyNews(s.symbol).items
+        newsLoading = false
     }
 
     LaunchedEffect(s.symbol) {
@@ -940,10 +947,12 @@ fun CompanyIntelligence(
     // data path, but do not reintroduce the previous dense intelligence dashboard.
     // The other existing intelligence sections remain available in the codebase
     // for the next targeted redesign pass.
-    ApprovedCompanyOverview(
+    MobileCompanyIntelligenceLayout(
         stock = s,
         back = back,
-        sector = profile.sector.ifBlank { "Banking and Financial Services" },
+        profile = intelligence.profile,
+        intelligence = intelligence,
+        points = points,
         previousClose = previousClose,
         open = open,
         dayHigh = dayHigh,
@@ -952,9 +961,291 @@ fun CompanyIntelligence(
         observedAt = observedAt,
         dailyChange = dailyChange,
         sinceOpen = sinceOpen,
-        points = points,
-        loading = historyLoading
+        historyLoading = historyLoading,
+        news = companyNews,
+        newsLoading = newsLoading
     )
+}
+
+
+@Composable
+private fun MobileCompanyIntelligenceLayout(
+    stock: Stock,
+    back: () -> Unit,
+    profile: CompanyIntelligenceCache.Profile,
+    intelligence: CompanyIntelligenceCache.Result,
+    points: List<MyStocksCache.HistoryPoint>,
+    previousClose: Double?,
+    open: Double?,
+    dayHigh: Double?,
+    dayLow: Double?,
+    latest: Double?,
+    observedAt: String,
+    dailyChange: Double?,
+    sinceOpen: Double?,
+    historyLoading: Boolean,
+    news: List<NewsItem>,
+    newsLoading: Boolean
+) {
+    var selected by rememberSaveable(stock.symbol) { mutableStateOf("Overview") }
+
+    BoxWithConstraints(Modifier.fillMaxSize().background(Color(0xFF061625))) {
+        val phone = maxWidth < 600.dp
+        val edge = if (phone) 12.dp else 28.dp
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(if (phone) 12.dp else 18.dp)
+        ) {
+            item {
+                Column(
+                    Modifier.fillMaxWidth().background(Color(0xFF071B2D))
+                        .padding(horizontal = if (phone) 14.dp else 28.dp, vertical = if (phone) 8.dp else 16.dp)
+                ) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = back, modifier = Modifier.size(42.dp)) {
+                            Icon(Icons.Default.ArrowBack, "Back", tint = Color.White)
+                        }
+                        Text("Company Intelligence", Modifier.weight(1f), color = Color.White,
+                            fontSize = if (phone) 20.sp else 26.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
+                        Box(Modifier.size(28.dp)) {
+                            Icon(Icons.Default.NotificationsNone, "Notifications", tint = Color.White, modifier = Modifier.size(25.dp))
+                            Box(Modifier.align(Alignment.TopEnd).size(8.dp).clip(RoundedCornerShape(50)).background(Color(0xFFFF4650)))
+                        }
+                        Icon(Icons.Default.MoreVert, "More", tint = Color.White, modifier = Modifier.size(25.dp))
+                    }
+                    Spacer(Modifier.height(if (phone) 10.dp else 18.dp))
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        CompanyLogo(stock.symbol, if (phone) 62 else 92, stock.logoUrl)
+                        Spacer(Modifier.width(if (phone) 12.dp else 20.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(stock.name, color = Color.White, fontSize = if (phone) 20.sp else 28.sp, fontWeight = FontWeight.ExtraBold, maxLines = 2)
+                            Text(stock.symbol + "  •  NSE", color = Color(0xFFA9BCD0), fontSize = if (phone) 12.sp else 16.sp)
+                            Text(profile.sector.ifBlank { "Banking and Financial Services" }, color = Color(0xFFA9BCD0), fontSize = if (phone) 11.sp else 15.sp, maxLines = 2)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(latest?.let(::currencyLabel) ?: "Unavailable", color = Color.White, fontSize = if (phone) 19.sp else 25.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
+                            dailyChange?.let {
+                                Text(String.format(Locale.US, "%+.2f%%", it), color = if (it >= 0) Color(0xFF00D084) else Color(0xFFFF4D55), fontSize = if (phone) 16.sp else 20.sp, fontWeight = FontWeight.ExtraBold)
+                            }
+                            Text("vs previous close", color = Color(0xFFA9BCD0), fontSize = if (phone) 9.sp else 12.sp)
+                        }
+                    }
+                }
+            }
+
+            item {
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                        .background(Color(0xFF071B2D))
+                        .padding(horizontal = edge, vertical = 5.dp),
+                    horizontalArrangement = Arrangement.spacedBy(if (phone) 7.dp else 16.dp)
+                ) {
+                    listOf("Overview", "Financials", "News", "Analysis", "About").forEach { tab ->
+                        val active = selected == tab
+                        Surface(
+                            onClick = { selected = tab },
+                            color = if (active) Color(0xFF43E51B) else Color.Transparent,
+                            shape = RoundedCornerShape(22.dp),
+                            modifier = Modifier.height(if (phone) 40.dp else 48.dp)
+                        ) {
+                            Box(Modifier.padding(horizontal = if (active) 16.dp else 5.dp), contentAlignment = Alignment.Center) {
+                                Text(tab, color = if (active) Color(0xFF061B10) else Color(0xFFA9BCD0),
+                                    fontSize = if (phone) 13.sp else 16.sp,
+                                    fontWeight = if (active) FontWeight.Bold else FontWeight.SemiBold, maxLines = 1)
+                            }
+                        }
+                    }
+                }
+                HorizontalDivider(color = Color(0xFF12283B))
+            }
+
+            when (selected) {
+                "Overview" -> {
+                    item { MobileGlanceCard(previousClose, open, dayHigh, dayLow, latest, observedAt, dailyChange, sinceOpen, edge, phone) }
+                    item { MobileChartCard(points, previousClose, latest, historyLoading, edge, phone) }
+                    item {
+                        Surface(
+                            onClick = { },
+                            modifier = Modifier.padding(horizontal = edge).fillMaxWidth(),
+                            color = Color(0xFF0A1F32), shape = RoundedCornerShape(18.dp),
+                            border = BorderStroke(1.dp, Color(0xFF17364F))
+                        ) {
+                            Row(Modifier.padding(if (phone) 16.dp else 24.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Surface(Modifier.size(if (phone) 44.dp else 54.dp), RoundedCornerShape(50), color = Color(0xFF102D28), border = BorderStroke(1.dp, Color(0xFF1E5B45))) {
+                                    Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Psychology, null, tint = Color(0xFF00D084), modifier = Modifier.size(if (phone) 27.dp else 32.dp)) }
+                                }
+                                Spacer(Modifier.width(if (phone) 13.dp else 20.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text("Company Intelligence", color = Color.White, fontSize = if (phone) 18.sp else 23.sp, fontWeight = FontWeight.ExtraBold)
+                                    Text("Financials, sourced evidence and key information about " + stock.name + ".", color = Color(0xFFA9BCD0), fontSize = if (phone) 11.sp else 14.sp, lineHeight = 17.sp)
+                                }
+                                Text("›", color = Color(0xFFA9BCD0), fontSize = 32.sp)
+                            }
+                        }
+                    }
+                }
+                "Financials" -> item {
+                    Surface(Modifier.padding(horizontal = edge).fillMaxWidth(), color = Color(0xFF0A1F32), shape = RoundedCornerShape(18.dp), border = BorderStroke(1.dp, Color(0xFF17364F))) {
+                        Column(Modifier.padding(if (phone) 15.dp else 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text("Financials", color = Color.White, fontSize = if (phone) 21.sp else 26.sp, fontWeight = FontWeight.ExtraBold)
+                            Text("Sourced financial information, ratios and dividends.", color = Color(0xFFA9BCD0), fontSize = 12.sp)
+                            MetricGrid(
+                                listOf(
+                                    "Revenue" to profile.revenue.ifBlank { "Unavailable" },
+                                    "Profit" to profile.profit.ifBlank { "Unavailable" },
+                                    "EPS (Earnings Per Share)" to profile.eps.ifBlank { "Unavailable" },
+                                    "ROE (Return on Equity)" to profile.roe.ifBlank { "Unavailable" },
+                                    "Debt / Equity" to profile.debtToEquity.ifBlank { "Unavailable" },
+                                    "Net margin" to profile.margin.ifBlank { "Unavailable" },
+                                    "P/E (Price-to-Earnings)" to profile.pe.ifBlank { "Unavailable" },
+                                    "P/B (Price-to-Book)" to profile.pb.ifBlank { "Unavailable" },
+                                    "Dividend yield" to profile.dividendYield.ifBlank { "Unavailable" },
+                                    "Market cap" to profile.marketCap.ifBlank { "Unavailable" }
+                                ), intelligence.fieldSources, intelligence.fieldQuality
+                            )
+                            if (intelligence.dividends.isNotEmpty()) {
+                                HorizontalDivider(color = Color(0xFF17364F))
+                                Text("Dividends", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                                intelligence.dividends.take(6).forEach { d ->
+                                    Text(d.amount.ifBlank { "Amount unavailable" } + " • " + d.status.ifBlank { "Status unavailable" } + " • Ex-date " + d.exDate.ifBlank { "Unavailable" }, color = Color(0xFFA9BCD0), fontSize = 11.sp, lineHeight = 16.sp)
+                                }
+                            }
+                            if (intelligence.financialHistory.isNotEmpty()) {
+                                HorizontalDivider(color = Color(0xFF17364F))
+                                Text("Financial history", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                                intelligence.financialHistory.takeLast(6).forEach { f ->
+                                    Text(f.period + " • Revenue " + f.revenue + " • Profit " + f.profit + " • EPS " + f.eps, color = Color(0xFFA9BCD0), fontSize = 10.sp, lineHeight = 15.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+                "News" -> item { CompanyNewsSection(news, newsLoading) }
+                "Analysis" -> item {
+                    Surface(Modifier.padding(horizontal = edge).fillMaxWidth(), color = Color(0xFF0A1F32), shape = RoundedCornerShape(18.dp), border = BorderStroke(1.dp, Color(0xFF17364F))) {
+                        Column(Modifier.padding(if (phone) 15.dp else 24.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text("Analysis", color = Color.White, fontSize = if (phone) 21.sp else 26.sp, fontWeight = FontWeight.ExtraBold)
+                            Text("Data-backed observations from the currently available company and market fields.", color = Color(0xFFA9BCD0), fontSize = 12.sp, lineHeight = 17.sp)
+                            EvidenceRow("Latest", latest?.let(::currencyLabel) ?: "Unavailable")
+                            EvidenceRow("Previous close", previousClose?.let(::currencyLabel) ?: "Unavailable")
+                            EvidenceRow("Today's change", dailyChange?.let { String.format(Locale.US, "%+.2f%%", it) } ?: "Unavailable")
+                            EvidenceRow("Since open", sinceOpen?.let { String.format(Locale.US, "%+.2f%%", it) } ?: "Unavailable")
+                            EvidenceRow("P/E", profile.pe.ifBlank { "Unavailable" })
+                            EvidenceRow("ROE", profile.roe.ifBlank { "Unavailable" })
+                            EvidenceRow("Net margin", profile.margin.ifBlank { "Unavailable" })
+                            HorizontalDivider(color = Color(0xFF17364F))
+                            Text("Evidence", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                            if (intelligence.evidence.isEmpty()) {
+                                Text("No additional evidence records are available.", color = Color(0xFFA9BCD0), fontSize = 11.sp)
+                            } else {
+                                intelligence.evidence.take(8).forEach { e ->
+                                    Text(e.claim.ifBlank { "Sourced claim" }, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                    Text(e.value.ifBlank { "Value unavailable" } + " • " + e.source.ifBlank { "Source unavailable" }, color = Color(0xFFA9BCD0), fontSize = 10.sp, lineHeight = 15.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+                "About" -> item {
+                    Surface(Modifier.padding(horizontal = edge).fillMaxWidth(), color = Color(0xFF0A1F32), shape = RoundedCornerShape(18.dp), border = BorderStroke(1.dp, Color(0xFF17364F))) {
+                        Column(Modifier.padding(if (phone) 15.dp else 24.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
+                            Text("About", color = Color.White, fontSize = if (phone) 21.sp else 26.sp, fontWeight = FontWeight.ExtraBold)
+                            Text(stock.name, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                            Text(profile.description.ifBlank { "Company description is not available from the current source." }, color = Color(0xFFA9BCD0), fontSize = 12.sp, lineHeight = 18.sp)
+                            EvidenceRow("Sector", profile.sector.ifBlank { "Unavailable" })
+                            EvidenceRow("Headquarters", profile.headquarters.ifBlank { "Unavailable" })
+                            EvidenceRow("Website", profile.website.ifBlank { "Unavailable" })
+                            EvidenceRow("Financial period", profile.financialPeriod.ifBlank { "Unavailable" })
+                            EvidenceRow("Source", intelligence.source)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MobileGlanceCard(
+    previousClose: Double?, open: Double?, high: Double?, low: Double?, latest: Double?,
+    observedAt: String, dailyChange: Double?, sinceOpen: Double?, edge: androidx.compose.ui.unit.Dp, phone: Boolean
+) {
+    Surface(Modifier.padding(horizontal = edge).fillMaxWidth(), color = Color(0xFF0A1F32), shape = RoundedCornerShape(18.dp), border = BorderStroke(1.dp, Color(0xFF17364F))) {
+        Column(Modifier.padding(if (phone) 15.dp else 24.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.ShowChart, null, tint = Color(0xFF19E7D0), modifier = Modifier.size(if (phone) 27.dp else 33.dp))
+                Spacer(Modifier.width(10.dp))
+                Text("Today at a glance", color = Color.White, fontSize = if (phone) 20.sp else 26.sp, fontWeight = FontWeight.ExtraBold)
+            }
+            Spacer(Modifier.height(if (phone) 18.dp else 25.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(if (phone) 8.dp else 22.dp)) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(if (phone) 17.dp else 25.dp)) {
+                    ApprovedMetric(Icons.Default.ShowChart, "Previous close", previousClose?.let(::currencyLabel) ?: "Unavailable")
+                    ApprovedMetric(Icons.Default.ArrowUpward, "Day high", high?.let(::currencyLabel) ?: "Unavailable")
+                    ApprovedMetric(Icons.Default.AccessTime, "Latest observation", latest?.let(::currencyLabel) ?: "Unavailable")
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(if (phone) 17.dp else 25.dp)) {
+                    ApprovedMetric(Icons.Default.ShowChart, "Today's open", open?.let(::currencyLabel) ?: "Unavailable")
+                    ApprovedMetric(Icons.Default.ArrowDownward, "Day low", low?.let(::currencyLabel) ?: "Unavailable")
+                    ApprovedMetric(Icons.Default.AccessTime, "Observed at", approvedObservedTime(observedAt))
+                }
+            }
+            Spacer(Modifier.height(if (phone) 15.dp else 22.dp))
+            HorizontalDivider(color = Color(0xFF17364F))
+            Spacer(Modifier.height(if (phone) 15.dp else 22.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(Modifier.weight(1f)) {
+                    ApprovedMovement(dailyChange?.let { it >= 0 }, "Today's change", dailyChange?.let { String.format(Locale.US, "%+.2f%%", it) } ?: "Unavailable",
+                        previousClose?.let { "vs previous close (" + currencyLabel(it) + ")" } ?: "vs previous close")
+                }
+                Box(Modifier.weight(1f)) {
+                    ApprovedMovement(sinceOpen?.let { it >= 0 }, "Since open", sinceOpen?.let { String.format(Locale.US, "%+.2f%%", it) } ?: "Unavailable",
+                        if (open != null && latest != null) "(" + currencyLabel(open) + " → " + currencyLabel(latest) + ")" else "Open-to-latest unavailable")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MobileChartCard(
+    points: List<MyStocksCache.HistoryPoint>, previousClose: Double?, latest: Double?, loading: Boolean,
+    edge: androidx.compose.ui.unit.Dp, phone: Boolean
+) {
+    Surface(Modifier.padding(horizontal = edge).fillMaxWidth(), color = Color(0xFF0A1F32), shape = RoundedCornerShape(18.dp), border = BorderStroke(1.dp, Color(0xFF17364F))) {
+        Column(Modifier.padding(if (phone) 15.dp else 24.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.ShowChart, null, tint = Color(0xFF19E7D0), modifier = Modifier.size(if (phone) 27.dp else 31.dp))
+                Spacer(Modifier.width(9.dp))
+                Text("1D Intraday Chart", Modifier.weight(1f), color = Color.White, fontSize = if (phone) 19.sp else 25.sp, fontWeight = FontWeight.ExtraBold)
+                Box(Modifier.size(9.dp).clip(RoundedCornerShape(50)).background(Color(0xFF00D084)))
+            }
+            Text("NSE session 09:30 – 15:00 EAT", color = Color(0xFFA9BCD0), fontSize = 9.sp, modifier = Modifier.padding(start = 36.dp))
+            Spacer(Modifier.height(10.dp))
+            if (loading && points.isEmpty()) {
+                Box(Modifier.fillMaxWidth().height(if (phone) 220.dp else 300.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = Color(0xFF00D084), strokeWidth = 2.dp)
+                }
+            } else {
+                ApprovedIntradayCanvas(points, previousClose, latest, Modifier.fillMaxWidth().height(if (phone) 230.dp else 320.dp))
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                ApprovedLegend(false, "NSE observations")
+                ApprovedLegend(true, "Previous close")
+            }
+            Spacer(Modifier.height(10.dp))
+            Surface(Modifier.fillMaxWidth(), color = Color(0xFF10283D), shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, Color(0xFF17364F))) {
+                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Info, null, tint = Color(0xFFAFC2F0), modifier = Modifier.size(22.dp))
+                    Spacer(Modifier.width(9.dp))
+                    Text("Actual NSE observations are plotted. Previous close is a reference line, not a trading observation.", color = Color(0xFFA9BCD0), fontSize = 10.sp, lineHeight = 14.sp, modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
 }
 
 
