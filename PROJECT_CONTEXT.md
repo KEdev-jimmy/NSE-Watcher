@@ -2275,3 +2275,27 @@ Implemented as one coherent batch from `c7726e9407024c394292b76c610fa51b33863c8a
 - The 12-second startup gate now distinguishes **startup complete** from **startup allowed to continue**.
 - If all Home prerequisites finish, Home uses the preloaded stocks/news/status without immediately fetching them again.
 - If the 12-second fallback is reached, the welcome screen can still be entered, but Home is allowed to retry incomplete data rather than treating the incomplete startup as fully loaded.
+
+# 2026-09-21 — Premium Two-Stage Opening / Icon Redesign
+
+- Implemented the approved two-stage opening experience based on the selected visual concepts:
+  1. **Logo-only premium intro** — dark navy/black background, glossy 3D NSE Watcher mark, light rim, blue bars, neon green rising chart, concentric green rings, rotating progress arc, loading indicator, and spaced NSE WATCHER wordmark.
+  2. **Main startup gate** — light mint background, floating glossy 3D logo, `NSE • KENYA MARKET INTELLIGENCE` pill, centered divider/market marker, `NSE Watcher` title, exact evidence tagline, three feature cues, skyline/chart backdrop, flowing green waves, and the existing `Start Exploring →` gate.
+- The first logo-only screen transitions automatically into the second screen after a short branded hand-off. The **second screen still does not auto-enter Home**; the user must tap Start Exploring after startup readiness is available.
+- The startup data gate remains unchanged: stocks, news, and market status load concurrently with the opening sequence, with the existing bounded 12-second fallback.
+- The animated logo was upgraded from the previous flat navy square to a reusable premium 3D treatment:
+  - clean light outer rim
+  - dark lower extrusion
+  - glossy navy face
+  - blue gradient market bars with darker lower faces
+  - bright green chart line and arrow
+  - subtle green glow
+- The Android launcher/system splash icon was updated to match the same premium identity, including the light outer rim.
+- The Android system splash background is now dark navy so the hand-off into the logo-only intro is visually consistent.
+- Active files:
+  - `app/src/main/java/ke/co/nsewatcher/SplashIntro.kt`
+  - `app/src/main/res/drawable/ic_nse_watcher.xml`
+  - `app/src/main/res/values/styles.xml`
+- No Home/data logic was intentionally changed in this visual batch.
+- CI must be checked for the new commits before calling the visual redesign verified. Runtime appearance should be checked on the APK because system splash rendering and Compose layout can differ by device/API level.
+\n
