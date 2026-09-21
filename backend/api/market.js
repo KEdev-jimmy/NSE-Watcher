@@ -1,5 +1,7 @@
 const BASE_URL = process.env.MYSTOCKS_BASE_URL || 'https://mystocks.africa/api/v1/partner';
 const API_KEY = process.env.MYSTOCKS_API_KEY;
+const MARKET_DATA_DELAY_MINUTES = 15;
+const MARKET_DATA_REFRESH_SECONDS = 900;
 
 function json(res, status, body) {
   res.status(status).setHeader('Content-Type', 'application/json');
@@ -195,7 +197,10 @@ module.exports = async (req, res) => {
     }
     if (action === 'stocks') {
       const data = await loadAllNseStocks();
-      return json(res, 200, { source: 'MyStocks Africa', delayMinutes: 15, fetchedAt: new Date().toISOString(), data });
+      const observations = (data?.stocks || []).map(stock => stock?.lastPriceUpdate || stock?.asOf).filter(Boolean);
+      const dates = observations.map(value => new Date(value)).filter(date => Number.isFinite(date.getTime()));
+      const newestObservationAt = dates.length ? new Date(Math.max(...dates.map(date => date.getTime()))).toISOString() : null;
+      return json(res, 200, { source: 'MyStocks Africa', delayMinutes: MARKET_DATA_DELAY_MINUTES, refreshIntervalSeconds: MARKET_DATA_REFRESH_SECONDS, fetchedAt: new Date().toISOString(), newestObservationAt, data });
     }
     if (action === 'indices') {
       // MyStocks' documented market-quote surface does not provide a verified
@@ -215,7 +220,7 @@ module.exports = async (req, res) => {
     if (action === 'movers') {
       const gainers = await mystocks('/market/movers?exchange=NSE&direction=gainers&limit=10');
       const losers = await mystocks('/market/movers?exchange=NSE&direction=losers&limit=10');
-      return json(res, 200, { source: 'MyStocks Africa', delayMinutes: 15, fetchedAt: new Date().toISOString(), gainers, losers });
+      return json(res, 200, { source: 'MyStocks Africa', delayMinutes: MARKET_DATA_DELAY_MINUTES, refreshIntervalSeconds: MARKET_DATA_REFRESH_SECONDS, fetchedAt: new Date().toISOString(), gainers, losers });
     }
     if (action === 'chart') {
       const symbol = String(req.query.symbol || '').trim();
@@ -267,7 +272,7 @@ module.exports = async (req, res) => {
         : null;
 
       return json(res, 200, {
-        source: 'MyStocks Africa', delayMinutes: 15, fetchedAt: new Date().toISOString(),
+        source: 'MyStocks Africa', delayMinutes: MARKET_DATA_DELAY_MINUTES, refreshIntervalSeconds: MARKET_DATA_REFRESH_SECONDS, fetchedAt: new Date().toISOString(),
         symbol, period, interval: cfg.interval, asOf: chartAsOf, latestObservationAt,
         session: period === '1d' ? {
           open: Number.isFinite(sessionOpen) ? sessionOpen : null,
@@ -290,7 +295,7 @@ module.exports = async (req, res) => {
       ? `/market/snapshot?symbols=${encodeURIComponent(symbols)}`
       : '/market/snapshot?symbols=SCOM.KE,EQTY.KE,KCB.KE,ABSA.KE,COOP.KE,SBIC.KE';
     const data = await mystocks(path);
-    return json(res, 200, { source: 'MyStocks Africa', delayMinutes: 15, fetchedAt: new Date().toISOString(), data });
+    return json(res, 200, { source: 'MyStocks Africa', delayMinutes: MARKET_DATA_DELAY_MINUTES, refreshIntervalSeconds: MARKET_DATA_REFRESH_SECONDS, fetchedAt: new Date().toISOString(), data });
   } catch (error) {
     return json(res, error.status || 502, {
       error: 'Market data unavailable', detail: error.message,
