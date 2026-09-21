@@ -105,7 +105,6 @@ fun HomeDashboard(
 @Composable
 private fun HomeHero(advancing: Int, declining: Int, unchanged: Int, reportedVolume: Long, marketStatus: MyStocksCache.MarketStatus) {
     Box(Modifier.fillMaxWidth().height(300.dp).clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))) {
-        Image(painter = painterResource(id = R.drawable.nairobi_city_county_skyline), contentDescription = "Nairobi skyline", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
         Box(Modifier.fillMaxSize().background(Color(0x55061A13)))
         Box(Modifier.fillMaxSize().background(Color(0x2500A859)))
         Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 16.dp)) {
