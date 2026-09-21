@@ -239,7 +239,6 @@ private fun Companies(open:(Stock)->Unit, openWatchlist:()->Unit, openCompare:()
         LazyColumn(contentPadding=PaddingValues(16.dp,0.dp,16.dp,20.dp),verticalArrangement=Arrangement.spacedBy(11.dp)){
             item{
                 Box(Modifier.fillMaxWidth().height(270.dp).clip(RoundedCornerShape(bottomStart=26.dp,bottomEnd=26.dp))){
-                    Image(painter=painterResource(id=R.drawable.nairobi_city_county_skyline),contentDescription="Nairobi skyline",modifier=Modifier.fillMaxSize(),contentScale=androidx.compose.ui.layout.ContentScale.Crop)
                     Box(Modifier.fillMaxSize().background(Color(0x55052B24)))
                     Column(Modifier.fillMaxSize().padding(10.dp,20.dp,10.dp,18.dp),verticalArrangement=Arrangement.Bottom){Text("Discover",color=Color.White,fontSize=25.sp,fontWeight=FontWeight.ExtraBold);Text("Great Companies",color=Color.White,fontSize=25.sp,fontWeight=FontWeight.ExtraBold);Spacer(Modifier.height(5.dp));Text("Research. Analyze. Understand.\\nExplore sourced NSE company information.",color=Color.White,fontSize=11.sp)}
                 }
@@ -576,7 +575,6 @@ private fun newsDisplayMeta(item:NewsItem):NewsDisplayMeta{
 @Composable private fun NewsFeatured(item:NewsItem,open:(NewsItem)->Unit){
     Card(Modifier.fillMaxWidth().clickable{open(item)},RoundedCornerShape(19.dp),colors=CardDefaults.cardColors(containerColor=DarkGreen)){
         Box(Modifier.fillMaxWidth().height(240.dp)){
-            Image(painter=painterResource(id=R.drawable.nairobi_city_county_skyline),contentDescription="Nairobi skyline",modifier=Modifier.fillMaxSize(),contentScale=androidx.compose.ui.layout.ContentScale.Crop)
             Box(Modifier.fillMaxSize().background(Color(0x66083C27)))
             Column(Modifier.fillMaxSize().padding(15.dp),verticalArrangement=Arrangement.Bottom){
                 Row(verticalAlignment=Alignment.CenterVertically){NewsMetaIcon(item,38,true);Spacer(Modifier.width(7.dp));Column(Modifier.weight(1f)){Text(newsDisplayMeta(item).label,color=Color.White,fontWeight=FontWeight.ExtraBold,fontSize=9.sp);if(newsDisplayMeta(item).company.isNotBlank())Text(newsDisplayMeta(item).company,color=Color.White.copy(alpha=.8f),fontSize=8.sp)};NewsChip(item.category,true)}
