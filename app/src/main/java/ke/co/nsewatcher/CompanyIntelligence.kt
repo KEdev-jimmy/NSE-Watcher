@@ -887,34 +887,51 @@ private fun ApprovedIntradayCanvas(
             )
         }
 
-        val line = Path()
-        var hasLinePoint = false
-        visiblePoints.forEach { (_, point, minute) ->
-            if (minute < visibleStart - 1f || minute > visibleEnd + 1f) return@forEach
-            val x = xAtMinute(minute)
-            val y = yAt(point.close)
-            if (!hasLinePoint) {
-                line.moveTo(x, y)
-                hasLinePoint = true
-            } else {
-                line.lineTo(x, y)
-            }
-        }
-
-        if (hasLinePoint) {
-            val fill = Path()
-            val first = visiblePoints.firstOrNull { it.third >= visibleStart }
-            val last = visiblePoints.lastOrNull { it.third <= visibleEnd }
-            if (first != null && last != null) {
-                fill.moveTo(xAtMinute(first.third), top + plotHeight)
-                visiblePoints.filter { it.third in visibleStart..visibleEnd }.forEach { (_, point, minute) ->
-                    fill.lineTo(xAtMinute(minute), yAt(point.close))
+        // Draw each movement segment independently. Green means the next
+        // observation is at or above the previous one; red means it moved down.
+        // This keeps the intraday line readable when the price changes direction
+        // several times during the session.
+        val plottedPoints = visiblePoints.filter { it.third >= visibleStart - 1f && it.third <= visibleEnd + 1f }
+        if (plottedPoints.isNotEmpty()) {
+            for (i in 1 until plottedPoints.size) {
+                val previous = plottedPoints[i - 1]
+                val current = plottedPoints[i]
+                val x1 = xAtMinute(previous.third)
+                val y1 = yAt(previous.second.close)
+                val x2 = xAtMinute(current.third)
+                val y2 = yAt(current.second.close)
+                val movementColor = when {
+                    current.second.close > previous.second.close -> Color(0xFF00D084)
+                    current.second.close < previous.second.close -> Color(0xFFFF5C5C)
+                    else -> Color(0xFF9FB3C8)
                 }
-                fill.lineTo(xAtMinute(last.third), top + plotHeight)
-                fill.close()
-                drawPath(fill, Color(0xFF00D084).copy(alpha = .11f))
+                drawLine(
+                    movementColor,
+                    androidx.compose.ui.geometry.Offset(x1, y1),
+                    androidx.compose.ui.geometry.Offset(x2, y2),
+                    strokeWidth = 4.2f,
+                    cap = StrokeCap.Round
+                )
             }
-            drawPath(line, Color(0xFF00D084), style = Stroke(width = 4.2f, cap = StrokeCap.Round))
+
+            // Subtle directional fill follows the same movement colors.
+            for (i in 1 until plottedPoints.size) {
+                val previous = plottedPoints[i - 1]
+                val current = plottedPoints[i]
+                val movementColor = when {
+                    current.second.close > previous.second.close -> Color(0xFF00D084)
+                    current.second.close < previous.second.close -> Color(0xFFFF5C5C)
+                    else -> Color(0xFF9FB3C8)
+                }
+                val fill = Path().apply {
+                    moveTo(xAtMinute(previous.third), top + plotHeight)
+                    lineTo(xAtMinute(previous.third), yAt(previous.second.close))
+                    lineTo(xAtMinute(current.third), yAt(current.second.close))
+                    lineTo(xAtMinute(current.third), top + plotHeight)
+                    close()
+                }
+                drawPath(fill, movementColor.copy(alpha = 0.07f))
+            }
         }
 
         fun drawMarker(point: MyStocksCache.HistoryPoint?, label: String, tint: Color, alignLeft: Boolean) {
