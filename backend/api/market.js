@@ -1,5 +1,5 @@
 const BASE_URL = process.env.MYSTOCKS_BASE_URL || 'https://mystocks.africa/api/v1/partner';
-const API_KEY = process.env.MYSTOCKS_API_KEY;
+const API_KEY = process.env.MYSTOCKS_DATA_KEY || process.env.MYSTOCKS_API_KEY;
 const MARKET_DATA_DELAY_MINUTES = 15;
 const MARKET_DATA_REFRESH_SECONDS = 900;
 
