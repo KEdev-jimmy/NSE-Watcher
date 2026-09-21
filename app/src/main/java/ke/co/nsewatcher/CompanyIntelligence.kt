@@ -1440,7 +1440,7 @@ private fun MobileChartCard(
                     Text("Intraday chart data unavailable.", color = Color(0xFFA9BCD0), fontSize = 12.sp)
                 }
             } else {
-                $axisCall
+                ApprovedIntradayCanvas(points, previousClose, latest, Modifier.fillMaxWidth().height(if (phone) 230.dp else 320.dp))
             }
             Spacer(Modifier.height(10.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
