@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.clipToBounds
@@ -52,6 +53,215 @@ private val IntelligenceText = Color(0xFF12231B)
 private val IntelligenceMuted = Color(0xFF6C7A72)
 private val IntelligenceBorder = Color(0xFFE1EAE5)
 private val IntelligenceRed = Color(0xFFE04444)
+
+@Composable
+private fun CompanyNewsSection(
+    news: List<NewsItem>,
+    loading: Boolean
+) {
+    val uriHandler = LocalUriHandler.current
+
+    Column(Modifier.fillMaxWidth()) {
+        SectionTitle(
+            "Company news",
+            "Recent announcements, market coverage and corporate events",
+            Icons.Default.Newspaper
+        )
+
+        when {
+            loading -> IntelligenceCard {
+                IntelligenceLoader("Loading company news", "Checking recent company announcements…")
+            }
+
+            news.isEmpty() -> IntelligenceCard {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(Modifier.size(42.dp), RoundedCornerShape(12.dp), color = IntelligenceLight) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.Default.Newspaper, null, tint = IntelligenceGreen)
+                        }
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("No recent company news", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(3.dp))
+                        Text(
+                            "No articles or corporate events were returned by the current feed.",
+                            color = IntelligenceMuted,
+                            fontSize = 9.sp,
+                            lineHeight = 13.sp
+                        )
+                    }
+                }
+            }
+
+            else -> {
+                val featured = news.first()
+                val secondary = news.drop(1).take(4)
+
+                IntelligenceCard {
+                    Text(
+                        "LATEST",
+                        color = IntelligenceGreen,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 0.8.sp
+                    )
+                    Spacer(Modifier.height(7.dp))
+
+                    if (featured.imageUrl.isNotBlank()) {
+                        AsyncImage(
+                            model = featured.imageUrl,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxWidth().height(156.dp).clip(RoundedCornerShape(14.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                        Spacer(Modifier.height(10.dp))
+                    } else {
+                        Surface(
+                            Modifier.fillMaxWidth().height(74.dp),
+                            RoundedCornerShape(14.dp),
+                            color = IntelligenceLight
+                        ) {
+                            Row(
+                                Modifier.fillMaxSize().padding(horizontal = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Newspaper, null, tint = IntelligenceGreen, modifier = Modifier.size(30.dp))
+                                Spacer(Modifier.width(10.dp))
+                                Text("Company intelligence update", color = IntelligenceDark, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        Spacer(Modifier.height(10.dp))
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            featured.category.ifBlank { "Market" }.uppercase(Locale.US),
+                            color = IntelligenceGreen,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                        Spacer(Modifier.width(7.dp))
+                        Text(formatCompanyNewsDate(featured.publishedAt), color = IntelligenceMuted, fontSize = 8.sp)
+                    }
+                    Spacer(Modifier.height(5.dp))
+                    Text(
+                        featured.title,
+                        color = IntelligenceText,
+                        fontSize = 15.sp,
+                        lineHeight = 19.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        maxLines = 4
+                    )
+                    if (featured.summary.isNotBlank()) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            featured.summary,
+                            color = IntelligenceMuted,
+                            fontSize = 9.sp,
+                            lineHeight = 14.sp,
+                            maxLines = 3
+                        )
+                    }
+                    if (featured.url.isNotBlank()) {
+                        Spacer(Modifier.height(10.dp))
+                        TextButton(
+                            onClick = { runCatching { uriHandler.openUri(featured.url) } },
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Text("Read full story  →", color = IntelligenceGreen, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                secondary.forEach { article ->
+                    Spacer(Modifier.height(8.dp))
+                    Surface(
+                        onClick = {
+                            if (article.url.isNotBlank()) runCatching { uriHandler.openUri(article.url) }
+                        },
+                        enabled = article.url.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        color = Color.White,
+                        border = BorderStroke(1.dp, IntelligenceBorder)
+                    ) {
+                        Row(Modifier.fillMaxWidth().padding(11.dp), verticalAlignment = Alignment.Top) {
+                            if (article.imageUrl.isNotBlank()) {
+                                AsyncImage(
+                                    model = article.imageUrl,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(72.dp).clip(RoundedCornerShape(10.dp)),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Surface(Modifier.size(72.dp), RoundedCornerShape(10.dp), color = IntelligenceLight) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Default.Article, null, tint = IntelligenceGreen)
+                                    }
+                                }
+                            }
+                            Spacer(Modifier.width(11.dp))
+                            Column(Modifier.weight(1f)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        article.category.ifBlank { "Market" }.uppercase(Locale.US),
+                                        color = IntelligenceGreen,
+                                        fontSize = 7.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        maxLines = 1
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(formatCompanyNewsDate(article.publishedAt), color = IntelligenceMuted, fontSize = 7.sp, maxLines = 1)
+                                }
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    article.title,
+                                    color = IntelligenceText,
+                                    fontSize = 10.sp,
+                                    lineHeight = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 3
+                                )
+                                if (article.source.isNotBlank()) {
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(article.source, color = IntelligenceMuted, fontSize = 7.sp, maxLines = 1)
+                                }
+                            }
+                            if (article.url.isNotBlank()) {
+                                Icon(Icons.Default.OpenInNew, contentDescription = "Open article", tint = IntelligenceMuted, modifier = Modifier.size(15.dp))
+                            }
+                        }
+                    }
+                }
+
+                if (news.size > 5) {
+                    Spacer(Modifier.height(7.dp))
+                    Text(
+                        "+\${news.size - 5} more stories available in the company news feed",
+                        color = IntelligenceMuted,
+                        fontSize = 8.sp,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun formatCompanyNewsDate(raw: String): String {
+    if (raw.isBlank()) return "Latest"
+    return runCatching {
+        Instant.parse(raw)
+            .atZone(ZoneId.of("Africa/Nairobi"))
+            .format(DateTimeFormatter.ofPattern("dd MMM yy • h:mm a", Locale.US))
+    }.getOrElse { raw.take(10) }
+}
+
 
 private fun marketObservationLabel(stock: Stock): String {
     val delay = stock.delayMinutes ?: 15
@@ -776,28 +986,7 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
         }
 
         if (researchSection == CompanyIntelligenceSection.NEWS) {
-        item {
-            IntelligenceCard {
-                when {
-                    newsLoading -> IntelligenceLoader("Loading company intelligence", "Checking recent announcements and news…")
-                    news.isEmpty() -> Text("No recent company news or corporate actions were returned.", color = IntelligenceMuted, fontSize = 11.sp)
-                    else -> news.take(5).forEachIndexed { index, item ->
-                        Column(Modifier.fillMaxWidth().padding(vertical = 7.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(item.category.ifBlank { "Market" }, color = IntelligenceGreen, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                                Spacer(Modifier.width(7.dp))
-                                Text(item.publishedAt.take(10).ifBlank { "Latest" }, color = IntelligenceMuted, fontSize = 8.sp)
-                            }
-                            Spacer(Modifier.height(3.dp))
-                            Text(item.title, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 3)
-                            if (item.summary.isNotBlank()) Text(item.summary, color = IntelligenceMuted, fontSize = 9.sp, maxLines = 2)
-                        }
-                        if (index < news.take(5).lastIndex) HorizontalDivider(color = IntelligenceBorder)
-                    }
-                }
-            }
-        }
-
+            item { CompanyNewsSection(news = news, loading = newsLoading) }
         }
 
         if (researchSection == CompanyIntelligenceSection.EVIDENCE) {
