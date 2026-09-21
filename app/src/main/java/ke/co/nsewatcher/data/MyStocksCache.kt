@@ -32,6 +32,9 @@ object MyStocksCache {
         val sessionOpen: Double? = null,
         val sessionClose: Double? = null,
         val sessionChangePct: Double? = null,
+        val previousSessionClose: Double? = null,
+        val previousSessionCloseAt: String = "",
+        val dailyChangePct: Double? = null,
         val sessionOpenAt: String = "",
         val sessionCloseAt: String = ""
     )
@@ -245,6 +248,9 @@ object MyStocksCache {
                 sessionOpen = session?.optDouble("open", Double.NaN)?.takeIf { it.isFinite() },
                 sessionClose = session?.optDouble("close", Double.NaN)?.takeIf { it.isFinite() },
                 sessionChangePct = session?.optDouble("changePct", Double.NaN)?.takeIf { it.isFinite() },
+                previousSessionClose = session?.optDouble("previousClose", Double.NaN)?.takeIf { it.isFinite() && it > 0.0 },
+                previousSessionCloseAt = session?.optString("previousCloseAt", "") ?: "",
+                dailyChangePct = session?.optDouble("dailyChangePct", Double.NaN)?.takeIf { it.isFinite() },
                 sessionOpenAt = session?.optString("openAt", "") ?: "",
                 sessionCloseAt = session?.optString("closeAt", "") ?: ""
             )
