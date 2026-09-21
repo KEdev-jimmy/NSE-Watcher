@@ -7,7 +7,7 @@
     <!-- Clean light rim around the same NSE Watcher mark. -->
     <path
         android:fillColor="#F7FFFB"
-        android:pathData="M8,1h32c4.97,0 9,4.03 9,9v28c0,4.97 -4.03,9 -9,9H8c-4.97,0 -9,-4.03 -9,-9V10C-1,5.03 3.03,1 8,1z" />
+        android:pathData="M8,1h32c3.87,0 7,3.13 7,7v32c0,3.87 -3.13,7 -7,7H8c-3.87,0 -7,-3.13 -7,-7V8c0,-3.87 3.13,-7 7,-7z" />
 
     <!-- Lower/right extrusion. -->
     <path
