@@ -585,9 +585,9 @@ private fun ApprovedGlanceCard(
             Spacer(Modifier.height(27.dp))
             Row(Modifier.fillMaxWidth()) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(28.dp)) {
-                    ApprovedMetric(Icons.Default.ShowChart, "Previous close", previousClose?.let(::currencyLabel) ?: "Unavailable")
-                    ApprovedMetric(Icons.Default.ArrowUpward, "Day high", dayHigh?.let(::currencyLabel) ?: "Unavailable")
-                    ApprovedMetric(Icons.Default.AccessTime, "Latest observation", latest?.let(::currencyLabel) ?: "Unavailable")
+                    ApprovedMetric(Icons.Default.ShowChart, "Previous close", previousClose?.let(::currencyLabel) ?: "Unavailable", phone = true)
+                    ApprovedMetric(Icons.Default.ArrowUpward, "Day high", high?.let(::currencyLabel) ?: "Unavailable", phone = true)
+                    ApprovedMetric(Icons.Default.AccessTime, "Latest observation", latest?.let(::currencyLabel) ?: "Unavailable", phone = true)
                 }
                 VerticalDivider(Modifier.padding(horizontal = 25.dp).height(265.dp), color = Color(0xFF17364F))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(28.dp)) {
@@ -610,15 +610,16 @@ private fun ApprovedGlanceCard(
 private fun ApprovedMetric(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
-    value: String
+    value: String,
+    phone: Boolean = false
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, tint = Color(0xFFAFC2F0), modifier = Modifier.size(27.dp))
-        Spacer(Modifier.width(20.dp))
+        Icon(icon, null, tint = Color(0xFFAFC2F0), modifier = Modifier.size(if (phone) 18.dp else 27.dp))
+        Spacer(Modifier.width(if (phone) 8.dp else 20.dp))
         Column {
-            Text(label, color = Color(0xFFA9BCD0), fontSize = 17.sp)
-            Spacer(Modifier.height(8.dp))
-            Text(value, color = Color(0xFFF4F7FA), fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
+            Text(label, color = Color(0xFFA9BCD0), fontSize = if (phone) 12.sp else 17.sp)
+            Spacer(Modifier.height(if (phone) 3.dp else 8.dp))
+            Text(value, color = Color(0xFFF4F7FA), fontSize = if (phone) 12.sp else 22.sp, fontWeight = if (phone) FontWeight.Medium else FontWeight.SemiBold)
         }
     }
 }
@@ -648,9 +649,9 @@ private fun ApprovedMovement(
         )
         Spacer(Modifier.width(17.dp))
         Column {
-            Text(label, color = color, fontSize = 17.sp)
-            Spacer(Modifier.height(7.dp))
-            Text(value, color = color, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
+            Text(label, color = color, fontSize = 12.sp)
+            Spacer(Modifier.height(4.dp))
+            Text(value, color = color, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
             Spacer(Modifier.height(4.dp))
             Text(detail, color = Color(0xFFA9BCD0), fontSize = 14.sp, lineHeight = 19.sp)
         }
@@ -1187,9 +1188,9 @@ private fun MobileGlanceCard(
                     ApprovedMetric(Icons.Default.AccessTime, "Latest observation", latest?.let(::currencyLabel) ?: "Unavailable")
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(if (phone) 17.dp else 25.dp)) {
-                    ApprovedMetric(Icons.Default.ShowChart, "Today's open", open?.let(::currencyLabel) ?: "Unavailable")
-                    ApprovedMetric(Icons.Default.ArrowDownward, "Day low", low?.let(::currencyLabel) ?: "Unavailable")
-                    ApprovedMetric(Icons.Default.AccessTime, "Observed at", approvedObservedTime(observedAt))
+                    ApprovedMetric(Icons.Default.ShowChart, "Today's open", open?.let(::currencyLabel) ?: "Unavailable", phone = true)
+                    ApprovedMetric(Icons.Default.ArrowDownward, "Day low", low?.let(::currencyLabel) ?: "Unavailable", phone = true)
+                    ApprovedMetric(Icons.Default.AccessTime, "Observed at", approvedObservedTime(observedAt), phone = true)
                 }
             }
             Spacer(Modifier.height(if (phone) 15.dp else 22.dp))
