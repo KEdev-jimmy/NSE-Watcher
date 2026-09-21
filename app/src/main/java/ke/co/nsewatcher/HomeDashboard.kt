@@ -41,7 +41,7 @@ private val HomeTextDark = Color(0xFF12352A)
 private val HomeMuted = Color(0xFF64756D)
 private val HomeBorder = Color(0xFFDDE9E3)
 private val HomeRed = Color(0xFFE94A4A)
-private const val NairobiSkyline = "https://upload.wikimedia.org/wikipedia/commons/8/80/Nairobi_Skyline_from_West.jpg"
+private const val NairobiSkyline = "https://upload.wikimedia.org/wikipedia/commons/thumb/4/42/Nairobi_City_County_Skyline.jpg/1280px-Nairobi_City_County_Skyline.jpg"
 
 @Composable
 fun HomeDashboard(
