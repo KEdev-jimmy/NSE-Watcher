@@ -2388,3 +2388,11 @@ About now identifies:
   - 711ca950e716b1971bb24bd0b8ac483282c3740c — initial reference-layout implementation.
   - 91aab72de35c9960b146cdcfdf7d2cf04aecda5f — restored header back navigation and dynamic sector handling.
 - Android CI run #893 for the final source commit is currently in progress; do not call this source build verified until that run completes successfully and the APK is checked where appropriate.
+
+
+## 2026-09-21 — Company Intelligence reference-layout refinement
+- Refined the active Company Intelligence overview to stay aligned with the supplied 1024×1536 reference: dark navy presentation, company header/navigation, Today at a glance card, intraday chart, provenance note, and bottom Company Intelligence card.
+- Preserved the existing real-data paths and left the previous intelligence/company sections in the file/codebase for later reconnection; this change is presentation-focused rather than a data-source rewrite.
+- Corrected the reference-layout movement indicators so positive and negative daily/since-open values render green/up or red/down from the actual calculated value; unavailable movement remains neutral.
+- Refined the intraday chart grid/axis density and time labels to more closely match the supplied reference while continuing to plot provider-returned observations only.
+- Commit: `a0f46410f0c0f709d1936c239b8aa30f63ffb9fc`.
