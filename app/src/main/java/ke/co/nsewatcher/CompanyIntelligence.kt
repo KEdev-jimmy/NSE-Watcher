@@ -706,7 +706,7 @@ private fun ApprovedChartCard(
                     Icon(Icons.Default.Info, null, tint = Color(0xFFAFC2F0), modifier = Modifier.size(27.dp))
                     Spacer(Modifier.width(15.dp))
                     Text(
-                        "The chart shows today's trading session using actual NSE data points.\nPrevious close (" + (previousClose?.let(::currencyLabel) ?: "unavailable") + ") is shown as a reference line, not a trading price.",
+                        "The chart is anchored to the previous trading close, then continues through today's actual NSE observations. The opening point is still an actual observation; no synthetic intraday price is added.",
                         color = Color(0xFFA9BCD0), fontSize = 13.sp, lineHeight = 19.sp, modifier = Modifier.weight(1f)
                     )
                     Icon(Icons.Default.Fullscreen, "Expand chart", tint = Color(0xFFAFC2F0), modifier = Modifier.size(25.dp))
@@ -898,9 +898,24 @@ private fun ApprovedIntradayCanvas(
         // several times during the session.
         val plottedPoints = visiblePoints.filter { it.third >= visibleStart - 1f && it.third <= visibleEnd + 1f }
         if (plottedPoints.isNotEmpty()) {
-            for (i in 1 until plottedPoints.size) {
-                val previous = plottedPoints[i - 1]
-                val current = plottedPoints[i]
+            // Anchor the session chart to the actual previous trading close.
+            // The previous close is a reference observation, not a fabricated
+            // intraday candle. The segment to the first NSE observation makes
+            // the opening move visible instead of making the chart appear to
+            // start only at today's opening price.
+            val firstPoint = plottedPoints.firstOrNull()
+            val previousClosePoint = previousClose?.takeIf { it.isFinite() && it > 0.0 }?.let {
+                Triple(-1, MyStocksCache.HistoryPoint(it, ""), 0f)
+            }
+            val chartPoints = if (previousClosePoint != null && firstPoint != null && firstPoint.third > 0f) {
+                listOf(previousClosePoint) + plottedPoints
+            } else {
+                plottedPoints
+            }
+
+            for (i in 1 until chartPoints.size) {
+                val previous = chartPoints[i - 1]
+                val current = chartPoints[i]
                 val x1 = xAtMinute(previous.third)
                 val y1 = yAt(previous.second.close)
                 val x2 = xAtMinute(current.third)
