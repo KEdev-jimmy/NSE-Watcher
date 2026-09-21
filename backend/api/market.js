@@ -74,7 +74,7 @@ function periodConfig(period) {
   let interval = '1d';
   switch (String(period || '1y').toLowerCase()) {
     case '3d': start.setDate(start.getDate() - 3); interval = '1d'; break;
-    case '1d': start.setDate(start.getDate() - 2); interval = '15m'; break;
+    case '1d': start.setDate(start.getDate() - 7); interval = '15m'; break;
     case '1w': start.setDate(start.getDate() - 7); interval = '1d'; break;
     case '1m': start.setMonth(start.getMonth() - 1); interval = '1d'; break;
     case '3m': start.setMonth(start.getMonth() - 3); interval = '1d'; break;
@@ -124,23 +124,43 @@ function latestTradingSession(candles) {
     valid[0].timestamp
   ).toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' });
 
+  const dayKeys = [...new Set(valid.map((entry) =>
+    entry.timestamp.toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' })
+  ))].sort().reverse();
+  const latestDayKey = dayKeys[0];
+  const previousDayKey = dayKeys[1] || null;
+
   const session = valid
-    .filter((entry) => entry.timestamp.toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' }) === latestDay)
+    .filter((entry) => entry.timestamp.toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' }) === latestDayKey)
     .sort((a, b) => a.timestamp - b.timestamp)
     .map((entry) => entry.candle);
 
   if (!session.length) return null;
+
+  const previousSession = previousDayKey
+    ? valid
+        .filter((entry) => entry.timestamp.toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' }) === previousDayKey)
+        .sort((a, b) => a.timestamp - b.timestamp)
+        .map((entry) => entry.candle)
+    : [];
+  const previousClose = Number.isFinite(Number(previousSession[previousSession.length - 1]?.close)) && Number(previousSession[previousSession.length - 1].close) > 0
+    ? Number(previousSession[previousSession.length - 1].close)
+    : null;
+  const previousCloseAt = candleTimestamp(previousSession[previousSession.length - 1])?.toISOString() || null;
+  const close = Number.isFinite(Number(session[session.length - 1]?.close)) && Number(session[session.length - 1].close) > 0
+    ? Number(session[session.length - 1].close)
+    : null;
 
   return {
     candles: session,
     open: Number.isFinite(Number(session[0]?.open)) && Number(session[0].open) > 0
       ? Number(session[0].open)
       : null,
-    close: Number.isFinite(Number(session[session.length - 1]?.close)) && Number(session[session.length - 1].close) > 0
-      ? Number(session[session.length - 1].close)
-      : null,
+    close,
     openAt: candleTimestamp(session[0])?.toISOString() || null,
     closeAt: candleTimestamp(session[session.length - 1])?.toISOString() || null,
+    previousClose,
+    previousCloseAt,
   };
 }
 
@@ -270,6 +290,8 @@ module.exports = async (req, res) => {
       let sessionClose = null;
       let sessionOpenAt = null;
       let sessionCloseAt = null;
+      let previousSessionClose = null;
+      let previousSessionCloseAt = null;
 
       if (period === '1d') {
         try {
@@ -279,6 +301,8 @@ module.exports = async (req, res) => {
             sessionClose = session.close;
             sessionOpenAt = session.openAt;
             sessionCloseAt = session.closeAt;
+            previousSessionClose = session.previousClose;
+            previousSessionCloseAt = session.previousCloseAt;
 
             // Keep the chart timeline strictly observational and chronological:
             // return only actual candles from the latest Nairobi trading session.
@@ -311,6 +335,11 @@ module.exports = async (req, res) => {
           changePct: Number.isFinite(sessionChangePct) ? sessionChangePct : null,
           openAt: sessionOpenAt,
           closeAt: sessionCloseAt,
+          previousClose: Number.isFinite(previousSessionClose) ? previousSessionClose : null,
+          previousCloseAt: previousSessionCloseAt,
+          dailyChangePct: Number.isFinite(previousSessionClose) && previousSessionClose > 0 && Number.isFinite(sessionClose)
+            ? ((sessionClose - previousSessionClose) / previousSessionClose) * 100
+            : null,
         } : null,
         dataQuality: meta ? {
           qualityStatus: meta.qualityStatus || null,
