@@ -1184,9 +1184,9 @@ private fun MobileGlanceCard(
             Spacer(Modifier.height(if (phone) 18.dp else 25.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(if (phone) 8.dp else 22.dp)) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(if (phone) 17.dp else 25.dp)) {
-                    ApprovedMetric(Icons.Default.ShowChart, "Previous close", previousClose?.let(::currencyLabel) ?: "Unavailable")
-                    ApprovedMetric(Icons.Default.ArrowUpward, "Day high", high?.let(::currencyLabel) ?: "Unavailable")
-                    ApprovedMetric(Icons.Default.AccessTime, "Latest observation", latest?.let(::currencyLabel) ?: "Unavailable")
+                    ApprovedMetric(Icons.Default.ShowChart, "Previous close", previousClose?.let(::currencyLabel) ?: "Unavailable", phone = phone)
+                    ApprovedMetric(Icons.Default.ArrowUpward, "Day high", high?.let(::currencyLabel) ?: "Unavailable", phone = phone)
+                    ApprovedMetric(Icons.Default.AccessTime, "Latest observation", latest?.let(::currencyLabel) ?: "Unavailable", phone = phone)
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(if (phone) 17.dp else 25.dp)) {
                     ApprovedMetric(Icons.Default.ShowChart, "Today's open", open?.let(::currencyLabel) ?: "Unavailable", phone = phone)
