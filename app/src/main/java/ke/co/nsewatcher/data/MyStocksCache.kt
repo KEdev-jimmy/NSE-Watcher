@@ -307,9 +307,17 @@ object MyStocksCache {
                     // percentage value, so convert the provider fraction to percentage
                     // points before it reaches Gainers/Losers or the UI.
                     // Derivation from price/previousClose already produces percentage points.
+                    // MyStocks can return changePct as 0 even when the quote has
+                    // enough price data to determine a real close-to-close movement.
+                    // Zero is therefore treated as "no provider percentage supplied"
+                    // when previousClose and today's price are both valid. In that case,
+                    // derive the percentage from the two provider-supplied prices:
+                    // ((todayClose - previousClose) / previousClose) * 100.
+                    // Never invent previousClose: it must come from the provider field.
                     val changePct = when {
-                        suppliedChangePct.isFinite() -> suppliedChangePct * 100.0
+                        suppliedChangePct.isFinite() && suppliedChangePct != 0.0 -> suppliedChangePct * 100.0
                         derived.isFinite() -> derived
+                        suppliedChangePct.isFinite() -> suppliedChangePct * 100.0
                         else -> Double.NaN
                     }
                     val changeAvailable = changePct.isFinite()
