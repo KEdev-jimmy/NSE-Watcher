@@ -53,6 +53,11 @@ private val IntelligenceText = Color(0xFF12231B)
 private val IntelligenceMuted = Color(0xFF6C7A72)
 private val IntelligenceBorder = Color(0xFFE1EAE5)
 private val IntelligenceRed = Color(0xFFE04444)
+private val CompanyScreenBg = Color(0xFF061A2B)
+private val CompanyCardBg = Color(0xFF081F34)
+private val CompanyCardBorder = Color(0xFF17364F)
+private val CompanyAccent = Color(0xFF18E56B)
+private val CompanyMuted = Color(0xFFA9B8CA)
 
 @Composable
 private fun CompanyOverviewCard(
@@ -398,7 +403,8 @@ private fun CompanySectionNavigation(
 @Composable
 fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, onWatchToggle: (() -> Unit)? = null) {
     val periods = listOf("1D", "1W", "1M", "3M", "6M", "1Y", "3Y", "5Y", "NOW")
-    var period by rememberSaveable(s.symbol) { mutableStateOf("1D") }
+    var period by rememberSaveable(s.symbol) { mutableStateOf("1D")         }
+    }
     var history by remember(s.symbol) {
         mutableStateOf(s.history.map { MyStocksCache.HistoryPoint(it) })
     }
@@ -472,12 +478,63 @@ fun CompanyIntelligence(s: Stock, back: () -> Unit, watched: Boolean = false, on
     var primarySection by rememberSaveable(s.symbol) { mutableStateOf(CompanyIntelligenceSection.INTELLIGENCE) }
     var metricsSection by rememberSaveable(s.symbol) { mutableStateOf(CompanyIntelligenceSection.PERFORMANCE) }
     var researchSection by rememberSaveable(s.symbol) { mutableStateOf(CompanyIntelligenceSection.NEWS) }
+    var selectedCompanyTab by rememberSaveable(s.symbol) { mutableStateOf("Overview") }
 
     LazyColumn(
         state = listState,
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
+        modifier = Modifier.fillMaxSize().background(CompanyScreenBg),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 22.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        item {
+            CompanyTopBar(onBack = back, title = "Company Intelligence")
+        }
+
+        item {
+            CompanyHeroHeader(stock = s)
+        }
+
+        item {
+            CompanyTopTabs(
+                selected = selectedCompanyTab,
+                onSelected = { tab ->
+                    selectedCompanyTab = tab
+                    when (tab) {
+                        "Financials" -> metricsSection = CompanyIntelligenceSection.FINANCIALS
+                        "News" -> researchSection = CompanyIntelligenceSection.NEWS
+                        "Analysis" -> {
+                            primarySection = CompanyIntelligenceSection.INTELLIGENCE
+                            researchSection = CompanyIntelligenceSection.ANALYSIS
+                        }
+                        "About" -> primarySection = CompanyIntelligenceSection.ABOUT
+                        else -> primarySection = CompanyIntelligenceSection.INTELLIGENCE
+                    }
+                }
+            )
+        }
+
+        if (selectedCompanyTab == "Overview") {
+            item {
+                TodayAtAGlance(stock = s, historyResult = historyResult, marketStatus = marketStatus)
+            }
+            item {
+                CompanyIntradayChartCard(
+                    stock = s,
+                    history = history,
+                    selectedPeriodReturn = selectedPeriodReturn,
+                    loading = historyLoading
+                )
+            }
+            item {
+                CompanyIntelligenceLauncher(
+                    onClick = {
+                        selectedCompanyTab = "Analysis"
+                        primarySection = CompanyIntelligenceSection.INTELLIGENCE
+                        researchSection = CompanyIntelligenceSection.ANALYSIS
+                    }
+                )
+            }
+        } else {
         item {
             CompanyOverviewCard(
                 stock = s,
@@ -1607,6 +1664,135 @@ private fun formatHeaderChange(
 }
 
 @Composable
+private fun CompanyTopBar(onBack: () -> Unit, title: String) {
+    Row(Modifier.fillMaxWidth().height(52.dp), verticalAlignment = Alignment.CenterVertically) {
+        IconButton(onClick = onBack, modifier = Modifier.size(42.dp)) {
+            Icon(Icons.Default.ArrowBack, "Back", tint = Color.White, modifier = Modifier.size(28.dp))
+        }
+        Text(title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.weight(1f))
+        Box(Modifier.size(38.dp), contentAlignment = Alignment.Center) {
+            Icon(Icons.Default.NotificationsNone, null, tint = Color.White, modifier = Modifier.size(27.dp))
+            Surface(Modifier.size(9.dp).align(Alignment.TopEnd).offset(x = (-4).dp, y = 5.dp), RoundedCornerShape(50), color = Color(0xFFFF4D5A)) {}
+        }
+        IconButton(onClick = { }, modifier = Modifier.size(38.dp)) {
+            Icon(Icons.Default.MoreVert, "More", tint = Color.White, modifier = Modifier.size(27.dp))
+        }
+    }
+}
+
+@Composable
+private fun CompanyHeroHeader(stock: Stock) {
+    val hasPrice = stock.price.isFinite() && stock.dataOrigin == "backend"
+    val hasChange = stock.changeAvailable && stock.change.isFinite() && stock.dataOrigin == "backend"
+    val change = stock.change
+    Row(Modifier.fillMaxWidth().padding(top = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+        CompanyLogo(stock.symbol, 62, stock.logoUrl)
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(stock.name, color = Color.White, fontSize = 25.sp, fontWeight = FontWeight.ExtraBold, maxLines = 2)
+            Text("${stock.symbol}  •  NSE", color = CompanyMuted, fontSize = 12.sp)
+            Text(stock.sector.ifBlank { "Market sector unavailable" }, color = CompanyMuted, fontSize = 11.sp, maxLines = 1)
+        }
+        Column(horizontalAlignment = Alignment.End) {
+            Text(if (hasPrice) currencyLabel(stock.price) else "Price unavailable", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold)
+            if (hasChange) {
+                Text(String.format(Locale.US, "%+.2f%%", change), color = if (change >= 0) CompanyAccent else IntelligenceRed, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
+                Text("vs previous close", color = CompanyMuted, fontSize = 10.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompanyTopTabs(selected: String, onSelected: (String) -> Unit) {
+    val tabs = listOf("Overview", "Financials", "News", "Analysis", "About")
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color(0xFF071B2F)).padding(3.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        tabs.forEach { tab ->
+            val active = tab == selected
+            Surface(
+                onClick = { onSelected(tab) },
+                modifier = Modifier.weight(1f).height(45.dp),
+                color = if (active) CompanyAccent else Color.Transparent,
+                contentColor = if (active) Color(0xFF052116) else CompanyMuted,
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(tab, fontSize = 10.sp, fontWeight = if (active) FontWeight.ExtraBold else FontWeight.SemiBold, maxLines = 1)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompanyIntradayChartCard(
+    stock: Stock,
+    history: List<MyStocksCache.HistoryPoint>,
+    selectedPeriodReturn: Double?,
+    loading: Boolean
+) {
+    Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = CompanyCardBg), border = BorderStroke(1.dp, CompanyCardBorder)) {
+        Column(Modifier.padding(horizontal = 18.dp, vertical = 15.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                    Surface(Modifier.size(34.dp), RoundedCornerShape(10.dp), CompanyAccent.copy(alpha = 0.13f)) {
+                        Icon(Icons.Default.AutoGraph, null, tint = CompanyAccent, modifier = Modifier.padding(7.dp))
+                    }
+                    Spacer(Modifier.width(9.dp))
+                    Text("1D Intraday Chart", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(9.dp).background(CompanyAccent, RoundedCornerShape(50)))
+                    Spacer(Modifier.width(5.dp))
+                    Text("NSE session 09:30 – 15:00 EAT", color = CompanyMuted, fontSize = 8.sp)
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            if (loading) {
+                IntelligenceLoader("Loading 1D market history", "Checking the latest exchange observations…")
+            } else if (history.size >= 2) {
+                IntelligenceChart(
+                    points = history,
+                    period = "1D",
+                    tint = if ((selectedPeriodReturn ?: stock.change) >= 0) CompanyAccent else IntelligenceRed,
+                    previousClose = stock.previousClose
+                )
+            } else {
+                Text("Historical market data is not available for this period.", color = CompanyMuted, fontSize = 10.sp)
+            }
+            Spacer(Modifier.height(8.dp))
+            Surface(Modifier.fillMaxWidth(), RoundedCornerShape(14.dp), color = Color(0xFF102B45), border = BorderStroke(1.dp, Color(0xFF1B3A55))) {
+                Row(Modifier.padding(11.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Info, null, tint = CompanyMuted, modifier = Modifier.size(23.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        "The chart shows today's trading session using actual NSE data points. Previous close is shown as a reference line, not a trading price.",
+                        color = CompanyMuted, fontSize = 9.sp, lineHeight = 13.sp, modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompanyIntelligenceLauncher(onClick: () -> Unit) {
+    Card(onClick = onClick, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = CompanyCardBg), border = BorderStroke(1.dp, CompanyCardBorder)) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Surface(Modifier.size(44.dp), RoundedCornerShape(14.dp), CompanyAccent.copy(alpha = 0.12f)) {
+                Icon(Icons.Default.Psychology, null, tint = CompanyAccent, modifier = Modifier.padding(9.dp))
+            }
+            Spacer(Modifier.width(13.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Company Intelligence", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
+                Text("AI-powered insights, financials and key information about this company.", color = CompanyMuted, fontSize = 10.sp, lineHeight = 14.sp)
+            }
+            Icon(Icons.Default.ChevronRight, null, tint = CompanyMuted, modifier = Modifier.size(27.dp))
+        }
+    }
+}
+
+@Composable
 private fun TodayAtAGlance(
     stock: Stock,
     historyResult: MyStocksCache.HistoryResult,
@@ -1617,142 +1803,98 @@ private fun TodayAtAGlance(
     val actualPoints = historyResult.points.filter { it.close.isFinite() && it.close > 0.0 }
     val dayHigh = actualPoints.maxOfOrNull { it.close }
     val dayLow = actualPoints.minOfOrNull { it.close }
-    val hasSession = latest != null && latest > 0.0
-    val observedRaw = historyResult.sessionCloseAt
-        .takeIf { it.isNotBlank() }
+    val dailyMove = stock.change.takeIf {
+        stock.changeAvailable && it.isFinite() && stock.dataOrigin == "backend"
+    } ?: stock.previousClose?.takeIf { it > 0.0 }?.let { previous ->
+        latest?.takeIf { it > 0.0 }?.let { current -> ((current - previous) / previous) * 100.0 }
+    }
+    val sinceOpen = if (open != null && open > 0.0 && latest != null && latest > 0.0) {
+        ((latest - open) / open) * 100.0
+    } else null
+    val observedRaw = historyResult.sessionCloseAt.takeIf { it.isNotBlank() }
         ?: historyResult.observedAt.takeIf { it.isNotBlank() }
-    val observed = observedRaw?.let(::formatChartTimestamp)
-    val sessionDate = observedRaw?.let(::formatChartTimestampDate)
-    val nextOpen = marketStatus.nextOpen.takeIf { it.isNotBlank() }?.let(::formatChartTimestamp)
+    val observed = observedRaw?.let(::formatChartTimestamp)?.removeSuffix(" EAT")
     val known = marketStatus.isKnown
-    val openSession = known && marketStatus.isOpen
+    val isOpen = known && marketStatus.isOpen
 
-    SectionTitle(
-        "Today at a glance",
-        when {
-            openSession -> "NSE session • latest available data"
-            known -> "NSE session • latest available observation"
-            else -> "NSE session status is currently unavailable"
-        },
-        Icons.Default.Schedule
-    )
-
-    IntelligenceCard {
-        when {
-            !known -> {
-                Text(
-                    "Market status is currently unavailable. No current-session state is inferred.",
-                    color = IntelligenceMuted,
-                    fontSize = 10.sp
-                )
+    Card(
+        Modifier.fillMaxWidth(),
+        RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = CompanyCardBg),
+        border = BorderStroke(1.dp, CompanyCardBorder)
+    ) {
+        Column(Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(Modifier.size(34.dp), RoundedCornerShape(10.dp), CompanyAccent.copy(alpha = 0.13f)) {
+                    Icon(Icons.Default.AutoGraph, null, tint = CompanyAccent, modifier = Modifier.padding(7.dp))
+                }
+                Spacer(Modifier.width(10.dp))
+                Text("Today at a glance", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
             }
-            !hasSession -> {
-                Text(
-                    "Today's intraday price summary is not available from the current market feed.",
-                    color = IntelligenceMuted,
-                    fontSize = 10.sp
-                )
-                nextOpen?.let {
-                    Spacer(Modifier.height(6.dp))
-                    Text("Next regular session: " + it, color = IntelligenceMuted, fontSize = 8.sp)
+            Spacer(Modifier.height(16.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Column(Modifier.weight(1f)) {
+                    CompanyFact("Previous close", stock.previousClose?.let(::currencyLabel) ?: "—")
+                    Spacer(Modifier.height(22.dp))
+                    CompanyFact("Day high", dayHigh?.let(::currencyLabel) ?: "—")
+                    Spacer(Modifier.height(22.dp))
+                    CompanyFact("Latest observation", latest?.let(::currencyLabel) ?: "—")
                 }
-            }
-            else -> {
-                val intradayMove = if (open != null && open > 0.0 && latest != null) {
-                    ((latest - open) / open) * 100.0
-                } else null
-
-                val dailyMove = stock.change.takeIf {
-                    stock.changeAvailable && it.isFinite() && stock.dataOrigin == "backend"
-                } ?: stock.previousClose?.takeIf { it > 0.0 }?.let { previous ->
-                    latest?.takeIf { it > 0.0 }?.let { current ->
-                        ((current - previous) / previous) * 100.0
-                    }
+                Box(Modifier.width(1.dp).height(190.dp).background(CompanyCardBorder))
+                Column(Modifier.weight(1f)) {
+                    CompanyFact("Today's open", open?.let(::currencyLabel) ?: "—")
+                    Spacer(Modifier.height(22.dp))
+                    CompanyFact("Day low", dayLow?.let(::currencyLabel) ?: "—")
+                    Spacer(Modifier.height(22.dp))
+                    CompanyFact("Observed at", observed ?: "—")
                 }
-
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    stock.previousClose?.takeIf { it > 0.0 }?.let {
-                        Box(Modifier.weight(1f)) { MiniFact("PREVIOUS CLOSE", currencyLabel(it)) }
-                    }
-                    open?.takeIf { it > 0.0 }?.let {
-                        Box(Modifier.weight(1f)) { MiniFact("TODAY'S OPEN", currencyLabel(it)) }
-                    }
-                    dayHigh?.let {
-                        Box(Modifier.weight(1f)) { MiniFact("DAY HIGH", currencyLabel(it)) }
-                    }
-                }
-
-                Spacer(Modifier.height(8.dp))
-
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    dayLow?.let {
-                        Box(Modifier.weight(1f)) { MiniFact("DAY LOW", currencyLabel(it)) }
-                    }
-                    latest?.takeIf { it > 0.0 }?.let {
-                        Box(Modifier.weight(1f)) { MiniFact("LATEST OBSERVATION", currencyLabel(it)) }
-                    }
-                    observed?.let {
-                        Box(Modifier.weight(1f)) { MiniFact("OBSERVED AT", it.removeSuffix(" EAT")) }
-                    }
-                }
-
-                Spacer(Modifier.height(9.dp))
-
-                if (!openSession) {
+                Box(Modifier.width(1.dp).height(190.dp).background(CompanyCardBorder))
+                Column(Modifier.weight(1f)) {
+                    Text("Today's change", color = CompanyMuted, fontSize = 10.sp)
+                    Spacer(Modifier.height(3.dp))
                     Text(
-                        "MARKET CLOSED",
-                        color = IntelligenceText,
-                        fontSize = 11.sp,
+                        dailyMove?.let { String.format(Locale.US, "%+.2f%%", it) } ?: "—",
+                        color = dailyMove?.let { if (it >= 0) CompanyAccent else IntelligenceRed } ?: CompanyMuted,
+                        fontSize = 22.sp,
                         fontWeight = FontWeight.ExtraBold
                     )
-                    sessionDate?.let {
-                        Text("Today's NSE session • " + it, color = IntelligenceMuted, fontSize = 8.sp)
-                    }
-                }
-
-                dailyMove?.let {
+                    Text("vs previous close", color = CompanyMuted, fontSize = 9.sp)
+                    stock.previousClose?.let { Text("(${currencyLabel(it)})", color = CompanyMuted, fontSize = 8.sp) }
+                    Spacer(Modifier.height(28.dp))
+                    Text("Since open", color = CompanyMuted, fontSize = 10.sp)
+                    Spacer(Modifier.height(3.dp))
                     Text(
-                        "Today's change " + String.format(Locale.US, "%+.2f%%", it) + " vs previous close",
-                        color = if (it >= 0.0) IntelligenceGreen else IntelligenceRed,
-                        fontSize = 10.sp,
+                        sinceOpen?.let { String.format(Locale.US, "%+.2f%%", it) } ?: "—",
+                        color = sinceOpen?.let { if (it >= 0) CompanyAccent else IntelligenceRed } ?: CompanyMuted,
+                        fontSize = 18.sp,
                         fontWeight = FontWeight.ExtraBold
                     )
+                    if (open != null && latest != null) {
+                        Text("(${currencyLabel(open)} → ${currencyLabel(latest)})", color = CompanyMuted, fontSize = 8.sp)
+                    }
                 }
-
-                intradayMove?.let {
-                    Text(
-                        "Since open " + String.format(Locale.US, "%+.2f%%", it),
-                        color = if (it >= 0.0) IntelligenceGreen else IntelligenceRed,
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-
-                observed?.let {
-                    Text(
-                        "Latest observation: " + it + " • exchange-supplied • 15 min delayed",
-                        color = IntelligenceMuted,
-                        fontSize = 8.sp
-                    )
-                }
-
-                if (!openSession) {
-                    Text(
-                        "The feed is showing the latest available observation; it is not labelled as a final close unless the source confirms one.",
-                        color = IntelligenceMuted,
-                        fontSize = 8.sp,
-                        lineHeight = 12.sp
-                    )
-                }
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    when {
+                        !known -> "NSE status unavailable"
+                        isOpen -> "NSE session • latest available data"
+                        else -> "NSE session • latest available observation"
+                    },
+                    color = CompanyMuted, fontSize = 8.sp
+                )
+                Text("~15 min delayed", color = CompanyMuted, fontSize = 8.sp)
             }
         }
     }
+}
+
+@Composable
+private fun CompanyFact(label: String, value: String) {
+    Text(label, color = CompanyMuted, fontSize = 10.sp)
+    Spacer(Modifier.height(3.dp))
+    Text(value, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
 }
 
 private fun formatChartTimestamp(raw: String): String = runCatching {
