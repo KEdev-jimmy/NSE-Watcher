@@ -242,12 +242,7 @@ private fun MarketFreshnessStrip(stocks: List<Stock>, marketStatus: MyStocksCach
     }
     val available = stocks.filter { it.price.isFinite() && it.price > 0.0 }
     val source = available.map { it.source.trim() }.firstOrNull { it.isNotBlank() } ?: "Market source unavailable"
-    val freshness = when {
-        available.any { it.freshnessMode == "CURRENT_SESSION" } -> "Current session"
-        available.any { it.freshnessMode == "END_OF_DAY" } -> "End-of-day observation"
-        available.any { it.freshnessMode == "STALE" } -> "Previous session"
-        else -> "Freshness unknown"
-    }
+    val newestObservedAt = available.mapNotNull { it.observedAt.takeIf(String::isNotBlank)?.let(::parseObservationTime) }.maxOrNull()\n    val ageMinutes = newestObservedAt?.let { ((System.currentTimeMillis() - it.toEpochMilli()).coerceAtLeast(0L) / 60_000L) }\n    val freshness = when {\n        available.isEmpty() -> "Data unavailable"\n        !marketStatus.isKnown -> "Freshness unknown"\n        !marketStatus.isOpen -> "Previous session"\n        newestObservedAt == null -> "Freshness unknown"\n        ageMinutes != null && ageMinutes > 30 -> "Stale • \${ageMinutes}m old"\n        ageMinutes != null -> "Delayed • \${ageMinutes}m old"\n        else -> "Freshness unknown"\n    }
     val coverage = if (available.isNotEmpty()) available.size.toString() + " valid quotes" else "No valid quotes"
     val refreshStatus = when {
         controllerState.refreshInProgress -> "Refreshing market data…"
@@ -255,7 +250,7 @@ private fun MarketFreshnessStrip(stocks: List<Stock>, marketStatus: MyStocksCach
         controllerState.lastSuccessfulRefreshMs == null -> "Waiting for first refresh"
         !marketStatus.isKnown -> controllerState.lastSuccessfulRefreshMs?.let { "Market status unavailable • Last checked " + formatLocalTime(it) } ?: "Market status unavailable"
         !marketStatus.isOpen -> controllerState.lastSuccessfulRefreshMs?.let { closedMarketStatus(marketStatus, it) } ?: "Market closed"
-        else -> "Next data check " + MarketRefreshController.formatCountdown(MarketRefreshController.secondsUntilNextCheck(nowMs))
+        else -> { val next = MarketRefreshController.formatCountdown(MarketRefreshController.secondsUntilNextCheck(nowMs)); if (available.isEmpty()) "Market open • data unavailable" else "Market open • delayed feed • next check $next" }
     }
     Surface(
         Modifier.fillMaxWidth().padding(horizontal = 14.dp),
@@ -276,7 +271,7 @@ private fun MarketFreshnessStrip(stocks: List<Stock>, marketStatus: MyStocksCach
             Text(refreshStatus, color = HomeDarkGreen, fontSize = 8.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 21.dp, top = 3.dp))
             Text(
                 if (marketStatus.isOpen) {
-                    "Source: $source • Next check means the app will check the feed; the provider may return unchanged data."
+                    "Source: $source • ${if (ageMinutes != null) "Latest observation ${ageMinutes}m ago." else "Observation time unavailable."} The feed is exchange-supplied and delayed; unchanged prices can be legitimate."
                 } else if (!marketStatus.isKnown) {
                     "Source: $source • Market status is unavailable, so no open/closed state is inferred."
                 } else {
@@ -300,6 +295,8 @@ private fun closedMarketStatus(status: MyStocksCache.MarketStatus, lastSuccessfu
 private fun formatNairobiTime(value: String): String? = runCatching {
     Instant.parse(value).atZone(ZoneId.of("Africa/Nairobi")).toLocalTime().toString().take(5) + " EAT"
 }.getOrNull()
+
+private fun parseObservationTime(value: String): Instant? = runCatching { Instant.parse(value) }.getOrNull()
 
 private fun formatLocalTime(valueMs: Long): String =
     Instant.ofEpochMilli(valueMs).atZone(ZoneId.of("Africa/Nairobi")).toLocalTime().toString().take(5) + " EAT"
