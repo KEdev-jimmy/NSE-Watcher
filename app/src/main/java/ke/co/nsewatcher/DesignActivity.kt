@@ -1425,5 +1425,5 @@ private fun selectedTypeLabel(type:AlertType):String=when(type){
             Spacer(Modifier.height(9.dp))
             Text("Nairobi skyline photo: Antony Trivet • Creative Commons BY-SA 4.0",fontSize=9.sp,color=Muted)
             Text("Used as a visual background with attribution.",fontSize=9.sp,color=Muted,modifier=Modifier.padding(top=2.dp))
-        )}}}}
+        }}}}
 @Composable private fun Note(text:String){Card(Modifier.fillMaxWidth(),RoundedCornerShape(14.dp),colors=CardDefaults.cardColors(containerColor=LightGreen)){Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically){Icon(Icons.Default.Info,null,tint=Green);Spacer(Modifier.width(9.dp));Text(text,fontSize=9.sp,color=Muted)}}}
