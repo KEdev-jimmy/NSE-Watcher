@@ -743,14 +743,59 @@ private fun ApprovedIntradayCanvas(
     latest: Double?,
     modifier: Modifier
 ) {
-    Canvas(modifier) {
+    var zoom by remember(points.size) { mutableFloatStateOf(1f) }
+    var viewportStartMinutes by remember(points.size) { mutableFloatStateOf(0f) }
+
+    val sessionStartMinutes = 9 * 60 + 30
+    val sessionEndMinutes = 15 * 60
+    val sessionSpanMinutes = (sessionEndMinutes - sessionStartMinutes).toFloat()
+
+    fun clampViewport(nextZoom: Float, nextStart: Float): Float {
+        val span = sessionSpanMinutes / nextZoom.coerceIn(1f, 4f)
+        return nextStart.coerceIn(0f, max(0f, sessionSpanMinutes - span))
+    }
+
+    val gestureModifier = modifier
+        .clipToBounds()
+        .pointerInput(points.size) {
+            detectTransformGestures { centroid, pan, gestureZoom, _ ->
+                val oldZoom = zoom
+                val newZoom = (zoom * gestureZoom).coerceIn(1f, 4f)
+                val width = size.width.toFloat().coerceAtLeast(1f)
+                val currentSpan = sessionSpanMinutes / oldZoom
+                val anchorMinutes = viewportStartMinutes +
+                    ((centroid.x / width).coerceIn(0f, 1f) * currentSpan)
+                val newSpan = sessionSpanMinutes / newZoom
+                val desiredStart = anchorMinutes -
+                    ((centroid.x / width).coerceIn(0f, 1f) * newSpan) -
+                    (pan.x / width) * newSpan
+                zoom = newZoom
+                viewportStartMinutes = clampViewport(newZoom, desiredStart)
+            }
+        }
+
+    Canvas(gestureModifier) {
         val left = 50f
-        val right = 76f
+        val right = 104f
         val top = 18f
         val bottom = 50f
         val plotWidth = max(1f, size.width - left - right)
         val plotHeight = max(1f, size.height - top - bottom)
-        val values = (points.map { it.close } + listOfNotNull(previousClose)).filter { it.isFinite() && it > 0.0 }
+        val visibleSpanMinutes = sessionSpanMinutes / zoom
+        val visibleStart = viewportStartMinutes
+        val visibleEnd = visibleStart + visibleSpanMinutes
+
+        val visiblePoints = points.mapIndexedNotNull { index, point ->
+            if (!point.close.isFinite() || point.close <= 0.0) null
+            else {
+                val minute = approvedChartMinutes(point.date)?.toFloat()
+                    ?: (sessionStartMinutes + sessionSpanMinutes * index / max(1, points.lastIndex))
+                Triple(index, point, minute)
+            }
+        }
+
+        val values = (visiblePoints.map { it.second.close } + listOfNotNull(previousClose, latest))
+            .filter { it.isFinite() && it > 0.0 }
         if (values.isEmpty()) return@Canvas
 
         val minValue = values.minOrNull() ?: 0.0
@@ -760,41 +805,164 @@ private fun ApprovedIntradayCanvas(
         val yMax = maxValue + pad
         val range = max(0.0001, yMax - yMin)
 
-        fun xAt(i: Int) = left + if (points.size <= 1) 0f else plotWidth * i / points.lastIndex.toFloat()
-        fun yAt(v: Double) = top + plotHeight - (((v - yMin) / range).toFloat() * plotHeight)
+        fun xAtMinute(minute: Float): Float =
+            left + ((minute - visibleStart) / visibleSpanMinutes).coerceIn(0f, 1f) * plotWidth
+
+        fun yAt(value: Double): Float =
+            top + plotHeight - (((value - yMin) / range).toFloat() * plotHeight)
 
         repeat(6) { i ->
             val y = top + plotHeight * i / 5f
-            drawLine(Color(0xFF17364F), androidx.compose.ui.geometry.Offset(left, y), androidx.compose.ui.geometry.Offset(left + plotWidth, y), strokeWidth = 1f)
+            drawLine(
+                Color(0xFF17364F),
+                androidx.compose.ui.geometry.Offset(left, y),
+                androidx.compose.ui.geometry.Offset(left + plotWidth, y),
+                strokeWidth = 1f
+            )
+        }
+
+        val tickStep = when {
+            zoom >= 3f -> 15f
+            zoom >= 1.8f -> 30f
+            else -> 60f
+        }
+        var tick = kotlin.math.ceil(visibleStart / tickStep) * tickStep
+        while (tick <= visibleEnd + 0.1f) {
+            val x = xAtMinute(tick)
+            drawLine(
+                Color(0xFF102B40),
+                androidx.compose.ui.geometry.Offset(x, top),
+                androidx.compose.ui.geometry.Offset(x, top + plotHeight),
+                strokeWidth = 1f
+            )
+            tick += tickStep
         }
 
         previousClose?.takeIf { it.isFinite() && it > 0.0 }?.let {
             val y = yAt(it)
             var x = left
             while (x < left + plotWidth) {
-                drawLine(Color(0xFF637FF0), androidx.compose.ui.geometry.Offset(x, y), androidx.compose.ui.geometry.Offset(min(x + 10f, left + plotWidth), y), strokeWidth = 3f)
+                drawLine(
+                    Color(0xFF8B78FF),
+                    androidx.compose.ui.geometry.Offset(x, y),
+                    androidx.compose.ui.geometry.Offset(min(x + 10f, left + plotWidth), y),
+                    strokeWidth = 3f
+                )
                 x += 16f
+            }
+
+            val bubbleWidth = 82f
+            val bubbleHeight = 46f
+            val bubbleLeft = left + plotWidth + 8f
+            val bubbleTop = (y - bubbleHeight / 2f).coerceIn(top, top + plotHeight - bubbleHeight)
+            drawRoundRect(
+                Color(0xFF8B78FF),
+                androidx.compose.ui.geometry.Offset(bubbleLeft, bubbleTop),
+                androidx.compose.ui.geometry.Size(bubbleWidth, bubbleHeight),
+                androidx.compose.ui.geometry.CornerRadius(9f)
+            )
+            drawContext.canvas.nativeCanvas.drawText(
+                String.format(Locale.US, "%.2f", it),
+                bubbleLeft + bubbleWidth / 2f,
+                bubbleTop + 19f,
+                android.graphics.Paint().apply {
+                    isAntiAlias = true
+                    color = android.graphics.Color.WHITE
+                    textSize = 13f
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                    textAlign = android.graphics.Paint.Align.CENTER
+                }
+            )
+            drawContext.canvas.nativeCanvas.drawText(
+                "PREV CLOSE",
+                bubbleLeft + bubbleWidth / 2f,
+                bubbleTop + 36f,
+                android.graphics.Paint().apply {
+                    isAntiAlias = true
+                    color = android.graphics.Color.WHITE
+                    textSize = 9f
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                    textAlign = android.graphics.Paint.Align.CENTER
+                }
+            )
+        }
+
+        val line = Path()
+        var hasLinePoint = false
+        visiblePoints.forEach { (_, point, minute) ->
+            if (minute < visibleStart - 1f || minute > visibleEnd + 1f) return@forEach
+            val x = xAtMinute(minute)
+            val y = yAt(point.close)
+            if (!hasLinePoint) {
+                line.moveTo(x, y)
+                hasLinePoint = true
+            } else {
+                line.lineTo(x, y)
             }
         }
 
-        if (points.isNotEmpty()) {
-            val line = Path()
-            points.forEachIndexed { i, p ->
-                val x = xAt(i); val y = yAt(p.close)
-                if (i == 0) line.moveTo(x, y) else line.lineTo(x, y)
+        if (hasLinePoint) {
+            val fill = Path()
+            val first = visiblePoints.firstOrNull { it.third >= visibleStart }
+            val last = visiblePoints.lastOrNull { it.third <= visibleEnd }
+            if (first != null && last != null) {
+                fill.moveTo(xAtMinute(first.third), top + plotHeight)
+                visiblePoints.filter { it.third in visibleStart..visibleEnd }.forEach { (_, point, minute) ->
+                    fill.lineTo(xAtMinute(minute), yAt(point.close))
+                }
+                fill.lineTo(xAtMinute(last.third), top + plotHeight)
+                fill.close()
+                drawPath(fill, Color(0xFF00D084).copy(alpha = .11f))
             }
-            val fill = Path().apply {
-                moveTo(xAt(0), top + plotHeight)
-                points.forEachIndexed { i, p -> lineTo(xAt(i), yAt(p.close)) }
-                lineTo(xAt(points.lastIndex), top + plotHeight)
-                close()
-            }
-            drawPath(fill, Color(0xFF00D084).copy(alpha = .11f))
             drawPath(line, Color(0xFF00D084), style = Stroke(width = 4.2f, cap = StrokeCap.Round))
-            val last = points.last()
-            val lx = xAt(points.lastIndex); val ly = yAt(last.close)
-            drawCircle(Color(0xFF00D084), 6.5f, androidx.compose.ui.geometry.Offset(lx, ly))
         }
+
+        fun drawMarker(point: MyStocksCache.HistoryPoint?, label: String, tint: Color, alignLeft: Boolean) {
+            if (point == null || !point.close.isFinite() || point.close <= 0.0) return
+            val minute = approvedChartMinutes(point.date)?.toFloat() ?: return
+            if (minute < visibleStart || minute > visibleEnd) return
+            val x = xAtMinute(minute)
+            val y = yAt(point.close)
+            drawCircle(tint, 6.5f, androidx.compose.ui.geometry.Offset(x, y))
+            val bubbleWidth = if (label == "OPEN") 68f else 76f
+            val bubbleHeight = 44f
+            val desiredLeft = if (alignLeft) x - bubbleWidth - 8f else x + 8f
+            val bubbleLeft = desiredLeft.coerceIn(left, left + plotWidth - bubbleWidth)
+            val bubbleTop = (y - bubbleHeight / 2f).coerceIn(top, top + plotHeight - bubbleHeight)
+            drawRoundRect(
+                tint,
+                androidx.compose.ui.geometry.Offset(bubbleLeft, bubbleTop),
+                androidx.compose.ui.geometry.Size(bubbleWidth, bubbleHeight),
+                androidx.compose.ui.geometry.CornerRadius(9f)
+            )
+            drawContext.canvas.nativeCanvas.drawText(
+                String.format(Locale.US, "%.2f", point.close),
+                bubbleLeft + bubbleWidth / 2f,
+                bubbleTop + 19f,
+                android.graphics.Paint().apply {
+                    isAntiAlias = true
+                    color = android.graphics.Color.rgb(4,35,24)
+                    textSize = 13f
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                    textAlign = android.graphics.Paint.Align.CENTER
+                }
+            )
+            drawContext.canvas.nativeCanvas.drawText(
+                label,
+                bubbleLeft + bubbleWidth / 2f,
+                bubbleTop + 35f,
+                android.graphics.Paint().apply {
+                    isAntiAlias = true
+                    color = android.graphics.Color.rgb(4,35,24)
+                    textSize = 9f
+                    typeface = android.graphics.Typeface.DEFAULT_BOLD
+                    textAlign = android.graphics.Paint.Align.CENTER
+                }
+            )
+        }
+
+        drawMarker(points.firstOrNull(), "OPEN", Color(0xFF6BE7B3), alignLeft = false)
+        drawMarker(points.lastOrNull(), "CLOSE", Color(0xFF00D084), alignLeft = true)
 
         val scale = (0 until 6).map { i -> yMax - (yMax - yMin) * i / 5 }
         scale.forEachIndexed { i, value ->
@@ -812,56 +980,51 @@ private fun ApprovedIntradayCanvas(
             )
         }
 
-        if (points.size > 1) {
-            val count = min(5, points.size)
-            repeat(count) { i ->
-                val index = (points.lastIndex.toDouble() * i / (count - 1)).toInt()
-                val x = xAt(index)
-                drawContext.canvas.nativeCanvas.drawText(
-                    approvedChartTime(points[index].date),
-                    x,
-                    size.height - 12f,
-                    android.graphics.Paint().apply {
-                        isAntiAlias = true
-                        color = android.graphics.Color.rgb(169,188,208)
-                        textSize = 14f
-                        textAlign = android.graphics.Paint.Align.CENTER
-                    }
-                )
-            }
+        var labelTick = kotlin.math.ceil(visibleStart / tickStep) * tickStep
+        while (labelTick <= visibleEnd + 0.1f) {
+            val x = xAtMinute(labelTick)
+            drawContext.canvas.nativeCanvas.drawText(
+                approvedMinuteLabel(sessionStartMinutes + labelTick),
+                x,
+                size.height - 12f,
+                android.graphics.Paint().apply {
+                    isAntiAlias = true
+                    color = android.graphics.Color.rgb(169,188,208)
+                    textSize = 12f
+                    textAlign = android.graphics.Paint.Align.CENTER
+                }
+            )
+            labelTick += tickStep
         }
 
-        if (points.isNotEmpty()) {
-            val p = points.last()
-            val bubbleLeft = left + plotWidth + 8f
-            val bubbleTop = max(top, yAt(p.close) - 27f)
-            drawRoundRect(Color(0xFF00D084), androidx.compose.ui.geometry.Offset(bubbleLeft, bubbleTop), androidx.compose.ui.geometry.Size(right - 14f, 52f), androidx.compose.ui.geometry.CornerRadius(10f))
-            drawContext.canvas.nativeCanvas.drawText(
-                String.format(Locale.US, "%.2f", p.close),
-                bubbleLeft + (right - 14f) / 2f,
-                bubbleTop + 20f,
-                android.graphics.Paint().apply {
-                    isAntiAlias = true
-                    color = android.graphics.Color.rgb(4,35,24)
-                    textSize = 15f
-                    typeface = android.graphics.Typeface.DEFAULT_BOLD
-                    textAlign = android.graphics.Paint.Align.CENTER
-                }
-            )
-            drawContext.canvas.nativeCanvas.drawText(
-                approvedChartTime(p.date),
-                bubbleLeft + (right - 14f) / 2f,
-                bubbleTop + 40f,
-                android.graphics.Paint().apply {
-                    isAntiAlias = true
-                    color = android.graphics.Color.rgb(4,35,24)
-                    textSize = 12f
-                    typeface = android.graphics.Typeface.DEFAULT_BOLD
-                    textAlign = android.graphics.Paint.Align.CENTER
-                }
-            )
-        }
+        drawContext.canvas.nativeCanvas.drawText(
+            if (zoom > 1.05f) "Zoom " + String.format(Locale.US, "%.1fx", zoom) + " • pinch / drag to explore"
+            else "Pinch to zoom • drag to explore the session",
+            left + plotWidth / 2f,
+            12f,
+            android.graphics.Paint().apply {
+                isAntiAlias = true
+                color = android.graphics.Color.rgb(169,188,208)
+                textSize = 10f
+                textAlign = android.graphics.Paint.Align.CENTER
+            }
+        )
     }
+}
+
+private fun approvedChartMinutes(raw: String): Int? {
+    if (raw.isBlank()) return null
+    val local = runCatching {
+        Instant.parse(raw).atZone(ZoneId.of("Africa/Nairobi")).toLocalTime()
+    }.getOrNull() ?: return null
+    return local.hour * 60 + local.minute
+}
+
+private fun approvedMinuteLabel(totalMinutes: Float): String {
+    val rounded = totalMinutes.toInt().coerceIn(0, 23 * 60 + 59)
+    val hour = rounded / 60
+    val minute = rounded % 60
+    return String.format(Locale.US, "%02d:%02d", hour, minute)
 }
 
 private fun approvedObservedTime(raw: String): String {
