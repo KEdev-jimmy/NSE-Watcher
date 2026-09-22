@@ -1162,21 +1162,24 @@ fun CompanyIntelligence(
     val latest = historyResult.sessionClose?.takeIf { it.isFinite() && it > 0.0 }
         ?: points.lastOrNull()?.close
         ?: s.price.takeIf { it.isFinite() && it > 0.0 }
-    val open = historyResult.sessionOpen?.takeIf { it.isFinite() && it > 0.0 }
-        ?: points.firstOrNull()?.close
-    val dayHigh = points.maxOfOrNull { it.close }
-    val dayLow = points.minOfOrNull { it.close }
+    val observedOhlc = CompanyChartAccuracy.observedOhlc(points)
+    val open = observedOhlc.open
+    val dayHigh = observedOhlc.high
+    val dayLow = observedOhlc.low
     val observedAt = historyResult.sessionCloseAt.ifBlank {
         historyResult.observedAt
     }.ifBlank {
         points.lastOrNull()?.date.orEmpty()
-    }
+    }.ifBlank { if (points.isEmpty()) s.observedAt else "" }
 
-    // Today's change is authoritative provider data already normalized by
-    // MyStocksCache from the API's changePct field. Do not recalculate it
-    // from prices in the UI. If the API does not provide it, show it as unavailable.
+    // History change is calculated by the backend. A quote fallback must belong
+    // to the displayed session and explicitly have an available change.
     val dailyChange = historyResult.dailyChangePct?.takeIf { it.isFinite() }
-        ?: s.change.takeIf { it.isFinite() }
+        ?: s.change.takeIf {
+            it.isFinite() && s.changeAvailable &&
+                CompanyChartAccuracy.observationDate(s.observedAt) != null &&
+                CompanyChartAccuracy.observationDate(s.observedAt) == CompanyChartAccuracy.observationDate(observedAt)
+        }
 
     // "Since open today" is intentionally kept separate: it is a different
     // metric from the provider's close-to-close daily change.
@@ -1400,8 +1403,8 @@ private fun MobileCompanyIntelligenceLayout(
                             Text("Data-backed observations from the currently available company and market fields.", color = Color(0xFFA9BCD0), fontSize = 12.sp, lineHeight = 17.sp)
                             EvidenceRow("Latest", latest?.let(::currencyLabel) ?: "Unavailable")
                             EvidenceRow("Previous close", previousClose?.let(::currencyLabel) ?: "Unavailable")
-                            EvidenceRow("Today's change", dailyChange?.let { String.format(Locale.US, "%+.2f%%", it) } ?: "Unavailable")
-                            EvidenceRow("Since open", sinceOpen?.let { String.format(Locale.US, "%+.2f%%", it) } ?: "Unavailable")
+                            EvidenceRow("Session change", dailyChange?.let { String.format(Locale.US, "%+.2f%%", it) } ?: "Unavailable")
+                            EvidenceRow("Since observed open", sinceOpen?.let { String.format(Locale.US, "%+.2f%%", it) } ?: "Unavailable")
                             EvidenceRow("P/E", profile.pe.ifBlank { "Unavailable" })
                             EvidenceRow("ROE", profile.roe.ifBlank { "Unavailable" })
                             EvidenceRow("Net margin", profile.margin.ifBlank { "Unavailable" })
@@ -1447,18 +1450,18 @@ private fun MobileGlanceCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.ShowChart, null, tint = Color(0xFF19E7D0), modifier = Modifier.size(if (phone) 27.dp else 33.dp))
                 Spacer(Modifier.width(10.dp))
-                Text("Today at a glance", color = Color.White, fontSize = if (phone) 18.sp else 26.sp, fontWeight = FontWeight.ExtraBold)
+                Text(CompanyChartAccuracy.sessionTitle(observedAt), color = Color.White, fontSize = if (phone) 18.sp else 26.sp, fontWeight = FontWeight.ExtraBold)
             }
             Spacer(Modifier.height(if (phone) 18.dp else 25.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(if (phone) 8.dp else 22.dp)) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(if (phone) 17.dp else 25.dp)) {
                     ApprovedMetric(Icons.Default.ShowChart, "Previous close", previousClose?.let(::currencyLabel) ?: "Unavailable", phone = phone)
-                    ApprovedMetric(Icons.Default.ArrowUpward, "Day high", high?.let(::currencyLabel) ?: "Unavailable", phone = phone)
-                    ApprovedMetric(Icons.Default.AccessTime, "Today's close", latest?.let(::currencyLabel) ?: "Unavailable", phone = phone)
+                    ApprovedMetric(Icons.Default.ArrowUpward, "Observed high", high?.let(::currencyLabel) ?: "Unavailable", phone = phone)
+                    ApprovedMetric(Icons.Default.AccessTime, "Latest observation", latest?.let(::currencyLabel) ?: "Unavailable", phone = phone)
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(if (phone) 17.dp else 25.dp)) {
-                    ApprovedMetric(Icons.Default.ShowChart, "Today's open", open?.let(::currencyLabel) ?: "Unavailable", phone = phone)
-                    ApprovedMetric(Icons.Default.ArrowDownward, "Day low", low?.let(::currencyLabel) ?: "Unavailable", phone = phone)
+                    ApprovedMetric(Icons.Default.ShowChart, "First observed open", open?.let(::currencyLabel) ?: "Unavailable", phone = phone)
+                    ApprovedMetric(Icons.Default.ArrowDownward, "Observed low", low?.let(::currencyLabel) ?: "Unavailable", phone = phone)
                     ApprovedMetric(Icons.Default.AccessTime, "Observed at", approvedObservedTime(observedAt), phone = phone)
                 }
             }
@@ -1467,11 +1470,11 @@ private fun MobileGlanceCard(
             Spacer(Modifier.height(if (phone) 15.dp else 22.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Box(Modifier.weight(1f)) {
-                    ApprovedMovement(dailyChange?.let { it >= 0 }, "Today's change", dailyChange?.let { String.format(Locale.US, "%+.2f%%", it) } ?: "Unavailable",
+                    ApprovedMovement(dailyChange?.let { it >= 0 }, "Session change", dailyChange?.let { String.format(Locale.US, "%+.2f%%", it) } ?: "Unavailable",
                         previousClose?.let { "vs previous close (" + currencyLabel(it) + ")" } ?: "vs previous close", phone = phone)
                 }
                 Box(Modifier.weight(1f)) {
-                    ApprovedMovement(sinceOpen?.let { it >= 0 }, "Since open today", sinceOpen?.let { String.format(Locale.US, "%+.2f%%", it) } ?: "Unavailable",
+                    ApprovedMovement(sinceOpen?.let { it >= 0 }, "Since observed open", sinceOpen?.let { String.format(Locale.US, "%+.2f%%", it) } ?: "Unavailable",
                         if (open != null && latest != null) "(" + currencyLabel(open) + " → " + currencyLabel(latest) + ")" else "Open-to-latest unavailable", phone = phone)
                 }
             }
@@ -1501,7 +1504,7 @@ private fun MobileChartCard(
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.ShowChart, null, tint = Color(0xFF19E7D0), modifier = Modifier.size(if (phone) 27.dp else 31.dp))
                 Spacer(Modifier.width(9.dp))
-                Text("1D Intraday Chart", Modifier.weight(1f), color = Color.White, fontSize = if (phone) 19.sp else 25.sp, fontWeight = FontWeight.ExtraBold)
+                Text(if (selectedRange == "1D") "1D Session Chart" else "$selectedRange Price Chart", Modifier.weight(1f), color = Color.White, fontSize = if (phone) 19.sp else 25.sp, fontWeight = FontWeight.ExtraBold)
                 Box(Modifier.size(9.dp).clip(RoundedCornerShape(50)).background(Color(0xFF00D084)))
             }
             Text(
@@ -1516,7 +1519,7 @@ private fun MobileChartCard(
                 Box(Modifier.fillMaxWidth().height(if (phone) 220.dp else 300.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = Color(0xFF00D084), strokeWidth = 2.dp)
                 }
-            } else if (chartPoints.isEmpty()) {
+            } else if (chartPoints.isEmpty() || (selectedRange != "1D" && chartPoints.size < 2)) {
                 Box(Modifier.fillMaxWidth().height(if (phone) 220.dp else 300.dp), contentAlignment = Alignment.Center) {
                     Text("Chart data unavailable for this period.", color = Color(0xFFA9BCD0), fontSize = 12.sp)
                 }
@@ -1565,9 +1568,9 @@ private fun MobileChartCard(
                     Spacer(Modifier.width(9.dp))
                     Text(
                         if (selectedRange == "1D")
-                            "Today's chart uses actual NSE observations. Previous close is a reference line, not a fabricated intraday observation."
+                            "Latest available session observations; not necessarily today's session. Previous close is a reference, not an intraday trade."
                         else
-                            "Historical charts use the actual candles returned for the selected period. Missing observations are not interpolated.",
+                            "Available historical candles only. Returns require dated observations near both range boundaries; — means insufficient coverage. Gaps are not filled with prices.",
                         color = Color(0xFFA9BCD0),
                         fontSize = 10.sp,
                         lineHeight = 14.sp,
@@ -1585,13 +1588,7 @@ private fun periodReturnPct(
     result: MyStocksCache.HistoryResult,
     oneDayFallback: Double?
 ): Double? {
-    if (range == "1D") {
-        return result.dailyChangePct?.takeIf { it.isFinite() } ?: oneDayFallback
-    }
-    val first = result.points.firstOrNull()?.close
-    val last = result.points.lastOrNull()?.close
-    if (first == null || last == null || !first.isFinite() || !last.isFinite() || first <= 0.0) return null
-    return ((last - first) / first) * 100.0
+    return CompanyChartAccuracy.periodReturn(range, result, oneDayFallback)
 }
 
 @Composable
