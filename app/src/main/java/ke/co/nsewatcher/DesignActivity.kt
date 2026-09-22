@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -163,6 +164,8 @@ private fun App(pickAvatar:()->Unit) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var selected by remember { mutableStateOf(Stock("", "", 0.0, 0.0, emptyList())) }
     var selectedNews by remember { mutableStateOf<NewsItem?>(null) }
+    val directoryState = rememberSaveableStateHolder()
+    var comparisonSymbols by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var dark by rememberSaveable { mutableStateOf(prefs.getBoolean("dark_mode", false)) }
     var name by rememberSaveable { mutableStateOf(prefs.getString("profile_name", "James Waweru") ?: "James Waweru") }
     var username by rememberSaveable { mutableStateOf(prefs.getString("username", "jameswaweru") ?: "jameswaweru") }
@@ -228,13 +231,13 @@ private fun App(pickAvatar:()->Unit) {
     fun go(to:Page){if(to!=page){history=history+page;page=to}}
     fun back(){if(history.isNotEmpty()){page=history.last();history=history.dropLast(1)}else page=Page.HOME}
     BackHandler(enabled=page!=Page.HOME){back()}
-    val scheme=if(page==Page.HOME || page==Page.COMPANY || page==Page.WATCHLIST) CompanyResearchColors else if(page==Page.NEWS) NewsColorScheme else if(dark) darkColorScheme(primary=Color(0xFF32D486),background=Color(0xFF0D1712),surface=Color(0xFF132019),onSurface=Color.White,onBackground=Color.White,onSurfaceVariant=Color(0xFFB7C7BE)) else lightColorScheme(primary=Green,background=Color.White,surface=Color.White,onSurface=TextDark,onBackground=TextDark,onSurfaceVariant=Muted)
+    val scheme=if(page==Page.HOME || page==Page.COMPANIES || page==Page.COMPARE || page==Page.COMPANY || page==Page.WATCHLIST) CompanyResearchColors else if(page==Page.NEWS) NewsColorScheme else if(dark) darkColorScheme(primary=Color(0xFF32D486),background=Color(0xFF0D1712),surface=Color(0xFF132019),onSurface=Color.White,onBackground=Color.White,onSurfaceVariant=Color(0xFFB7C7BE)) else lightColorScheme(primary=Green,background=Color.White,surface=Color.White,onSurface=TextDark,onBackground=TextDark,onSurfaceVariant=Muted)
     MaterialTheme(colorScheme=scheme){Surface(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing),color=scheme.background){
         when(page){
-            Page.HOME,Page.MARKET,Page.NEWS,Page.COMPANIES,Page.PAPER,Page.MORE -> Scaffold(topBar={if(page!=Page.HOME && page!=Page.MARKET && page!=Page.NEWS) TopBar(name,::go)},bottomBar={BottomNav(when(page){Page.HOME->0;Page.MARKET->1;Page.NEWS->2;Page.COMPANIES->3;else->4}, newsStyle=page==Page.NEWS, homeStyle=page==Page.HOME){tab=it;history=emptyList();page=when(it){0->Page.HOME;1->Page.MARKET;2->Page.NEWS;3->Page.COMPANIES;else->Page.MORE}}}){pad->Box(Modifier.fillMaxSize().padding(pad)){when(page){Page.HOME->HomeDashboard(stocks,{selected=it;go(Page.COMPANY)},{selectedNews=it;go(Page.NEWS_DETAIL)},{go(Page.MARKET)},{go(Page.WATCHLIST)},startupNews,startupMarketStatus,startupComplete,name=name,initialCatalog=companyCatalog,practiceEnabled=PaperPortfolioStore.isEnabled(context),practiceCash=PaperPortfolioStore.cash(context),openAllNews={go(Page.NEWS)},openPractice={go(Page.PAPER)},openProfile={go(Page.PROFILE)},openAlertSettings={go(Page.NOTIFICATIONS)},onQuotesLoaded={liveStocks.value=it});Page.MARKET->MarketDashboard(stocks);Page.NEWS->NewsDashboard{selectedNews=it;go(Page.NEWS_DETAIL)};Page.COMPANIES->Companies(companyCatalog, stocks, {selected=it;go(Page.COMPANY)},{go(Page.WATCHLIST)},{go(Page.COMPARE)});Page.PAPER->Paper();else->More(::go)}}}
+            Page.HOME,Page.MARKET,Page.NEWS,Page.COMPANIES,Page.PAPER,Page.MORE -> Scaffold(topBar={if(page!=Page.HOME && page!=Page.MARKET && page!=Page.NEWS && page!=Page.COMPANIES) TopBar(name,::go)},bottomBar={BottomNav(when(page){Page.HOME->0;Page.MARKET->1;Page.NEWS->2;Page.COMPANIES->3;else->4}, newsStyle=page==Page.NEWS, homeStyle=page==Page.HOME || page==Page.COMPANIES){tab=it;history=emptyList();page=when(it){0->Page.HOME;1->Page.MARKET;2->Page.NEWS;3->Page.COMPANIES;else->Page.MORE}}}){pad->Box(Modifier.fillMaxSize().padding(pad)){when(page){Page.HOME->HomeDashboard(stocks,{selected=it;go(Page.COMPANY)},{selectedNews=it;go(Page.NEWS_DETAIL)},{go(Page.MARKET)},{go(Page.WATCHLIST)},startupNews,startupMarketStatus,startupComplete,name=name,initialCatalog=companyCatalog,practiceEnabled=PaperPortfolioStore.isEnabled(context),practiceCash=PaperPortfolioStore.cash(context),openAllNews={go(Page.NEWS)},openPractice={go(Page.PAPER)},openProfile={go(Page.PROFILE)},openAlertSettings={go(Page.NOTIFICATIONS)},onQuotesLoaded={liveStocks.value=it});Page.MARKET->MarketDashboard(stocks);Page.NEWS->NewsDashboard{selectedNews=it;go(Page.NEWS_DETAIL)};Page.COMPANIES->directoryState.SaveableStateProvider("companies"){CompaniesDirectory(catalog=companyCatalog,quotes=stocks,name=name,openCompany={selected=it;go(Page.COMPANY)},openWatchlist={go(Page.WATCHLIST)},openCompare={comparisonSymbols=it;go(Page.COMPARE)},openNews={selectedNews=it;go(Page.NEWS_DETAIL)},openProfile={go(Page.PROFILE)},onCatalogLoaded={companyCatalog=it},onQuotesLoaded={liveStocks.value=it})};Page.PAPER->Paper();else->More(::go)}}}
             Page.COMPANY->Company(selected,::back){selectedNews=it;go(Page.NEWS_DETAIL)}
             Page.WATCHLIST->WatchlistDashboard(quoteStocks=stocks, initialCatalog=companyCatalog, initialMarket=startupMarketStatus, onQuotesLoaded={liveStocks.value=it}, openCompany={selected=it;go(Page.COMPANY)}, openNews={selectedNews=it;go(Page.NEWS_DETAIL)}, openPreferences={go(Page.NOTIFICATIONS)}, back=::back)
-            Page.COMPARE->CompanyComparison(stocks,::back)
+            Page.COMPARE->CompanyComparison(CompaniesPresentation.companies(companyCatalog, stocks),::back,comparisonSymbols)
             Page.NEWS_DETAIL->selectedNews?.let { NewsDetail(it,::back) }
             Page.PROFILE->Profile(name,username,email,description,{name=it;put("profile_name",it)},{username=it;put("username",it)},{email=it;put("email",it)},{description=it;put("description",it)},pickAvatar,::back,::go)
             Page.SETTINGS->Settings(dark,marketAlerts,priceAlerts,newsAlerts,appAlerts,autoRefresh,showVolume,showChanges,{dark=it;put("dark_mode",it)},{marketAlerts=it;put("market_alerts",it)},{priceAlerts=it;put("price_alerts",it)},{newsAlerts=it;put("news_alerts",it)},{appAlerts=it;put("app_alerts",it)},{autoRefresh=it;put("auto_refresh",it)},{showVolume=it;put("show_volume",it)},{showChanges=it;put("show_changes",it)},::back,::go)
@@ -294,103 +297,6 @@ private fun BottomNav(selected: Int, newsStyle: Boolean = false, homeStyle: Bool
     }
 }
 @Composable private fun Header(title:String,sub:String?=null,back:(()->Unit)?=null){Row(Modifier.fillMaxWidth().padding(horizontal=8.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically){if(back!=null)IconButton(back){Icon(Icons.Default.ArrowBack,"Back")};Column{Text(title,fontSize=20.sp,fontWeight=FontWeight.ExtraBold);if(sub!=null)Text(sub,fontSize=10.sp,color=Muted)}}}
-
-@Composable
-private fun Companies(catalog: List<Stock>, quoteStocks: List<Stock>, open:(Stock)->Unit, openWatchlist:()->Unit, openCompare:()->Unit){
-    var query by rememberSaveable{mutableStateOf("")}
-    val displayed = if (catalog.isNotEmpty()) {
-        catalog.map { company ->
-            quoteStocks.firstOrNull { it.symbol.equals(company.symbol, ignoreCase = true) }?.let { quote ->
-                company.copy(
-                    price = quote.price,
-                    change = quote.change,
-                    changeAvailable = quote.changeAvailable,
-                    volume = quote.volume,
-                    volumeAvailable = quote.volumeAvailable,
-                    source = quote.source,
-                    observedAt = quote.observedAt,
-                    freshnessMode = quote.freshnessMode,
-                    dataOrigin = quote.dataOrigin,
-                    averageVolume = quote.averageVolume,
-                    averageVolumeAvailable = quote.averageVolumeAvailable,
-                    previousClose = quote.previousClose,
-                    delayMinutes = quote.delayMinutes
-                )
-            } ?: company
-        }
-    } else quoteStocks
-    val filtered=displayed.filter{it.name.contains(query,true)||it.symbol.contains(query,true)}
-    Box(Modifier.fillMaxSize().background(Color(0xFF062A23))){
-        LazyColumn(contentPadding=PaddingValues(16.dp,0.dp,16.dp,20.dp),verticalArrangement=Arrangement.spacedBy(11.dp)){
-            item{
-                Box(Modifier.fillMaxWidth().height(270.dp).clip(RoundedCornerShape(bottomStart=26.dp,bottomEnd=26.dp))){
-                    Box(Modifier.fillMaxSize().background(Color(0x55052B24)))
-                    Column(Modifier.fillMaxSize().padding(10.dp,20.dp,10.dp,18.dp),verticalArrangement=Arrangement.Bottom){Text("Discover",color=Color.White,fontSize=25.sp,fontWeight=FontWeight.ExtraBold);Text("Great Companies",color=Color.White,fontSize=25.sp,fontWeight=FontWeight.ExtraBold);Spacer(Modifier.height(5.dp));Text("Research. Analyze. Understand.\\nExplore sourced NSE company information.",color=Color.White,fontSize=11.sp)}
-                }
-            }
-            item{CompanyDataCoverage(filtered)}
-            item{OutlinedTextField(value=query,onValueChange={query=it},modifier=Modifier.fillMaxWidth(),singleLine=true,placeholder={Text("Search companies...",color=Muted)},leadingIcon={Icon(Icons.Default.Search,null,tint=Muted)},shape=RoundedCornerShape(24.dp),colors=OutlinedTextFieldDefaults.colors(unfocusedContainerColor=Color.White,focusedContainerColor=Color.White,unfocusedBorderColor=Color.Transparent,focusedBorderColor=Green,unfocusedTextColor=TextDark,focusedTextColor=TextDark))}
-            item{
-                Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){
-                    Text("Companies",color=Color.White,fontWeight=FontWeight.ExtraBold,fontSize=17.sp)
-                    Spacer(Modifier.weight(1f))
-                    OutlinedButton(onClick=openCompare,shape=RoundedCornerShape(18.dp),border=BorderStroke(1.dp,Color(0xFF55E0A0)),contentPadding=PaddingValues(horizontal=11.dp,vertical=4.dp)){
-                        Icon(Icons.Default.StarBorder,null,tint=Color(0xFF55E0A0),modifier=Modifier.size(16.dp));Spacer(Modifier.width(4.dp));Text("Compare",color=Color(0xFF55E0A0),fontSize=10.sp,fontWeight=FontWeight.Bold)
-                    }
-                    Spacer(Modifier.width(6.dp))
-                    OutlinedButton(onClick=openWatchlist,shape=RoundedCornerShape(18.dp),border=BorderStroke(1.dp,Color(0xFF55E0A0)),contentPadding=PaddingValues(horizontal=11.dp,vertical=4.dp)){
-                        Icon(Icons.Default.StarBorder,null,tint=Color(0xFF55E0A0),modifier=Modifier.size(16.dp));Spacer(Modifier.width(4.dp));Text("Watchlist",color=Color(0xFF55E0A0),fontSize=10.sp,fontWeight=FontWeight.Bold)
-                    }
-                }
-            }
-            item{
-                Card(Modifier.fillMaxWidth(),RoundedCornerShape(17.dp),colors=CardDefaults.cardColors(containerColor=Color.White)){
-                    Column(Modifier.padding(horizontal=12.dp)){
-                        filtered.forEachIndexed{index,s->
-                            Row(Modifier.fillMaxWidth().clickable{open(s)}.padding(vertical=10.dp),verticalAlignment=Alignment.CenterVertically){
-                                Logo(s.symbol,40,s.logoUrl);Spacer(Modifier.width(10.dp));Column(Modifier.weight(1f)){Text(s.name,color=TextDark,fontWeight=FontWeight.ExtraBold,fontSize=12.sp);Text(s.symbol,color=Muted,fontSize=10.sp);Text(marketObservationShort(s),color=Muted,fontSize=7.sp)};Column(horizontalAlignment=Alignment.End){Text(if(s.price.isFinite()) String.format(Locale.US,"KSh %.2f",s.price) else "Price unavailable",color=TextDark,fontWeight=FontWeight.Bold,fontSize=11.sp);if(s.changeAvailable && s.change.isFinite()){Text(String.format(Locale.US,"%+.1f%%",s.change),color=if(s.change>=0)Green else Red,fontWeight=FontWeight.Bold,fontSize=10.sp)}else{Text("Daily change unavailable",color=Muted,fontWeight=FontWeight.Bold,fontSize=9.sp)}}
-                            }
-                            if(index<filtered.lastIndex)HorizontalDivider(color=Border)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-@Composable
-private fun CompanyDataCoverage(stocks: List<Stock>) {
-    val valid = stocks.count { it.price.isFinite() && it.price > 0.0 }
-    val sourced = stocks.count { it.source.isNotBlank() }
-    val freshness = when {
-        stocks.any { it.freshnessMode == "CURRENT_SESSION" } -> "Current session"
-        stocks.any { it.freshnessMode == "END_OF_DAY" } -> "End-of-day"
-        stocks.any { it.freshnessMode == "STALE" } -> "Previous session"
-        else -> "Freshness unknown"
-    }
-    Card(
-        Modifier.fillMaxWidth(),
-        RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.97f))
-    ) {
-        Column(Modifier.padding(horizontal = 12.dp, vertical = 9.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Verified, null, tint = Green, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("Data coverage", color = TextDark, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
-                Spacer(Modifier.weight(1f))
-                Text("$valid valid quotes", color = Muted, fontSize = 8.sp)
-            }
-            Spacer(Modifier.height(3.dp))
-            Text(
-                "$sourced/${stocks.size} quotes have a recorded source • $freshness",
-                color = Muted,
-                fontSize = 8.sp
-            )
-            Text("Prices may be delayed. Missing values are not estimated.", color = Muted, fontSize = 8.sp)
-        }
-    }
-}
 
 @Composable
 private fun Company(s: Stock, back: () -> Unit, openNews: (NewsItem) -> Unit) {
@@ -1435,4 +1341,5 @@ private fun selectedTypeLabel(type:AlertType):String=when(type){
             Text("License: creativecommons.org/licenses/by-sa/4.0/ • Image bundled with the app; crop/overlay applied.",fontSize=8.sp,color=Muted,modifier=Modifier.padding(top=2.dp))
         }}}}
 @Composable private fun Note(text:String){Card(Modifier.fillMaxWidth(),RoundedCornerShape(14.dp),colors=CardDefaults.cardColors(containerColor=LightGreen)){Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically){Icon(Icons.Default.Info,null,tint=Green);Spacer(Modifier.width(9.dp));Text(text,fontSize=9.sp,color=Muted)}}}
+
 
