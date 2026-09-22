@@ -228,10 +228,10 @@ private fun App(pickAvatar:()->Unit) {
     fun go(to:Page){if(to!=page){history=history+page;page=to}}
     fun back(){if(history.isNotEmpty()){page=history.last();history=history.dropLast(1)}else page=Page.HOME}
     BackHandler(enabled=page!=Page.HOME){back()}
-    val scheme=if(dark) darkColorScheme(primary=Color(0xFF32D486),background=Color(0xFF0D1712),surface=Color(0xFF132019),onSurface=Color.White,onBackground=Color.White,onSurfaceVariant=Color(0xFFB7C7BE)) else lightColorScheme(primary=Green,background=Color.White,surface=Color.White,onSurface=TextDark,onBackground=TextDark,onSurfaceVariant=Muted)
+    val scheme=if(page==Page.NEWS) NewsColorScheme else if(dark) darkColorScheme(primary=Color(0xFF32D486),background=Color(0xFF0D1712),surface=Color(0xFF132019),onSurface=Color.White,onBackground=Color.White,onSurfaceVariant=Color(0xFFB7C7BE)) else lightColorScheme(primary=Green,background=Color.White,surface=Color.White,onSurface=TextDark,onBackground=TextDark,onSurfaceVariant=Muted)
     MaterialTheme(colorScheme=scheme){Surface(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing),color=scheme.background){
         when(page){
-            Page.HOME,Page.MARKET,Page.NEWS,Page.COMPANIES,Page.PAPER,Page.MORE -> Scaffold(topBar={if(page!=Page.HOME && page!=Page.MARKET) TopBar(name,::go)},bottomBar={BottomNav(tab){tab=it;history=emptyList();page=when(it){0->Page.HOME;1->Page.MARKET;2->Page.NEWS;3->Page.COMPANIES;else->Page.MORE}}}){pad->Box(Modifier.fillMaxSize().padding(pad)){when(page){Page.HOME->HomeDashboard(stocks,{selected=it;go(Page.COMPANY)},{selectedNews=it;go(Page.NEWS_DETAIL)},{go(Page.MARKET)},{go(Page.WATCHLIST)},startupNews,startupMarketStatus,startupComplete);Page.MARKET->MarketDashboard(stocks);Page.NEWS->NewsDashboard{selectedNews=it;go(Page.NEWS_DETAIL)};Page.COMPANIES->Companies(companyCatalog, stocks, {selected=it;go(Page.COMPANY)},{go(Page.WATCHLIST)},{go(Page.COMPARE)});Page.PAPER->Paper();else->More(::go)}}}
+            Page.HOME,Page.MARKET,Page.NEWS,Page.COMPANIES,Page.PAPER,Page.MORE -> Scaffold(topBar={if(page!=Page.HOME && page!=Page.MARKET && page!=Page.NEWS) TopBar(name,::go)},bottomBar={BottomNav(if(page==Page.NEWS) 2 else tab, newsStyle=page==Page.NEWS){tab=it;history=emptyList();page=when(it){0->Page.HOME;1->Page.MARKET;2->Page.NEWS;3->Page.COMPANIES;else->Page.MORE}}}){pad->Box(Modifier.fillMaxSize().padding(pad)){when(page){Page.HOME->HomeDashboard(stocks,{selected=it;go(Page.COMPANY)},{selectedNews=it;go(Page.NEWS_DETAIL)},{go(Page.MARKET)},{go(Page.WATCHLIST)},startupNews,startupMarketStatus,startupComplete);Page.MARKET->MarketDashboard(stocks);Page.NEWS->NewsDashboard{selectedNews=it;go(Page.NEWS_DETAIL)};Page.COMPANIES->Companies(companyCatalog, stocks, {selected=it;go(Page.COMPANY)},{go(Page.WATCHLIST)},{go(Page.COMPARE)});Page.PAPER->Paper();else->More(::go)}}}
             Page.COMPANY->Company(selected,::back)
             Page.WATCHLIST->Watchlist({selected=it;go(Page.COMPANY)},::back)
             Page.COMPARE->CompanyComparison(stocks,::back)
@@ -266,7 +266,33 @@ private fun App(pickAvatar:()->Unit) {
 }
 @Composable private fun TopBar(name:String,go:(Page)->Unit){Row(Modifier.fillMaxWidth().padding(horizontal=15.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically){Surface(Modifier.size(42.dp),RoundedCornerShape(12.dp),LightGreen){Icon(Icons.Default.ShowChart,null,Modifier.padding(7.dp),Green)};Spacer(Modifier.width(9.dp));Column(Modifier.weight(1f)){Text("NSE Watcher",fontSize=18.sp,fontWeight=FontWeight.ExtraBold);Text("Analyse • Understand • Invest Smarter",fontSize=10.sp,color=Muted)};Avatar(name){go(Page.PROFILE)}}}
 @Composable private fun Avatar(name:String,onClick:()->Unit){val c=androidx.compose.ui.platform.LocalContext.current;val u=c.getSharedPreferences(PREFS,0).getString("avatar_uri",null);val b by produceState<Bitmap?>(null,u){value=try{u?.let{c.contentResolver.openInputStream(Uri.parse(it))?.use{stream->BitmapFactory.decodeStream(stream)}}}catch(_:Exception){null}};Surface(Modifier.size(38.dp).clip(CircleShape).clickable(onClick=onClick),CircleShape,Color(0xFFDDEFE6)){if(b!=null)Image(b!!.asImageBitmap(),"Profile",Modifier.fillMaxSize())else Box(Modifier.fillMaxSize(),Alignment.Center){Text(name.take(1).uppercase(),color=Green,fontWeight=FontWeight.Bold)}}}
-@Composable private fun BottomNav(selected:Int,onSelect:(Int)->Unit){val items=listOf("Home" to Icons.Default.Home,"Market" to Icons.Default.CandlestickChart,"News" to Icons.Default.Article,"Companies" to Icons.Default.Business,"More" to Icons.Default.AutoGraph);NavigationBar{items.forEachIndexed{i,x->NavigationBarItem(selected==i,{onSelect(i)},icon={Icon(x.second,x.first)},label={Text(x.first,fontSize=9.sp)},colors=NavigationBarItemDefaults.colors(selectedIconColor=Green,selectedTextColor=Green,indicatorColor=LightGreen,unselectedIconColor=Muted,unselectedTextColor=Muted))}}}
+@Composable
+private fun BottomNav(selected: Int, newsStyle: Boolean = false, onSelect: (Int) -> Unit) {
+    val items = listOf(
+        "Home" to Icons.Default.Home, "Market" to Icons.Default.CandlestickChart,
+        "News" to Icons.Default.Article, "Companies" to Icons.Default.Business,
+        "More" to Icons.Default.AutoGraph
+    )
+    val accent = if (newsStyle) NewsColorScheme.primary else Green
+    NavigationBar(
+        containerColor = if (newsStyle) NewsColorScheme.background else NavigationBarDefaults.containerColor
+    ) {
+        items.forEachIndexed { index, item ->
+            NavigationBarItem(
+                selected = selected == index,
+                onClick = { onSelect(index) },
+                icon = { Icon(item.second, item.first) },
+                label = { Text(item.first, fontSize = if (newsStyle) 11.sp else 9.sp) },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = accent, selectedTextColor = accent,
+                    indicatorColor = if (newsStyle) NewsColorScheme.surfaceVariant else LightGreen,
+                    unselectedIconColor = if (newsStyle) NewsColorScheme.onSurfaceVariant else Muted,
+                    unselectedTextColor = if (newsStyle) NewsColorScheme.onSurfaceVariant else Muted
+                )
+            )
+        }
+    }
+}
 @Composable private fun Header(title:String,sub:String?=null,back:(()->Unit)?=null){Row(Modifier.fillMaxWidth().padding(horizontal=8.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically){if(back!=null)IconButton(back){Icon(Icons.Default.ArrowBack,"Back")};Column{Text(title,fontSize=20.sp,fontWeight=FontWeight.ExtraBold);if(sub!=null)Text(sub,fontSize=10.sp,color=Muted)}}}
 
 @Composable
