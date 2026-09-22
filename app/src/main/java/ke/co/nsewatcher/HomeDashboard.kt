@@ -2,733 +2,384 @@ package ke.co.nsewatcher
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import java.util.Locale
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeParseException
-import ke.co.nsewatcher.data.NewsCache
+import ke.co.nsewatcher.data.AlertStore
 import ke.co.nsewatcher.data.MyStocksCache
+import ke.co.nsewatcher.data.NewsCache
+import ke.co.nsewatcher.data.WatchlistStore
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.launch
+import java.time.Instant
+import java.util.Locale
 
-private val HomeGreen = Color(0xFF00A859)
-private val HomeLightGreen = Color(0xFFE9F8F0)
-private val HomeDarkGreen = Color(0xFF063D2A)
-private val HomeTextDark = Color(0xFF12352A)
-private val HomeMuted = Color(0xFF64756D)
-private val HomeBorder = Color(0xFFDDE9E3)
-private val HomeRed = Color(0xFFE94A4A)
-
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeDashboard(
-    currentStocks: List<Stock>,
-    openCompany: (Stock) -> Unit,
-    openNews: (NewsItem) -> Unit,
-    openMarket: () -> Unit = {},
-    openWatchlist: () -> Unit = {},
-    initialNews: List<NewsItem> = emptyList(),
-    initialMarketStatus: MyStocksCache.MarketStatus = MyStocksCache.MarketStatus(),
-    startupDataLoaded: Boolean = false
+    currentStocks: List<Stock>, openCompany: (Stock) -> Unit, openNews: (NewsItem) -> Unit,
+    openMarket: () -> Unit, openWatchlist: () -> Unit, initialNews: List<NewsItem>,
+    initialMarketStatus: MyStocksCache.MarketStatus, startupDataLoaded: Boolean,
+    name: String, initialCatalog: List<Stock>, practiceEnabled: Boolean, practiceCash: Double,
+    openAllNews: () -> Unit, openPractice: () -> Unit, openProfile: () -> Unit,
+    openAlertSettings: () -> Unit, onQuotesLoaded: (List<Stock>) -> Unit
 ) {
-    var news by remember(initialNews) { mutableStateOf(initialNews) }
-    var newsLoading by remember(startupDataLoaded) { mutableStateOf(!startupDataLoaded) }
-    var newsError by remember { mutableStateOf<String?>(null) }
-    var marketStatus by remember(initialMarketStatus) { mutableStateOf(initialMarketStatus) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val watchlist = remember { WatchlistStore(context) }
+    val alertStore = remember { AlertStore(context) }
+    var watchlistError by remember { mutableStateOf(false) }
+    var alertError by remember { mutableStateOf(false) }
+    val savedFlow = remember(watchlist) { watchlist.symbols.catch { watchlistError = true } }
+    val saved by savedFlow.collectAsState<List<String>, List<String>?>(initial = null)
+    val eventFlow = remember(alertStore) { alertStore.events.catch { alertError = true } }
+    val events by eventFlow.collectAsState(initial = emptyList())
+    var news by remember { mutableStateOf(initialNews) }
+    var newsLoading by remember { mutableStateOf(initialNews.isEmpty()) }
+    var newsError by remember { mutableStateOf(false) }
+    var catalog by remember { mutableStateOf(initialCatalog) }
+    var market by remember { mutableStateOf(initialMarketStatus) }
+    var showAlerts by rememberSaveable { mutableStateOf(false) }
+    var gainersSelected by rememberSaveable { mutableStateOf(true) }
+    var refreshing by remember { mutableStateOf(false) }
+    var refreshError by remember { mutableStateOf<String?>(null) }
+    var now by remember { mutableStateOf(Instant.now()) }
+    var historyRevision by remember { mutableIntStateOf(0) }
+    var histories by remember { mutableStateOf<Map<String, List<MyStocksCache.HistoryPoint>>>(emptyMap()) }
+    val avatar = context.getSharedPreferences("nse_watcher_preferences", 0).getString("avatar_uri", null)
+    LaunchedEffect(initialMarketStatus) { market = initialMarketStatus }
+    LaunchedEffect(initialCatalog) { if (initialCatalog.isNotEmpty()) catalog = initialCatalog }
+    LaunchedEffect(Unit) { while (true) { now = Instant.now(); delay(60_000L) } }
 
-    LaunchedEffect(currentStocks, startupDataLoaded) {
-        if (startupDataLoaded) return@LaunchedEffect
-
-        marketStatus = MyStocksCache.loadMarketStatus()
-        val result = NewsCache.loadFeedResult()
-        news = result.items
-        newsError = result.error
-        newsLoading = false
+    suspend fun refreshNews(force: Boolean = false) {
+        newsLoading = true
+        try {
+            val result = NewsCache.loadFeedResult(forceRefresh = force)
+            newsError = result.error != null
+            if (!newsError) news = result.items
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { newsError = true }
+        finally { newsLoading = false }
     }
-
-    val intelligence = remember(currentStocks, news, marketStatus.isOpen) { HomeIntelligenceEngine.build(currentStocks, news) }
-    val breadth = intelligence.breadth
-    val gainers = intelligence.gainers
-    val losers = intelligence.losers
-    val sectorChanges = intelligence.sectors.map { it.sector to it.averageChangePct }
-    val corporateActions = intelligence.corporateActions
-    val companyNews = intelligence.companyNews
-
-    LazyColumn(contentPadding = PaddingValues(bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(0.dp)) {
-        item { HomeHero(breadth.advancing, breadth.declining, breadth.unchanged, breadth.reportedVolume, marketStatus) }
-        item { Spacer(Modifier.height(16.dp)); HomeSectionHeader("YOUR MARKET RADAR", "What is happening?", "A simple view of the latest available NSE evidence.") }
-        item { Spacer(Modifier.height(8.dp)); TodaysIntelligence(intelligence.intelligence, currentStocks, news, openCompany, openNews, openMarket) }
-        item { Spacer(Modifier.height(18.dp)); HomeSectionHeader("MARKET MOVEMENT", "What's moving", "The strongest and weakest observed price changes.") }
-        item { Spacer(Modifier.height(8.dp)); if (gainers.isNotEmpty() || losers.isNotEmpty()) MarketMovers(gainers, losers, openCompany) else EmptyHomeCard("Movement unavailable", "Verified daily change data is not available for the current feed.") }
-        item { Spacer(Modifier.height(18.dp)); HomeSectionHeader("EXPLAINED", "What changed?", "Observable changes, with evidence attached.") }
-        item { Spacer(Modifier.height(8.dp)); WhatChanged(intelligence.changes, openCompany, currentStocks) }
-        if (sectorChanges.isNotEmpty()) {
-            item { Spacer(Modifier.height(18.dp)); HomeSectionHeader("MARKET STRUCTURE", "Sector pulse", "Calculated from available counters — not an official sector index.") }
-            item { Spacer(Modifier.height(8.dp)); LazyRow(contentPadding = PaddingValues(horizontal = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) { items(sectorChanges.take(5)) { (sector, change) -> SectorPulseCard(sector, change) } } }
-        }
-        if (companyNews.isNotEmpty() || newsLoading || newsError != null) {
-            item { Spacer(Modifier.height(18.dp)); HomeSectionHeader("FROM THE NEWS FEED", "Worth knowing", "Company-linked information surfaced from the available feed.", if (news.isNotEmpty()) "All news" else null, if (news.isNotEmpty()) { { openNews(news.first()) } } else null) }
-            item { Spacer(Modifier.height(8.dp)); when { companyNews.isNotEmpty() -> Column(Modifier.padding(horizontal = 14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) { companyNews.take(3).forEach { story -> IntelligenceNewsCard(story) { openNews(story) } } }; newsLoading -> LoadingHomeCard("Preparing the latest market news…"); else -> EmptyHomeCard("News temporarily unavailable", "The feed returned an error. NSE Watcher will not invent a story.") } }
-        }
-        if (corporateActions.isNotEmpty()) {
-            item { Spacer(Modifier.height(18.dp)); HomeSectionHeader("CORPORATE EVENTS", "Corporate actions", "Dividends, rights, bonuses and announcements.", "View market", openMarket) }
-            item { Spacer(Modifier.height(8.dp)); Column(Modifier.padding(horizontal = 14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) { corporateActions.take(2).forEach { action -> CorporateActionCard(action) { openNews(action) } } } }
-        }
-        item { Spacer(Modifier.height(18.dp)); WatchlistQuickAccess(openWatchlist); Spacer(Modifier.height(14.dp)); HomeQuickActions(openMarket, if (news.isNotEmpty()) { { openNews(news.first()) } } else null); Spacer(Modifier.height(12.dp)); Text(marketDataFooter(currentStocks), color = HomeMuted, fontSize = 8.sp, lineHeight = 11.sp, modifier = Modifier.padding(horizontal = 17.dp)) }
-    }
-}
-
-@Composable
-private fun HomeHero(advancing: Int, declining: Int, unchanged: Int, reportedVolume: Long, marketStatus: MyStocksCache.MarketStatus) {
-    Box(Modifier.fillMaxWidth().height(300.dp).clip(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp))) {
-        Box(Modifier.fillMaxSize().background(Color(0x55061A13)))
-        Box(Modifier.fillMaxSize().background(Color(0x2500A859)))
-        Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(42.dp).clip(RoundedCornerShape(13.dp)).background(HomeGreen), contentAlignment = Alignment.Center) { Icon(Icons.Default.ShowChart, null, tint = Color.White, modifier = Modifier.size(24.dp)) }
-                Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text("NSE WATCHER", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 0.5.sp); Text("Understand the market. Follow the evidence.", color = Color(0xFFD6EDE3), fontSize = 10.sp, maxLines = 1) }
-                Icon(Icons.Default.NotificationsNone, "Notifications", tint = Color.White, modifier = Modifier.size(25.dp))
-            }
-            Spacer(Modifier.height(22.dp)); Text(greetingForNairobi(), color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold); Spacer(Modifier.height(3.dp)); Text("Here is your latest NSE market snapshot.", color = Color(0xFFD7E9E2), fontSize = 11.sp); Spacer(Modifier.height(18.dp))
-            Surface(Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), color = Color(0xE61A3C31), border = BorderStroke(1.dp, Color(0x5539D995))) {
-                Column(Modifier.padding(horizontal = 15.dp, vertical = 13.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) { Text("MARKET BREADTH", color = Color(0xFF9ED9BF), fontSize = 9.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 0.7.sp); Text(when { advancing > declining -> "More stocks are advancing"; declining > advancing -> "More stocks are declining"; else -> "Advancers and decliners are balanced" }, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold) }
-                        Surface(shape = RoundedCornerShape(20.dp), color = if (marketStatus.isKnown && marketStatus.isOpen) Color(0x3327C982) else Color(0x33FFFFFF)) { Text(if (!marketStatus.isKnown) "STATUS UNKNOWN" else if (marketStatus.isOpen) "MARKET OPEN" else "MARKET CLOSED", color = if (marketStatus.isKnown && marketStatus.isOpen) Color(0xFF7CE6B3) else Color(0xFFD5E1DC), fontSize = 8.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)) }
-                    }
-                    Spacer(Modifier.height(12.dp)); Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { HeroMetric("Advancing", advancing.toString(), HomeGreen, Modifier.weight(1f)); HeroMetric("Declining", declining.toString(), HomeRed, Modifier.weight(1f)); HeroMetric("Unchanged", unchanged.toString(), Color(0xFFD4DFDB), Modifier.weight(1f)) }
-                    Spacer(Modifier.height(9.dp)); Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.BarChart, null, tint = Color(0xFF9ED9BF), modifier = Modifier.size(14.dp)); Spacer(Modifier.width(5.dp)); Text("Reported volume  " + formatShares(reportedVolume), color = Color(0xFFD5E5DE), fontSize = 9.sp, fontWeight = FontWeight.SemiBold); Spacer(Modifier.weight(1f)); Text("Latest available", color = Color(0xFF9ED9BF), fontSize = 8.sp, fontWeight = FontWeight.Bold) }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun HeroMetric(label: String, value: String, accent: Color, modifier: Modifier) { Surface(modifier = modifier, shape = RoundedCornerShape(13.dp), color = Color(0x331A5A45)) { Column(Modifier.padding(horizontal = 9.dp, vertical = 8.dp)) { Text(label, color = Color(0xFFB8D5C9), fontSize = 7.sp, maxLines = 1); Text(value, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold); Box(Modifier.padding(top = 3.dp).width(20.dp).height(2.dp).clip(RoundedCornerShape(2.dp)).background(accent)) } } }
-@Composable
-private fun CompactBreadthCard(advancing: Int, declining: Int, unchanged: Int, reportedVolume: Long) {
-    Card(
-        Modifier.fillMaxWidth().padding(horizontal = 14.dp),
-        RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xE604543C)),
-        border = BorderStroke(1.dp, Color(0x5539D995))
-    ) {
-        Row(Modifier.padding(horizontal = 11.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-            BreadthLine("Adv", advancing, HomeGreen)
-            Spacer(Modifier.width(10.dp))
-            BreadthLine("Dec", declining, HomeRed)
-            Spacer(Modifier.width(10.dp))
-            BreadthLine("Flat", unchanged, Color(0xFFD4DFDB))
-            Spacer(Modifier.width(12.dp))
-            Text("Vol ${formatShares(reportedVolume)}", color = Color(0xFFD7EAE1), fontSize = 8.sp, fontWeight = FontWeight.SemiBold)
-        }
-    }
-}
-
-@Composable
-private fun BreadthLine(label: String, value: Int, color: Color) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(7.dp).clip(CircleShape).background(color))
-        Spacer(Modifier.width(4.dp))
-        Text(label, color = Color(0xFFD7EAE1), fontSize = 8.sp)
-        Spacer(Modifier.width(4.dp))
-        Text(value.toString(), color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-    }
-}
-
-@Composable
-private fun MarketIndexPulse(indices: List<MyStocksCache.MarketIndex>, marketStatus: MyStocksCache.MarketStatus) {
-    val shown = indices.filter { it.symbol in setOf("^NASI", "^N20I", "^N25I") }.take(3)
-    if (shown.isEmpty()) return
-    Column(Modifier.padding(horizontal = 14.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(7.dp)
-        ) {
-            shown.forEach { index ->
-                Column(
-                    Modifier.weight(1f)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(HomeLightGreen)
-                        .border(1.dp, HomeBorder, RoundedCornerShape(12.dp))
-                        .padding(horizontal = 9.dp, vertical = 8.dp)
-                ) {
-                    Text(indexLabel(index.symbol), color = HomeMuted, fontSize = 8.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                    Text(String.format(Locale.US, "%.2f", index.value), color = HomeTextDark, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
-                    index.changePct?.let {
-                        Text(
-                            String.format(Locale.US, "%+.2f%%", it),
-                            color = if (it >= 0) HomeGreen else HomeRed,
-                            fontSize = 8.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    if (index.asOf.isNotBlank()) {
-                        Text(freshnessLabel(index.asOf, index.freshnessMode), color = HomeMuted, fontSize = 7.sp, maxLines = 1)
-                    }
-                }
-            }
-        }
-        Text(
-            "NSE index data • MyStocks Africa • freshness shown from observation time",
-            color = HomeMuted,
-            fontSize = 7.sp,
-            modifier = Modifier.padding(start = 2.dp, top = 4.dp)
-        )
-    }
-}
-
-private fun freshnessMode(mode: String): HomeMarketDataMode = when (mode) {
-    "CURRENT_SESSION" -> HomeMarketDataMode.CURRENT_SESSION
-    "END_OF_DAY" -> HomeMarketDataMode.END_OF_DAY
-    "STALE" -> HomeMarketDataMode.STALE
-    else -> HomeMarketDataMode.UNKNOWN
-}
-
-private fun freshnessLabel(asOf: String, freshnessMode: String): String = when (freshnessMode(freshnessMode)) {
-    HomeMarketDataMode.CURRENT_SESSION -> {
-        val display = runCatching {
-            Instant.parse(asOf).atZone(ZoneId.of("Africa/Nairobi")).toLocalTime().toString().take(5)
-        }.getOrDefault(asOf.replace("T", " ").take(16))
-        "Current observation • $display EAT"
-    }
-    HomeMarketDataMode.END_OF_DAY -> "End of day • " + asOf.take(10)
-    HomeMarketDataMode.STALE -> "Previous session • " + asOf.take(10)
-    HomeMarketDataMode.UNKNOWN -> "As of " + asOf.replace("T", " ").removeSuffix("Z").take(16)
-}
-
-private fun indexLabel(symbol: String): String = when (symbol) {
-    "^NASI" -> "NASI"
-    "^N20I" -> "NSE 20"
-    "^N25I" -> "NSE 25"
-    else -> symbol.removePrefix("^")
-}
-
-@Composable
-private fun MarketFreshnessStrip(stocks: List<Stock>, marketStatus: MyStocksCache.MarketStatus) {
-    val controllerState by MarketRefreshController.state
-    var nowMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
-        while (true) {
-            nowMs = System.currentTimeMillis()
-            kotlinx.coroutines.delay(1000L)
+        refreshNews()
+        if (catalog.isEmpty()) catalog = MyStocksCache.loadCompanies()
+        if (!startupDataLoaded && currentStocks.isEmpty()) {
+            MyStocksCache.loadStocks().takeIf { it.isNotEmpty() }?.let(onQuotesLoaded)
+            market = MyStocksCache.loadMarketStatus()
+        }
+        while (true) { delay(MarketRefreshController.REFRESH_INTERVAL_MS); refreshNews(); historyRevision++ }
+    }
+    fun refresh() {
+        if (refreshing) return
+        refreshing = true
+        scope.launch {
+            try {
+                market = MyStocksCache.loadMarketStatus()
+                // Respect the existing 15-minute quote cadence, including manual refreshes.
+                val state = MarketRefreshController.state.value
+                val due = state.lastSuccessfulRefreshMs?.let { System.currentTimeMillis() - it >= MarketRefreshController.REFRESH_INTERVAL_MS } ?: true
+                if (!state.refreshInProgress && (currentStocks.isEmpty() || due)) {
+                    val quotes = MyStocksCache.loadStocks()
+                    if (quotes.isNotEmpty()) { onQuotesLoaded(quotes); refreshError = null }
+                    else refreshError = "Quotes could not be updated. Available observations are still shown."
+                } else refreshError = null
+                refreshNews(force = true)
+                if (catalog.isEmpty()) catalog = MyStocksCache.loadCompanies()
+                historyRevision++
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { refreshError = "Could not refresh. Please try again." }
+            finally { refreshing = false }
         }
     }
-    val available = stocks.filter { it.price.isFinite() && it.price > 0.0 }
-    val source = available.map { it.source.trim() }.firstOrNull { it.isNotBlank() } ?: "Market source unavailable"
-    val newestObservedAt = available.mapNotNull { it.observedAt.takeIf(String::isNotBlank)?.let(::parseObservationTime) }.maxOrNull()
-    val ageMinutes = newestObservedAt?.let { ((System.currentTimeMillis() - it.toEpochMilli()).coerceAtLeast(0L) / 60_000L) }
-    val freshness = when {
-        available.isEmpty() -> "Data unavailable"
-        !marketStatus.isKnown -> "Freshness unknown"
-        !marketStatus.isOpen -> "Previous session"
-        newestObservedAt == null -> "Freshness unknown"
-        ageMinutes != null && ageMinutes > 30 -> "Stale • ${ageMinutes}m old"
-        ageMinutes != null -> "Delayed • ${ageMinutes}m old"
-        else -> "Freshness unknown"
-    }
-    val coverage = if (available.isNotEmpty()) available.size.toString() + " valid quotes" else "No valid quotes"
-    val refreshStatus = when {
-        controllerState.refreshInProgress -> "Refreshing market data…"
-        controllerState.lastRefreshFailed -> "Last refresh failed"
-        controllerState.lastSuccessfulRefreshMs == null -> "Waiting for first refresh"
-        !marketStatus.isKnown -> controllerState.lastSuccessfulRefreshMs?.let { "Market status unavailable • Last checked " + formatLocalTime(it) } ?: "Market status unavailable"
-        !marketStatus.isOpen -> controllerState.lastSuccessfulRefreshMs?.let { closedMarketStatus(marketStatus, it) } ?: "Market closed"
-        else -> { val next = MarketRefreshController.formatCountdown(MarketRefreshController.secondsUntilNextCheck(nowMs)); if (available.isEmpty()) "Market open • data unavailable" else "Market open • delayed feed • next check $next" }
-    }
-    Surface(
-        Modifier.fillMaxWidth().padding(horizontal = 14.dp),
-        RoundedCornerShape(10.dp),
-        color = HomeLightGreen,
-        border = BorderStroke(1.dp, HomeBorder)
-    ) {
-        Column(Modifier.padding(horizontal = 10.dp, vertical = 7.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Schedule, null, tint = HomeDarkGreen, modifier = Modifier.size(15.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("Market data", color = HomeTextDark, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.width(5.dp))
-                Text("• $freshness", color = HomeMuted, fontSize = 8.sp)
-                Spacer(Modifier.weight(1f))
-                Text(coverage, color = HomeMuted, fontSize = 8.sp)
-            }
-            Text(refreshStatus, color = HomeDarkGreen, fontSize = 8.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 21.dp, top = 3.dp))
-            Text(
-                if (marketStatus.isOpen) {
-                    "Source: $source • ${if (ageMinutes != null) "Latest observation ${ageMinutes}m ago." else "Observation time unavailable."} The feed is exchange-supplied and delayed; unchanged prices can be legitimate."
-                } else if (!marketStatus.isKnown) {
-                    "Source: $source • Market status is unavailable, so no open/closed state is inferred."
-                } else {
-                    "Source: $source • Market is closed, so no countdown is shown."
-                },
-                color = HomeMuted, fontSize = 7.sp, modifier = Modifier.padding(start = 21.dp, top = 2.dp)
-            )
+    val watched = remember(saved, catalog, currentStocks) { WatchlistPresentation.companies(saved.orEmpty(), catalog, currentStocks) }
+    val preview = watched.take(3)
+    LaunchedEffect(preview.map { it.symbol }, historyRevision) {
+        preview.forEach { stock ->
+            try { histories = histories + (stock.symbol to WatchlistPresentation.trend(MyStocksCache.loadHistoryDetails(stock.symbol, "1m").points)) }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { histories = histories + (stock.symbol to emptyList()) }
         }
     }
-}
-
-private fun closedMarketStatus(status: MyStocksCache.MarketStatus, lastSuccessfulRefreshMs: Long): String {
-    val nextOpen = status.nextOpen?.let(::formatNairobiTime)
-    return if (nextOpen != null) {
-        "Market closed • Next open $nextOpen"
-    } else {
-        "Market closed • Last checked " + formatLocalTime(lastSuccessfulRefreshMs)
+    val intelligence = remember(currentStocks, news) {
+        HomeIntelligenceEngine.build(currentStocks.filter { it.price.isFinite() && it.price > 0.0 }, news)
     }
-}
+    val brief = remember(watched, news, events, now) { HomePresentation.brief(watched, news, events, now) }
+    val relevantNews = remember(news, watched) { HomePresentation.companyNews(news, watched) }
+    val displayedNews = if (watched.isEmpty()) news.distinctBy { it.id }.sortedByDescending { CompanyResearchPresentation.timestamp(it.publishedAt) } else relevantNews
 
-private fun formatNairobiTime(value: String): String? = runCatching {
-    Instant.parse(value).atZone(ZoneId.of("Africa/Nairobi")).toLocalTime().toString().take(5) + " EAT"
-}.getOrNull()
-
-private fun parseObservationTime(value: String): Instant? = runCatching { Instant.parse(value) }.getOrNull()
-
-private fun formatLocalTime(valueMs: Long): String =
-    Instant.ofEpochMilli(valueMs).atZone(ZoneId.of("Africa/Nairobi")).toLocalTime().toString().take(5) + " EAT"
-
-@Composable
-private fun HomeSectionHeader(eyebrow: String, title: String, subtitle: String, action: String? = null, onAction: (() -> Unit)? = null) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.Bottom) {
-        Column(Modifier.weight(1f)) { Text(eyebrow, color = HomeGreen, fontSize = 8.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 0.9.sp); Spacer(Modifier.height(2.dp)); Text(title, color = HomeTextDark, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold); Text(subtitle, color = HomeMuted, fontSize = 9.sp, lineHeight = 13.sp, maxLines = 2) }
-        if (action != null && onAction != null) Text(action, color = HomeGreen, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable(onClick = onAction).padding(start = 8.dp, bottom = 2.dp))
-    }
-}
-@Composable
-private fun TodaysIntelligence(
-    items: List<HomeIntelligenceItem>,
-    currentStocks: List<Stock>,
-    news: List<NewsItem>,
-    openCompany: (Stock) -> Unit,
-    openNews: (NewsItem) -> Unit,
-    openMarket: () -> Unit
-) {
-    Column(Modifier.padding(horizontal = 14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-        items.take(3).forEach { item ->
-            val accent = when (item.type) {
-                HomeIntelligenceType.NEWS -> HomeDarkGreen
-                HomeIntelligenceType.CALCULATION -> if (item.calculation?.contains("+") == true) HomeGreen else HomeRed
-                HomeIntelligenceType.FACT -> HomeGreen
-            }
-            val targetStock = item.symbol.takeIf { it.isNotBlank() }?.let { symbol ->
-                currentStocks.firstOrNull { it.symbol.equals(symbol, ignoreCase = true) }
-            }
-            val targetNews = if (item.type == HomeIntelligenceType.NEWS) {
-                news.firstOrNull { it.id.toString() == item.evidence.firstOrNull()?.id?.removePrefix("NEWS-") || (item.fact.isNotBlank() && it.title == item.fact) }
-            } else null
-
-            IntelligenceItem(
-                type = item.type.name,
-                title = item.fact.ifBlank { item.interpretation },
-                detail = listOf(item.calculation, item.interpretation)
-                    .filter { !it.isNullOrBlank() && it != item.fact }
-                    .joinToString(" "),
-                source = item.source.ifBlank { item.evidence.firstOrNull()?.source ?: "Source unavailable" },
-                evidence = item.evidence,
-                accent = accent,
-                actionLabel = when {
-                    targetNews != null -> "Source"
-                    targetStock != null -> "Open"
-                    else -> "Source"
-                },
-                onAction = when {
-                    targetNews != null -> { { openNews(targetNews) } }
-                    targetStock != null -> { { openCompany(targetStock) } }
-                    else -> openMarket
-                }
-            )
-        }
-        if (items.isEmpty()) {
-            EmptyHomeCard("Not enough current evidence", "The Home feed will stay factual until market or news data is available.")
-        }
-    }
-}
-
-@Composable
-private fun IntelligenceItem(
-    type: String,
-    title: String,
-    detail: String,
-    source: String,
-    evidence: List<HomeEvidenceReference>,
-    accent: Color,
-    actionLabel: String,
-    onAction: () -> Unit
-) {
-    val uriHandler = LocalUriHandler.current
-    val primaryEvidence = evidence.firstOrNull()
-    val evidenceSource = primaryEvidence?.source?.takeIf { it.isNotBlank() } ?: source
-    val evidenceDate = primaryEvidence?.date?.takeIf { it.isNotBlank() }?.let(::compactEvidenceDate) ?: ""
-    val sourceUrl = primaryEvidence?.sourceUrl?.takeIf { it.startsWith("http://") || it.startsWith("https://") }
-
-    Card(Modifier.fillMaxWidth(), RoundedCornerShape(13.dp), colors = CardDefaults.cardColors(containerColor = Color.White), border = BorderStroke(1.dp, HomeBorder)) {
-        Column(Modifier.padding(10.dp)) {
-            Row(verticalAlignment = Alignment.Top) {
-                Box(Modifier.size(26.dp).clip(RoundedCornerShape(7.dp)).background(accent.copy(alpha = .11f)), contentAlignment = Alignment.Center) {
-                    Icon(if (type == "NEWS") Icons.Default.Article else Icons.Default.Insights, null, tint = accent, modifier = Modifier.size(16.dp))
-                }
-                Spacer(Modifier.width(8.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(type, color = accent, fontSize = 8.sp, fontWeight = FontWeight.ExtraBold)
-                    Spacer(Modifier.height(2.dp))
-                    Text(title, color = HomeTextDark, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 14.sp)
-                    Spacer(Modifier.height(3.dp))
-                    Text(detail.ifBlank { "No additional interpretation is available from the current evidence." }, color = HomeMuted, fontSize = 8.sp, lineHeight = 12.sp, maxLines = 3)
+    MaterialTheme(colorScheme = CompanyResearchColors) {
+        Column(Modifier.fillMaxSize().background(ResearchBackground)) {
+            Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.ShowChart, null, tint = ResearchGreen, modifier = Modifier.size(28.dp))
+                Spacer(Modifier.width(9.dp))
+                Text("NSE Watcher", Modifier.weight(1f), color = ResearchText, fontSize = 21.sp, fontWeight = FontWeight.Bold)
+                IconButton(onClick = { showAlerts = true }) { Icon(Icons.Default.NotificationsNone, "Open recorded alerts", tint = ResearchText) }
+                IconButton(onClick = openProfile, modifier = Modifier.semantics { contentDescription = "Open profile" }) {
+                    Box(Modifier.size(34.dp).clip(CircleShape).background(ResearchRaised), contentAlignment = Alignment.Center) {
+                        Text(name.trim().take(1).uppercase().ifBlank { "?" }, color = ResearchText, fontWeight = FontWeight.Bold)
+                        if (avatar != null) AsyncImage(avatar, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                    }
                 }
             }
-            Spacer(Modifier.height(7.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                val freshness = primaryEvidence?.freshness?.takeIf { it.isNotBlank() }
-                val provenanceText = listOfNotNull(
-                    evidenceSource.takeIf { it.isNotBlank() },
-                    evidenceDate.takeIf { it.isNotBlank() },
-                    freshness?.let(::homeFreshnessLabel)
-                ).joinToString(" • ")
-
-                Surface(
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(8.dp),
-                    color = HomeLightGreen
-                ) {
-                    Text(
-                        text = provenanceText.ifBlank { "Evidence source unavailable" },
-                        color = HomeDarkGreen,
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp),
-                        maxLines = 1
-                    )
+            LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                item {
+                    Text(HomePresentation.greeting(name, now), color = ResearchText, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(5.dp)); ResearchBody("Here’s what matters to you.")
                 }
-                Spacer(Modifier.width(5.dp))
-                if (sourceUrl != null) {
-                    Text(
-                        "Source ↗",
-                        color = HomeGreen,
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.clickable { uriHandler.openUri(sourceUrl) }.padding(4.dp)
-                    )
-                } else {
-                    Text(
-                        actionLabel,
-                        color = HomeGreen,
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.clickable(onClick = onAction).padding(4.dp)
-                    )
+                item {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                                Box(Modifier.size(8.dp).background(if (market.isKnown && market.isOpen) ResearchGreen else ResearchMuted, CircleShape))
+                                Text(when { !market.isKnown -> "Market status unavailable"; market.isOpen -> "Market open"; else -> "Market closed" }, color = if (market.isKnown && market.isOpen) ResearchGreen else ResearchMuted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                            ResearchCaption(HomePresentation.freshness(currentStocks, now))
+                            val latest = currentStocks.filter { it.price.isFinite() && it.price > 0 }.mapNotNull { CompanyResearchPresentation.timestamp(it.observedAt) }.maxOrNull()
+                            if (latest != null) ResearchCaption("Latest observation · ${CompanyResearchPresentation.date(latest.toString())}")
+                        }
+                        IconButton(onClick = ::refresh, enabled = !refreshing) {
+                            if (refreshing) CircularProgressIndicator(Modifier.size(18.dp), color = ResearchGreen, strokeWidth = 2.dp)
+                            else Icon(Icons.Default.Refresh, "Refresh Home", tint = ResearchMuted)
+                        }
+                    }
+                    refreshError?.let { ResearchCaption(it) }
+                }
+                item {
+                    ResearchPanel {
+                        Text("YOUR DAILY BRIEF", color = ResearchGreen, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("What needs your attention?", Modifier.weight(1f), color = ResearchText, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                            if (brief.isNotEmpty()) Surface(color = ResearchGreen.copy(alpha = 0.12f), shape = RoundedCornerShape(10.dp), border = BorderStroke(1.dp, ResearchGreen.copy(alpha = 0.45f))) {
+                                Text("${brief.size} ${if (brief.size == 1) "update" else "updates"}", Modifier.padding(7.dp), color = ResearchText, fontSize = 11.sp)
+                            }
+                        }
+                        when {
+                            watchlistError -> ResearchCaption("Saved companies could not be read. Reopen Home to retry.")
+                            saved == null -> ResearchLoading("Loading your companies…")
+                            watched.isEmpty() -> {
+                                ResearchBody("Make this brief yours")
+                                ResearchCaption("Follow companies to bring their published updates and recorded alerts here.")
+                                TextButton(onClick = openWatchlist) { Text("Choose your companies →", color = ResearchGreen) }
+                            }
+                            brief.isEmpty() && newsLoading -> ResearchLoading("Checking your company updates…")
+                            brief.isEmpty() -> {
+                                ResearchBody(if (newsError || alertError) "Some updates are unavailable" else "No recent updates returned")
+                                ResearchCaption("This brief checks your companies’ available news and recorded alerts from the last 7 days.")
+                                TextButton(onClick = openWatchlist) { Text("Review your watchlist →", color = ResearchGreen) }
+                            }
+                        }
+                        brief.forEachIndexed { index, item ->
+                            if (index > 0) HorizontalDivider(color = ResearchBorder)
+                            HomeBriefRow(item) { if (item.story != null) openNews(item.story) else showAlerts = true }
+                        }
+                        if (newsError) ResearchCaption("News refresh failed; available stories retain their publication dates.")
+                        if (alertError) ResearchCaption("Recorded alerts could not be read.")
+                    }
+                }
+                item {
+                    HomeHeading("Your watchlist", "View all", openWatchlist)
+                    Spacer(Modifier.height(8.dp))
+                    ResearchPanel {
+                        when {
+                            watchlistError -> ResearchCaption("Your saved companies are temporarily unavailable.")
+                            saved == null -> ResearchLoading("Loading watchlist…")
+                            preview.isEmpty() -> {
+                                ResearchBody("Keep the companies you care about close.")
+                                TextButton(onClick = openWatchlist) { Text("Add your first company →", color = ResearchGreen) }
+                            }
+                            else -> preview.forEachIndexed { index, stock ->
+                                if (index > 0) HorizontalDivider(color = ResearchBorder)
+                                HomeStockRow(stock, histories[stock.symbol].orEmpty(), true) { openCompany(stock) }
+                            }
+                        }
+                        if (preview.isNotEmpty()) ResearchCaption("1M trends · Provider daily changes · Quotes may have different observation times")
+                    }
+                }
+                item {
+                    HomeHeading("Understand today’s market")
+                    Spacer(Modifier.height(8.dp))
+                    ResearchPanel {
+                        val breadth = intelligence.breadth
+                        val total = breadth.advancing + breadth.declining + breadth.unchanged
+                        ResearchBody(HomePresentation.marketSummary(breadth))
+                        if (total > 0) {
+                            ResearchCaption("Among $total companies with available daily changes. Based on the latest available observations.")
+                            Row(Modifier.fillMaxWidth().height(9.dp).clip(RoundedCornerShape(8.dp))) {
+                                if (breadth.advancing > 0) Box(Modifier.weight(breadth.advancing.toFloat()).fillMaxHeight().background(ResearchGreen))
+                                if (breadth.unchanged > 0) Box(Modifier.weight(breadth.unchanged.toFloat()).fillMaxHeight().background(ResearchMuted))
+                                if (breadth.declining > 0) Box(Modifier.weight(breadth.declining.toFloat()).fillMaxHeight().background(ResearchRed))
+                            }
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("${breadth.advancing} rising", color = ResearchGreen, fontSize = 12.sp)
+                                Text("${breadth.unchanged} unchanged", color = ResearchMuted, fontSize = 12.sp)
+                                Text("${breadth.declining} falling", color = ResearchRed, fontSize = 12.sp)
+                            }
+                        } else ResearchCaption("Missing data is not counted as unchanged. Refresh when quotes become available.")
+                        val sources = currentStocks.map { it.source.trim() }.filter { it.isNotEmpty() }.distinct()
+                        ResearchCaption("Source: ${sources.joinToString().ifBlank { "Unavailable" }}")
+                    }
+                }
+                item {
+                    HomeHeading("Market movers")
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        listOf(true to "Gainers", false to "Losers").forEach { (selected, label) ->
+                            FilterChip(selected = gainersSelected == selected, onClick = { gainersSelected = selected }, label = { Text(label) },
+                                shape = RoundedCornerShape(10.dp), modifier = Modifier.heightIn(min = 44.dp),
+                                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = ResearchGreen.copy(alpha = 0.12f), selectedLabelColor = ResearchGreen, containerColor = ResearchCard, labelColor = ResearchMuted),
+                                border = BorderStroke(1.dp, if (gainersSelected == selected) ResearchGreen else ResearchBorder))
+                        }
+                    }
+                    ResearchPanel {
+                        val movers = (if (gainersSelected) intelligence.gainers else intelligence.losers).take(3)
+                        if (movers.isEmpty()) ResearchCaption(if (currentStocks.isEmpty()) "Market quotes are unavailable." else "No ${if (gainersSelected) "gainers" else "losers"} in the available daily changes.")
+                        movers.forEachIndexed { index, stock ->
+                            if (index > 0) HorizontalDivider(color = ResearchBorder)
+                            HomeStockRow(stock, emptyList(), false) { openCompany(stock) }
+                        }
+                        TextButton(onClick = openMarket) { Text("Explore market →", color = ResearchGreen) }
+                    }
+                }
+                item {
+                    HomeHeading(if (watched.isEmpty()) "Latest market news" else "News for your companies", "View all", openAllNews)
+                    Spacer(Modifier.height(8.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        displayedNews.take(2).forEach { story -> HomeNewsRow(story) { openNews(story) } }
+                        if (newsLoading && displayedNews.isEmpty()) ResearchLoading("Loading news…")
+                        if (!newsLoading && displayedNews.isEmpty()) ResearchPanel {
+                            ResearchCaption(if (newsError) "The news service is unavailable. Try refreshing." else if (watched.isEmpty()) "No articles were returned by the feed." else "No articles linked to your saved companies were returned by this feed.")
+                            TextButton(onClick = openAllNews) { Text("Explore all news →", color = ResearchGreen) }
+                        }
+                        if (newsError && displayedNews.isNotEmpty()) ResearchCaption("Could not refresh news. Previously loaded articles are shown.")
+                    }
+                }
+                item {
+                    ResearchPanel {
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Icon(Icons.Default.AccountBalanceWallet, null, tint = ResearchMuted, modifier = Modifier.size(28.dp))
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                Text("PRACTICE PORTFOLIO", color = ResearchGreen, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                ResearchBody("Build confidence with virtual money")
+                                Text(if (practiceEnabled) practiceCash.takeIf { it.isFinite() && it >= 0 }?.let { String.format(Locale.US, "KSh %,.2f", it) } ?: "Unavailable" else "KSh 1,000,000",
+                                    color = ResearchText, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                                ResearchCaption(if (practiceEnabled) "Available virtual cash" else "Suggested virtual starting balance")
+                            }
+                        }
+                        ResearchCaption(if (practiceEnabled) "Continue learning with your saved practice portfolio." else "Choose your starting balance and try a practice investment.")
+                        Button(onClick = openPractice, shape = RoundedCornerShape(10.dp), modifier = Modifier.align(Alignment.End)) {
+                            Text(if (practiceEnabled) "Open practice portfolio →" else "Start practising →")
+                        }
+                    }
+                }
+            }
+        }
+        if (showAlerts) ModalBottomSheet(onDismissRequest = { showAlerts = false }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = ResearchBackground) {
+            LazyColumn(Modifier.fillMaxWidth().fillMaxHeight(0.85f), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                item {
+                    ResearchTitle("Your recorded alerts")
+                    ResearchCaption("Conditions detected by background checks. Detection does not confirm Android notification delivery.")
+                    Row {
+                        TextButton(onClick = { showAlerts = false; openWatchlist() }) { Text("Manage rules →", color = ResearchGreen) }
+                        TextButton(onClick = { showAlerts = false; openAlertSettings() }) { Text("Preferences", color = ResearchGreen) }
+                    }
+                    if (alertError) ResearchCaption("Alert history could not be read. Reopen Home to retry.")
+                    else if (events.isEmpty()) ResearchCaption("No alerts have been recorded yet. History starts with this app update; past notifications are not reconstructed.")
+                }
+                items(events, key = { it.id }) { event ->
+                    ResearchPanel {
+                        ResearchBody("${event.symbol} · ${event.title}")
+                        ResearchBody(event.message)
+                        ResearchCaption("Detected · ${CompanyResearchPresentation.date(event.recordedAt)}")
+                        if (event.observedAt.isNotBlank()) ResearchCaption("Quote observed · ${CompanyResearchPresentation.date(event.observedAt)}")
+                        val company = WatchlistPresentation.companies(listOf(event.symbol), catalog, currentStocks).firstOrNull()
+                        if (company != null) TextButton(onClick = { showAlerts = false; openCompany(company) }) { Text("Research company →", color = ResearchGreen) }
+                    }
                 }
             }
         }
     }
 }
 
-private fun compactEvidenceDate(value: String): String =
-    value.replace("T", " ").removeSuffix("Z").take(16)
-
-private fun homeFreshnessLabel(value: String): String = when (value) {
-    "CURRENT_SESSION" -> "Current session"
-    "CURRENT_DAY" -> "Current day"
-    "END_OF_DAY" -> "End of day"
-    "STALE" -> "Stale"
-    "UNKNOWN" -> "Freshness unknown"
-    else -> value.replace("_", " ").lowercase(Locale.US)
-        .replaceFirstChar { it.uppercase(Locale.US) }
+@Composable
+private fun HomeHeading(title: String, action: String? = null, onAction: () -> Unit = {}) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(title, Modifier.weight(1f), color = ResearchText, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+        if (action != null) TextButton(onClick = onAction) { Text("$action →", color = ResearchGreen, fontSize = 12.sp) }
+    }
 }
 
-
 @Composable
-private fun WhatChanged(changes: List<HomeChangeItem>, openCompany: (Stock) -> Unit, currentStocks: List<Stock>) {
-    Column(Modifier.padding(horizontal = 14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-        changes.take(6).forEach { change ->
-            val stock = change.symbol.takeIf { it.isNotBlank() }?.let { symbol -> currentStocks.firstOrNull { it.symbol.equals(symbol, ignoreCase = true) } }
-            ChangeRow(
-                label = change.label,
-                detail = change.detail,
-                value = change.value,
-                valueColor = when {
-                    change.value.startsWith("-") -> HomeRed
-                    change.type == HomeIntelligenceType.CALCULATION -> HomeDarkGreen
-                    else -> HomeGreen
-                },
-                source = change.source?.source.orEmpty(),
-                onClick = stock?.let { { openCompany(it) } }
-            )
+private fun HomeBriefRow(item: HomeBriefItem, open: () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Box(Modifier.size(40.dp).background(ResearchRaised, CircleShape), contentAlignment = Alignment.Center) {
+            Icon(if (item.alert != null) Icons.Default.NotificationsNone else Icons.Default.Description, null, tint = ResearchMuted, modifier = Modifier.size(23.dp))
         }
-        if (changes.isEmpty()) {
-            EmptyHomeCard("No observable changes yet", "The app will not fill this section with invented market activity.")
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(item.title, color = ResearchText, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            Text(item.detail, color = ResearchMuted, fontSize = 13.sp, lineHeight = 19.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            ResearchCaption("${item.source} · ${CompanyResearchPresentation.date(item.time)}")
+            TextButton(onClick = open, contentPadding = PaddingValues(0.dp)) { Text("${item.action} ↗", color = ResearchGreen, fontSize = 13.sp) }
         }
     }
 }
 
 @Composable
-private fun ChangeRow(label: String, detail: String, value: String, valueColor: Color, source: String = "", onClick: (() -> Unit)? = null) {
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(13.dp)).background(Color.White).border(1.dp, HomeBorder, RoundedCornerShape(13.dp)).clickable(enabled = onClick != null, onClick = { onClick?.invoke() }).padding(horizontal = 11.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text(label, color = HomeMuted, fontSize = 8.sp, fontWeight = FontWeight.SemiBold)
-            Text(detail, color = HomeTextDark, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-            if (source.isNotBlank()) Text("Source: $source", color = HomeMuted, fontSize = 7.sp, maxLines = 1)
-        }
-        Text(value, color = valueColor, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
-        if (onClick != null) {
-            Spacer(Modifier.width(5.dp))
-            Icon(Icons.Default.ChevronRight, null, tint = HomeMuted, modifier = Modifier.size(16.dp))
-        }
-    }
-}
-
-@Composable
-private fun MarketMovers(gainers: List<Stock>, losers: List<Stock>, openCompany: (Stock) -> Unit) {
-    var selectedTab by remember { mutableStateOf(0) }
-    val selected = if (selectedTab == 0) gainers else losers
-    Column(Modifier.fillMaxWidth()) {
-        Row(Modifier.padding(horizontal = 14.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            MoverTab("Gainers", selectedTab == 0) { selectedTab = 0 }
-            MoverTab("Losers", selectedTab == 1) { selectedTab = 1 }
-        }
-        Spacer(Modifier.height(7.dp))
-        if (selected.isEmpty()) {
-            EmptyHomeCard(if (selectedTab == 0) "No gainers in the current feed" else "No losers in the current feed", "The app will not substitute invented market values.")
-        } else {
-            Column(Modifier.padding(horizontal = 14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                selected.take(5).forEach { stock -> CompactMoverRow(stock) { openCompany(stock) } }
+private fun HomeStockRow(stock: Stock, history: List<MyStocksCache.HistoryPoint>, trend: Boolean, open: () -> Unit) {
+    Column(Modifier.fillMaxWidth().clickable(role = Role.Button, onClickLabel = "Research ${stock.name}", onClick = open).padding(vertical = 8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box(Modifier.size(32.dp).background(ResearchRaised, CircleShape), contentAlignment = Alignment.Center) {
+                Text(stock.symbol.take(1), color = ResearchGreen, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(stock.name, color = ResearchText, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                ResearchCaption(stock.symbol)
+            }
+            if (trend) WatchlistSparkline(history, Modifier.width(46.dp).height(24.dp))
+            Column(Modifier.widthIn(max = 105.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (trend) Text(CompanyResearchPresentation.money(stock.price), color = ResearchText, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                val change = stock.change.takeIf { stock.changeAvailable && it.isFinite() }
+                Text(change?.let { CompanyResearchPresentation.percent(it) } ?: "Unavailable", color = researchChangeColor(change), fontSize = 13.sp, fontWeight = FontWeight.Bold)
             }
         }
+        Text(if (stock.observedAt.isBlank()) "Observation time unavailable" else "As of ${CompanyResearchPresentation.date(stock.observedAt)}", color = ResearchMuted, fontSize = 10.sp, modifier = Modifier.padding(start = 40.dp, top = 5.dp))
     }
 }
 
 @Composable
-private fun MoverTab(text: String, selected: Boolean, onClick: () -> Unit) {
-    Box(Modifier.clip(RoundedCornerShape(18.dp)).background(if (selected) HomeDarkGreen else Color(0xFFF1F4F3)).clickable(onClick = onClick)) {
-        Text(text, color = if (selected) Color.White else HomeMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 13.dp, vertical = 7.dp))
-    }
-}
-
-@Composable
-private fun CompactMoverRow(stock: Stock, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color.White).border(1.dp, HomeBorder, RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(horizontal = 9.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-        HomeLogo(stock.symbol, stock.logoUrl, 31)
-        Spacer(Modifier.width(8.dp))
-        Column(Modifier.weight(1f)) {
-            Text(stock.symbol, color = HomeTextDark, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
-            Text(formatPrice(stock.price), color = HomeMuted, fontSize = 8.sp)
-        }
-        Text(String.format(Locale.US, "%+.2f%%", stock.change), color = if (stock.change >= 0) HomeGreen else HomeRed, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
-        Spacer(Modifier.width(3.dp))
-        Icon(Icons.Default.ChevronRight, null, tint = HomeMuted, modifier = Modifier.size(16.dp))
-    }
-}
-
-@Composable
-private fun SectorPulseCard(sector: String, change: Double) {
-    val (icon, iconBg) = sectorVisual(sector)
-    Card(Modifier.width(128.dp), RoundedCornerShape(14.dp), border = BorderStroke(1.dp, HomeBorder), colors = CardDefaults.cardColors(containerColor = Color.White)) {
-        Column(Modifier.padding(9.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(27.dp).clip(RoundedCornerShape(8.dp)).background(iconBg)) { Icon(icon, null, tint = HomeDarkGreen, modifier = Modifier.padding(5.dp)) }
-                Spacer(Modifier.width(6.dp))
-                Text(displaySector(sector), color = HomeTextDark, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-            }
-            Spacer(Modifier.height(5.dp))
-            Text(String.format(Locale.US, "%+.1f%%", change), color = if (change >= 0) HomeGreen else HomeRed, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
-            Spacer(Modifier.height(5.dp))
-            Box(Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(4.dp)).background(HomeBorder)) {
-                Box(Modifier.fillMaxWidth((kotlin.math.abs(change).coerceAtMost(3.0) / 3.0).coerceIn(.18, 1.0).toFloat()).fillMaxHeight().clip(RoundedCornerShape(4.dp)).background(if (change >= 0) HomeGreen else HomeRed))
-            }
-        }
-    }
-}
-
-private fun displaySector(sector: String): String = when (sector.lowercase(Locale.US)) {
-    "telecommunication", "telecommunications" -> "Telecom"
-    "manufacturing" -> "Manufacturing"
-    "insurance" -> "Insurance"
-    "banking", "banks" -> "Banking"
-    "energy", "oil & gas", "oil and gas" -> "Energy"
-    else -> sector
-}
-
-private fun sectorVisual(sector: String): Pair<ImageVector, Color> = when (sector.lowercase(Locale.US)) {
-    "banking", "banks" -> Icons.Default.AccountBalance to Color(0xFFFFF3C4)
-    "telecommunication", "telecommunications" -> Icons.Default.CellTower to Color(0xFFDDF3FF)
-    "insurance" -> Icons.Default.Security to Color(0xFFDDF7EC)
-    "energy", "oil & gas", "oil and gas" -> Icons.Default.WaterDrop to Color(0xFFE2F3FA)
-    "manufacturing" -> Icons.Default.Factory to Color(0xFFFFE1E8)
-    else -> Icons.Default.BusinessCenter to Color(0xFFE9F8F0)
-}
-
-@Composable
-private fun CorporateActionCard(item: NewsItem, onClick: () -> Unit) {
-    Card(Modifier.fillMaxWidth().clickable(onClick = onClick), RoundedCornerShape(14.dp), border = BorderStroke(1.dp, HomeBorder), colors = CardDefaults.cardColors(containerColor = Color.White)) {
-        Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            HomeLogo(item.symbol, null, 40)
-            Spacer(Modifier.width(9.dp))
-            Column(Modifier.weight(1f)) {
-                Text(item.companyName.ifBlank { item.symbol.ifBlank { "NSE company" } }, color = HomeMuted, fontSize = 8.sp)
-                Text(item.category.ifBlank { "Corporate action" }, color = HomeTextDark, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                Text(item.title, color = HomeTextDark, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
-                val event = listOf(item.dividendAmount, item.exDate, item.paymentDate).firstOrNull { it.isNotBlank() }
-                if (event != null) Text(event, color = HomeMuted, fontSize = 7.sp)
-            }
-            Icon(Icons.Default.ChevronRight, null, tint = HomeMuted, modifier = Modifier.size(18.dp))
-        }
-    }
-}
-
-@Composable
-private fun IntelligenceNewsCard(item: NewsItem, onClick: () -> Unit) {
-    Card(Modifier.fillMaxWidth().clickable(onClick = onClick), RoundedCornerShape(14.dp), border = BorderStroke(1.dp, HomeBorder), colors = CardDefaults.cardColors(containerColor = Color.White)) {
-        Row(Modifier.padding(9.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (item.imageUrl.isNotBlank()) {
-                AsyncImage(model = item.imageUrl, contentDescription = null, modifier = Modifier.size(54.dp).clip(RoundedCornerShape(9.dp)), contentScale = ContentScale.Crop)
-            } else HomeLogo(item.symbol, null, 54)
-            Spacer(Modifier.width(9.dp))
-            Column(Modifier.weight(1f)) {
-                Text(item.title, color = HomeTextDark, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 2)
-                if (item.summary.isNotBlank()) Text(item.summary, color = HomeMuted, fontSize = 8.sp, maxLines = 2)
-                Text(listOf(item.companyName.ifBlank { item.symbol }, timeAgo(item.publishedAt)).filter { it.isNotBlank() }.joinToString("  •  "), color = HomeMuted, fontSize = 7.sp)
-            }
-            Icon(Icons.Default.ChevronRight, null, tint = HomeMuted, modifier = Modifier.size(18.dp))
-        }
-    }
-}
-
-@Composable
-private fun WatchlistQuickAccess(openWatchlist: () -> Unit) {
-    Column(Modifier.padding(horizontal = 14.dp)) {
-        Text("Quick Access", color = HomeTextDark, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
-        Spacer(Modifier.height(6.dp))
-        Card(
-            Modifier.fillMaxWidth().clickable(onClick = openWatchlist),
-            RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = HomeLightGreen),
-            border = BorderStroke(1.dp, HomeBorder)
-        ) {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 11.dp, vertical = 9.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(Icons.Default.StarBorder, null, tint = HomeDarkGreen, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("My Watchlist", color = HomeTextDark, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    Text("Your selected companies", color = HomeMuted, fontSize = 8.sp)
+private fun HomeNewsRow(story: NewsItem, open: () -> Unit) {
+    Surface(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable(role = Role.Button, onClick = open), color = ResearchCard, shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, ResearchBorder)) {
+        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(story.title, color = ResearchText, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                ResearchCaption("${story.source.ifBlank { "Source unavailable" }} · ${CompanyResearchPresentation.date(story.publishedAt)}")
+                if (story.symbol.isNotBlank()) Surface(color = ResearchRaised, shape = RoundedCornerShape(5.dp)) {
+                    Text(story.symbol, Modifier.padding(horizontal = 6.dp, vertical = 3.dp), color = ResearchMuted, fontSize = 10.sp)
                 }
-                Text("View →", color = HomeDarkGreen, fontSize = 9.sp, fontWeight = FontWeight.Bold)
             }
+            if (story.imageUrl.isNotBlank()) AsyncImage(story.imageUrl, null, Modifier.size(68.dp).clip(RoundedCornerShape(8.dp)), contentScale = ContentScale.Crop)
         }
     }
-}
-
-@Composable
-private fun HomeQuickActions(openMarket: () -> Unit, openNews: (() -> Unit)?) {
-    Column(Modifier.padding(horizontal = 14.dp)) {
-        Text("Explore", color = HomeTextDark, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
-        Spacer(Modifier.height(7.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-            QuickAction("Market", Icons.Default.ShowChart, openMarket, Modifier.weight(1f))
-            QuickAction("News", Icons.Default.Article, { openNews?.invoke() }, Modifier.weight(1f), enabled = openNews != null)
-        }
-    }
-}
-
-@Composable
-private fun QuickAction(label: String, icon: ImageVector, onClick: () -> Unit, modifier: Modifier, enabled: Boolean = true) {
-    Card(modifier = modifier.clickable(enabled = enabled, onClick = onClick), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = if (enabled) HomeLightGreen else Color(0xFFF3F5F4)), border = BorderStroke(1.dp, HomeBorder)) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-            Icon(icon, null, tint = if (enabled) HomeDarkGreen else HomeMuted, modifier = Modifier.size(16.dp))
-            Spacer(Modifier.width(5.dp))
-            Text(label, color = if (enabled) HomeDarkGreen else HomeMuted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-        }
-    }
-}
-
-@Composable
-private fun LoadingHomeCard(message: String = "Loading market intelligence…") {
-    Card(Modifier.fillMaxWidth().padding(horizontal = 14.dp), RoundedCornerShape(14.dp), border = BorderStroke(1.dp, HomeBorder)) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = HomeGreen)
-            Spacer(Modifier.width(9.dp))
-            Text(message, color = HomeMuted, fontSize = 9.sp)
-        }
-    }
-}
-
-@Composable
-private fun EmptyHomeCard(title: String, subtitle: String) {
-    Card(Modifier.fillMaxWidth().padding(horizontal = 14.dp), RoundedCornerShape(14.dp), border = BorderStroke(1.dp, HomeBorder)) {
-        Column(Modifier.padding(12.dp)) {
-            Text(title, color = HomeTextDark, fontWeight = FontWeight.Bold, fontSize = 10.sp)
-            Text(subtitle, color = HomeMuted, fontSize = 8.sp, lineHeight = 11.sp)
-        }
-    }
-}
-
-@Composable
-private fun HomeLogo(symbol: String, logoUrl: String?, size: Int) {
-    val resolved = logoUrl?.takeIf { it.isNotBlank() } ?: symbol.takeIf { it.isNotBlank() }?.let { "https://mystocks.africa/logos/${it.lowercase(Locale.US)}-ke.svg" }
-    Box(Modifier.size(size.dp).clip(RoundedCornerShape(8.dp)).background(HomeLightGreen)) {
-        if (resolved != null) AsyncImage(model = resolved, contentDescription = symbol, modifier = Modifier.fillMaxSize().padding(4.dp), contentScale = ContentScale.Fit)
-        else Icon(Icons.Default.Article, null, tint = HomeGreen, modifier = Modifier.padding((size / 4).dp))
-    }
-}
-
-private fun greetingForNairobi(): String {
-    val hour = java.time.ZonedDateTime.now(java.time.ZoneId.of("Africa/Nairobi")).hour
-    val greeting = when {
-        hour < 12 -> "Good morning"
-        hour < 17 -> "Good afternoon"
-        else -> "Good evening"
-    }
-    return "$greeting, James"
-}
-
-private fun formatPrice(value: Double): String = if (value.isFinite()) String.format(Locale.US, "KSh %.2f", value) else "Price unavailable"
-
-private fun formatShares(value: Long): String = when {
-    value >= 1_000_000_000L -> String.format(Locale.US, "%.1fB", value / 1_000_000_000.0)
-    value >= 1_000_000L -> String.format(Locale.US, "%.1fM", value / 1_000_000.0)
-    value >= 1_000L -> String.format(Locale.US, "%.1fK", value / 1_000.0)
-    else -> String.format(Locale.US, "%,d", value)
-}
-
-private fun marketDataFooter(stocks: List<Stock>): String {
-    val sources = stocks.map { it.source.trim() }.filter { it.isNotBlank() }.distinct()
-    val fallbackOnly = stocks.isNotEmpty() && stocks.all { it.dataOrigin == "fallback" }
-    return when {
-        fallbackOnly -> "Market data: NSE Watcher fallback catalogue • not live provider data. Intelligence is informational; verify material announcements with the issuer or NSE."
-        sources.size == 1 -> {
-            val source = sources.first()
-            val delay = if (stocks.all { it.dataOrigin == "backend" && it.source.equals("MyStocks Africa", ignoreCase = true) }) " • approximately 15 minutes delayed" else ""
-            "Market data: $source$delay. Intelligence is informational; verify material announcements with the issuer or NSE."
-        }
-        sources.size > 1 -> "Market data: multiple sources • delays may vary. Intelligence is informational; verify material announcements with the issuer or NSE."
-        else -> "Market data source unavailable. Intelligence is informational; verify material announcements with the issuer or NSE."
-    }
-}
-
-private fun timeAgo(value: String): String {
-    if (value.isBlank()) return ""
-    return value.replace("T", " ").take(16)
 }

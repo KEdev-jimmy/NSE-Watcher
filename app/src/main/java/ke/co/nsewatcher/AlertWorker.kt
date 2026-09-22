@@ -18,6 +18,7 @@ import androidx.work.WorkerParameters
 import ke.co.nsewatcher.data.AlertStore
 import ke.co.nsewatcher.data.NewsCache
 import kotlinx.coroutines.flow.first
+import ke.co.nsewatcher.domain.AlertEvent
 import ke.co.nsewatcher.domain.AlertType
 import java.time.Instant
 import java.time.LocalDate
@@ -63,6 +64,15 @@ class AlertWorker(appContext: Context, workerParams: WorkerParameters) : Corouti
             val source = alerts.firstOrNull { it.id == item.alertId }
             source?.type !in setOf(AlertType.DAILY_GAIN, AlertType.DAILY_LOSS) || lastDaily[item.alertId] != today
         }
+        val detectedAt = Instant.now().toString()
+        store.recordEvents(triggered.map { item ->
+            val observedAt = stocks.firstOrNull { it.symbol.equals(item.symbol, true) }?.observedAt.orEmpty()
+            AlertEvent(
+                id = listOf(item.alertId, observedAt.ifBlank { today }, item.message).joinToString("|"),
+                ruleId = item.alertId, symbol = item.symbol, title = item.title, message = item.message,
+                recordedAt = detectedAt, observedAt = observedAt
+            )
+        })
         store.recordNewsTriggers(
             triggered.filter { item -> alerts.firstOrNull { it.id == item.alertId }?.type in setOf(AlertType.NEWS, AlertType.CORPORATE_ACTION) }
                 .associate { it.alertId to (news.firstOrNull { n -> n.symbol.equals(it.symbol, true) && isPublishedToday(n.publishedAt) && (it.message.endsWith(n.title) || it.message.contains(n.title)) }?.id ?: "") }
@@ -119,3 +129,4 @@ class AlertWorker(appContext: Context, workerParams: WorkerParameters) : Corouti
         }
     }
 }
+

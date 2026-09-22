@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import ke.co.nsewatcher.domain.AlertEvent
+import ke.co.nsewatcher.domain.mergeAlertEvents
 import ke.co.nsewatcher.domain.AlertType
 import ke.co.nsewatcher.domain.PriceAlert
 import kotlinx.coroutines.flow.Flow
@@ -18,7 +20,37 @@ private val previousPricesKey = stringPreferencesKey("previous_prices")
 private val lastDailyTriggerDatesKey = stringPreferencesKey("last_daily_trigger_dates")
 private val lastNewsTriggerIdsKey = stringPreferencesKey("last_news_trigger_ids")
 
+private val alertEventsKey = stringPreferencesKey("alert_events")
+
 class AlertStore(private val context: Context) {
+    val events: Flow<List<AlertEvent>> = context.alertDataStore.data.map { decodeEvents(it[alertEventsKey].orEmpty()) }
+
+    suspend fun recordEvents(events: List<AlertEvent>) {
+        if (events.isEmpty()) return
+        context.alertDataStore.edit { prefs ->
+            val merged = mergeAlertEvents(decodeEvents(prefs[alertEventsKey].orEmpty()), events)
+            prefs[alertEventsKey] = JSONArray().apply {
+                merged.forEach { event -> put(JSONObject().apply {
+                    put("id", event.id); put("ruleId", event.ruleId); put("symbol", event.symbol)
+                    put("title", event.title); put("message", event.message)
+                    put("recordedAt", event.recordedAt); put("observedAt", event.observedAt)
+                }) }
+            }.toString()
+        }
+    }
+
+    private fun decodeEvents(raw: String): List<AlertEvent> = runCatching {
+        val array = JSONArray(raw.ifBlank { "[]" })
+        buildList {
+            for (i in 0 until array.length()) {
+                val item = array.optJSONObject(i) ?: continue
+                if (item.optString("id").isBlank() || item.optString("symbol").isBlank()) continue
+                add(AlertEvent(item.optString("id"), item.optString("ruleId"), item.optString("symbol"),
+                    item.optString("title"), item.optString("message"), item.optString("recordedAt"), item.optString("observedAt")))
+            }
+        }
+    }.getOrDefault(emptyList())
+
     val alerts: Flow<List<PriceAlert>> = context.alertDataStore.data.map { prefs -> decodeAlerts(prefs[alertsKey].orEmpty()) }
 
     suspend fun save(alert: PriceAlert) {
@@ -134,3 +166,4 @@ class AlertStore(private val context: Context) {
         }.getOrDefault(emptyMap())
     }
 }
+

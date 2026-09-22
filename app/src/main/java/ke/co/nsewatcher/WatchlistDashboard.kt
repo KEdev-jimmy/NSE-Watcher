@@ -362,7 +362,7 @@ private fun WatchlistCompanyCard(stock: Stock, history: List<MyStocksCache.Histo
 }
 
 @Composable
-private fun WatchlistSparkline(points: List<MyStocksCache.HistoryPoint>, modifier: Modifier) {
+internal fun WatchlistSparkline(points: List<MyStocksCache.HistoryPoint>, modifier: Modifier) {
     if (points.size < 2) {
         Box(modifier, contentAlignment = Alignment.Center) { Text("No data", color = ResearchMuted, fontSize = 10.sp) }
         return
@@ -467,3 +467,4 @@ private fun WatchlistNewsSheet(companies: List<Stock>, dismiss: () -> Unit, open
         }
     }
 }
+
