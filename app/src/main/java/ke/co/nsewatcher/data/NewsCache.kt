@@ -71,7 +71,7 @@ object NewsCache {
         parseItem(request(DETAIL_URL + encoded)?.optJSONObject("item"))
     }
 
-    private fun parseItem(item: JSONObject?): NewsItem? {
+    internal fun parseItem(item: JSONObject?): NewsItem? {
         if (item == null) return null
         val id = item.optString("id").trim()
         val title = item.optString("title").trim()
@@ -81,7 +81,7 @@ object NewsCache {
             title = title,
             summary = item.optString("summary").trim(),
             body = item.optString("body").trim(),
-            source = item.optString("source", "MyStocks Africa").trim(),
+            source = item.optString("source", "").trim(),
             publishedAt = item.optString("publishedAt").trim(),
             category = item.optString("category", "Market").trim(),
             symbol = item.optString("symbol").trim(),
@@ -127,3 +127,4 @@ object NewsCache {
         }
     }.getOrNull()
 }
+

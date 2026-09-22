@@ -27,6 +27,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import ke.co.nsewatcher.data.SavedNewsStore
+import kotlinx.coroutines.flow.catch
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -59,7 +62,7 @@ internal val NewsColorScheme = darkColorScheme(
     outline = NewsBorder
 )
 
-private val NewsCategories = listOf("All", "Companies", "Dividends", "Market", "Results", "Announcements", "Analysis")
+private val NewsCategories = listOf("All", "Saved", "Companies", "Dividends", "Market", "Results", "Announcements", "Analysis")
 
 private fun isDividendNews(item: NewsItem): Boolean =
     item.category.equals("Dividends", true) || item.dividendAmount.isNotBlank() ||
@@ -85,6 +88,11 @@ private fun matchesNewsCategory(item: NewsItem, category: String): Boolean = whe
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NewsDashboard(open: (NewsItem) -> Unit) {
+    val context = LocalContext.current
+    val savedStore = remember { SavedNewsStore(context) }
+    var savedError by remember { mutableStateOf(false) }
+    val savedFlow = remember { savedStore.articles.catch { savedError = true } }
+    val saved by savedFlow.collectAsState<List<NewsItem>, List<NewsItem>?>(null)
     var feed by remember { mutableStateOf(emptyList<NewsItem>()) }
     var loading by remember { mutableStateOf(true) }
     var refreshing by remember { mutableStateOf(false) }
@@ -132,15 +140,15 @@ fun NewsDashboard(open: (NewsItem) -> Unit) {
 
     LaunchedEffect(Unit) { refreshNews(false) }
 
-    val filtered = remember(feed, category, query) {
+    val filtered = remember(feed, saved, category, query) {
         val term = query.trim()
-        feed.filter { item ->
-            matchesNewsCategory(item, category) && (term.isEmpty() ||
+        (if (category == "Saved") saved.orEmpty() else feed).filter { item ->
+            (category == "Saved" || matchesNewsCategory(item, category)) && (term.isEmpty() ||
                 listOf(item.title, item.summary, item.companyName, item.symbol, item.source)
                     .any { it.contains(term, ignoreCase = true) })
         }
     }
-    val browsingList = showAll || query.isNotBlank()
+    val browsingList = category == "Saved" || showAll || query.isNotBlank()
 
     PullToRefreshBox(
         isRefreshing = refreshing,
@@ -208,7 +216,7 @@ fun NewsDashboard(open: (NewsItem) -> Unit) {
                     }
                 }
             }
-            if (error != null && feed.isNotEmpty()) {
+            if (category != "Saved" && error != null && feed.isNotEmpty()) {
                 item {
                     NewsMessage(
                         "Refresh unavailable", "Showing previously loaded stories. Try refreshing again.",
@@ -217,7 +225,16 @@ fun NewsDashboard(open: (NewsItem) -> Unit) {
                 }
             }
             when {
-                loading -> item {
+                category == "Saved" && savedError -> item {
+                    NewsMessage("Saved articles unavailable", "Your saved articles could not be read. Reopen News to retry.", "Show all news", { selectCategory("All") })
+                }
+                category == "Saved" && saved == null -> item { ResearchLoading("Loading saved articles…") }
+                category == "Saved" && filtered.isEmpty() -> item {
+                    NewsMessage(if (query.isBlank()) "No saved articles yet" else "No matching saved articles",
+                        "Tap the bookmark in an article to keep its available text here. Images and original links may still need internet.",
+                        "Explore news", { selectCategory("All") })
+                }
+                loading && category != "Saved" -> item {
                     Column(Modifier.fillMaxWidth().padding(vertical = 64.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator(color = NewsGreen)
                         Spacer(Modifier.height(16.dp))
@@ -239,8 +256,8 @@ fun NewsDashboard(open: (NewsItem) -> Unit) {
                 browsingList -> {
                     item {
                         NewsSectionHeading(
-                            if (query.isNotBlank()) "Search results (${filtered.size})" else "All stories (${filtered.size})",
-                            if (query.isBlank()) "Show less" else null,
+                            if (query.isNotBlank()) "Search results (${filtered.size})" else if (category == "Saved") "Saved articles (${filtered.size})" else "All stories (${filtered.size})",
+                            if (query.isBlank() && category != "Saved") "Show less" else null,
                             { showAll = false }
                         )
                     }
@@ -450,3 +467,4 @@ private fun newsDate(value: String): String {
         LocalDate.parse(value.take(10)).format(DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.US))
     }.getOrDefault(value.take(10))
 }
+
