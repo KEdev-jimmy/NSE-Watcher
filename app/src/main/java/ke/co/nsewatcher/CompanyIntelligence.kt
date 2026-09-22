@@ -1,6 +1,7 @@
 package ke.co.nsewatcher
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
@@ -48,6 +49,7 @@ import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
 
 private val IntelligenceGreen = Color(0xFF00A859)
 private val IntelligenceLight = Color(0xFFE9F8F0)
