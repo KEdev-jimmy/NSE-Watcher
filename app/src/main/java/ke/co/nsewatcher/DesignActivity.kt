@@ -228,12 +228,12 @@ private fun App(pickAvatar:()->Unit) {
     fun go(to:Page){if(to!=page){history=history+page;page=to}}
     fun back(){if(history.isNotEmpty()){page=history.last();history=history.dropLast(1)}else page=Page.HOME}
     BackHandler(enabled=page!=Page.HOME){back()}
-    val scheme=if(page==Page.COMPANY) CompanyResearchColors else if(page==Page.NEWS) NewsColorScheme else if(dark) darkColorScheme(primary=Color(0xFF32D486),background=Color(0xFF0D1712),surface=Color(0xFF132019),onSurface=Color.White,onBackground=Color.White,onSurfaceVariant=Color(0xFFB7C7BE)) else lightColorScheme(primary=Green,background=Color.White,surface=Color.White,onSurface=TextDark,onBackground=TextDark,onSurfaceVariant=Muted)
+    val scheme=if(page==Page.COMPANY || page==Page.WATCHLIST) CompanyResearchColors else if(page==Page.NEWS) NewsColorScheme else if(dark) darkColorScheme(primary=Color(0xFF32D486),background=Color(0xFF0D1712),surface=Color(0xFF132019),onSurface=Color.White,onBackground=Color.White,onSurfaceVariant=Color(0xFFB7C7BE)) else lightColorScheme(primary=Green,background=Color.White,surface=Color.White,onSurface=TextDark,onBackground=TextDark,onSurfaceVariant=Muted)
     MaterialTheme(colorScheme=scheme){Surface(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing),color=scheme.background){
         when(page){
             Page.HOME,Page.MARKET,Page.NEWS,Page.COMPANIES,Page.PAPER,Page.MORE -> Scaffold(topBar={if(page!=Page.HOME && page!=Page.MARKET && page!=Page.NEWS) TopBar(name,::go)},bottomBar={BottomNav(if(page==Page.NEWS) 2 else tab, newsStyle=page==Page.NEWS){tab=it;history=emptyList();page=when(it){0->Page.HOME;1->Page.MARKET;2->Page.NEWS;3->Page.COMPANIES;else->Page.MORE}}}){pad->Box(Modifier.fillMaxSize().padding(pad)){when(page){Page.HOME->HomeDashboard(stocks,{selected=it;go(Page.COMPANY)},{selectedNews=it;go(Page.NEWS_DETAIL)},{go(Page.MARKET)},{go(Page.WATCHLIST)},startupNews,startupMarketStatus,startupComplete);Page.MARKET->MarketDashboard(stocks);Page.NEWS->NewsDashboard{selectedNews=it;go(Page.NEWS_DETAIL)};Page.COMPANIES->Companies(companyCatalog, stocks, {selected=it;go(Page.COMPANY)},{go(Page.WATCHLIST)},{go(Page.COMPARE)});Page.PAPER->Paper();else->More(::go)}}}
             Page.COMPANY->Company(selected,::back){selectedNews=it;go(Page.NEWS_DETAIL)}
-            Page.WATCHLIST->Watchlist({selected=it;go(Page.COMPANY)},::back)
+            Page.WATCHLIST->WatchlistDashboard(quoteStocks=stocks, initialCatalog=companyCatalog, initialMarket=startupMarketStatus, onQuotesLoaded={liveStocks.value=it}, openCompany={selected=it;go(Page.COMPANY)}, openNews={selectedNews=it;go(Page.NEWS_DETAIL)}, openPreferences={go(Page.NOTIFICATIONS)}, back=::back)
             Page.COMPARE->CompanyComparison(stocks,::back)
             Page.NEWS_DETAIL->selectedNews?.let { NewsDetail(it,::back) }
             Page.PROFILE->Profile(name,username,email,description,{name=it;put("profile_name",it)},{username=it;put("username",it)},{email=it;put("email",it)},{description=it;put("description",it)},pickAvatar,::back,::go)
@@ -358,86 +358,6 @@ private fun Companies(catalog: List<Stock>, quoteStocks: List<Stock>, open:(Stoc
         }
     }
 }
-@Composable
-private fun Watchlist(open: (Stock) -> Unit, back: () -> Unit) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val watchlistStore = remember { WatchlistStore(context) }
-    LaunchedEffect(Unit) {
-        MyStocksCache.loadStocks().takeIf { it.isNotEmpty() }?.let { liveStocks.value = it }
-    }
-    val watchedSymbols by watchlistStore.symbols.collectAsState(initial = emptyList())
-    val scope = rememberCoroutineScope()
-
-    LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        item { Header("Watchlist", "Companies you explicitly chose to follow", back) }
-        item {
-            Text("Prices and daily changes are from MyStocks Africa and may be delayed. Verify material announcements with the issuer or NSE.", color = Muted, fontSize = 9.sp)
-        }
-        if (watchedSymbols.isEmpty()) {
-            item {
-                Card(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), border = BorderStroke(1.dp, Border)) {
-                    Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Surface(Modifier.size(58.dp), CircleShape, LightGreen) {
-                            Icon(Icons.Default.StarBorder, null, tint = Green, modifier = Modifier.padding(15.dp))
-                        }
-                        Spacer(Modifier.height(10.dp))
-                        Text("Your watchlist is empty", fontWeight = FontWeight.ExtraBold, fontSize = 17.sp)
-                        Spacer(Modifier.height(4.dp))
-                        Text("Open a company and tap Watch to add it here. Nothing is added automatically.", color = Muted, fontSize = 10.sp, textAlign = TextAlign.Center)
-                    }
-                }
-            }
-        } else {
-            item {
-                Text("${watchedSymbols.size} ${if (watchedSymbols.size == 1) "company" else "companies"} watched", color = Muted, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
-            }
-            items(watchedSymbols) { symbol ->
-                val stock = stocks.firstOrNull { it.symbol.trim().uppercase() == symbol.trim().uppercase() }
-                if (stock != null) {
-                    Card(Modifier.fillMaxWidth().clickable { open(stock) }, RoundedCornerShape(16.dp), border = BorderStroke(1.dp, Border)) {
-                        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Logo(stock.symbol, 42, stock.logoUrl)
-                            Spacer(Modifier.width(10.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(stock.name, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
-                                Text(stock.symbol, color = Muted, fontSize = 9.sp)
-                                Text(if (stock.price.isFinite()) String.format(Locale.US, "KSh %.2f", stock.price) else "Price unavailable", color = TextDark, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                Text(marketObservationShort(stock), color = Muted, fontSize = 7.sp)
-                            }
-                            Column(horizontalAlignment = Alignment.End) {
-                                if (stock.changeAvailable) {
-                                    Text(String.format(Locale.US, "%+.2f%%", stock.change), color = if (stock.change >= 0) Green else Red, fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                                } else {
-                                    Text("Daily change unavailable", color = Muted, fontSize = 9.sp)
-                                }
-                                TextButton(onClick = { scope.launch { watchlistStore.remove(stock.symbol) } }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) {
-                                    Text("Remove", color = Muted, fontSize = 9.sp)
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    Card(Modifier.fillMaxWidth(), RoundedCornerShape(16.dp), border = BorderStroke(1.dp, Border)) {
-                        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Surface(Modifier.size(42.dp), CircleShape, LightGreen) {
-                                Icon(Icons.Default.HelpOutline, null, tint = Muted, modifier = Modifier.padding(11.dp))
-                            }
-                            Spacer(Modifier.width(10.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(symbol, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
-                                Text("Current market data unavailable", color = Muted, fontSize = 9.sp)
-                            }
-                            TextButton(onClick = { scope.launch { watchlistStore.remove(symbol) } }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) {
-                                Text("Remove", color = Muted, fontSize = 9.sp)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
 @Composable
 private fun CompanyDataCoverage(stocks: List<Stock>) {
     val valid = stocks.count { it.price.isFinite() && it.price > 0.0 }
@@ -1515,3 +1435,4 @@ private fun selectedTypeLabel(type:AlertType):String=when(type){
             Text("License: creativecommons.org/licenses/by-sa/4.0/ • Image bundled with the app; crop/overlay applied.",fontSize=8.sp,color=Muted,modifier=Modifier.padding(top=2.dp))
         }}}}
 @Composable private fun Note(text:String){Card(Modifier.fillMaxWidth(),RoundedCornerShape(14.dp),colors=CardDefaults.cardColors(containerColor=LightGreen)){Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically){Icon(Icons.Default.Info,null,tint=Green);Spacer(Modifier.width(9.dp));Text(text,fontSize=9.sp,color=Muted)}}}
+
