@@ -24,7 +24,7 @@ import java.util.Locale
 import ke.co.nsewatcher.data.MyStocksCache
 
 internal val PracticeAmber = Color(0xFFFFCE71)
-internal fun practiceMoney(value: Double) = CompanyResearchPresentation.money(value)
+internal fun practiceMoney(value: Double) = if (value.isFinite()) String.format(Locale.US, "KSh %,.2f", value) else "Unavailable"
 internal fun practiceTime(time: Long) = CompanyResearchPresentation.date(Instant.ofEpochMilli(time).toString())
 internal fun practiceGain(value: Double) = (if (value > 0) "+" else if (value < 0) "−" else "") + practiceMoney(kotlin.math.abs(value))
 
@@ -69,7 +69,7 @@ internal fun practiceGain(value: Double) = (if (value > 0) "+" else if (value < 
         MarketChoiceRow(listOf("Value", "Gain / loss"), metric) { metric = it }
         // Contributions stay in the value chart; profit uses contribution-adjusted snapshots.
         if (metric == "Value") {
-            CompanyResearchChart(rows.map { MyStocksCache.HistoryPoint(it.value, Instant.ofEpochMilli(it.time).toString()) }, range, false, {}, title = "Portfolio value · KSh")
+            CompanyResearchChart(rows.map { MyStocksCache.HistoryPoint(it.value, Instant.ofEpochMilli(it.time).toString()) }, range, false, {}, title = "Portfolio value · KSh", allowZero = true)
             ResearchCaption("Account value includes added virtual cash. Snapshots begin when this version records a complete valuation.")
         } else {
             if (rows.isEmpty()) ResearchCaption("No complete valuations in this period yet.")

@@ -83,6 +83,11 @@ class PracticeEngineTest {
         val added = PracticeEngine.snapshot(s.copy(cash = 110000.0, contributed = 110000.0), now + 2000)
         assertEquals(0.0, added.snapshots.last().value - added.snapshots.last().contributed, 0.0)
     }
+    @Test fun zeroBalancesAndZeroGainsAreAmountsNotMissingPrices() {
+        assertEquals("KSh 0.00", practiceMoney(0.0))
+        assertEquals("KSh 0.00", practiceGain(0.0))
+        assertEquals("Unavailable", practiceMoney(Double.NaN))
+    }
     @Test fun invalidInputsCannotEnterTheLedger() {
         for (p in listOf(Double.NaN, Double.POSITIVE_INFINITY, -1.0, 0.0, 100.001)) assertNotNull(PracticeEngine.validate(account(), order(limit = p)))
         for (n in listOf(0L, -1L, Long.MAX_VALUE)) assertNotNull(PracticeEngine.validate(account(), order(shares = n)))

@@ -30,16 +30,17 @@ import java.util.Locale
 import kotlin.math.abs
 
 @Composable
-internal fun CompanyResearchChart(points: List<MyStocksCache.HistoryPoint>, range: String, loading: Boolean, retry: () -> Unit, title: String? = null, purchaseMarkers: List<Pair<Long, Double>> = emptyList()) {
-    val dated = remember(points) {
+internal fun CompanyResearchChart(points: List<MyStocksCache.HistoryPoint>, range: String, loading: Boolean, retry: () -> Unit, title: String? = null, purchaseMarkers: List<Pair<Long, Double>> = emptyList(), allowZero: Boolean = false) {
+    val dated = remember(points, allowZero) {
         points.mapNotNull { point ->
-            CompanyResearchPresentation.timestamp(point.date)?.takeIf { point.close.isFinite() && point.close > 0.0 }
+            CompanyResearchPresentation.timestamp(point.date)?.takeIf { point.close.isFinite() && (point.close > 0.0 || (allowZero && point.close == 0.0)) }
                 ?.let { point to it.toEpochMilli() }
         }.sortedBy { it.second }.distinctBy { it.second }
     }
     var selected by remember(dated, range) { mutableStateOf<Int?>(null) }
     var zoom by remember(dated, range) { mutableFloatStateOf(1f) }
     var startFraction by remember(dated, range) { mutableFloatStateOf(0f) }
+    fun displayValue(value: Double) = if (allowZero && value == 0.0) "KSh 0.00" else CompanyResearchPresentation.money(value)
     val density = LocalDensity.current
     val leftPx = with(density) { 54.dp.toPx() }
     val rightPx = with(density) { 14.dp.toPx() }
@@ -82,7 +83,7 @@ internal fun CompanyResearchChart(points: List<MyStocksCache.HistoryPoint>, rang
                 }
 
                 val chosen = selected?.let { dated.getOrNull(it) }
-                val description = "$range price chart. ${dated.size} observations. First ${CompanyResearchPresentation.money(dated.first().first.close)} on ${CompanyResearchPresentation.date(dated.first().first.date)}. Latest ${CompanyResearchPresentation.money(dated.last().first.close)} on ${CompanyResearchPresentation.date(dated.last().first.date)}."
+                val description = "$range price chart. ${dated.size} observations. First ${displayValue(dated.first().first.close)} on ${CompanyResearchPresentation.date(dated.first().first.date)}. Latest ${displayValue(dated.last().first.close)} on ${CompanyResearchPresentation.date(dated.last().first.date)}."
                 Canvas(
                     Modifier.fillMaxWidth().height(220.dp)
                         .semantics { contentDescription = description }
@@ -157,7 +158,7 @@ internal fun CompanyResearchChart(points: List<MyStocksCache.HistoryPoint>, rang
                         drawContext.canvas.nativeCanvas.drawText(label, left + (right - left) * i / 2, size.height - 7.dp.toPx(), paint)
                     }
                 }
-                if (chosen != null) ResearchCaption("${CompanyResearchPresentation.money(chosen.first.close)} · ${CompanyResearchPresentation.date(chosen.first.date)}")
+                if (chosen != null) ResearchCaption("${displayValue(chosen.first.close)} · ${CompanyResearchPresentation.date(chosen.first.date)}")
                 else ResearchCaption(if (intraday) "Times in EAT · Tap an observation · Pinch to zoom" else "Dated observations · Tap to inspect · Pinch to zoom")
                 if (dated.size == 1) ResearchCaption("Only one dated observation is available; no trend is inferred.")
                 if (loading) ResearchCaption("Refreshing observations…")
