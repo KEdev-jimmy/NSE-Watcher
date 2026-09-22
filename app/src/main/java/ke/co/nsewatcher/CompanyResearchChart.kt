@@ -30,7 +30,7 @@ import java.util.Locale
 import kotlin.math.abs
 
 @Composable
-internal fun CompanyResearchChart(points: List<MyStocksCache.HistoryPoint>, range: String, loading: Boolean, retry: () -> Unit) {
+internal fun CompanyResearchChart(points: List<MyStocksCache.HistoryPoint>, range: String, loading: Boolean, retry: () -> Unit, title: String? = null, purchaseMarkers: List<Pair<Long, Double>> = emptyList()) {
     val dated = remember(points) {
         points.mapNotNull { point ->
             CompanyResearchPresentation.timestamp(point.date)?.takeIf { point.close.isFinite() && point.close > 0.0 }
@@ -46,7 +46,7 @@ internal fun CompanyResearchChart(points: List<MyStocksCache.HistoryPoint>, rang
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            ResearchCaption(if (range == "1D") "Session price · KSh" else "$range price history · KSh", Modifier.weight(1f))
+            ResearchCaption(title ?: if (range == "1D") "Session price · KSh" else "$range price history · KSh", Modifier.weight(1f))
             if (zoom > 1.01f) TextButton(onClick = { zoom = 1f; startFraction = 0f; selected = null }) {
                 Text("Reset zoom", color = ResearchGreen)
             }
@@ -137,6 +137,13 @@ internal fun CompanyResearchChart(points: List<MyStocksCache.HistoryPoint>, rang
                             drawPath(line, ResearchGreen, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
                         }
                         dated.forEach { (point, time) -> drawCircle(ResearchGreen, if (dated.size == 1) 4.dp.toPx() else 1.5.dp.toPx(), Offset(x(time), y(point.close))) }
+                        purchaseMarkers.filter { it.first >= viewStart && it.first <= viewStart + viewSpan }.forEach { (time, price) ->
+                            if (price.isFinite() && price > 0) {
+                                drawLine(ResearchMuted.copy(alpha = 0.5f), Offset(x(time), top), Offset(x(time), bottom), 1.dp.toPx())
+                                drawCircle(ResearchText, 5.dp.toPx(), Offset(x(time), y(price)))
+                                drawCircle(ResearchGreen, 3.dp.toPx(), Offset(x(time), y(price)))
+                            }
+                        }
                         chosen?.let { (point, time) ->
                             drawLine(ResearchMuted.copy(alpha = 0.6f), Offset(x(time), top), Offset(x(time), bottom), 1.dp.toPx())
                             drawCircle(ResearchText, 4.dp.toPx(), Offset(x(time), y(point.close)))
@@ -158,3 +165,4 @@ internal fun CompanyResearchChart(points: List<MyStocksCache.HistoryPoint>, rang
         }
     }
 }
+
