@@ -2396,3 +2396,15 @@ About now identifies:
 - Corrected the reference-layout movement indicators so positive and negative daily/since-open values render green/up or red/down from the actual calculated value; unavailable movement remains neutral.
 - Refined the intraday chart grid/axis density and time labels to more closely match the supplied reference while continuing to plot provider-returned observations only.
 - Commit: `a0f46410f0c0f709d1936c239b8aa30f63ffb9fc`.
+
+
+# 2026-09-22 — Company Intelligence 1D chart: Previous Close → Today’s Latest
+
+- Updated the active 1D intraday chart in commit `94129ede2a2f997bca712b741e95a8dae9cd5d9d`.
+- The chart now presents the intended semantic flow as **Previous Close → Today’s actual observations → Latest available price**.
+- Removed the separate **OPEN** endpoint marker and replaced the right-hand endpoint marker with **LATEST** so the chart does not imply that an open or final close is the endpoint while the session is still active.
+- The chart legend now calls the plotted series **Today's observations** and keeps **Previous close** as the reference.
+- The chart remains anchored to the actual previous trading close at the left edge; the previous-close anchor is a visual reference, not a fabricated intraday observation.
+- The existing actual provider observations remain unchanged. No synthetic 09:30, 09:45, 10:00 or other intraday prices are created to fill missing data.
+- The chart's fixed session coordinate remains 09:30–15:00 EAT. If the provider's first returned observation is later than 09:30 (for example 11:00), the app must not invent the missing observations. The visible line begins from the previous close and then joins the first actual observation.
+- The current implementation has **not yet been CI-verified** after commit `94129ede2a2f997bca712b741e95a8dae9cd5d9d`. Check the GitHub Actions run before calling this change build-verified.
