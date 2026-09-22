@@ -10,12 +10,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -174,11 +178,15 @@ fun MarketDashboard(stockFeed: List<Stock>, catalog: List<Stock>, initialStatus:
                     items(sectors, key = { it.name }) { sector ->
                         Surface(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(role = Role.Button) { sheet = "Sector:${sector.name}" }, color = ResearchCard, shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, ResearchBorder)) {
                             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Column(Modifier.weight(1f)) { ResearchBody(sector.name); Text(sector.average?.let { CompanyResearchPresentation.percent(it) } ?: "Unavailable", color = researchChangeColor(sector.average), fontWeight = FontWeight.Bold, fontSize = 17.sp) }
-                                    ResearchCaption("${sector.breadth.covered} of ${sector.breadth.total} with data")
-                                    Icon(Icons.Default.ChevronRight, null, tint = ResearchMuted)
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    MarketSectorIcon(sector.name)
+                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        ResearchBody(sector.name)
+                                        Text(sector.average?.let { CompanyResearchPresentation.percent(it) } ?: "Unavailable", color = researchChangeColor(sector.average), fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                                    }
+                                    Icon(Icons.Default.ChevronRight, null, tint = ResearchMuted, modifier = Modifier.size(20.dp))
                                 }
+                                ResearchCaption("${sector.breadth.covered} of ${sector.breadth.total} with data")
                                 MarketBreadthBar(sector.breadth)
                             }
                         }
@@ -198,7 +206,12 @@ fun MarketDashboard(stockFeed: List<Stock>, catalog: List<Stock>, initialStatus:
         sheet?.let { title ->
             ModalBottomSheet(onDismissRequest = { sheet = null }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = ResearchBackground) {
                 LazyColumn(Modifier.fillMaxWidth().fillMaxHeight(0.85f), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    item { ResearchTitle(title.substringAfter(':')) }
+                    item {
+                        if (title.startsWith("Sector:")) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            MarketSectorIcon(title.substringAfter(':'))
+                            Column(Modifier.weight(1f)) { ResearchTitle(title.substringAfter(':')) }
+                        } else ResearchTitle(title.substringAfter(':'))
+                    }
                     when {
                         title == "Market participation" -> item {
                             ResearchBody("Each company with a finite provider-supplied daily change and a valid price counts once. Rising and falling counts describe participation, not the change in an NSE index.")
@@ -291,5 +304,45 @@ internal fun MarketStockRow(stock: Stock, value: String, change: Double?, open: 
             Icon(Icons.Default.ChevronRight, null, tint = ResearchMuted, modifier = Modifier.size(16.dp))
         }
         Text(dates ?: "Observed: ${CompanyResearchPresentation.date(stock.observedAt)}", Modifier.padding(start = 40.dp, top = 4.dp), color = ResearchMuted, fontSize = 10.sp)
+    }
+}
+
+
+// Sector identity stays mint regardless of daily return; red/green values carry performance.
+@Composable
+private fun MarketSectorIcon(sector: String) {
+    Surface(
+        modifier = Modifier.size(48.dp),
+        shape = RoundedCornerShape(14.dp),
+        color = Color.Transparent,
+        border = BorderStroke(1.dp, ResearchGreen.copy(alpha = 0.22f))
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize().background(
+                Brush.linearGradient(listOf(ResearchGreen.copy(alpha = 0.18f), ResearchGreen.copy(alpha = 0.04f)))
+            ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(marketSectorSymbol(sector), contentDescription = null,
+                tint = Color(0xFF8AE8B9), modifier = Modifier.size(27.dp))
+        }
+    }
+}
+
+private fun marketSectorSymbol(sector: String): ImageVector {
+    val name = sector.trim().lowercase(Locale.US)
+    return when {
+        name.contains("bank") -> Icons.Outlined.AccountBalance
+        name.contains("telecom") -> Icons.Outlined.CellTower
+        name.contains("agric") || name.contains("farm") -> Icons.Outlined.Eco
+        name.contains("energy") || name.contains("petroleum") || name.contains("oil") || name.contains("gas") -> Icons.Outlined.Bolt
+        name.contains("insurance") -> Icons.Outlined.Shield
+        name.contains("construct") || name.contains("allied") -> Icons.Outlined.Construction
+        name.contains("manufactur") -> Icons.Outlined.Factory
+        name.contains("automobil") || name.contains("transport") -> Icons.Outlined.DirectionsCar
+        name.contains("real estate") || name.contains("reit") || name.contains("property") -> Icons.Outlined.Apartment
+        name.contains("invest") || name.contains("exchange traded") || name.contains("etf") -> Icons.Outlined.PieChart
+        name.contains("commercial") || name.contains("service") -> Icons.Outlined.Storefront
+        else -> Icons.Outlined.Category
     }
 }
