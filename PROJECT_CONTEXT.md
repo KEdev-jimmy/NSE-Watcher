@@ -2408,3 +2408,19 @@ About now identifies:
 - The existing actual provider observations remain unchanged. No synthetic 09:30, 09:45, 10:00 or other intraday prices are created to fill missing data.
 - The chart's fixed session coordinate remains 09:30–15:00 EAT. If the provider's first returned observation is later than 09:30 (for example 11:00), the app must not invent the missing observations. The visible line begins from the previous close and then joins the first actual observation.
 - The current implementation has **not yet been CI-verified** after commit `94129ede2a2f997bca712b741e95a8dae9cd5d9d`. Check the GitHub Actions run before calling this change build-verified.
+
+# 2026-09-22 — Company Intelligence multi-period chart/range selector
+
+- Implemented the requested multi-period Company Intelligence performance/chart experience in CompanyIntelligence.kt.
+- The chart now supports selectable ranges: 1D, 3D, 1W, 1M, 3M, 6M, 1Y, 3Y and 5Y.
+- Below the chart, a horizontally scrollable performance strip shows the calculated percentage movement for each available range, e.g. +3.00% with 3D, +15.00% with 1W, etc. Positive values are green, negative values red, and unavailable values remain —.
+- The same range labels are also selectable chips below the performance strip. Selecting a range switches the graph to that period.
+- 1D remains the special intraday chart: it uses the existing actual NSE observations, the real previous-session close as a reference line, and the latest available observation. No synthetic 09:30/15-minute prices are created.
+- 3D–5Y use historical candles returned by the existing backend/MyStocks path. Non-1D ranges use a dedicated historical line renderer rather than the 09:30–15:00 intraday coordinate system.
+- Percentage movement is calculated from the first and last available observations for each historical range. For 1D, the existing daily close-to-previous-close calculation is used when available.
+- The Android screen currently loads the nine supported ranges concurrently on Company Intelligence entry/market refresh, then keeps the loaded results in screen state so switching ranges does not refetch.
+- The implementation preserves the RAW DATA → CALCULATION → EXPLANATION → EVIDENCE rule: no missing historical observations are interpolated and no percentage is invented when the source range has insufficient data.
+- Active implementation commits: 40a07aa66121ffe095ec4f28ae54d668a63428e2 (multi-period chart/range implementation); 2caf0542dda6161bdbf70dd48c79ce1e0b58c725 (required Compose/coroutines imports).
+- Compare against known-good chart-fix base 1693ed9de80d3546e6d30fd45a65baf2e7d7c90b: only CompanyIntelligence.kt changed, with 255 additions and 14 deletions. This avoids the earlier accidental whole-file truncation.
+- CI verification is still pending. Do not call this implementation build-verified until the Android workflow result is inspected. Runtime APK verification should also confirm range switching, chart rendering, and the performance strip on a real device.
+- MyStocks documentation confirms /stocks/{symbol}/candles supports date-bounded daily/weekly/monthly aggregation and that intraday 15m data may be sparse; missing observations are not interpolated. See the current Partner API reference.
