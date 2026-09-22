@@ -1094,6 +1094,10 @@ fun CompanyIntelligence(
     onWatchToggle: (() -> Unit)? = null
 ) {
     var historyResult by remember(s.symbol) { mutableStateOf(MyStocksCache.HistoryResult()) }
+    var chartResult by remember(s.symbol) { mutableStateOf(MyStocksCache.HistoryResult()) }
+    var chartLoading by remember(s.symbol) { mutableStateOf(true) }
+    var selectedChartRange by rememberSaveable(s.symbol) { mutableStateOf("1D") }
+    var rangeResults by remember(s.symbol) { mutableStateOf<Map<String, MyStocksCache.HistoryResult>>(emptyMap()) }
     var marketStatus by remember(s.symbol) { mutableStateOf(MyStocksCache.MarketStatus()) }
     var intelligence by remember(s.symbol) { mutableStateOf(CompanyIntelligenceCache.Result()) }
     var companyNews by remember(s.symbol) { mutableStateOf<List<NewsItem>>(emptyList()) }
@@ -1121,6 +1125,29 @@ fun CompanyIntelligence(
         historyLoading = true
         historyResult = MyStocksCache.loadHistoryDetails(s.symbol, "1D")
         historyLoading = false
+    }
+
+    LaunchedEffect(s.symbol, lastMarketRefreshMs) {
+        val ranges = listOf("1D", "3D", "1W", "1M", "3M", "6M", "1Y", "3Y", "5Y")
+        chartLoading = true
+        val loaded = kotlinx.coroutines.coroutineScope {
+            ranges.map { range ->
+                async {
+                    range to if (range == "1D") {
+                        MyStocksCache.loadHistoryDetails(s.symbol, "1D")
+                    } else {
+                        MyStocksCache.loadHistoryDetails(s.symbol, range.lowercase())
+                    }
+                }
+            }.mapNotNull { deferred -> runCatching { deferred.await() }.getOrNull() }.toMap()
+        }
+        rangeResults = loaded
+        chartResult = loaded[selectedChartRange] ?: MyStocksCache.HistoryResult()
+        chartLoading = false
+    }
+
+    LaunchedEffect(selectedChartRange, rangeResults) {
+        rangeResults[selectedChartRange]?.let { chartResult = it }
     }
 
     val profile = intelligence.profile
@@ -1175,7 +1202,17 @@ fun CompanyIntelligence(
         sinceOpen = sinceOpen,
         historyLoading = historyLoading,
         news = companyNews,
-        newsLoading = newsLoading
+        newsLoading = newsLoading,
+        chartPoints = chartResult.points.filter { it.close.isFinite() && it.close > 0.0 },
+        chartPreviousClose = if (selectedChartRange == "1D") chartResult.previousSessionClose else null,
+        chartLatest = chartResult.sessionClose?.takeIf { it.isFinite() && it > 0.0 }
+            ?: chartResult.points.lastOrNull()?.close,
+        chartLoading = chartLoading,
+        selectedChartRange = selectedChartRange,
+        onChartRangeSelected = { selectedChartRange = it },
+        rangeReturns = rangeResults.mapValues { (range, result) ->
+            periodReturnPct(range, result, if (range == "1D") dailyChange else null)
+        }
     )
 }
 
@@ -1197,7 +1234,14 @@ private fun MobileCompanyIntelligenceLayout(
     sinceOpen: Double?,
     historyLoading: Boolean,
     news: List<NewsItem>,
-    newsLoading: Boolean
+    newsLoading: Boolean,
+    chartPoints: List<MyStocksCache.HistoryPoint>,
+    chartPreviousClose: Double?,
+    chartLatest: Double?,
+    chartLoading: Boolean,
+    selectedChartRange: String,
+    onChartRangeSelected: (String) -> Unit,
+    rangeReturns: Map<String, Double?>
 ) {
     var selected by rememberSaveable(stock.symbol) { mutableStateOf("Overview") }
 
@@ -1276,7 +1320,19 @@ private fun MobileCompanyIntelligenceLayout(
             when (selected) {
                 "Overview" -> {
                     item { MobileGlanceCard(previousClose, open, dayHigh, dayLow, latest, observedAt, dailyChange, sinceOpen, edge, phone) }
-                    item { MobileChartCard(points, previousClose, latest, historyLoading, edge, phone) }
+                    item {
+                        MobileChartCard(
+                            chartPoints = chartPoints,
+                            previousClose = chartPreviousClose,
+                            latest = chartLatest,
+                            loading = chartLoading,
+                            edge = edge,
+                            phone = phone,
+                            selectedRange = selectedChartRange,
+                            onRangeSelected = onChartRangeSelected,
+                            rangeReturns = rangeReturns
+                        )
+                    }
                     item {
                         Surface(
                             onClick = { },
@@ -1423,8 +1479,15 @@ private fun MobileGlanceCard(
 
 @Composable
 private fun MobileChartCard(
-    points: List<MyStocksCache.HistoryPoint>, previousClose: Double?, latest: Double?, loading: Boolean,
-    edge: androidx.compose.ui.unit.Dp, phone: Boolean
+    chartPoints: List<MyStocksCache.HistoryPoint>,
+    previousClose: Double?,
+    latest: Double?,
+    loading: Boolean,
+    edge: androidx.compose.ui.unit.Dp,
+    phone: Boolean,
+    selectedRange: String,
+    onRangeSelected: (String) -> Unit,
+    rangeReturns: Map<String, Double?>
 ) {
     Surface(
         Modifier.padding(horizontal = edge).fillMaxWidth(),
@@ -1440,28 +1503,54 @@ private fun MobileChartCard(
                 Box(Modifier.size(9.dp).clip(RoundedCornerShape(50)).background(Color(0xFF00D084)))
             }
             Text(
-                "NSE session 09:30 – 15:00 EAT",
+                if (selectedRange == "1D") "NSE session 09:30 – 15:00 EAT"
+                else "Historical NSE price movement • available exchange observations",
                 color = Color(0xFFA9BCD0),
                 fontSize = 9.sp,
                 modifier = Modifier.padding(start = 36.dp)
             )
             Spacer(Modifier.height(10.dp))
-            if (loading && points.isEmpty()) {
+            if (loading && chartPoints.isEmpty()) {
                 Box(Modifier.fillMaxWidth().height(if (phone) 220.dp else 300.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = Color(0xFF00D084), strokeWidth = 2.dp)
                 }
-            } else if (points.isEmpty()) {
+            } else if (chartPoints.isEmpty()) {
                 Box(Modifier.fillMaxWidth().height(if (phone) 220.dp else 300.dp), contentAlignment = Alignment.Center) {
-                    Text("Intraday chart data unavailable.", color = Color(0xFFA9BCD0), fontSize = 12.sp)
+                    Text("Chart data unavailable for this period.", color = Color(0xFFA9BCD0), fontSize = 12.sp)
                 }
+            } else if (selectedRange == "1D") {
+                ApprovedIntradayCanvas(chartPoints, previousClose, latest, Modifier.fillMaxWidth().height(if (phone) 230.dp else 320.dp))
             } else {
-                ApprovedIntradayCanvas(points, previousClose, latest, Modifier.fillMaxWidth().height(if (phone) 230.dp else 320.dp))
+                HistoricalRangeCanvas(chartPoints, Modifier.fillMaxWidth().height(if (phone) 230.dp else 320.dp))
             }
+
             Spacer(Modifier.height(10.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                ApprovedLegend(false, "NSE observations")
-                ApprovedLegend(true, "Previous close")
+            RangePerformanceStrip(rangeReturns, selectedRange, onRangeSelected, phone)
+
+            Spacer(Modifier.height(9.dp))
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(7.dp)
+            ) {
+                listOf("1D", "3D", "1W", "1M", "3M", "6M", "1Y", "3Y", "5Y").forEach { range ->
+                    val active = selectedRange == range
+                    Surface(
+                        onClick = { onRangeSelected(range) },
+                        color = if (active) Color(0xFF00D084) else Color(0xFF10283D),
+                        contentColor = if (active) Color(0xFF062018) else Color(0xFFA9BCD0),
+                        shape = RoundedCornerShape(9.dp),
+                        border = BorderStroke(1.dp, if (active) Color(0xFF00D084) else Color(0xFF17364F))
+                    ) {
+                        Text(
+                            range,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            fontSize = 10.sp,
+                            fontWeight = if (active) FontWeight.Bold else FontWeight.SemiBold
+                        )
+                    }
+                }
             }
+
             Spacer(Modifier.height(10.dp))
             Surface(
                 Modifier.fillMaxWidth(),
@@ -1473,7 +1562,10 @@ private fun MobileChartCard(
                     Icon(Icons.Default.Info, null, tint = Color(0xFFAFC2F0), modifier = Modifier.size(22.dp))
                     Spacer(Modifier.width(9.dp))
                     Text(
-                        "Actual NSE observations are plotted from the market-data API. Previous close is a reference line, not a trading observation.",
+                        if (selectedRange == "1D")
+                            "Today's chart uses actual NSE observations. Previous close is a reference line, not a fabricated intraday observation."
+                        else
+                            "Historical charts use the actual candles returned for the selected period. Missing observations are not interpolated.",
                         color = Color(0xFFA9BCD0),
                         fontSize = 10.sp,
                         lineHeight = 14.sp,
@@ -1485,6 +1577,153 @@ private fun MobileChartCard(
     }
 }
 
+
+private fun periodReturnPct(
+    range: String,
+    result: MyStocksCache.HistoryResult,
+    oneDayFallback: Double?
+): Double? {
+    if (range == "1D") {
+        return result.dailyChangePct?.takeIf { it.isFinite() } ?: oneDayFallback
+    }
+    val first = result.points.firstOrNull()?.close
+    val last = result.points.lastOrNull()?.close
+    if (first == null || last == null || !first.isFinite() || !last.isFinite() || first <= 0.0) return null
+    return ((last - first) / first) * 100.0
+}
+
+@Composable
+private fun RangePerformanceStrip(
+    rangeReturns: Map<String, Double?>,
+    selectedRange: String,
+    onRangeSelected: (String) -> Unit,
+    phone: Boolean
+) {
+    val ranges = listOf("1D", "3D", "1W", "1M", "3M", "6M", "1Y", "3Y", "5Y")
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(if (phone) 14.dp else 18.dp)
+    ) {
+        ranges.forEach { range ->
+            val value = rangeReturns[range]
+            val tint = when {
+                value == null -> Color(0xFF8FA4B8)
+                value >= 0.0 -> Color(0xFF00D084)
+                else -> Color(0xFFFF5C5C)
+            }
+            Column(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (selectedRange == range) Color(0xFF10283D) else Color.Transparent)
+                    .padding(horizontal = 8.dp, vertical = 5.dp)
+                    .clickable { onRangeSelected(range) },
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    value?.let { String.format(Locale.US, "%+.2f%%", it) } ?: "—",
+                    color = tint,
+                    fontSize = if (phone) 12.sp else 14.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(range, color = Color(0xFFA9BCD0), fontSize = 8.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun HistoricalRangeCanvas(
+    points: List<MyStocksCache.HistoryPoint>,
+    modifier: Modifier
+) {
+    Canvas(modifier) {
+        val left = 46f
+        val right = 12f
+        val top = 18f
+        val bottom = 32f
+        val plotWidth = max(1f, size.width - left - right)
+        val plotHeight = max(1f, size.height - top - bottom)
+        val values = points.map { it.close }.filter { it.isFinite() && it > 0.0 }
+        if (values.size < 2) return@Canvas
+
+        val minValue = values.minOrNull() ?: return@Canvas
+        val maxValue = values.maxOrNull() ?: return@Canvas
+        val pad = max(0.05, (maxValue - minValue) * 0.08)
+        val yMin = minValue - pad
+        val yMax = maxValue + pad
+        val range = max(0.0001, yMax - yMin)
+
+        fun xAt(index: Int): Float =
+            left + (index.toFloat() / max(1, points.lastIndex)) * plotWidth
+
+        fun yAt(value: Double): Float =
+            top + plotHeight - (((value - yMin) / range).toFloat() * plotHeight)
+
+        repeat(5) { i ->
+            val y = top + plotHeight * i / 4f
+            drawLine(
+                Color(0xFF17364F),
+                androidx.compose.ui.geometry.Offset(left, y),
+                androidx.compose.ui.geometry.Offset(left + plotWidth, y),
+                strokeWidth = 1f
+            )
+        }
+
+        for (i in 1 until points.size) {
+            val previous = points[i - 1]
+            val current = points[i]
+            val movementColor = when {
+                current.close > previous.close -> Color(0xFF00D084)
+                current.close < previous.close -> Color(0xFFFF5C5C)
+                else -> Color(0xFF9FB3C8)
+            }
+            drawLine(
+                movementColor,
+                androidx.compose.ui.geometry.Offset(xAt(i - 1), yAt(previous.close)),
+                androidx.compose.ui.geometry.Offset(xAt(i), yAt(current.close)),
+                strokeWidth = 3.6f,
+                cap = StrokeCap.Round
+            )
+        }
+
+        val scale = (0 until 5).map { i -> yMax - (yMax - yMin) * i / 4 }
+        scale.forEachIndexed { i, value ->
+            val y = top + plotHeight * i / 4f
+            drawContext.canvas.nativeCanvas.drawText(
+                String.format(Locale.US, "%.0f", value),
+                left - 7f,
+                y + 4f,
+                android.graphics.Paint().apply {
+                    isAntiAlias = true
+                    color = android.graphics.Color.rgb(169,188,208)
+                    textSize = 11f
+                    textAlign = android.graphics.Paint.Align.RIGHT
+                }
+            )
+        }
+
+        val labelIndexes = listOf(0, points.lastIndex / 2, points.lastIndex).distinct()
+        labelIndexes.forEach { index ->
+            val raw = points[index].date
+            val label = runCatching {
+                Instant.parse(raw).atZone(ZoneId.of("Africa/Nairobi"))
+                    .format(DateTimeFormatter.ofPattern("dd MMM", Locale.US))
+            }.getOrElse { raw.take(10) }
+            drawContext.canvas.nativeCanvas.drawText(
+                label,
+                xAt(index),
+                size.height - 8f,
+                android.graphics.Paint().apply {
+                    isAntiAlias = true
+                    color = android.graphics.Color.rgb(169,188,208)
+                    textSize = 10f
+                    textAlign = android.graphics.Paint.Align.CENTER
+                }
+            )
+        }
+    }
+}
 
 @Composable
 private fun SignalGroup(title: String, tint: Color, items: List<String>) {
