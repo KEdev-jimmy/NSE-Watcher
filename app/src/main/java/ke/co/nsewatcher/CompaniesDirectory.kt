@@ -42,7 +42,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CompaniesDirectory(
-    catalog: List<Stock>, quotes: List<Stock>, name: String,
+    catalog: List<Stock>, quotes: List<Stock>, name: String, initialSector: String = "All",
     openCompany: (Stock) -> Unit, openWatchlist: () -> Unit, openCompare: (List<String>) -> Unit,
     openNews: (NewsItem) -> Unit, openProfile: () -> Unit,
     onCatalogLoaded: (List<Stock>) -> Unit, onQuotesLoaded: (List<Stock>) -> Unit
@@ -56,7 +56,7 @@ fun CompaniesDirectory(
     val saved by savedFlow.collectAsState<List<String>, List<String>?>(initial = null)
     val savedSymbols = saved.orEmpty().map(WatchlistPresentation::symbol).toSet()
     var query by rememberSaveable { mutableStateOf("") }
-    var selectedSector by rememberSaveable { mutableStateOf("All") }
+    var selectedSector by rememberSaveable(initialSector) { mutableStateOf(initialSector) }
     var sortName by rememberSaveable { mutableStateOf(CompanySort.NAME.name) }
     var comparing by rememberSaveable { mutableStateOf(false) }
     var selected by rememberSaveable { mutableStateOf(emptyList<String>()) }
@@ -282,3 +282,4 @@ private fun DirectoryCompanyCard(stock: Stock, comparing: Boolean, selected: Boo
         }
     }
 }
+
