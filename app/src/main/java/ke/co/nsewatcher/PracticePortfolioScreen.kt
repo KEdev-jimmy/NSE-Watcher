@@ -24,6 +24,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import ke.co.nsewatcher.data.CompanyChangeStore
 import ke.co.nsewatcher.data.MyStocksCache
+import ke.co.nsewatcher.data.MarketData
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.catch
 import java.time.Instant
@@ -84,7 +85,7 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
     LaunchedEffect(Unit) {
         try { state = withContext(Dispatchers.IO) { store.read() } }
         catch (e: Exception) { error = "Could not read the saved portfolio: ${e.message}. Your stored account has not been replaced." }
-        if (catalog.isEmpty()) { val rows = MyStocksCache.loadCompanies(); if (rows.isNotEmpty()) onCatalog(rows) }
+        if (catalog.isEmpty()) { val rows = MarketData.companies(); if (rows.isNotEmpty()) onCatalog(rows) }
     }
     LaunchedEffect(state?.enabled, initialSymbol) {
         if (PracticeLaunch.shouldOpenOrder(state?.enabled == true, initialSymbol, launchHandled)) {
@@ -99,9 +100,9 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
     LaunchedEffect(resumed) {
         if (!resumed) return@LaunchedEffect
         while (isActive) {
-            market = MyStocksCache.loadMarketStatus(); statusChecked = System.currentTimeMillis()
+            market = MarketData.status(); statusChecked = System.currentTimeMillis()
             if (MarketRefreshController.shouldRefreshQuotes(quoteFeed.isNotEmpty())) {
-                val quotes = MyStocksCache.loadStocks(); if (quotes.isNotEmpty()) onQuotes(quotes)
+                val quotes = MarketData.stocks(); if (quotes.isNotEmpty()) onQuotes(quotes)
             }
             delay(30_000L)
         }
