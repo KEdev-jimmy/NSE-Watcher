@@ -235,10 +235,8 @@ private fun App(
     var description by rememberSaveable { mutableStateOf(prefs.getString("description", ProfileDefaults.description) ?: ProfileDefaults.description) }
     var marketAlerts by rememberSaveable { mutableStateOf(prefs.getBoolean("market_alerts", true)) }
     var priceAlerts by rememberSaveable { mutableStateOf(prefs.getBoolean("price_alerts", true)) }
-    var newsAlerts by rememberSaveable { mutableStateOf(prefs.getBoolean("news_alerts", true)) }
-    var corporateAlerts by rememberSaveable {
-        mutableStateOf(if (prefs.contains("corporate_action_alerts")) prefs.getBoolean("corporate_action_alerts", true) else prefs.getBoolean("news_alerts", true))
-    }
+    var watchlistNewsAlerts by rememberSaveable { mutableStateOf(prefs.getBoolean("watchlist_news_alerts", false)) }
+    var watchlistCorporateAlerts by rememberSaveable { mutableStateOf(prefs.getBoolean("watchlist_corporate_alerts", false)) }
     var practiceAlerts by rememberSaveable {
         mutableStateOf(if (prefs.contains("practice_alerts")) prefs.getBoolean("practice_alerts", true) else prefs.getBoolean("app_alerts", true))
     }
@@ -368,12 +366,20 @@ private fun App(
             Page.ACCOUNT->AccountSignInScreen(name,username,::back){go(Page.PROFILE)}
             Page.THEME->DisplayAppearanceScreen(dark,fontSizeSetting,{dark=it;put("dark_mode",it)},{fontSizeSetting=it;put("font_size",it)},::back)
             Page.NOTIFICATIONS->NotificationCenterScreen(
-                marketAlerts=marketAlerts,priceAlerts=priceAlerts,newsAlerts=newsAlerts,corporateAlerts=corporateAlerts,
+                marketAlerts=marketAlerts,priceAlerts=priceAlerts,newsAlerts=watchlistNewsAlerts,corporateAlerts=watchlistCorporateAlerts,
                 practiceAlerts=practiceAlerts,soundMode=notificationSound,
                 onMarketAlerts={marketAlerts=it;put("market_alerts",it)},
                 onPriceAlerts={priceAlerts=it;put("price_alerts",it)},
-                onNewsAlerts={newsAlerts=it;put("news_alerts",it)},
-                onCorporateAlerts={corporateAlerts=it;put("corporate_action_alerts",it)},
+                onNewsAlerts={enabled->
+                    watchlistNewsAlerts=enabled
+                    prefs.edit().putBoolean("watchlist_news_alerts",enabled).apply()
+                    if(enabled) prefs.edit().putLong("watchlist_news_enabled_at",System.currentTimeMillis()).apply()
+                },
+                onCorporateAlerts={enabled->
+                    watchlistCorporateAlerts=enabled
+                    prefs.edit().putBoolean("watchlist_corporate_alerts",enabled).apply()
+                    if(enabled) prefs.edit().putLong("watchlist_corporate_enabled_at",System.currentTimeMillis()).apply()
+                },
                 onPracticeAlerts={practiceAlerts=it;put("practice_alerts",it)},
                 onSoundMode={notificationSound=it;put("notification_sound",it)},
                 openAlertRules={go(Page.ALERTS)},back=::back
