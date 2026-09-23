@@ -45,23 +45,25 @@ import ke.co.nsewatcher.data.MarketData
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
-private val NewsBackground = Color(0xFF061625)
-private val NewsCard = Color(0xFF0A1F32)
-private val NewsRaised = Color(0xFF10283D)
-private val NewsGreen = Color(0xFF00D084)
-private val NewsText = Color(0xFFF4F7FA)
-private val NewsMuted = Color(0xFFA9BCD0)
-private val NewsBorder = Color(0xFF17364F)
-private val NewsLink = Color(0xFF75C5FF)
+private val NewsBackground: Color
+    @Composable get() = MaterialTheme.colorScheme.background
+private val NewsCard: Color
+    @Composable get() = MaterialTheme.colorScheme.surface
+private val NewsRaised: Color
+    @Composable get() = MaterialTheme.colorScheme.surfaceVariant
+private val NewsGreen: Color
+    @Composable get() = MaterialTheme.colorScheme.primary
+private val NewsText: Color
+    @Composable get() = MaterialTheme.colorScheme.onBackground
+private val NewsMuted: Color
+    @Composable get() = MaterialTheme.colorScheme.onSurfaceVariant
+private val NewsBorder: Color
+    @Composable get() = MaterialTheme.colorScheme.outline
+private val NewsLink: Color
+    @Composable get() = MaterialTheme.colorScheme.tertiary
 
-// Also applied to the News scaffold so its safe-area and navigation match the screen.
-internal val NewsColorScheme = darkColorScheme(
-    primary = NewsGreen, onPrimary = NewsBackground,
-    background = NewsBackground, onBackground = NewsText,
-    surface = NewsCard, onSurface = NewsText,
-    surfaceVariant = NewsRaised, onSurfaceVariant = NewsMuted,
-    outline = NewsBorder
-)
+internal val NewsColorScheme: ColorScheme
+    @Composable get() = MaterialTheme.colorScheme
 
 private val NewsCategories = listOf("All", "Saved", "Companies", "Dividends", "Market", "Results", "Announcements", "Analysis")
 
@@ -211,7 +213,7 @@ fun NewsDashboard(newsFeed: List<NewsItem>, onNewsLoaded: (List<NewsItem>) -> Un
                             modifier = Modifier.heightIn(min = 44.dp), shape = RoundedCornerShape(24.dp),
                             colors = FilterChipDefaults.filterChipColors(
                                 containerColor = NewsCard, labelColor = NewsMuted,
-                                selectedContainerColor = NewsGreen, selectedLabelColor = NewsBackground
+                                selectedContainerColor = NewsGreen, selectedLabelColor = MaterialTheme.colorScheme.onPrimary
                             ),
                             border = BorderStroke(1.dp, if (category == label) NewsGreen else NewsBorder)
                         )
@@ -337,7 +339,7 @@ private fun NewsSectionHeading(title: String, action: String?, onAction: () -> U
 @Composable
 private fun NewsArticleImage(item: NewsItem, modifier: Modifier = Modifier) {
     var imageLoaded by remember(item.imageUrl) { mutableStateOf(false) }
-    Box(modifier.background(Brush.linearGradient(listOf(NewsRaised, Color(0xFF143E4E), NewsCard))), contentAlignment = Alignment.Center) {
+    Box(modifier.background(Brush.linearGradient(listOf(NewsRaised, MaterialTheme.colorScheme.tertiaryContainer, NewsCard))), contentAlignment = Alignment.Center) {
         if (!imageLoaded) Icon(Icons.Default.Newspaper, null, tint = NewsMuted.copy(alpha = 0.45f), modifier = Modifier.size(48.dp))
         if (item.imageUrl.isNotBlank()) {
             AsyncImage(
@@ -360,8 +362,8 @@ private fun NewsFeaturedCard(item: NewsItem, open: (NewsItem) -> Unit) {
             NewsArticleImage(item, Modifier.matchParentSize())
             Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(Color.Transparent, NewsBackground.copy(alpha = 0.82f), NewsBackground))))
             Column(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 110.dp, bottom = 18.dp)) {
-                Surface(color = Color(0xFF174569), shape = RoundedCornerShape(6.dp)) {
-                    Text(item.category.ifBlank { "Latest story" }.uppercase(Locale.US), color = NewsText, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp))
+                Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(6.dp)) {
+                    Text(item.category.ifBlank { "Latest story" }.uppercase(Locale.US), color = MaterialTheme.colorScheme.onPrimaryContainer, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp))
                 }
                 Spacer(Modifier.height(8.dp))
                 Text(item.title, color = NewsText, fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold, maxLines = 4, overflow = TextOverflow.Ellipsis)
