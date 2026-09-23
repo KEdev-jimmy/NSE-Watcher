@@ -41,6 +41,7 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import ke.co.nsewatcher.data.NewsCache
+import ke.co.nsewatcher.data.MarketData
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
@@ -111,7 +112,7 @@ fun NewsDashboard(newsFeed: List<NewsItem>, onNewsLoaded: (List<NewsItem>) -> Un
         if (force) refreshing = true else loading = true
         scope.launch {
             try {
-                val result = NewsCache.loadFeedResult(forceRefresh = force)
+                val result = MarketData.newsFeed(forceRefresh = force)
                 // Keep the last successful feed visible if a subsequent refresh fails.
                 if (result.error == null) {
                     onNewsLoaded(result.items.distinctBy { it.id }.sortedByDescending { it.publishedAt })
