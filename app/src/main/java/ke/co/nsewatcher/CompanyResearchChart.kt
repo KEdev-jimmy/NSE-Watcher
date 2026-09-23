@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -44,6 +45,10 @@ internal fun CompanyResearchChart(points: List<MyStocksCache.HistoryPoint>, rang
     val density = LocalDensity.current
     val leftPx = with(density) { 54.dp.toPx() }
     val rightPx = with(density) { 14.dp.toPx() }
+    val chartBorder = ResearchBorder
+    val chartGreen = ResearchGreen
+    val chartMuted = ResearchMuted
+    val chartText = ResearchText
 
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -114,14 +119,14 @@ internal fun CompanyResearchChart(points: List<MyStocksCache.HistoryPoint>, rang
                     fun x(time: Long) = left + ((time - viewStart) / viewSpan).toFloat() * (right - left)
                     fun y(value: Double) = bottom - ((value - minY) / (maxY - minY)).toFloat() * (bottom - top)
                     val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        color = android.graphics.Color.rgb(169, 188, 208)
+                        color = chartMuted.toArgb()
                         textSize = 10.sp.toPx()
                         textAlign = Paint.Align.RIGHT
                     }
                     repeat(4) { i ->
                         val value = maxY - (maxY - minY) * i / 3
                         val at = y(value)
-                        drawLine(ResearchBorder, Offset(left, at), Offset(right, at), strokeWidth = 1.dp.toPx())
+                        drawLine(chartBorder, Offset(left, at), Offset(right, at), strokeWidth = 1.dp.toPx())
                         val label = String.format(Locale.US, if (high < 100) "%.2f" else if (high < 1000) "%.1f" else "%.0f", value)
                         drawContext.canvas.nativeCanvas.drawText(label, left - 6.dp.toPx(), at + 3.dp.toPx(), paint)
                     }
@@ -134,20 +139,20 @@ internal fun CompanyResearchChart(points: List<MyStocksCache.HistoryPoint>, rang
                             val fill = Path().apply {
                                 addPath(line); lineTo(x(dated.last().second), bottom); lineTo(x(dated.first().second), bottom); close()
                             }
-                            drawPath(fill, Brush.verticalGradient(listOf(ResearchGreen.copy(alpha = 0.18f), Color.Transparent), top, bottom))
-                            drawPath(line, ResearchGreen, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
+                            drawPath(fill, Brush.verticalGradient(listOf(chartGreen.copy(alpha = 0.18f), Color.Transparent), top, bottom))
+                            drawPath(line, chartGreen, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
                         }
-                        dated.forEach { (point, time) -> drawCircle(ResearchGreen, if (dated.size == 1) 4.dp.toPx() else 1.5.dp.toPx(), Offset(x(time), y(point.close))) }
+                        dated.forEach { (point, time) -> drawCircle(chartGreen, if (dated.size == 1) 4.dp.toPx() else 1.5.dp.toPx(), Offset(x(time), y(point.close))) }
                         purchaseMarkers.filter { it.first >= viewStart && it.first <= viewStart + viewSpan }.forEach { (time, price) ->
                             if (price.isFinite() && price > 0) {
-                                drawLine(ResearchMuted.copy(alpha = 0.5f), Offset(x(time), top), Offset(x(time), bottom), 1.dp.toPx())
-                                drawCircle(ResearchText, 5.dp.toPx(), Offset(x(time), y(price)))
-                                drawCircle(ResearchGreen, 3.dp.toPx(), Offset(x(time), y(price)))
+                                drawLine(chartMuted.copy(alpha = 0.5f), Offset(x(time), top), Offset(x(time), bottom), 1.dp.toPx())
+                                drawCircle(chartText, 5.dp.toPx(), Offset(x(time), y(price)))
+                                drawCircle(chartGreen, 3.dp.toPx(), Offset(x(time), y(price)))
                             }
                         }
                         chosen?.let { (point, time) ->
-                            drawLine(ResearchMuted.copy(alpha = 0.6f), Offset(x(time), top), Offset(x(time), bottom), 1.dp.toPx())
-                            drawCircle(ResearchText, 4.dp.toPx(), Offset(x(time), y(point.close)))
+                            drawLine(chartMuted.copy(alpha = 0.6f), Offset(x(time), top), Offset(x(time), bottom), 1.dp.toPx())
+                            drawCircle(chartText, 4.dp.toPx(), Offset(x(time), y(point.close)))
                         }
                     }
                     val formatter = DateTimeFormatter.ofPattern(if (intraday) "HH:mm" else if (range in listOf("3Y", "5Y")) "MMM yy" else "dd MMM", Locale.US)
