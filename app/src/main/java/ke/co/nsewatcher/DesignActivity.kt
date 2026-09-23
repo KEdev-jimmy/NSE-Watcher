@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 15142)
+Total output lines: 696
+
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package ke.co.nsewatcher
 
@@ -102,6 +105,7 @@ private val stocks: List<Stock> get() = liveStocks.value
 private enum class Page { HOME, MARKET, NEWS, COMPANIES, PAPER, MORE, COMPANY, WATCHLIST, COMPARE, NEWS_DETAIL, PROFILE, SETTINGS, THEME, NOTIFICATIONS, LIVE_DATA, CHARTS, ALERTS, LANGUAGE, SECURITY, PRIVACY, DISPLAY, HELP, ABOUT }
 
 class DesignActivity : ComponentActivity() {
+    private var alertDestination by mutableStateOf<AlertDestination?>(null)
     private val picker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         uri ?: return@registerForActivityResult
         try { contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
@@ -111,12 +115,18 @@ class DesignActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         AlertWorker.schedule(this)
-        setContent { App { picker.launch(arrayOf("image/*")) } }
+        alertDestination = AlertNotifications.destination(intent)
+        setContent { App(alertDestination, { alertDestination = null; intent.action = null }) { picker.launch(arrayOf("image/*")) } }
+    }
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        alertDestination = AlertNotifications.destination(intent)
     }
 }
 
 @Composable
-private fun App(pickAvatar:()->Unit) {
+private fun App(alertDestination: AlertDestination?, consumeAlert: () -> Unit, pickAvatar:()->Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     var showOpeningScreen by rememberSaveable { mutableStateOf(true) }
@@ -185,6 +195,19 @@ private fun App(pickAvatar:()->Unit) {
             onFinished = { showOpeningScreen = false }
         )
         return
+    }
+    LaunchedEffect(alertDestination) {
+        val target = alertDestination ?: return@LaunchedEffect
+        history = listOf(Page.HOME)
+        val article = target.article()
+        if (article != null) {
+            selectedNews = article
+            page = Page.NEWS_DETAIL
+        } else {
+            selected = target.company(CompaniesPresentation.companies(companyCatalog, stocks))
+            page = Page.COMPANY
+        }
+        consumeAlert()
     }
     LaunchedEffect(page) {
         if (page == Page.COMPANIES && companyCatalog.isEmpty()) {
@@ -390,80 +413,7 @@ private fun CompanyNewsSection(
 }
 
 @Composable
-private fun CompanyHistoryChart(values: List<Double>, tint: Color) {
-    val valid = values.filter { it.isFinite() && it > 0.0 }
-    if (valid.size < 2) return
-
-    Canvas(
-        Modifier
-            .fillMaxWidth()
-            .height(150.dp)
-            .padding(vertical = 8.dp)
-    ) {
-        val min = valid.minOrNull() ?: return@Canvas
-        val max = valid.maxOrNull() ?: return@Canvas
-        val range = (max - min).takeIf { it > 0.0 } ?: 1.0
-        val path = Path()
-
-        valid.forEachIndexed { index, value ->
-            val x = size.width * index / (valid.lastIndex.coerceAtLeast(1))
-            val y = size.height - (((value - min) / range).toFloat() * size.height)
-            if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
-        }
-
-        drawPath(
-            path = path,
-            color = tint,
-            style = Stroke(width = 4f, cap = StrokeCap.Round)
-        )
-    }
-}
-
-@Composable private fun InfoRow(i:ImageVector,a:String,b:String){Row(Modifier.fillMaxWidth().padding(vertical=7.dp),verticalAlignment=Alignment.CenterVertically){Icon(i,null,tint=Green,modifier=Modifier.size(20.dp));Spacer(Modifier.width(10.dp));Text(a,Modifier.weight(1f),fontSize=11.sp);Text(b,fontSize=11.sp,fontWeight=FontWeight.Bold)}}
-
-@Composable
-private fun News(open:(NewsItem)->Unit){
-    var items by remember { mutableStateOf(emptyList<NewsItem>()) }
-    var loading by remember { mutableStateOf(true) }
-    var category by rememberSaveable { mutableStateOf("All") }
-    LaunchedEffect(Unit){ loading=true; items=NewsCache.loadFeed(); loading=false }
-    val categories=listOf("All","Company News","Dividends","Market","Analysis","Corporate Actions")
-    val filtered=if(category=="All") items else items.filter{it.category.equals(category,true)}
-    val top=filtered.firstOrNull()
-    val trending=filtered.drop(1).take(3)
-    val latest=filtered.drop(4)
-    LazyColumn(contentPadding=PaddingValues(16.dp,8.dp,16.dp,20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
-        item{Header("News","NSE companies, dividends & market intelligence")}
-        item{Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(7.dp)){categories.forEach{c->FilterChip(selected=category==c,onClick={category=c},label={Text(c,fontSize=10.sp)})}}}
-        if(loading){item{Box(Modifier.fillMaxWidth().height(180.dp),contentAlignment=Alignment.Center){CircularProgressIndicator(color=Green)}}}
-        else if(filtered.isEmpty()){
-            item{Card(Modifier.fillMaxWidth(),RoundedCornerShape(18.dp),border=BorderStroke(1.dp,Border)){Column(Modifier.fillMaxWidth().padding(20.dp),horizontalAlignment=Alignment.CenterHorizontally){Icon(Icons.Default.Article,null,tint=Green,modifier=Modifier.size(36.dp));Spacer(Modifier.height(8.dp));Text("News unavailable",fontWeight=FontWeight.ExtraBold,fontSize=16.sp);Text("The live news provider did not return any articles right now. No placeholder news is shown.",color=Muted,fontSize=10.sp,textAlign=TextAlign.Center)}}}
-        } else {
-            top?.let{item{Text("Top News",fontWeight=FontWeight.ExtraBold,fontSize=17.sp)};item{NewsFeatured(it,open)}}
-            if(trending.isNotEmpty()){
-                item{Text("Most Trending News",fontWeight=FontWeight.ExtraBold,fontSize=17.sp)}
-                items(trending){item->NewsListCard(item,open)}
-            }
-            if(latest.isNotEmpty()){
-                item{Text("Latest News",fontWeight=FontWeight.ExtraBold,fontSize=17.sp)}
-                items(latest){item->NewsListCard(item,open)}
-            }
-        }
-        item{Text("News and corporate-action information is sourced through the MyStocks market-intelligence feed. Market data may be delayed; always verify important announcements against the issuer or exchange source.",color=Muted,fontSize=9.sp)}
-    }
-}
-
-private data class NewsDisplayMeta(val symbol:String,val company:String,val logoUrl:String,val label:String,val icon:ImageVector)
-
-private fun newsDisplayMeta(item:NewsItem):NewsDisplayMeta{
-    val raw=item.symbol.trim().uppercase(Locale.US)
-    val normalized=raw.removeSuffix(".KE")
-    val stock=stocks.firstOrNull{it.symbol.equals(normalized,true)}
-    val company=item.companyName.trim().ifBlank{stock?.name.orEmpty()}
-    val symbol=stock?.symbol?:normalized
-    if(company.isNotBlank()||symbol.isNotBlank()){
-        val logo=stock?.logoUrl?.takeIf{it.isNotBlank()} ?: "https://mystocks.africa/logos/${symbol.lowercase(Locale.US)}-ke.svg"
-        return NewsDisplayMeta(symbol,company,logo,symbol.ifBlank{"COMPANY"},Icons.Default.Business)
+private f…1142 tokens truncated…s.Default.Business)
     }
     val c=item.category.lowercase(Locale.US)
     return when{
@@ -540,7 +490,7 @@ private fun Settings(dark:Boolean,market:Boolean,price:Boolean,news:Boolean,app:
 @Composable private fun RowItem(icon:ImageVector,title:String,sub:String,onClick:()->Unit={}){Row(Modifier.fillMaxWidth().clickable(onClick=onClick).padding(vertical=9.dp),verticalAlignment=Alignment.CenterVertically){Icon(icon,null,tint=Green,modifier=Modifier.size(22.dp));Spacer(Modifier.width(11.dp));Column(Modifier.weight(1f)){Text(title,fontSize=12.sp,fontWeight=FontWeight.Bold);Text(sub,fontSize=9.sp,color=Muted)};Icon(Icons.Default.ChevronRight,null,tint=Muted,modifier=Modifier.size(19.dp))}}
 @Composable private fun ThemePage(dark:Boolean,set:(Boolean)->Unit,back:()->Unit){LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){item{Header("Theme","Choose how NSE Watcher looks",back)};item{ThemeChoice("Light","Bright white interface",!dark){set(false)}};item{ThemeChoice("Dark","Low-light interface",dark){set(true)}};}}
 @Composable private fun ThemeChoice(title:String,sub:String,selected:Boolean,onClick:()->Unit){Card(Modifier.fillMaxWidth().clickable(onClick=onClick),RoundedCornerShape(16.dp),border=BorderStroke(if(selected)2.dp else 1.dp,if(selected)Green else Border),colors=CardDefaults.cardColors(containerColor=if(selected)LightGreen else MaterialTheme.colorScheme.surface)){Row(Modifier.padding(15.dp),verticalAlignment=Alignment.CenterVertically){Icon(if(title=="Light")Icons.Default.LightMode else if(title=="Dark")Icons.Default.DarkMode else Icons.Default.SettingsSystemDaydream,null,tint=Green);Spacer(Modifier.width(12.dp));Column(Modifier.weight(1f)){Text(title,fontWeight=FontWeight.Bold);Text(sub,fontSize=10.sp,color=Muted)};if(selected)Icon(Icons.Default.CheckCircle,null,tint=Green)}}}
-@Composable private fun NotificationsPage(m:Boolean,p:Boolean,n:Boolean,a:Boolean,sm:(Boolean)->Unit,sp:(Boolean)->Unit,sn:(Boolean)->Unit,sa:(Boolean)->Unit,back:()->Unit){LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){item{Header("Notifications","Choose what you want to hear about",back)};item{SettingsCard("Notification Types",Icons.Default.Notifications){ToggleRow(Icons.Default.ShowChart,"Market updates","NSE-wide movements and daily briefs",m,sm);ToggleRow(Icons.Default.PriceChange,"Price alerts","Your watchlist thresholds",p,sp);ToggleRow(Icons.Default.Article,"News alerts","Company and market news",n,sn);ToggleRow(Icons.Default.Apps,"App notifications","Product updates",a,sa)}};item{Note("Price, news, and corporate-action alerts are monitored from provider-backed market data. Background checks run no more often than every 15 minutes when the market is open.")}}}
+@Composable private fun NotificationsPage(m:Boolean,p:Boolean,n:Boolean,a:Boolean,sm:(Boolean)->Unit,sp:(Boolean)->Unit,sn:(Boolean)->Unit,sa:(Boolean)->Unit,back:()->Unit){LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){item{Header("Notifications","Choose what you want to hear about",back)};item{SettingsCard("Notification Types",Icons.Default.Notifications){ToggleRow(Icons.Default.ShowChart,"Market updates","NSE-wide movements and daily briefs",m,sm);ToggleRow(Icons.Default.PriceChange,"Price alerts","Your watchlist thresholds",p,sp);ToggleRow(Icons.Default.Article,"News alerts","Company and market news",n,sn);ToggleRow(Icons.Default.Apps,"App notifications","Product updates",a,sa)}};item{Note("Price, news, and corporate-action alerts are monitored from provider-backed market data. Background checks are scheduled about every 15 minutes; Android may delay them. News checks run outside market hours and catch up on available stories from the last 7 days. Price alerts require an open market and quotes no more than 30 minutes old. Daily gain, loss and volume alerts notify once per rule per Nairobi day.")}}}
 @Composable private fun LiveData(refresh:Boolean,volume:Boolean,changes:Boolean,sr:(Boolean)->Unit,sv:(Boolean)->Unit,sc:(Boolean)->Unit,back:()->Unit){LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){item{Header("Live Data","Market-data display preferences",back)};item{SettingsCard("Data Display",Icons.Default.ShowChart){ToggleRow(Icons.Default.Sync,"Auto refresh","Keep market information current",refresh,sr);ToggleRow(Icons.Default.BarChart,"Show volume","Display trading activity",volume,sv);ToggleRow(Icons.Default.TrendingUp,"Show price changes","Display daily percentage moves",changes,sc)}}}}
 @Composable
 private fun AlertPage(back:()->Unit){
@@ -668,6 +618,7 @@ private fun selectedTypeLabel(type:AlertType):String=when(type){
             Text("License: creativecommons.org/licenses/by-sa/4.0/ • Image bundled with the app; crop/overlay applied.",fontSize=8.sp,color=Muted,modifier=Modifier.padding(top=2.dp))
         }}}}
 @Composable private fun Note(text:String){Card(Modifier.fillMaxWidth(),RoundedCornerShape(14.dp),colors=CardDefaults.cardColors(containerColor=LightGreen)){Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically){Icon(Icons.Default.Info,null,tint=Green);Spacer(Modifier.width(9.dp));Text(text,fontSize=9.sp,color=Muted)}}}
+
 
 
 
