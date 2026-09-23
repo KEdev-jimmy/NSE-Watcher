@@ -40,6 +40,7 @@ import ke.co.nsewatcher.data.NewsCache
 import ke.co.nsewatcher.domain.EvidenceAdapters
 import ke.co.nsewatcher.domain.EvidenceGraph
 import ke.co.nsewatcher.data.MyStocksCache
+import ke.co.nsewatcher.data.MarketData
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -74,8 +75,8 @@ fun WhyStockMovingSection(symbol: String) {
 
     LaunchedEffect(symbol) {
         dayLoading = true
-        day = MyStocksCache.loadHistoryDetails(symbol, "1D")
-        market = MyStocksCache.loadMarketStatus()
+        day = MarketData.loadHistoryDetails(symbol, "1D")
+        market = MarketData.loadMarketStatus()
         dayLoading = false
     }
 
