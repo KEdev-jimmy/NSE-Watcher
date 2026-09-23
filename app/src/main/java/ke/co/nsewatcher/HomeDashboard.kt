@@ -27,6 +27,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import ke.co.nsewatcher.data.AlertStore
+import ke.co.nsewatcher.data.HomeChangeState
+import ke.co.nsewatcher.data.HomeChangeStore
 import ke.co.nsewatcher.data.MyStocksCache
 import ke.co.nsewatcher.data.NewsCache
 import ke.co.nsewatcher.data.WatchlistStore
@@ -52,6 +54,9 @@ fun HomeDashboard(
     val scope = rememberCoroutineScope()
     val watchlist = remember { WatchlistStore(context) }
     val alertStore = remember { AlertStore(context) }
+    val changeStore = remember { HomeChangeStore(context) }
+    var changeState by remember { mutableStateOf<HomeChangeState?>(null) }
+    var changeStateError by remember { mutableStateOf(false) }
     var watchlistError by remember { mutableStateOf(false) }
     var alertError by remember { mutableStateOf(false) }
     val savedFlow = remember(watchlist) { watchlist.symbols.catch { watchlistError = true } }
@@ -114,6 +119,51 @@ fun HomeDashboard(
         }
     }
     val watched = remember(saved, catalog, currentStocks) { WatchlistPresentation.companies(saved.orEmpty(), catalog, currentStocks) }
+    val watchedSymbols = remember(watched) { watched.map { WatchlistPresentation.symbol(it.symbol) }.toSet() }
+    val changes = remember(watched, newsFeed, events, now) { HomePresentation.changes(watched, newsFeed, events, now) }
+    LaunchedEffect(saved, watchedSymbols, changes.map { it.id }) {
+        if (saved == null) return@LaunchedEffect
+        try {
+            changeState = changeStore.reconcile(watchedSymbols, changes, Instant.now())
+            changeStateError = false
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            changeStateError = true
+        }
+    }
+    val unreviewedChanges = remember(changes, changeState) {
+        val reviewed = changeState?.reviewedIds ?: emptySet()
+        if (changeState == null) emptyList() else changes.filter { it.id !in reviewed }
+    }
+    val brief = unreviewedChanges.take(3)
+    fun markReviewed(ids: Set<String>) {
+        if (ids.isEmpty()) return
+        scope.launch {
+            try {
+                changeState = changeStore.markReviewed(ids, Instant.now())
+                changeStateError = false
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                changeStateError = true
+            }
+        }
+    }
+    fun reviewAndOpen(item: HomeBriefItem) {
+        scope.launch {
+            try {
+                changeState = changeStore.markReviewed(setOf(item.id), Instant.now())
+                changeStateError = false
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                changeStateError = true
+            } finally {
+                if (item.story != null) openNews(item.story) else showAlerts = true
+            }
+        }
+    }
     val preview = watched.take(3)
     LaunchedEffect(preview.map { it.symbol }, historyRevision) {
         preview.forEach { stock ->
@@ -125,7 +175,6 @@ fun HomeDashboard(
     val intelligence = remember(currentStocks, newsFeed) {
         HomeIntelligenceEngine.build(currentStocks.filter { it.price.isFinite() && it.price > 0.0 }, newsFeed)
     }
-    val brief = remember(watched, newsFeed, events, now) { HomePresentation.brief(watched, newsFeed, events, now) }
     val relevantNews = remember(newsFeed, watched) { HomePresentation.companyNews(newsFeed, watched) }
     val displayedNews = if (watched.isEmpty()) newsFeed.distinctBy { it.id }.sortedByDescending { CompanyResearchPresentation.timestamp(it.publishedAt) } else relevantNews
 
@@ -171,8 +220,8 @@ fun HomeDashboard(
                         Text("YOUR DAILY BRIEF", color = ResearchGreen, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text("What needs your attention?", Modifier.weight(1f), color = ResearchText, fontSize = 19.sp, fontWeight = FontWeight.Bold)
-                            if (brief.isNotEmpty()) Surface(color = ResearchGreen.copy(alpha = 0.12f), shape = RoundedCornerShape(10.dp), border = BorderStroke(1.dp, ResearchGreen.copy(alpha = 0.45f))) {
-                                Text("${brief.size} ${if (brief.size == 1) "update" else "updates"}", Modifier.padding(7.dp), color = ResearchText, fontSize = 11.sp)
+                            if (unreviewedChanges.isNotEmpty()) Surface(color = ResearchGreen.copy(alpha = 0.12f), shape = RoundedCornerShape(10.dp), border = BorderStroke(1.dp, ResearchGreen.copy(alpha = 0.45f))) {
+                                Text("${unreviewedChanges.size} new", Modifier.padding(7.dp), color = ResearchText, fontSize = 11.sp)
                             }
                         }
                         when {
@@ -180,22 +229,35 @@ fun HomeDashboard(
                             saved == null -> ResearchLoading("Loading your companies…")
                             watched.isEmpty() -> {
                                 ResearchBody("Make this brief yours")
-                                ResearchCaption("Follow companies to bring their published updates and recorded alerts here.")
+                                ResearchCaption("Follow companies to establish a baseline. Existing items become known; later developments can then appear here as new.")
                                 TextButton(onClick = openWatchlist) { Text("Choose your companies →", color = ResearchGreen) }
                             }
-                            brief.isEmpty() && newsLoading -> ResearchLoading("Checking your company updates…")
+                            changeState == null -> ResearchLoading("Establishing your change baseline…")
+                            brief.isEmpty() && newsLoading -> ResearchLoading("Checking for new company developments…")
                             brief.isEmpty() -> {
-                                ResearchBody(if (newsError || alertError) "Some updates are unavailable" else "No recent updates returned")
-                                ResearchCaption("This brief checks your companies’ available news and recorded alerts from the last 7 days.")
+                                ResearchBody(when {
+                                    newsError || alertError || changeStateError -> "Some change tracking is unavailable"
+                                    changes.isNotEmpty() -> "You’re caught up"
+                                    else -> "No new changes detected"
+                                })
+                                ResearchCaption(if (changes.isNotEmpty())
+                                    "No unreviewed changes remain in the available 7-day company news and alert history."
+                                else "NSE Watcher is tracking later published updates and recorded alerts for your followed companies.")
                                 TextButton(onClick = openWatchlist) { Text("Review your watchlist →", color = ResearchGreen) }
                             }
                         }
                         brief.forEachIndexed { index, item ->
                             if (index > 0) HorizontalDivider(color = ResearchBorder)
-                            HomeBriefRow(item) { if (item.story != null) openNews(item.story) else showAlerts = true }
+                            HomeBriefRow(item) { reviewAndOpen(item) }
+                        }
+                        if (unreviewedChanges.isNotEmpty()) {
+                            TextButton(onClick = { markReviewed(unreviewedChanges.map { it.id }.toSet()) }, contentPadding = PaddingValues(0.dp)) {
+                                Text("Mark all reviewed", color = ResearchGreen, fontSize = 12.sp)
+                            }
                         }
                         if (newsError) ResearchCaption("News refresh failed; available stories retain their publication dates.")
                         if (alertError) ResearchCaption("Recorded alerts could not be read.")
+                        if (changeStateError) ResearchCaption("Review state could not be saved; items may reappear until storage succeeds.")
                     }
                 }
                 item {

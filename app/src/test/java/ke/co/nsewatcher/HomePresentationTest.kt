@@ -18,11 +18,27 @@ class HomePresentationTest {
     @Test fun briefUsesActualPublishedTextAndRecordedEvents() {
         val brief = HomePresentation.brief(listOf(quote()), listOf(story()), listOf(event()), now)
         assertEquals(2, brief.size)
-        assertEquals("Published company update", brief[0].title)
-        assertEquals("Actual publisher", brief[0].source)
-        assertEquals("Actual summary", brief[0].detail)
-        assertEquals(story(), brief[0].story)
-        assertEquals(event(), brief[1].alert)
+        assertEquals(event(), brief[0].alert)
+        assertEquals("Published company update", brief[1].title)
+        assertEquals("Actual publisher", brief[1].source)
+        assertEquals("Actual summary", brief[1].detail)
+        assertEquals(story(), brief[1].story)
+    }
+
+
+    @Test fun reviewedChangesDisappearFromBriefButRemainInChangeHistory() {
+        val all = HomePresentation.changes(listOf(quote()), listOf(story()), listOf(event()), now)
+        val brief = HomePresentation.brief(listOf(quote()), listOf(story()), listOf(event()), now, setOf("news:news"))
+        assertEquals(2, all.size)
+        assertEquals(1, brief.size)
+        assertEquals("alert:e", brief.single().id)
+    }
+
+    @Test fun newsAlertForTheSameArticleDoesNotDuplicateThePublishedStory() {
+        val newsAlert = event(id = "news-alert").copy(articleId = "news")
+        val changes = HomePresentation.changes(listOf(quote()), listOf(story()), listOf(newsAlert), now)
+        assertEquals(1, changes.size)
+        assertEquals("news:news", changes.single().id)
     }
 
     @Test fun CurrentPriceAloneNeverCreatesAnAlert() {
