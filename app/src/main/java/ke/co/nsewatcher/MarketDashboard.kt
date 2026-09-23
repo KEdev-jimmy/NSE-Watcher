@@ -57,7 +57,6 @@ fun MarketDashboard(
     var sheet by rememberSaveable { mutableStateOf<String?>(null) }
     var historyRevision by remember { mutableIntStateOf(0) }
     var now by remember { mutableStateOf(Instant.now()) }
-    val historyCache = remember { mutableMapOf<String, Pair<Long, MyStocksCache.HistoryResult>>() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val observationStore = remember { MarketObservationStore(context) }
@@ -101,7 +100,7 @@ fun MarketDashboard(
                 if (data.isNotEmpty()) { onQuotesLoaded(data); error = null }
                 else error = "Quotes could not be refreshed. Available observations keep their original dates."
             }
-            if (force) { historyCache.clear(); historyRevision++ }
+            if (force) historyRevision++
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) { error = "Market refresh failed. Please try again." }
         finally { busy = false }
@@ -125,7 +124,7 @@ fun MarketDashboard(
             MarketChoiceRow(listOf("Overview", "Sectors", "Performance"), tab) { tab = it }
             HorizontalDivider(color = ResearchBorder)
             if (tab == "Performance") {
-                Box(Modifier.weight(1f)) { MarketPerformanceView(companies, historyRevision, now, historyCache, openCompany) }
+                Box(Modifier.weight(1f)) { MarketPerformanceView(companies, historyRevision, now, openCompany) }
             } else LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 if (error != null) item { ResearchCaption(error.orEmpty()) }
                 if (busy && companies.isEmpty()) item { ResearchLoading("Loading market observations…") }
