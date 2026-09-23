@@ -86,7 +86,7 @@ private fun ArticleReader(item: NewsItem, catalog: List<Stock>, quotes: List<Sto
     val points = remember(detail) { ArticlePresentation.keyPoints(detail) }
     val hasBody = remember(detail) { ArticlePresentation.hasDistinctBody(detail) }
     val blocks = remember(detail, hasBody) { ArticlePresentation.blocks(if (hasBody) detail.body else detail.summary.ifBlank { detail.body }) }
-    val linkColor = Color(0xFF8CCBFF)
+    val linkColor = MaterialTheme.colorScheme.tertiary
 
     LaunchedEffect(Unit) { if (localCatalog.isEmpty()) localCatalog = MyStocksCache.loadCompanies() }
     LaunchedEffect(retry) {
