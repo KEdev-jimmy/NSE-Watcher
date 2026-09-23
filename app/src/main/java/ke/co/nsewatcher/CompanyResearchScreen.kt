@@ -71,7 +71,7 @@ internal fun CompanyResearchScreen(
     watched: Boolean, onWatchToggle: (() -> Unit)?, back: () -> Unit, openNews: (NewsItem) -> Unit,
     openPractice: () -> Unit, onRefresh: () -> Unit, refreshing: Boolean, selectedRange: String, onRange: (String) -> Unit,
     chart: MyStocksCache.HistoryResult, chartLoading: Boolean, rangeReturns: Map<String, Double?>,
-    sessionLoading: Boolean
+    sessionLoading: Boolean, showChartGrid: Boolean
 ) {
     var tab by rememberSaveable(stock.symbol) { mutableStateOf("Overview") }
     var selectedMetric by remember(stock.symbol) { mutableStateOf<ResearchMetric?>(null) }
@@ -138,7 +138,7 @@ internal fun CompanyResearchScreen(
                                 "Observed low" to CompanyResearchPresentation.money(session.low)
                             ))
                             HorizontalDivider(color = ResearchBorder)
-                            CompanyResearchChart(chart.points, selectedRange, chartLoading, onRefresh)
+                            CompanyResearchChart(chart.points, selectedRange, chartLoading, onRefresh, showGrid = showChartGrid)
                             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 CompanyResearchPresentation.ranges.forEach { range ->
                                     FilterChip(
