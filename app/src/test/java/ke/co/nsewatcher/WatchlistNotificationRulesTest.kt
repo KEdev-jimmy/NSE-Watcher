@@ -8,8 +8,13 @@ import org.junit.Test
 
 class WatchlistNotificationRulesTest {
     @Test fun watchedCompaniesGetAutomaticNewsAndCorporateRulesWhenEnabled() {
-        val rules = automaticWatchlistAlertRules(setOf(" kcb ", "SCOM"), emptyList(), newsEnabled = true, corporateEnabled = true)
+        val rules = automaticWatchlistAlertRules(
+            setOf(" kcb ", "SCOM"), emptyList(), newsEnabled = true, corporateEnabled = true,
+            newsSinceMillis = 1000L, corporateSinceMillis = 2000L
+        )
         assertEquals(4, rules.size)
+        assertEquals(setOf(1000.0), rules.filter { it.type == AlertType.NEWS }.mapNotNull { it.threshold }.toSet())
+        assertEquals(setOf(2000.0), rules.filter { it.type == AlertType.CORPORATE_ACTION }.mapNotNull { it.threshold }.toSet())
         assertEquals(setOf("KCB", "SCOM"), rules.map { it.symbol }.toSet())
         assertEquals(setOf(AlertType.NEWS, AlertType.CORPORATE_ACTION), rules.map { it.type }.toSet())
     }
