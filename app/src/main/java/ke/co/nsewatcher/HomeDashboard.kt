@@ -45,6 +45,7 @@ import java.util.Locale
 fun HomeDashboard(
     currentStocks: List<Stock>, openCompany: (Stock) -> Unit, openNews: (NewsItem) -> Unit,
     openMarket: () -> Unit, openWatchlist: () -> Unit, newsFeed: List<NewsItem>,
+    marketIndices: List<MyStocksCache.MarketIndex>,
     initialMarketStatus: MyStocksCache.MarketStatus, startupDataLoaded: Boolean,
     name: String, initialCatalog: List<Stock>, practiceEnabled: Boolean, practiceCash: Double,
     openAllNews: () -> Unit, openPractice: () -> Unit, openProfile: () -> Unit,
@@ -191,8 +192,13 @@ fun HomeDashboard(
             catch (_: Exception) { histories = histories + (stock.symbol to emptyList()) }
         }
     }
-    val intelligence = remember(currentStocks, newsFeed) {
-        HomeIntelligenceEngine.build(currentStocks.filter { it.price.isFinite() && it.price > 0.0 }, newsFeed)
+    val homeIndices = remember(marketIndices) { HomeMarketIndexPresentation.fromProvider(marketIndices) }
+    val intelligence = remember(currentStocks, newsFeed, homeIndices) {
+        HomeIntelligenceEngine.build(
+            currentStocks.filter { it.price.isFinite() && it.price > 0.0 },
+            newsFeed,
+            homeIndices
+        )
     }
     val relevantNews = remember(newsFeed, watched) { HomePresentation.companyNews(newsFeed, watched) }
     val displayedNews = if (watched.isEmpty()) newsFeed.distinctBy { it.id }.sortedByDescending { CompanyResearchPresentation.timestamp(it.publishedAt) } else relevantNews
