@@ -67,7 +67,14 @@ object AlertEvaluator {
             if (isNews(alert.type)) {
                 // News remains useful after hours, across weekends and without a quote.
                 news.asSequence().filter { it.symbol.trim().equals(symbol, true) && it.id.isNotBlank() }
-                    .filter { alert.type == AlertType.NEWS || it.category.equals("Corporate Actions", true) || it.category.equals("Dividends", true) }
+                    .filter { item ->
+                        val corporate = item.category.equals("Corporate Actions", true) || item.category.equals("Dividends", true)
+                        when (alert.type) {
+                            AlertType.NEWS -> !corporate
+                            AlertType.CORPORATE_ACTION -> corporate
+                            else -> false
+                        }
+                    }
                     .filter { item -> newsTime(item.publishedAt)?.let { !it.isAfter(now) && Duration.between(it, now) <= newsWindow } == true }
                     .filter { it.id != legacyNewsIds[alert.id] }
                     .distinctBy { it.id }.sortedByDescending { newsTime(it.publishedAt) }
