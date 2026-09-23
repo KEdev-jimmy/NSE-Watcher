@@ -296,134 +296,92 @@ fun HomeDashboard(
                     }
                 }
                 item {
-                    HomeHeading("Your watchlist", "View all", openWatchlist)
-                    Spacer(Modifier.height(8.dp))
-                    ResearchPanel {
-                        when {
-                            watchlistError -> ResearchCaption("Your saved companies are temporarily unavailable.")
-                            saved == null -> ResearchLoading("Loading watchlist…")
-                            preview.isEmpty() -> {
-                                ResearchBody("Keep the companies you care about close.")
-                                TextButton(onClick = openWatchlist) { Text("Add your first company →", color = ResearchGreen) }
-                            }
-                            else -> preview.forEachIndexed { index, stock ->
-                                if (index > 0) HorizontalDivider(color = ResearchBorder)
-                                HomeStockRow(stock, histories[stock.symbol].orEmpty(), true) { openCompany(stock) }
-                            }
-                        }
-                        if (preview.isNotEmpty()) ResearchCaption("1M trends · Provider daily changes · Quotes may have different observation times")
-                    }
-                }
-                item {
-                    HomeHeading("Understand today’s market")
-                    Spacer(Modifier.height(8.dp))
-                    ResearchPanel {
-                        val breadth = intelligence.breadth
-                        val total = breadth.advancing + breadth.declining + breadth.unchanged
-                        ResearchBody(HomePresentation.marketSummary(breadth))
-                        if (total > 0) {
-                            ResearchCaption("Among $total companies with available daily changes. Based on the latest available observations.")
-                            Row(Modifier.fillMaxWidth().height(9.dp).clip(RoundedCornerShape(8.dp))) {
-                                if (breadth.advancing > 0) Box(Modifier.weight(breadth.advancing.toFloat()).fillMaxHeight().background(ResearchGreen))
-                                if (breadth.unchanged > 0) Box(Modifier.weight(breadth.unchanged.toFloat()).fillMaxHeight().background(ResearchMuted))
-                                if (breadth.declining > 0) Box(Modifier.weight(breadth.declining.toFloat()).fillMaxHeight().background(ResearchRed))
-                            }
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text("${breadth.advancing} rising", color = ResearchGreen, fontSize = 12.sp)
-                                Text("${breadth.unchanged} unchanged", color = ResearchMuted, fontSize = 12.sp)
-                                Text("${breadth.declining} falling", color = ResearchRed, fontSize = 12.sp)
-                            }
-                        } else ResearchCaption("Missing data is not counted as unchanged. Refresh when quotes become available.")
-                        val sources = currentStocks.map { it.source.trim() }.filter { it.isNotEmpty() }.distinct()
-                        ResearchCaption("Source: ${sources.joinToString().ifBlank { "Unavailable" }}")
-                    }
-                }
-                val marketContext = HomeMarketContextPresentation.items(intelligence)
-                if (marketContext.isNotEmpty()) item {
-                    HomeHeading("Market context")
-                    Spacer(Modifier.height(8.dp))
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        marketContext.forEach { insight ->
-                            ResearchPanel {
-                                Text("OBSERVED CONTEXT", color = ResearchGreen, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.6.sp)
-                                ResearchBody(insight.fact)
-                                if (insight.calculation.isNotBlank()) ResearchCaption(insight.calculation)
-                                if (insight.interpretation.isNotBlank()) {
-                                    Text("HOW TO READ IT", color = ResearchMuted, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
-                                    ResearchCaption(insight.interpretation)
-                                }
-                                val evidence = insight.evidence.firstOrNull()
-                                if (evidence != null) {
-                                    val evidenceDate = evidence.date.takeIf(String::isNotBlank)
-                                        ?.let(CompanyResearchPresentation::date)
-                                    ResearchCaption(
-                                        listOfNotNull(
-                                            "Evidence",
-                                            evidence.source.takeIf(String::isNotBlank),
-                                            evidenceDate
-                                        ).joinToString(" · ")
-                                    )
-                                } else if (insight.source.isNotBlank()) {
-                                    ResearchCaption("Evidence · ${insight.source}")
-                                }
-                                TextButton(onClick = openMarket, contentPadding = PaddingValues(0.dp)) {
-                                    Text("Inspect market evidence →", color = ResearchGreen, fontSize = 12.sp)
+                    Column(Modifier.padding(horizontal = 14.dp)) {
+                        HomeH3SectionHeader("Your watchlist", "View all", openWatchlist)
+                        Spacer(Modifier.height(6.dp))
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            color = ResearchCard,
+                            shape = RoundedCornerShape(16.dp),
+                            border = BorderStroke(1.dp, ResearchBorder)
+                        ) {
+                            Column(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
+                                when {
+                                    watchlistError -> HomeH3Message("Your saved companies are temporarily unavailable.")
+                                    saved == null -> HomeH3Message("Loading your watchlist…")
+                                    preview.isEmpty() -> Row(
+                                        Modifier.fillMaxWidth().clickable(onClick = openWatchlist).padding(vertical = 14.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(Icons.Default.AddCircleOutline, null, tint = ResearchGreen)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("Add your first company", Modifier.weight(1f), color = ResearchText, fontWeight = FontWeight.SemiBold)
+                                        Icon(Icons.Default.ChevronRight, null, tint = ResearchMuted)
+                                    }
+                                    else -> preview.forEachIndexed { index, stock ->
+                                        if (index > 0) HorizontalDivider(color = ResearchBorder.copy(alpha = 0.7f))
+                                        HomeH3WatchlistRow(stock, histories[stock.symbol].orEmpty()) { openCompany(stock) }
+                                    }
                                 }
                             }
                         }
                     }
                 }
                 item {
-                    HomeHeading("Market movers")
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        listOf(true to "Gainers", false to "Losers").forEach { (selected, label) ->
-                            FilterChip(selected = gainersSelected == selected, onClick = { gainersSelected = selected }, label = { Text(label) },
-                                shape = RoundedCornerShape(10.dp), modifier = Modifier.heightIn(min = 44.dp),
-                                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = ResearchGreen.copy(alpha = 0.12f), selectedLabelColor = ResearchGreen, containerColor = ResearchCard, labelColor = ResearchMuted),
-                                border = BorderStroke(1.dp, if (gainersSelected == selected) ResearchGreen else ResearchBorder))
-                        }
-                    }
-                    ResearchPanel {
-                        val movers = (if (gainersSelected) intelligence.gainers else intelligence.losers).take(3)
-                        if (movers.isEmpty()) ResearchCaption(if (currentStocks.isEmpty()) "Market quotes are unavailable." else "No ${if (gainersSelected) "gainers" else "losers"} in the available daily changes.")
-                        movers.forEachIndexed { index, stock ->
-                            if (index > 0) HorizontalDivider(color = ResearchBorder)
-                            HomeStockRow(stock, emptyList(), false) { openCompany(stock) }
-                        }
-                        TextButton(onClick = openMarket) { Text("Explore market →", color = ResearchGreen) }
+                    Box(Modifier.padding(horizontal = 14.dp)) {
+                        HomeH3MarketSnapshot(
+                            breadth = breadth,
+                            total = totalBreadth,
+                            sector = strongestSector,
+                            topMover = topMover,
+                            openMarket = openMarket,
+                            openMover = openCompany
+                        )
                     }
                 }
                 item {
-                    HomeHeading(if (watched.isEmpty()) "Latest market news" else "News for your companies", "View all", openAllNews)
-                    Spacer(Modifier.height(8.dp))
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        displayedNews.take(2).forEach { story -> HomeNewsRow(story) { openNews(story) } }
-                        if (newsLoading && displayedNews.isEmpty()) ResearchLoading("Loading news…")
-                        if (!newsLoading && displayedNews.isEmpty()) ResearchPanel {
-                            ResearchCaption(if (newsError) "The news service is unavailable. Try refreshing." else if (watched.isEmpty()) "No articles were returned by the feed." else "No articles linked to your saved companies were returned by this feed.")
-                            TextButton(onClick = openAllNews) { Text("Explore all news →", color = ResearchGreen) }
-                        }
-                        if (newsError && displayedNews.isNotEmpty()) ResearchCaption("Could not refresh news. Previously loaded articles are shown.")
+                    Box(Modifier.padding(horizontal = 14.dp)) {
+                        HomeH3MoversCard(
+                            selectedGainers = gainersSelected,
+                            movers = (if (gainersSelected) intelligence.gainers else intelligence.losers).take(3),
+                            quotesAvailable = currentStocks.isNotEmpty(),
+                            select = { gainersSelected = it },
+                            openMarket = openMarket,
+                            openCompany = openCompany
+                        )
                     }
                 }
                 item {
+                    Box(Modifier.padding(horizontal = 14.dp)) {
+                        HomeH3PracticeCard(practiceEnabled, practiceCash, openPractice)
+                    }
+                }
+            }
+        }
+        if (showChanges) ModalBottomSheet(
+            onDismissRequest = { showChanges = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = ResearchBackground
+        ) {
+            LazyColumn(
+                Modifier.fillMaxWidth().fillMaxHeight(0.78f),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                item {
+                    ResearchTitle("What changed for you")
+                    ResearchCaption("${unreviewedChanges.size} ${if (unreviewedChanges.size == 1) "development" else "developments"} ready to review")
+                }
+                items(unreviewedChanges, key = { it.id }) { item ->
                     ResearchPanel {
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Icon(Icons.Default.AccountBalanceWallet, null, tint = ResearchMuted, modifier = Modifier.size(28.dp))
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                                Text("PRACTICE PORTFOLIO", color = ResearchGreen, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                                ResearchBody("Build confidence with virtual money")
-                                Text(if (practiceEnabled) practiceCash.takeIf { it.isFinite() && it >= 0 }?.let { String.format(Locale.US, "KSh %,.2f", it) } ?: "Unavailable" else "KSh 1,000,000",
-                                    color = ResearchText, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                                ResearchCaption(if (practiceEnabled) "Available virtual cash" else "Suggested virtual starting balance")
-                            }
-                        }
-                        ResearchCaption(if (practiceEnabled) "Continue learning with your saved practice portfolio." else "Choose your starting balance and try a practice investment.")
-                        Button(onClick = openPractice, shape = RoundedCornerShape(10.dp), modifier = Modifier.align(Alignment.End)) {
-                            Text(if (practiceEnabled) "Open practice portfolio →" else "Start practising →")
+                        Text(item.title, color = ResearchText, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        ResearchCaption(item.detail)
+                        TextButton(onClick = { showChanges = false; reviewAndOpen(item) }, contentPadding = PaddingValues(0.dp)) {
+                            Text("${item.action} →", color = ResearchGreen, fontSize = 11.sp)
                         }
                     }
                 }
+                if (unreviewedChanges.isEmpty()) item { HomeH3Message("You're caught up.") }
             }
         }
         if (showAlerts) ModalBottomSheet(onDismissRequest = { showAlerts = false }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = ResearchBackground) {
