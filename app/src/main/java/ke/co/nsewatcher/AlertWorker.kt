@@ -21,6 +21,7 @@ import ke.co.nsewatcher.data.CompanyIntelligenceCache
 import ke.co.nsewatcher.data.MarketData
 import ke.co.nsewatcher.data.WatchlistStore
 import ke.co.nsewatcher.domain.AlertType
+import ke.co.nsewatcher.domain.PriceAlert
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import java.time.Instant
@@ -42,6 +43,14 @@ class AlertWorker(appContext: Context, workerParams: WorkerParameters) : Corouti
             val practiceStore = PracticeStore(applicationContext)
             val prefs = applicationContext.getSharedPreferences("nse_watcher_preferences", Context.MODE_PRIVATE)
             val configuredAlerts = alertStore.alerts.first()
+            val watchedSymbols = WatchlistStore(applicationContext).symbols.first()
+                .map { it.trim().uppercase() }.filter { it.isNotBlank() }.toSet()
+            val corporateAlertsEnabled = if (prefs.contains("corporate_action_alerts")) {
+                prefs.getBoolean("corporate_action_alerts", true)
+            } else prefs.getBoolean("news_alerts", true)
+            val practiceAlertsEnabled = if (prefs.contains("practice_alerts")) {
+                prefs.getBoolean("practice_alerts", true)
+            } else prefs.getBoolean("app_alerts", true)
             val activeTypes = buildSet {
                 if (prefs.getBoolean("price_alerts", true)) {
                     add(AlertType.PRICE_ABOVE)
@@ -52,16 +61,24 @@ class AlertWorker(appContext: Context, workerParams: WorkerParameters) : Corouti
                     add(AlertType.DAILY_LOSS)
                     add(AlertType.HIGH_VOLUME)
                 }
-                if (prefs.getBoolean("news_alerts", true)) {
-                    add(AlertType.NEWS)
-                    add(AlertType.CORPORATE_ACTION)
+                if (prefs.getBoolean("news_alerts", true)) add(AlertType.NEWS)
+                if (corporateAlertsEnabled) add(AlertType.CORPORATE_ACTION)
+            }
+            val activeConfigured = configuredAlerts.filter { it.enabled && it.type in activeTypes }
+            val automaticWatchlistAlerts = buildList {
+                watchedSymbols.forEach { symbol ->
+                    if (AlertType.NEWS in activeTypes && activeConfigured.none { it.symbol.equals(symbol, true) && it.type == AlertType.NEWS }) {
+                        add(PriceAlert("watchlist-news:$symbol", symbol, AlertType.NEWS, null, true))
+                    }
+                    if (AlertType.CORPORATE_ACTION in activeTypes && activeConfigured.none { it.symbol.equals(symbol, true) && it.type == AlertType.CORPORATE_ACTION }) {
+                        add(PriceAlert("watchlist-corporate:$symbol", symbol, AlertType.CORPORATE_ACTION, null, true))
+                    }
                 }
             }
-            val alerts = configuredAlerts.filter { it.enabled && it.type in activeTypes }
+            val alerts = activeConfigured + automaticWatchlistAlerts
             val initialPractice = practiceStore.read()
             val practicePending = initialPractice.enabled && initialPractice.orders.any { it.status == "PENDING" }
             val now = Instant.now()
-            val watchedSymbols = WatchlistStore(applicationContext).symbols.first().toSet()
             val companyChecks = companyChangeStore.syncAndDue(watchedSymbols, now)
             if (alerts.isEmpty() && !practicePending && companyChecks.isEmpty()) return Result.success()
 
@@ -99,7 +116,7 @@ class AlertWorker(appContext: Context, workerParams: WorkerParameters) : Corouti
                     filledOrders = processed.filledOrders
                     processed.state
                 }
-                if (filledOrders.isNotEmpty() && prefs.getBoolean("app_alerts", true)) {
+                if (filledOrders.isNotEmpty() && practiceAlertsEnabled) {
                     notifyPracticeFills(filledOrders)
                 }
             }
@@ -138,17 +155,17 @@ class AlertWorker(appContext: Context, workerParams: WorkerParameters) : Corouti
     private fun notifyAlerts(events: List<ke.co.nsewatcher.domain.AlertEvent>) {
         if (events.isEmpty() || !notificationsAllowed()) return
         val manager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        manager.createNotificationChannel(
-            NotificationChannel(ALERT_CHANNEL_ID, "NSE Watcher alerts", NotificationManager.IMPORTANCE_DEFAULT)
-        )
+        val silent = notificationSoundIsSilent()
+        val channelId = ensureChannel(manager, practice = false, silent = silent)
         events.forEach { event ->
-            val notification = NotificationCompat.Builder(applicationContext, ALERT_CHANNEL_ID)
+            val notification = NotificationCompat.Builder(applicationContext, channelId)
                 .setSmallIcon(R.drawable.ic_nse_watcher)
                 .setContentTitle(event.title)
                 .setContentText("${event.symbol}: ${event.message}")
                 .setStyle(NotificationCompat.BigTextStyle().bigText(event.message))
                 .setContentIntent(AlertNotifications.pendingIntent(applicationContext, AlertDestination.from(event)))
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setSilent(silent)
                 .setOnlyAlertOnce(true)
                 .setAutoCancel(true)
                 .build()
@@ -159,18 +176,18 @@ class AlertWorker(appContext: Context, workerParams: WorkerParameters) : Corouti
     private fun notifyPracticeFills(orders: List<PracticeOrder>) {
         if (!notificationsAllowed()) return
         val manager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        manager.createNotificationChannel(
-            NotificationChannel(PRACTICE_CHANNEL_ID, "Practice Portfolio", NotificationManager.IMPORTANCE_DEFAULT)
-        )
+        val silent = notificationSoundIsSilent()
+        val channelId = ensureChannel(manager, practice = true, silent = silent)
         orders.forEach { order ->
             val message = "${order.side.lowercase().replaceFirstChar { it.uppercase() }} ${order.shares} ${order.symbol} at ${CompanyResearchPresentation.money(order.price)}"
-            val notification = NotificationCompat.Builder(applicationContext, PRACTICE_CHANNEL_ID)
+            val notification = NotificationCompat.Builder(applicationContext, channelId)
                 .setSmallIcon(R.drawable.ic_nse_watcher)
                 .setContentTitle("Practice order filled")
                 .setContentText(message)
                 .setStyle(NotificationCompat.BigTextStyle().bigText("$message using an eligible observed quote. Simulation only."))
                 .setContentIntent(PracticeNotifications.pendingIntent(applicationContext, order.id))
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setSilent(silent)
                 .setOnlyAlertOnce(true)
                 .setAutoCancel(true)
                 .build()
@@ -178,10 +195,42 @@ class AlertWorker(appContext: Context, workerParams: WorkerParameters) : Corouti
         }
     }
 
+    private fun notificationSoundIsSilent(): Boolean =
+        applicationContext.getSharedPreferences("nse_watcher_preferences", Context.MODE_PRIVATE)
+            .getString("notification_sound", "Default").equals("Silent", true)
+
+    private fun ensureChannel(manager: NotificationManager, practice: Boolean, silent: Boolean): String {
+        val id = when {
+            practice && silent -> PRACTICE_CHANNEL_SILENT
+            practice -> PRACTICE_CHANNEL_DEFAULT
+            silent -> ALERT_CHANNEL_SILENT
+            else -> ALERT_CHANNEL_DEFAULT
+        }
+        val name = when {
+            practice && silent -> "Practice Portfolio (silent)"
+            practice -> "Practice Portfolio"
+            silent -> "NSE Watcher alerts (silent)"
+            else -> "NSE Watcher alerts"
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            manager.createNotificationChannel(
+                NotificationChannel(id, name, NotificationManager.IMPORTANCE_DEFAULT).apply {
+                    if (silent) {
+                        setSound(null, null)
+                        enableVibration(false)
+                    }
+                }
+            )
+        }
+        return id
+    }
+
     companion object {
         private const val WORK_NAME = "nse_watcher_alert_monitor"
-        private const val ALERT_CHANNEL_ID = "market_alerts"
-        private const val PRACTICE_CHANNEL_ID = "practice_orders"
+        private const val ALERT_CHANNEL_DEFAULT = "market_alerts_v2"
+        private const val ALERT_CHANNEL_SILENT = "market_alerts_silent_v2"
+        private const val PRACTICE_CHANNEL_DEFAULT = "practice_orders_v2"
+        private const val PRACTICE_CHANNEL_SILENT = "practice_orders_silent_v2"
 
         fun schedule(context: Context) {
             val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
