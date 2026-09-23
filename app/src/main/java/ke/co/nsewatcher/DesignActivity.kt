@@ -171,6 +171,7 @@ private fun App(alertDestination: AlertDestination?, consumeAlert: () -> Unit, p
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var selected by remember { mutableStateOf(Stock("", "", 0.0, 0.0, emptyList())) }
     var selectedNews by remember { mutableStateOf<NewsItem?>(null) }
+    var alertNavigationRevision by remember { mutableIntStateOf(0) }
     val directoryState = rememberSaveableStateHolder()
     var directorySector by rememberSaveable { mutableStateOf("All") }
     var comparisonSymbols by rememberSaveable { mutableStateOf(emptyList<String>()) }
@@ -198,6 +199,7 @@ private fun App(alertDestination: AlertDestination?, consumeAlert: () -> Unit, p
         history = listOf(Page.HOME)
         val article = target.article()
         if (article != null) {
+            alertNavigationRevision++
             selectedNews = article
             page = Page.NEWS_DETAIL
         } else {
@@ -259,7 +261,7 @@ private fun App(alertDestination: AlertDestination?, consumeAlert: () -> Unit, p
             Page.COMPANY->Company(selected,::back){selectedNews=it;go(Page.NEWS_DETAIL)}
             Page.WATCHLIST->WatchlistDashboard(quoteStocks=stocks, initialCatalog=companyCatalog, initialMarket=startupMarketStatus, onQuotesLoaded={liveStocks.value=it}, openCompany={selected=it;go(Page.COMPANY)}, openNews={selectedNews=it;go(Page.NEWS_DETAIL)}, openPreferences={go(Page.NOTIFICATIONS)}, back=::back)
             Page.COMPARE->CompanyComparison(CompaniesPresentation.companies(companyCatalog, stocks),::back,comparisonSymbols)
-            Page.NEWS_DETAIL->selectedNews?.let { NewsArticleScreen(it,companyCatalog,stocks,::back){company->selected=company;go(Page.COMPANY)} }
+            Page.NEWS_DETAIL->key(alertNavigationRevision) { selectedNews?.let { NewsArticleScreen(it,companyCatalog,stocks,::back){company->selected=company;go(Page.COMPANY)} } }
             Page.PROFILE->Profile(name,username,email,description,{name=it;put("profile_name",it)},{username=it;put("username",it)},{email=it;put("email",it)},{description=it;put("description",it)},pickAvatar,::back,::go)
             Page.SETTINGS->Settings(dark,marketAlerts,priceAlerts,newsAlerts,appAlerts,autoRefresh,showVolume,showChanges,{dark=it;put("dark_mode",it)},{marketAlerts=it;put("market_alerts",it)},{priceAlerts=it;put("price_alerts",it)},{newsAlerts=it;put("news_alerts",it)},{appAlerts=it;put("app_alerts",it)},{autoRefresh=it;put("auto_refresh",it)},{showVolume=it;put("show_volume",it)},{showChanges=it;put("show_changes",it)},::back,::go)
             Page.THEME->ThemePage(dark,{dark=it;put("dark_mode",it)},::back)

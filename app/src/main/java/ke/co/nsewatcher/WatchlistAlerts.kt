@@ -126,7 +126,7 @@ internal fun WatchlistAlertsSheet(
                 if (companies.isEmpty()) ResearchCaption("Add a company to your watchlist to create a new alert.")
             }
             item {
-                ResearchCaption("Checks run about every 15 minutes while the market is open, subject to Android scheduling. Alerts are not real-time price guarantees.")
+                ResearchCaption("Checks are scheduled about every 15 minutes, subject to Android delays. News can arrive after hours. Price quotes must be no more than 30 minutes old; daily gain, loss and volume alerts notify once per rule per Nairobi day.")
                 if (rules.isEmpty()) ResearchBody("No rules saved here yet.")
             }
             items(rules, key = { it.id }) { rule ->
@@ -153,3 +153,4 @@ internal fun WatchlistAlertsSheet(
             dismissButton = { TextButton(onClick = { deleting = null }, enabled = !saving) { Text("Keep alert") } })
     }
 }
+
