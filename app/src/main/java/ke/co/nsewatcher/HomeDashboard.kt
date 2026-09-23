@@ -1,6 +1,7 @@
 package ke.co.nsewatcher
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -16,6 +17,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
@@ -41,6 +47,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.util.Locale
+import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -80,6 +87,7 @@ fun HomeDashboard(
     var catalog by remember { mutableStateOf(initialCatalog) }
     var market by remember { mutableStateOf(initialMarketStatus) }
     var showAlerts by rememberSaveable { mutableStateOf(false) }
+    var showChanges by rememberSaveable { mutableStateOf(false) }
     var gainersSelected by rememberSaveable { mutableStateOf(true) }
     var refreshing by remember { mutableStateOf(false) }
     var refreshError by remember { mutableStateOf<String?>(null) }
@@ -232,99 +240,59 @@ fun HomeDashboard(
     val relevantNews = remember(newsFeed, watched) { HomePresentation.companyNews(newsFeed, watched) }
     val displayedNews = if (watched.isEmpty()) newsFeed.distinctBy { it.id }.sortedByDescending { CompanyResearchPresentation.timestamp(it.publishedAt) } else relevantNews
 
+    val unreviewedNewsCompanies = remember(unreviewedChanges) {
+        unreviewedChanges.filter { it.story != null }.map { WatchlistPresentation.symbol(it.symbol) }.filter { it.isNotBlank() }.distinct().size
+    }
+    val unreviewedIds = remember(unreviewedChanges) { unreviewedChanges.map { it.id }.toSet() }
+    val unreviewedDividendUpdates = remember(unreviewedChanges, companyDataEvents, unreviewedIds) {
+        companyDataEvents.count { it.kind == ke.co.nsewatcher.data.CompanyDataChangeKind.DIVIDEND && it.id in unreviewedIds } +
+            unreviewedChanges.count { item ->
+                val story = item.story ?: return@count false
+                story.category.contains("dividend", true) || story.dividendAmount.isNotBlank() || story.exDate.isNotBlank()
+            }
+    }
+    val unreviewedAlertCount = remember(unreviewedChanges) { unreviewedChanges.count { it.alert != null } }
+    val breadth = intelligence.breadth
+    val totalBreadth = breadth.advancing + breadth.declining + breadth.unchanged
+    val strongestSector = intelligence.sectors.maxByOrNull { it.averageChangePct }
+    val topMover = (intelligence.gainers + intelligence.losers).maxByOrNull { abs(it.change) }
+
     MaterialTheme(colorScheme = CompanyResearchColors) {
         Column(Modifier.fillMaxSize().background(ResearchBackground)) {
-            Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.ShowChart, null, tint = ResearchGreen, modifier = Modifier.size(28.dp))
-                Spacer(Modifier.width(9.dp))
-                Text("NSE Watcher", Modifier.weight(1f), color = ResearchText, fontSize = 21.sp, fontWeight = FontWeight.Bold)
-                IconButton(onClick = { showAlerts = true }) { Icon(Icons.Default.NotificationsNone, "Open recorded alerts", tint = ResearchText) }
-                IconButton(onClick = openProfile, modifier = Modifier.semantics { contentDescription = "Open profile" }) {
-                    Box(Modifier.size(34.dp).clip(CircleShape).background(ResearchRaised), contentAlignment = Alignment.Center) {
-                        Text(name.trim().take(1).uppercase().ifBlank { "?" }, color = ResearchText, fontWeight = FontWeight.Bold)
-                        if (avatar != null) AsyncImage(avatar, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            LazyColumn(
+                Modifier.weight(1f),
+                contentPadding = PaddingValues(bottom = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                item {
+                    HomeNairobiHeader(
+                        name = name,
+                        avatar = avatar,
+                        market = market,
+                        stocks = currentStocks,
+                        now = now,
+                        refreshing = refreshing,
+                        hasAttention = unreviewedAlertCount > 0 || events.isNotEmpty(),
+                        onRefresh = ::refresh,
+                        openAlerts = { showAlerts = true },
+                        openProfile = openProfile
+                    )
+                    refreshError?.let {
+                        Text(it, Modifier.padding(horizontal = 16.dp, vertical = 3.dp), color = ResearchMuted, fontSize = 9.5.sp)
                     }
                 }
-            }
-            LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
                 item {
-                    Text(HomePresentation.greeting(name, now), color = ResearchText, fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(5.dp)); ResearchBody("Here’s what matters to you.")
-                }
-                item {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                                Box(Modifier.size(8.dp).background(if (market.isKnown && market.isOpen) ResearchGreen else ResearchMuted, CircleShape))
-                                Text(when { !market.isKnown -> "Market status unavailable"; market.isOpen -> "Market open"; else -> "Market closed" }, color = if (market.isKnown && market.isOpen) ResearchGreen else ResearchMuted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                            }
-                            ResearchCaption(HomePresentation.freshness(currentStocks, now))
-                            val latest = currentStocks.filter { it.price.isFinite() && it.price > 0 }.mapNotNull { CompanyResearchPresentation.timestamp(it.observedAt) }.maxOrNull()
-                            if (latest != null) ResearchCaption("Latest observation · ${CompanyResearchPresentation.date(latest.toString())}")
-                        }
-                        IconButton(onClick = ::refresh, enabled = !refreshing) {
-                            if (refreshing) CircularProgressIndicator(Modifier.size(18.dp), color = ResearchGreen, strokeWidth = 2.dp)
-                            else Icon(Icons.Default.Refresh, "Refresh Home", tint = ResearchMuted)
-                        }
-                    }
-                    refreshError?.let { ResearchCaption(it) }
-                }
-                item {
-                    ResearchPanel {
-                        Text("YOUR DAILY BRIEF", color = ResearchGreen, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.8.sp)
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("What needs your attention?", Modifier.weight(1f), color = ResearchText, fontSize = 19.sp, fontWeight = FontWeight.Bold)
-                            if (unreviewedChanges.isNotEmpty()) Surface(color = ResearchGreen.copy(alpha = 0.12f), shape = RoundedCornerShape(10.dp), border = BorderStroke(1.dp, ResearchGreen.copy(alpha = 0.45f))) {
-                                Text("${unreviewedChanges.size} new", Modifier.padding(7.dp), color = ResearchText, fontSize = 11.sp)
-                            }
-                        }
-                        attentionDigest?.let { digest ->
-                            Spacer(Modifier.height(6.dp))
-                            ResearchCaption(digest.summary)
-                            if (digest.breakdown.isNotEmpty()) {
-                                Text(
-                                    digest.breakdown.joinToString(" · "),
-                                    color = ResearchGreen,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-                        when {
-                            watchlistError -> ResearchCaption("Saved companies could not be read. Reopen Home to retry.")
-                            saved == null -> ResearchLoading("Loading your companies…")
-                            watched.isEmpty() -> {
-                                ResearchBody("Make this brief yours")
-                                ResearchCaption("Follow companies to establish a baseline. Existing items become known; later developments can then appear here as new.")
-                                TextButton(onClick = openWatchlist) { Text("Choose your companies →", color = ResearchGreen) }
-                            }
-                            changeState == null -> ResearchLoading("Establishing your change baseline…")
-                            brief.isEmpty() && newsLoading -> ResearchLoading("Checking for new company developments…")
-                            brief.isEmpty() -> {
-                                ResearchBody(when {
-                                    newsError || alertError || companyChangeError || changeStateError -> "Some change tracking is unavailable"
-                                    changes.isNotEmpty() -> "You’re caught up"
-                                    else -> "No new changes detected"
-                                })
-                                ResearchCaption(if (changes.isNotEmpty())
-                                    "No unreviewed changes remain in the available 7-day company news, recorded alerts and detected company-data updates."
-                                else "NSE Watcher is tracking later published updates, recorded alerts and observed company-data changes for your followed companies.")
-                                TextButton(onClick = openWatchlist) { Text("Review your watchlist →", color = ResearchGreen) }
-                            }
-                        }
-                        brief.forEachIndexed { index, item ->
-                            if (index > 0) HorizontalDivider(color = ResearchBorder)
-                            HomeBriefRow(item) { reviewAndOpen(item) }
-                        }
-                        if (unreviewedChanges.isNotEmpty()) {
-                            TextButton(onClick = { markReviewed(unreviewedChanges.map { it.id }.toSet()) }, contentPadding = PaddingValues(0.dp)) {
-                                Text("Mark all reviewed", color = ResearchGreen, fontSize = 12.sp)
-                            }
-                        }
-                        if (newsError) ResearchCaption("News refresh failed; available stories retain their publication dates.")
-                        if (alertError) ResearchCaption("Recorded alerts could not be read.")
-                        if (companyChangeError) ResearchCaption("Detected company-data changes could not be read.")
-                        if (changeStateError) ResearchCaption("Review state could not be saved; items may reappear until storage succeeds.")
+                    Box(Modifier.padding(horizontal = 14.dp)) {
+                        HomeH3BriefCard(
+                            newsCompanies = unreviewedNewsCompanies,
+                            dividendUpdates = unreviewedDividendUpdates,
+                            alertCount = unreviewedAlertCount,
+                            loading = saved == null || (watched.isNotEmpty() && changeState == null) || (newsLoading && changes.isEmpty()),
+                            hasError = watchlistError || newsError || alertError || companyChangeError || changeStateError,
+                            review = { if (unreviewedChanges.isEmpty()) openWatchlist() else showChanges = true },
+                            manageWatchlist = openWatchlist,
+                            seeAll = { if (unreviewedChanges.isEmpty()) openWatchlist() else showChanges = true }
+                        )
                     }
                 }
                 item {
