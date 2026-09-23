@@ -6,7 +6,7 @@ import java.time.Duration
 import java.time.ZoneId
 
 internal data class HomeBriefItem(
-    val id: String, val title: String, val detail: String, val source: String,
+    val id: String, val symbol: String, val title: String, val detail: String, val source: String,
     val time: String, val action: String, val story: NewsItem? = null,
     val stock: Stock? = null, val alert: AlertEvent? = null
 )
@@ -26,20 +26,58 @@ internal object HomePresentation {
     fun companyNews(news: List<NewsItem>, watched: List<Stock>): List<NewsItem> =
         WatchlistPresentation.linkedNews(news, watched).sortedByDescending { CompanyResearchPresentation.timestamp(it.publishedAt) }
 
-    fun brief(watched: List<Stock>, news: List<NewsItem>, events: List<AlertEvent>, now: Instant): List<HomeBriefItem> {
-        val symbols = watched.map { WatchlistPresentation.symbol(it.symbol) }.toSet()
-        val article = companyNews(news, watched).firstOrNull { recent(it.publishedAt, now) }
-        val event = events.filter { WatchlistPresentation.symbol(it.symbol) in symbols && recent(it.recordedAt, now) }
-            .maxByOrNull { CompanyResearchPresentation.timestamp(it.recordedAt)!! }
-        return buildList {
-            article?.let { add(HomeBriefItem("news:${it.id}", it.title,
-                it.summary.takeIf(String::isNotBlank) ?: "Read the published update and its source before drawing a conclusion.",
-                it.source.ifBlank { "Source unavailable" }, it.publishedAt, "Read the update", story = it)) }
-            event?.let { add(HomeBriefItem("alert:${it.id}", "${it.symbol} · ${it.title}", it.message,
-                "Your alert · detected", it.recordedAt, "Review this alert", alert = it,
-                stock = watched.firstOrNull { stock -> stock.symbol.equals(it.symbol, true) })) }
-        }.take(2)
+    fun changes(watched: List<Stock>, news: List<NewsItem>, events: List<AlertEvent>, now: Instant): List<HomeBriefItem> {
+        val bySymbol = watched.associateBy { WatchlistPresentation.symbol(it.symbol) }
+        val byName = watched.associateBy { it.name.trim().lowercase(java.util.Locale.US) }
+        val articles = companyNews(news, watched).filter { recent(it.publishedAt, now) }
+        val articleIds = articles.map { it.id }.toSet()
+        val articleChanges = articles.mapNotNull { item ->
+            val symbol = WatchlistPresentation.symbol(item.symbol).takeIf { it in bySymbol }
+                ?: byName[item.companyName.trim().lowercase(java.util.Locale.US)]?.symbol?.let(WatchlistPresentation::symbol)
+                ?: return@mapNotNull null
+            HomeBriefItem(
+                id = "news:${item.id}",
+                symbol = symbol,
+                title = item.title,
+                detail = item.summary.takeIf(String::isNotBlank)
+                    ?: "Read the published update and its source before drawing a conclusion.",
+                source = item.source.ifBlank { "Source unavailable" },
+                time = item.publishedAt,
+                action = "Read the update",
+                story = item
+            )
+        }
+        val alertChanges = events.asSequence()
+            .filter { WatchlistPresentation.symbol(it.symbol) in bySymbol && recent(it.recordedAt, now) }
+            // A news alert and its article are one development, not two Home changes.
+            .filter { it.articleId.isBlank() || it.articleId !in articleIds }
+            .map { event ->
+                val symbol = WatchlistPresentation.symbol(event.symbol)
+                HomeBriefItem(
+                    id = "alert:${event.id}",
+                    symbol = symbol,
+                    title = "${event.symbol} · ${event.title}",
+                    detail = event.message,
+                    source = "Your alert · detected",
+                    time = event.recordedAt,
+                    action = "Review this alert",
+                    alert = event,
+                    stock = bySymbol[symbol]
+                )
+            }.toList()
+        return (articleChanges + alertChanges).distinctBy { it.id }
+            .sortedByDescending { CompanyResearchPresentation.timestamp(it.time) ?: Instant.MIN }
     }
+
+    fun brief(
+        watched: List<Stock>,
+        news: List<NewsItem>,
+        events: List<AlertEvent>,
+        now: Instant,
+        reviewedIds: Set<String> = emptySet()
+    ): List<HomeBriefItem> = changes(watched, news, events, now)
+        .filter { it.id !in reviewedIds }
+        .take(3)
 
     fun marketSummary(breadth: HomeMarketBreadth): String = when {
         breadth.advancing + breadth.declining + breadth.unchanged == 0 -> "Daily market movement is unavailable."
