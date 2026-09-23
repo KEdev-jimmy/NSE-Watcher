@@ -673,3 +673,189 @@ private fun HomeH3Metric(
         }
     }
 }
+
+@Composable
+private fun HomeH3SectionHeader(title: String, action: String, onAction: () -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(title, Modifier.weight(1f), color = ResearchText, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
+        TextButton(onClick = onAction, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) {
+            Text("${action} →", color = ResearchGreen, fontSize = 10.5.sp)
+        }
+    }
+}
+
+@Composable
+private fun HomeH3Message(text: String) {
+    Text(
+        text,
+        Modifier.fillMaxWidth().padding(vertical = 12.dp),
+        color = ResearchMuted,
+        fontSize = 10.2.sp,
+        lineHeight = 14.sp
+    )
+}
+
+@Composable
+private fun HomeH3WatchlistRow(
+    stock: Stock,
+    history: List<MyStocksCache.HistoryPoint>,
+    open: () -> Unit
+) {
+    Row(
+        Modifier.fillMaxWidth()
+            .clickable(role = Role.Button, onClickLabel = "Research ${stock.name}", onClick = open)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.width(93.dp)) {
+            Text(stock.symbol, color = ResearchText, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+            Text(
+                stock.name,
+                color = ResearchMuted,
+                fontSize = 9.3.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        WatchlistSparkline(history, Modifier.weight(1f).height(25.dp).padding(horizontal = 6.dp))
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                stock.price.takeIf { it.isFinite() && it > 0.0 }?.let(CompanyResearchPresentation::money) ?: "Unavailable",
+                color = ResearchText,
+                fontSize = 11.2.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(Modifier.height(3.dp))
+            HomeH3ChangeBadge(stock.change.takeIf { stock.changeAvailable && it.isFinite() })
+        }
+        Spacer(Modifier.width(6.dp))
+        Icon(Icons.Default.ChevronRight, null, tint = ResearchMuted, modifier = Modifier.size(17.dp))
+    }
+}
+
+@Composable
+private fun HomeH3ChangeBadge(change: Double?) {
+    val color = researchChangeColor(change)
+    Surface(color = color.copy(alpha = 0.16f), shape = RoundedCornerShape(7.dp)) {
+        Text(
+            change?.let(CompanyResearchPresentation::percent) ?: "-",
+            Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            color = color,
+            fontSize = 9.3.sp,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@Composable
+private fun HomeNairobiSkyline(modifier: Modifier = Modifier) {
+    val background = ResearchBackground
+    Canvas(modifier) {
+        drawRect(
+            brush = Brush.verticalGradient(
+                listOf(Color(0xFF0A2943), Color(0xFF10273A), Color(0xFF081B2B), background)
+            )
+        )
+        val horizon = size.height * 0.53f
+        drawRect(
+            color = Color(0x22FF9A43),
+            topLeft = Offset(0f, horizon - size.height * 0.06f),
+            size = Size(size.width, size.height * 0.12f)
+        )
+
+        data class Building(val x: Float, val w: Float, val h: Float)
+        val blocks = listOf(
+            Building(0.00f, .07f, .17f), Building(.055f, .05f, .25f), Building(.11f, .06f, .20f),
+            Building(.17f, .045f, .29f), Building(.215f, .075f, .21f), Building(.29f, .045f, .34f),
+            Building(.34f, .06f, .23f), Building(.40f, .065f, .27f), Building(.59f, .05f, .31f),
+            Building(.64f, .065f, .22f), Building(.705f, .045f, .30f), Building(.75f, .08f, .24f),
+            Building(.83f, .05f, .34f), Building(.88f, .055f, .24f), Building(.935f, .065f, .29f)
+        )
+
+        blocks.forEachIndexed { index, building ->
+            val left = size.width * building.x
+            val width = size.width * building.w
+            val height = size.height * building.h
+            val top = horizon - height
+            drawRect(
+                color = if (index % 3 == 0) Color(0xFF102B40) else Color(0xFF0B2235),
+                topLeft = Offset(left, top),
+                size = Size(width, height)
+            )
+            val windowWidth = (width * .12f).coerceAtLeast(1.3f)
+            var wx = left + windowWidth
+            while (wx < left + width - windowWidth) {
+                var wy = top + size.height * .025f
+                var row = 0
+                while (wy < horizon - 3f) {
+                    if ((index + row + (wx / (windowWidth * 2f)).toInt()) % 3 != 0) {
+                        drawRoundRect(
+                            color = Color(0xB3FFB15A),
+                            topLeft = Offset(wx, wy),
+                            size = Size(windowWidth, windowWidth * .62f),
+                            cornerRadius = CornerRadius(windowWidth * .15f)
+                        )
+                    }
+                    wy += size.height * .029f
+                    row++
+                }
+                wx += windowWidth * 2.2f
+            }
+        }
+
+        val kiccX = size.width * .50f
+        val kiccWidth = size.width * .076f
+        val kiccTop = size.height * .18f
+        drawRoundRect(
+            color = Color(0xFF102A3D),
+            topLeft = Offset(kiccX, kiccTop),
+            size = Size(kiccWidth, horizon - kiccTop),
+            cornerRadius = CornerRadius(kiccWidth * .36f)
+        )
+        var floor = kiccTop + size.height * .026f
+        while (floor < horizon - 4f) {
+            drawLine(
+                color = Color(0xCFFF9A43),
+                start = Offset(kiccX + kiccWidth * .14f, floor),
+                end = Offset(kiccX + kiccWidth * .86f, floor),
+                strokeWidth = 1.4f
+            )
+            floor += size.height * .031f
+        }
+        drawOval(
+            color = Color(0xFF173C52),
+            topLeft = Offset(kiccX - kiccWidth * .05f, kiccTop - kiccWidth * .12f),
+            size = Size(kiccWidth * 1.10f, kiccWidth * .32f)
+        )
+        drawLine(
+            color = Color(0xFFFFA24A),
+            start = Offset(kiccX + kiccWidth * .5f, kiccTop - kiccWidth * .12f),
+            end = Offset(kiccX + kiccWidth * .5f, kiccTop - kiccWidth * .36f),
+            strokeWidth = 2f
+        )
+
+        repeat(30) { index ->
+            drawCircle(
+                color = Color(0xFF071722),
+                radius = size.width * (.016f + (index % 3) * .004f),
+                center = Offset(
+                    size.width * (index / 29f),
+                    horizon + size.height * (.01f + (index % 4) * .006f)
+                )
+            )
+        }
+
+        drawRect(
+            brush = Brush.horizontalGradient(
+                listOf(Color(0xE0061625), Color(0x6B061625), Color(0x26061625), Color(0x65061625))
+            )
+        )
+        drawRect(
+            brush = Brush.verticalGradient(
+                listOf(Color.Transparent, background.copy(alpha = .18f), background),
+                startY = size.height * .48f,
+                endY = size.height
+            )
+        )
+    }
+}
