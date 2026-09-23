@@ -5,12 +5,15 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -25,6 +28,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -73,16 +77,7 @@ internal fun MoreHubScreen(
                     Modifier.padding(18.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Surface(Modifier.size(62.dp), CircleShape, MaterialTheme.colorScheme.primary) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(
-                                profileInitials(name),
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.ExtraBold
-                            )
-                        }
-                    }
+                    HubAvatar(name, 62)
                     Spacer(Modifier.width(14.dp))
                     Column(Modifier.weight(1f)) {
                         Text(
@@ -221,11 +216,7 @@ internal fun ProfileHubScreen(
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.6f))
             ) {
                 Column(Modifier.padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Surface(Modifier.size(88.dp), CircleShape, MaterialTheme.colorScheme.primary) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text(profileInitials(name), color = MaterialTheme.colorScheme.onPrimary, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold)
-                        }
-                    }
+                    HubAvatar(name, 88)
                     Spacer(Modifier.height(12.dp))
                     Text(name.trim().ifBlank { ProfileDefaults.displayName }, fontSize = 21.sp, fontWeight = FontWeight.ExtraBold)
                     Text(
@@ -735,6 +726,35 @@ private fun FaqCard(question: String, answer: String) {
             if (expanded) {
                 Spacer(Modifier.height(8.dp))
                 Text(answer, fontSize = 10.5.sp, lineHeight = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+@Composable
+private fun HubAvatar(name: String, size: Int) {
+    val context = LocalContext.current
+    val uri = context.getSharedPreferences("nse_watcher_preferences", Context.MODE_PRIVATE).getString("avatar_uri", null)
+    val bitmap by produceState<Bitmap?>(initialValue = null, key1 = uri) {
+        value = try {
+            uri?.let { value ->
+                context.contentResolver.openInputStream(Uri.parse(value))?.use(BitmapFactory::decodeStream)
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+    Surface(Modifier.size(size.dp), CircleShape, MaterialTheme.colorScheme.primary) {
+        if (bitmap != null) {
+            Image(bitmap!!.asImageBitmap(), "Profile photo", Modifier.fillMaxSize())
+        } else {
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    profileInitials(name),
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    fontSize = if (size >= 80) 26.sp else 20.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
             }
         }
     }
