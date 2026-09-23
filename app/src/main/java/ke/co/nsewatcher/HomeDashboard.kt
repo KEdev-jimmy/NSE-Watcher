@@ -253,141 +253,40 @@ fun HomeDashboard(
     val topMover = (intelligence.gainers + intelligence.losers).maxByOrNull { abs(it.change) }
 
     MaterialTheme(colorScheme = CompanyResearchColors) {
-        Column(Modifier.fillMaxSize().background(ResearchBackground)) {
-            LazyColumn(
-                Modifier.weight(1f),
-                contentPadding = PaddingValues(bottom = 18.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                item {
-                    HomeH3Header(
-                        name = name,
-                        avatar = avatar,
-                        market = market,
-                        stocks = currentStocks,
-                        now = now,
-                        refreshing = refreshing,
-                        hasAttention = unreviewedAlertCount > 0 || events.isNotEmpty(),
-                        onRefresh = ::refresh,
-                        openAlerts = { showAlerts = true },
-                        openProfile = openProfile
-                    )
-                    refreshError?.let {
-                        Text(it, Modifier.padding(horizontal = 16.dp, vertical = 3.dp), color = ResearchMuted, fontSize = 9.5.sp)
-                    }
-                }
-                item {
-                    Box(Modifier.padding(horizontal = 14.dp)) {
-                        HomeH3BriefCard(
-                            hasWatchlist = watched.isNotEmpty(),
-                            hasChanges = unreviewedChanges.isNotEmpty(),
-                            newsCompanies = unreviewedNewsCompanies,
-                            dividendUpdates = unreviewedDividendUpdates,
-                            alertCount = unreviewedAlertCount,
-                            loading = saved == null || (watched.isNotEmpty() && changeState == null) || (newsLoading && changes.isEmpty()),
-                            hasError = watchlistError || newsError || alertError || companyChangeError || changeStateError,
-                            review = { if (unreviewedChanges.isEmpty()) openWatchlist() else showChanges = true },
-                            manageWatchlist = openWatchlist,
-                            seeAll = { if (unreviewedChanges.isEmpty()) openWatchlist() else showChanges = true }
-                        )
-                    }
-                }
-                item {
-                    Box(Modifier.padding(horizontal = 14.dp)) {
-                        HomeH3QuickActions(
-                            openWatchlist = openWatchlist,
-                            openAlerts = { showAlerts = true },
-                            openPractice = openPractice
-                        )
-                    }
-                }
-                item {
-                    Column(Modifier.padding(horizontal = 14.dp)) {
-                        HomeH3SectionHeader("Your watchlist", "View all", openWatchlist)
-                        Spacer(Modifier.height(6.dp))
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            color = ResearchCard,
-                            shape = RoundedCornerShape(16.dp),
-                            border = BorderStroke(1.dp, ResearchBorder)
-                        ) {
-                            Column(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
-                                when {
-                                    watchlistError -> HomeH3Message("Your saved companies are temporarily unavailable.")
-                                    saved == null -> HomeH3Message("Loading your watchlist…")
-                                    preview.isEmpty() -> Row(
-                                        Modifier.fillMaxWidth().clickable(onClick = openWatchlist).padding(vertical = 14.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(Icons.Default.AddCircleOutline, null, tint = ResearchGreen)
-                                        Spacer(Modifier.width(8.dp))
-                                        Text("Add your first company", Modifier.weight(1f), color = ResearchText, fontWeight = FontWeight.SemiBold)
-                                        Icon(Icons.Default.ChevronRight, null, tint = ResearchMuted)
-                                    }
-                                    else -> preview.forEachIndexed { index, stock ->
-                                        if (index > 0) HorizontalDivider(color = ResearchBorder.copy(alpha = 0.7f))
-                                        HomeH3WatchlistRow(stock, histories[stock.symbol].orEmpty()) { openCompany(stock) }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                item {
-                    Column(Modifier.padding(horizontal = 14.dp)) {
-                        HomeH3SectionHeader("News for your companies", "View all", openAllNews)
-                        Spacer(Modifier.height(6.dp))
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            color = ResearchCard,
-                            shape = RoundedCornerShape(16.dp),
-                            border = BorderStroke(1.dp, ResearchBorder)
-                        ) {
-                            Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                when {
-                                    watched.isEmpty() -> HomeH3Message("Follow companies to get a personalised company-news feed here.")
-                                    newsLoading && relevantNews.isEmpty() -> HomeH3Message("Loading company news…")
-                                    newsError && relevantNews.isEmpty() -> HomeH3Message("Company news is temporarily unavailable.")
-                                    relevantNews.isEmpty() -> HomeH3Message("No recent stories were found for your followed companies.")
-                                    else -> relevantNews.take(2).forEach { story ->
-                                        HomeH3NewsRow(story) { openNews(story) }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                item {
-                    Box(Modifier.padding(horizontal = 14.dp)) {
-                        HomeH3MarketSnapshot(
-                            breadth = breadth,
-                            total = totalBreadth,
-                            sector = strongestSector,
-                            topMover = topMover,
-                            openMarket = openMarket,
-                            openMover = openCompany
-                        )
-                    }
-                }
-                item {
-                    Box(Modifier.padding(horizontal = 14.dp)) {
-                        HomeH3MoversCard(
-                            selectedGainers = gainersSelected,
-                            movers = (if (gainersSelected) intelligence.gainers else intelligence.losers).take(3),
-                            quotesAvailable = currentStocks.isNotEmpty(),
-                            select = { gainersSelected = it },
-                            openMarket = openMarket,
-                            openCompany = openCompany
-                        )
-                    }
-                }
-                item {
-                    Box(Modifier.padding(horizontal = 14.dp)) {
-                        HomeH3PracticeCard(practiceEnabled, practiceCash, openPractice)
-                    }
-                }
+        HomeReferenceDashboard(
+            name = name,
+            avatar = avatar,
+            market = market,
+            stocks = currentStocks,
+            now = now,
+            refreshing = refreshing,
+            hasAttention = unreviewedAlertCount > 0 || events.isNotEmpty(),
+            watched = watched,
+            watchlistPreview = preview,
+            watchlistLoading = saved == null,
+            watchlistError = watchlistError,
+            relevantNews = relevantNews,
+            newsLoading = newsLoading,
+            newsError = newsError,
+            intelligence = intelligence,
+            gainersSelected = gainersSelected,
+            onGainersSelected = { gainersSelected = it },
+            practiceEnabled = practiceEnabled,
+            practiceCash = practiceCash,
+            onRefresh = ::refresh,
+            openAlerts = { showAlerts = true },
+            openProfile = openProfile,
+            openWatchlist = openWatchlist,
+            openPractice = openPractice,
+            openMarket = openMarket,
+            openAllNews = openAllNews,
+            openNews = openNews,
+            openCompany = openCompany,
+            reviewBrief = {
+                if (unreviewedChanges.isEmpty()) openMarket()
+                else showChanges = true
             }
-        }
+        )
         if (showChanges) ModalBottomSheet(
             onDismissRequest = { showChanges = false },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
