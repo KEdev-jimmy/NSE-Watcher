@@ -566,6 +566,7 @@ private fun ReferenceBriefAttentionRow(
 
 @Composable
 private fun ReferenceMarketGraphic(modifier: Modifier = Modifier) {
+    val green = ResearchGreen
     Canvas(modifier) {
         val width = size.width
         val height = size.height
@@ -603,7 +604,7 @@ private fun ReferenceMarketGraphic(modifier: Modifier = Modifier) {
             style = Stroke(width = 2.2.dp.toPx(), cap = StrokeCap.Round)
         )
         drawCircle(
-            color = ResearchGreen.copy(alpha = 0.35f),
+            color = green.copy(alpha = 0.35f),
             radius = 10.dp.toPx(),
             center = Offset(width * 0.97f, height * 0.16f)
         )
