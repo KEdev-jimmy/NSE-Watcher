@@ -36,13 +36,22 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MarketDashboard(stockFeed: List<Stock>, catalog: List<Stock>, initialStatus: MyStocksCache.MarketStatus,
-    openCompany: (Stock) -> Unit, openCompanies: (String) -> Unit,
-    onQuotesLoaded: (List<Stock>) -> Unit, onCatalogLoaded: (List<Stock>) -> Unit) {
+fun MarketDashboard(
+    stockFeed: List<Stock>,
+    catalog: List<Stock>,
+    initialStatus: MyStocksCache.MarketStatus,
+    marketIndices: List<MyStocksCache.MarketIndex>,
+    openCompany: (Stock) -> Unit,
+    openCompanies: (String) -> Unit,
+    onQuotesLoaded: (List<Stock>) -> Unit,
+    onCatalogLoaded: (List<Stock>) -> Unit,
+    onIndicesLoaded: (List<MyStocksCache.MarketIndex>) -> Unit,
+    onMarketStatusLoaded: (MyStocksCache.MarketStatus) -> Unit
+) {
     var tab by rememberSaveable { mutableStateOf("Overview") }
     var mover by rememberSaveable { mutableStateOf("Gainers") }
     var status by remember { mutableStateOf(initialStatus) }
-    var indices by remember { mutableStateOf(emptyList<MyStocksCache.MarketIndex>()) }
+    val indices = marketIndices
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var sheet by rememberSaveable { mutableStateOf<String?>(null) }
@@ -74,8 +83,15 @@ fun MarketDashboard(stockFeed: List<Stock>, catalog: List<Stock>, initialStatus:
     suspend fun refreshData(force: Boolean) {
         busy = true
         try {
-            status = MyStocksCache.loadMarketStatus()
-            indices = MyStocksCache.loadMarketIndices(status.isKnown && status.isOpen)
+            val refreshedStatus = MyStocksCache.loadMarketStatus()
+            status = refreshedStatus
+            if (refreshedStatus.isKnown || !initialStatus.isKnown) {
+                onMarketStatusLoaded(refreshedStatus)
+            }
+            val refreshedIndices = MyStocksCache.loadMarketIndices(refreshedStatus.isKnown && refreshedStatus.isOpen)
+            if (refreshedIndices.isNotEmpty()) {
+                onIndicesLoaded(refreshedIndices)
+            }
             if (catalog.isEmpty() || force) {
                 val data = MyStocksCache.loadCompanies()
                 if (data.isNotEmpty()) onCatalogLoaded(data)

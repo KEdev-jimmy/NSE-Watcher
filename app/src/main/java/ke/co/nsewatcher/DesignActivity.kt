@@ -148,6 +148,7 @@ private fun App(
     var startupComplete by remember { mutableStateOf(false) }
     var newsFeed by remember { mutableStateOf(emptyList<NewsItem>()) }
     var startupMarketStatus by remember { mutableStateOf(MyStocksCache.MarketStatus()) }
+    var marketIndices by remember { mutableStateOf(emptyList<MyStocksCache.MarketIndex>()) }
     var companyCatalog by remember { mutableStateOf(emptyList<Stock>()) }
 
     LaunchedEffect(Unit) {
@@ -165,6 +166,12 @@ private fun App(
                 val statusDeferred = async {
                     runCatching { MyStocksCache.loadMarketStatus() }.getOrDefault(MyStocksCache.MarketStatus())
                 }
+                val indicesDeferred = async {
+                    val status = statusDeferred.await()
+                    runCatching {
+                        MyStocksCache.loadMarketIndices(status.isKnown && status.isOpen)
+                    }.getOrDefault(emptyList())
+                }
 
                 val loadedStocks = stocksDeferred.await()
                 if (loadedStocks.isNotEmpty()) {
@@ -173,6 +180,7 @@ private fun App(
                 newsFeed = newsDeferred.await()
                 companyCatalog = companiesDeferred.await()
                 startupMarketStatus = statusDeferred.await()
+                marketIndices = indicesDeferred.await()
             }
             true
         } ?: false
@@ -240,6 +248,7 @@ private fun App(
     }
     LaunchedEffect(autoRefresh) {
         if (!autoRefresh) return@LaunchedEffect
+        var previousMarketKnown = startupMarketStatus.isKnown
         var previousMarketOpen = startupMarketStatus.isKnown && startupMarketStatus.isOpen
 
         while (isActive) {
@@ -249,11 +258,19 @@ private fun App(
             // This lets an app that is already open recognize the Nairobi session
             // transition around 09:30 EAT even when the user is physically abroad.
             val refreshedStatus = MyStocksCache.loadMarketStatus()
+            val marketStateChanged = refreshedStatus.isKnown &&
+                (!previousMarketKnown || refreshedStatus.isOpen != previousMarketOpen)
             val becameOpen = refreshedStatus.isKnown && refreshedStatus.isOpen && !previousMarketOpen
             startupMarketStatus = refreshedStatus
 
             val quoteRefreshDue = MarketRefreshController.shouldRefreshQuotes(stocks.isNotEmpty())
             val openingRefresh = becameOpen && !MarketRefreshController.state.value.refreshInProgress
+
+            if (marketStateChanged || quoteRefreshDue) {
+                MyStocksCache.loadMarketIndices(refreshedStatus.isKnown && refreshedStatus.isOpen)
+                    .takeIf { it.isNotEmpty() }
+                    ?.let { marketIndices = it }
+            }
 
             if (openingRefresh || quoteRefreshDue) {
                 MyStocksCache.loadStocks().takeIf { it.isNotEmpty() }?.let { refreshed ->
@@ -266,6 +283,7 @@ private fun App(
                 }
             }
 
+            previousMarketKnown = refreshedStatus.isKnown
             previousMarketOpen = refreshedStatus.isKnown && refreshedStatus.isOpen
         }
     }
@@ -279,7 +297,7 @@ private fun App(
     val scheme=if(page==Page.PAPER || page==Page.MARKET || page==Page.NEWS_DETAIL || page==Page.HOME || page==Page.COMPANIES || page==Page.COMPARE || page==Page.COMPANY || page==Page.WATCHLIST) CompanyResearchColors else if(page==Page.NEWS) NewsColorScheme else if(dark) darkColorScheme(primary=Color(0xFF32D486),background=Color(0xFF0D1712),surface=Color(0xFF132019),onSurface=Color.White,onBackground=Color.White,onSurfaceVariant=Color(0xFFB7C7BE)) else lightColorScheme(primary=Green,background=Color.White,surface=Color.White,onSurface=TextDark,onBackground=TextDark,onSurfaceVariant=Muted)
     MaterialTheme(colorScheme=scheme){Surface(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing),color=scheme.background){
         when(page){
-            Page.HOME,Page.MARKET,Page.NEWS,Page.COMPANIES,Page.PAPER,Page.MORE -> Scaffold(topBar={if(page!=Page.PAPER && page!=Page.HOME && page!=Page.MARKET && page!=Page.NEWS && page!=Page.COMPANIES) TopBar(name,::go)},bottomBar={BottomNav(when(page){Page.HOME->0;Page.MARKET->1;Page.NEWS->2;Page.COMPANIES->3;else->4}, newsStyle=page==Page.NEWS, homeStyle=page==Page.PAPER || page==Page.MARKET || page==Page.HOME || page==Page.COMPANIES){tab=it;if(it==3)directorySector="All";history=emptyList();page=when(it){0->Page.HOME;1->Page.MARKET;2->Page.NEWS;3->Page.COMPANIES;else->Page.MORE}}}){pad->Box(Modifier.fillMaxSize().padding(pad)){when(page){Page.HOME->HomeDashboard(stocks,{selected=it;go(Page.COMPANY)},{selectedNews=it;go(Page.NEWS_DETAIL)},{go(Page.MARKET)},{go(Page.WATCHLIST)},newsFeed,startupMarketStatus,startupComplete,name=name,initialCatalog=companyCatalog,practiceEnabled=PaperPortfolioStore.isEnabled(context),practiceCash=PaperPortfolioStore.cash(context),openAllNews={go(Page.NEWS)},openPractice={practiceSymbol="";go(Page.PAPER)},openProfile={go(Page.PROFILE)},openAlertSettings={go(Page.NOTIFICATIONS)},onQuotesLoaded={liveStocks.value=it},onNewsLoaded={newsFeed=it});Page.MARKET->directoryState.SaveableStateProvider("market"){MarketDashboard(stocks,companyCatalog,startupMarketStatus,openCompany={selected=it;go(Page.COMPANY)},openCompanies={directorySector=it;go(Page.COMPANIES)},onQuotesLoaded={liveStocks.value=it},onCatalogLoaded={companyCatalog=it})};Page.NEWS->directoryState.SaveableStateProvider("news"){NewsDashboard(newsFeed,onNewsLoaded={newsFeed=it}){selectedNews=it;go(Page.NEWS_DETAIL)}};Page.COMPANIES->directoryState.SaveableStateProvider("companies:$directorySector"){CompaniesDirectory(catalog=companyCatalog,quotes=stocks,name=name,initialSector=directorySector,openCompany={selected=it;go(Page.COMPANY)},openWatchlist={go(Page.WATCHLIST)},openCompare={comparisonSymbols=it;go(Page.COMPARE)},openNews={selectedNews=it;go(Page.NEWS_DETAIL)},openProfile={go(Page.PROFILE)},onCatalogLoaded={companyCatalog=it},onQuotesLoaded={liveStocks.value=it})};Page.PAPER->directoryState.SaveableStateProvider("practice"){PracticePortfolioScreen(quoteFeed=stocks,catalog=companyCatalog,initialMarket=startupMarketStatus,news=newsFeed,initialSymbol=practiceSymbol,onQuotes={liveStocks.value=it},onCatalog={companyCatalog=it},openCompany={selected=it;go(Page.COMPANY)},openNews={selectedNews=it;go(Page.NEWS_DETAIL)},back=::back)};else->More(::go)}}}
+            Page.HOME,Page.MARKET,Page.NEWS,Page.COMPANIES,Page.PAPER,Page.MORE -> Scaffold(topBar={if(page!=Page.PAPER && page!=Page.HOME && page!=Page.MARKET && page!=Page.NEWS && page!=Page.COMPANIES) TopBar(name,::go)},bottomBar={BottomNav(when(page){Page.HOME->0;Page.MARKET->1;Page.NEWS->2;Page.COMPANIES->3;else->4}, newsStyle=page==Page.NEWS, homeStyle=page==Page.PAPER || page==Page.MARKET || page==Page.HOME || page==Page.COMPANIES){tab=it;if(it==3)directorySector="All";history=emptyList();page=when(it){0->Page.HOME;1->Page.MARKET;2->Page.NEWS;3->Page.COMPANIES;else->Page.MORE}}}){pad->Box(Modifier.fillMaxSize().padding(pad)){when(page){Page.HOME->HomeDashboard(stocks,{selected=it;go(Page.COMPANY)},{selectedNews=it;go(Page.NEWS_DETAIL)},{go(Page.MARKET)},{go(Page.WATCHLIST)},newsFeed,marketIndices,startupMarketStatus,startupComplete,name=name,initialCatalog=companyCatalog,practiceEnabled=PaperPortfolioStore.isEnabled(context),practiceCash=PaperPortfolioStore.cash(context),openAllNews={go(Page.NEWS)},openPractice={practiceSymbol="";go(Page.PAPER)},openProfile={go(Page.PROFILE)},openAlertSettings={go(Page.NOTIFICATIONS)},onQuotesLoaded={liveStocks.value=it},onNewsLoaded={newsFeed=it},onIndicesLoaded={marketIndices=it},onMarketStatusLoaded={startupMarketStatus=it});Page.MARKET->directoryState.SaveableStateProvider("market"){MarketDashboard(stocks,companyCatalog,startupMarketStatus,marketIndices,openCompany={selected=it;go(Page.COMPANY)},openCompanies={directorySector=it;go(Page.COMPANIES)},onQuotesLoaded={liveStocks.value=it},onCatalogLoaded={companyCatalog=it},onIndicesLoaded={marketIndices=it},onMarketStatusLoaded={startupMarketStatus=it})};Page.NEWS->directoryState.SaveableStateProvider("news"){NewsDashboard(newsFeed,onNewsLoaded={newsFeed=it}){selectedNews=it;go(Page.NEWS_DETAIL)}};Page.COMPANIES->directoryState.SaveableStateProvider("companies:$directorySector"){CompaniesDirectory(catalog=companyCatalog,quotes=stocks,name=name,initialSector=directorySector,openCompany={selected=it;go(Page.COMPANY)},openWatchlist={go(Page.WATCHLIST)},openCompare={comparisonSymbols=it;go(Page.COMPARE)},openNews={selectedNews=it;go(Page.NEWS_DETAIL)},openProfile={go(Page.PROFILE)},onCatalogLoaded={companyCatalog=it},onQuotesLoaded={liveStocks.value=it})};Page.PAPER->directoryState.SaveableStateProvider("practice"){PracticePortfolioScreen(quoteFeed=stocks,catalog=companyCatalog,initialMarket=startupMarketStatus,news=newsFeed,initialSymbol=practiceSymbol,onQuotes={liveStocks.value=it},onCatalog={companyCatalog=it},openCompany={selected=it;go(Page.COMPANY)},openNews={selectedNews=it;go(Page.NEWS_DETAIL)},back=::back)};else->More(::go)}}}
             Page.COMPANY->Company(
                 s=selected,
                 sharedNews=newsFeed,
