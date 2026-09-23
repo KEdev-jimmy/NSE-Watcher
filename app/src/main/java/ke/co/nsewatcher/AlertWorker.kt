@@ -25,6 +25,7 @@ import ke.co.nsewatcher.domain.PriceAlert
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import java.time.Instant
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 /**
@@ -35,6 +36,22 @@ import java.util.concurrent.TimeUnit
  * chart history are never replayed to infer a fill that may have happened while the
  * app was not checking.
  */
+internal fun automaticWatchlistAlertRules(
+    watchedSymbols: Set<String>,
+    configured: List<PriceAlert>,
+    newsEnabled: Boolean,
+    corporateEnabled: Boolean
+): List<PriceAlert> = buildList {
+    watchedSymbols.map { it.trim().uppercase(Locale.ROOT) }.filter { it.isNotBlank() }.distinct().forEach { symbol ->
+        if (newsEnabled && configured.none { it.enabled && it.symbol.equals(symbol, true) && it.type == AlertType.NEWS }) {
+            add(PriceAlert("watchlist-news:$symbol", symbol, AlertType.NEWS, null, true))
+        }
+        if (corporateEnabled && configured.none { it.enabled && it.symbol.equals(symbol, true) && it.type == AlertType.CORPORATE_ACTION }) {
+            add(PriceAlert("watchlist-corporate:$symbol", symbol, AlertType.CORPORATE_ACTION, null, true))
+        }
+    }
+}
+
 class AlertWorker(appContext: Context, workerParams: WorkerParameters) : CoroutineWorker(appContext, workerParams) {
     override suspend fun doWork(): Result {
         try {
@@ -44,7 +61,7 @@ class AlertWorker(appContext: Context, workerParams: WorkerParameters) : Corouti
             val prefs = applicationContext.getSharedPreferences("nse_watcher_preferences", Context.MODE_PRIVATE)
             val configuredAlerts = alertStore.alerts.first()
             val watchedSymbols = WatchlistStore(applicationContext).symbols.first()
-                .map { it.trim().uppercase() }.filter { it.isNotBlank() }.toSet()
+                .map { it.trim().uppercase(Locale.ROOT) }.filter { it.isNotBlank() }.toSet()
             val corporateAlertsEnabled = if (prefs.contains("corporate_action_alerts")) {
                 prefs.getBoolean("corporate_action_alerts", true)
             } else prefs.getBoolean("news_alerts", true)
@@ -65,16 +82,12 @@ class AlertWorker(appContext: Context, workerParams: WorkerParameters) : Corouti
                 if (corporateAlertsEnabled) add(AlertType.CORPORATE_ACTION)
             }
             val activeConfigured = configuredAlerts.filter { it.enabled && it.type in activeTypes }
-            val automaticWatchlistAlerts = buildList {
-                watchedSymbols.forEach { symbol ->
-                    if (AlertType.NEWS in activeTypes && activeConfigured.none { it.symbol.equals(symbol, true) && it.type == AlertType.NEWS }) {
-                        add(PriceAlert("watchlist-news:$symbol", symbol, AlertType.NEWS, null, true))
-                    }
-                    if (AlertType.CORPORATE_ACTION in activeTypes && activeConfigured.none { it.symbol.equals(symbol, true) && it.type == AlertType.CORPORATE_ACTION }) {
-                        add(PriceAlert("watchlist-corporate:$symbol", symbol, AlertType.CORPORATE_ACTION, null, true))
-                    }
-                }
-            }
+            val automaticWatchlistAlerts = automaticWatchlistAlertRules(
+                watchedSymbols = watchedSymbols,
+                configured = activeConfigured,
+                newsEnabled = AlertType.NEWS in activeTypes,
+                corporateEnabled = AlertType.CORPORATE_ACTION in activeTypes
+            )
             val alerts = activeConfigured + automaticWatchlistAlerts
             val initialPractice = practiceStore.read()
             val practicePending = initialPractice.enabled && initialPractice.orders.any { it.status == "PENDING" }
