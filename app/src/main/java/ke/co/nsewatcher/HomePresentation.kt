@@ -134,7 +134,7 @@ internal object HomePresentation {
         news: List<NewsItem>,
         events: List<AlertEvent>,
         now: Instant,
-        reviewedIds: Set<String> = emptySet()
+        reviewedIds: Set<String> = emptySet(),
         companyDataEvents: List<CompanyDataChangeEvent> = emptyList()
     ): List<HomeBriefItem> = changes(watched, news, events, now, companyDataEvents)
         .filter { it.id !in reviewedIds }
