@@ -738,7 +738,7 @@ private fun HubAvatar(name: String, size: Int) {
     val bitmap by produceState<Bitmap?>(initialValue = null, key1 = uri) {
         value = try {
             uri?.let { value ->
-                context.contentResolver.openInputStream(Uri.parse(value))?.use(BitmapFactory::decodeStream)
+                context.contentResolver.openInputStream(Uri.parse(value))?.use { stream -> BitmapFactory.decodeStream(stream) }
             }
         } catch (_: Exception) {
             null
