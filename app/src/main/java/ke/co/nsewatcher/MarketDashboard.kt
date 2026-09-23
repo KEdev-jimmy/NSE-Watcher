@@ -338,7 +338,7 @@ private fun MarketSectorIcon(sector: String) {
             contentAlignment = Alignment.Center
         ) {
             Icon(marketSectorSymbol(sector), contentDescription = null,
-                tint = Color(0xFF8AE8B9), modifier = Modifier.size(27.dp))
+                tint = ResearchGreen.copy(alpha = 0.75f), modifier = Modifier.size(27.dp))
         }
     }
 }
