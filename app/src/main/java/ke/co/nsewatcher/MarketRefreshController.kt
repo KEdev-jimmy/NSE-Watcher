@@ -20,6 +20,13 @@ object MarketRefreshController {
     fun markStarted() { state.value = state.value.copy(refreshInProgress = true, lastRefreshFailed = false) }
     fun markSucceeded() { state.value = State(System.currentTimeMillis(), false, false) }
     fun markFailed() { state.value = state.value.copy(refreshInProgress = false, lastRefreshFailed = true) }
+    fun shouldRefreshQuotes(hasQuotes: Boolean, nowMs: Long = System.currentTimeMillis()): Boolean {
+        val current = state.value
+        if (current.refreshInProgress) return false
+        if (!hasQuotes) return true
+        val last = current.lastSuccessfulRefreshMs ?: return true
+        return nowMs - last >= REFRESH_INTERVAL_MS
+    }
     fun secondsUntilNextCheck(nowMs: Long = System.currentTimeMillis()): Long? {
         val last = state.value.lastSuccessfulRefreshMs ?: return null
         return ((last + REFRESH_INTERVAL_MS - nowMs).coerceAtLeast(0L)) / 1000L

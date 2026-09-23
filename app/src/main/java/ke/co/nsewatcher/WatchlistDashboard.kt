@@ -117,12 +117,17 @@ fun WatchlistDashboard(
         scope.launch {
             try {
                 coroutineScope {
-                    val quoteRequest = async { MyStocksCache.loadStocks() }
+                    val quoteRequest = async {
+                        if (MarketRefreshController.shouldRefreshQuotes(quoteStocks.isNotEmpty())) MyStocksCache.loadStocks() else null
+                    }
                     val catalogRequest = async { MyStocksCache.loadCompanies() }
                     val marketRequest = async { MyStocksCache.loadMarketStatus() }
                     val quotes = quoteRequest.await()
-                    if (quotes.isNotEmpty()) { onQuotesLoaded(quotes); refreshError = null }
-                    else refreshError = "Quotes could not be updated. Each company shows its available observation time."
+                    when {
+                        quotes == null -> refreshError = null
+                        quotes.isNotEmpty() -> { onQuotesLoaded(quotes); refreshError = null }
+                        else -> refreshError = "Quotes could not be updated. Each company shows its available observation time."
+                    }
                     catalogRequest.await().takeIf { it.isNotEmpty() }?.let { catalog = it }
                     market = marketRequest.await()
                 }

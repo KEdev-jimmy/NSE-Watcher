@@ -215,7 +215,6 @@ private fun App(alertDestination: AlertDestination?, consumeAlert: () -> Unit, p
     }
     LaunchedEffect(autoRefresh) {
         if (!autoRefresh) return@LaunchedEffect
-        var lastStockRefreshMs = System.currentTimeMillis()
         var previousMarketOpen = startupMarketStatus.isKnown && startupMarketStatus.isOpen
 
         while (isActive) {
@@ -228,14 +227,12 @@ private fun App(alertDestination: AlertDestination?, consumeAlert: () -> Unit, p
             val becameOpen = refreshedStatus.isKnown && refreshedStatus.isOpen && !previousMarketOpen
             startupMarketStatus = refreshedStatus
 
-            val now = System.currentTimeMillis()
-            val quoteRefreshDue =
-                now - lastStockRefreshMs >= MarketRefreshController.REFRESH_INTERVAL_MS
+            val quoteRefreshDue = MarketRefreshController.shouldRefreshQuotes(stocks.isNotEmpty())
+            val openingRefresh = becameOpen && !MarketRefreshController.state.value.refreshInProgress
 
-            if (becameOpen || quoteRefreshDue) {
+            if (openingRefresh || quoteRefreshDue) {
                 MyStocksCache.loadStocks().takeIf { it.isNotEmpty() }?.let { refreshed ->
                     liveStocks.value = refreshed
-                    lastStockRefreshMs = now
                     // Use the latest selected company without restarting the status timer
                     // when navigation changes the selection.
                     if (latestSelected.symbol.isNotBlank()) {
@@ -572,7 +569,9 @@ private fun AlertPage(back:()->Unit){
     val alerts by store.alerts.collectAsState(initial=emptyList())
     val watchedSymbols by watchlistStore.symbols.collectAsState(initial=emptyList())
     LaunchedEffect(Unit) {
-        MyStocksCache.loadStocks().takeIf { it.isNotEmpty() }?.let { liveStocks.value = it }
+        if (MarketRefreshController.shouldRefreshQuotes(stocks.isNotEmpty())) {
+            MyStocksCache.loadStocks().takeIf { it.isNotEmpty() }?.let { liveStocks.value = it }
+        }
     }
     val watched=stocks.filter{it.symbol.uppercase() in watchedSymbols.map(String::uppercase)}
     val scope=rememberCoroutineScope()
