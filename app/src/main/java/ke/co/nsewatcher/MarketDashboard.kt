@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ke.co.nsewatcher.data.MyStocksCache
+import ke.co.nsewatcher.data.MarketData
 import ke.co.nsewatcher.data.MarketObservationStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -82,21 +83,21 @@ fun MarketDashboard(
     suspend fun refreshData(force: Boolean) {
         busy = true
         try {
-            val refreshedStatus = MyStocksCache.loadMarketStatus()
+            val refreshedStatus = MarketData.status()
             status = refreshedStatus
             if (refreshedStatus.isKnown || !initialStatus.isKnown) {
                 onMarketStatusLoaded(refreshedStatus)
             }
-            val refreshedIndices = MyStocksCache.loadMarketIndices(refreshedStatus.isKnown && refreshedStatus.isOpen)
+            val refreshedIndices = MarketData.indices(refreshedStatus.isKnown && refreshedStatus.isOpen)
             if (refreshedIndices.isNotEmpty()) {
                 onIndicesLoaded(refreshedIndices)
             }
             if (catalog.isEmpty() || force) {
-                val data = MyStocksCache.loadCompanies()
+                val data = MarketData.companies()
                 if (data.isNotEmpty()) onCatalogLoaded(data)
             }
             if (MarketRefreshController.shouldRefreshQuotes(stockFeed.isNotEmpty()) && (stockFeed.isEmpty() || force)) {
-                val data = MyStocksCache.loadStocks()
+                val data = MarketData.stocks()
                 if (data.isNotEmpty()) { onQuotesLoaded(data); error = null }
                 else error = "Quotes could not be refreshed. Available observations keep their original dates."
             }
