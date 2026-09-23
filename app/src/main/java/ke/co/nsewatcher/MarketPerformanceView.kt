@@ -14,6 +14,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ke.co.nsewatcher.data.MyStocksCache
+import ke.co.nsewatcher.data.MarketHistoryCache
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
@@ -24,14 +25,19 @@ import java.time.Instant
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun MarketPerformanceView(companies: List<Stock>, revision: Int, now: Instant,
-    cache: MutableMap<String, Pair<Long, MyStocksCache.HistoryResult>>, openCompany: (Stock) -> Unit) {
+internal fun MarketPerformanceView(
+    companies: List<Stock>,
+    revision: Int,
+    now: Instant,
+    openCompany: (Stock) -> Unit
+) {
     var range by rememberSaveable { mutableStateOf("1Y") }
     var filter by rememberSaveable { mutableStateOf("Gainers") }
     var all by rememberSaveable { mutableStateOf(false) }
     var explain by rememberSaveable { mutableStateOf(false) }
     var loading by remember { mutableStateOf(false) }
     var processed by remember { mutableIntStateOf(0) }
+    var handledRevision by remember { mutableIntStateOf(0) }
     var histories by remember { mutableStateOf(emptyMap<String, MyStocksCache.HistoryResult>()) }
     val end = now.atZone(CompanyResearchPresentation.zone).toLocalDate()
     val symbols = companies.map { it.symbol }
@@ -40,23 +46,30 @@ internal fun MarketPerformanceView(companies: List<Stock>, revision: Int, now: I
         processed = 0
         if (range == "1D" || symbols.isEmpty()) { loading = false; return@LaunchedEffect }
         loading = true
+        val forceHistoryRefresh = revision > handledRevision
         try {
             val limiter = Semaphore(4)
             coroutineScope {
                 symbols.forEach { symbol -> launch {
                     limiter.withPermit {
-                        val key = "$range|$symbol|$end"
-                        val stored = cache[key]?.takeIf { System.currentTimeMillis() - it.first < MarketRefreshController.REFRESH_INTERVAL_MS }
-                        val result = stored?.second ?: try { MyStocksCache.loadHistoryDetails(symbol, MarketPresentation.historyPeriod(range)) }
-                            catch (cancelled: CancellationException) { throw cancelled }
-                            catch (_: Exception) { MyStocksCache.HistoryResult() }
+                        val result = try {
+                            MarketHistoryCache.load(
+                                symbol = symbol,
+                                period = MarketPresentation.historyPeriod(range),
+                                forceRefresh = forceHistoryRefresh
+                            )
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            MyStocksCache.HistoryResult()
+                        }
                         ensureActive()
-                        if (stored == null) cache[key] = System.currentTimeMillis() to result
                         histories = histories + (symbol to result)
                         processed++
                     }
                 } }
             }
+            if (forceHistoryRefresh) handledRevision = revision
         } finally { loading = false }
     }
     val evaluated = remember(companies, histories, range, end) {

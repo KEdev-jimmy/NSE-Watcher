@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ke.co.nsewatcher.data.MyStocksCache
+import ke.co.nsewatcher.data.MarketHistoryCache
 import java.util.Locale
 
 @Composable internal fun PracticeAllocation(s: PracticeState, companies: List<Stock>) {
@@ -79,7 +80,17 @@ import java.util.Locale
     var history by remember(stock.symbol) { mutableStateOf(MyStocksCache.HistoryResult()) }
     var loading by remember { mutableStateOf(false) }
     var retry by remember { mutableIntStateOf(0) }
-    LaunchedEffect(stock.symbol, range, retry) { loading = true; try { history = MyStocksCache.loadHistoryDetails(stock.symbol, range.lowercase(Locale.US)) } finally { loading = false } }
+    var handledRetry by remember(stock.symbol) { mutableIntStateOf(0) }
+    LaunchedEffect(stock.symbol, range, retry) {
+        loading = true
+        val forceRefresh = retry > handledRetry
+        try {
+            history = MarketHistoryCache.load(stock.symbol, range, forceRefresh = forceRefresh)
+            if (forceRefresh) handledRetry = retry
+        } finally {
+            loading = false
+        }
+    }
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) { PracticeCompanyIcon(stock); Column { ResearchTitle(stock.name); ResearchCaption("${stock.symbol} • ${stock.sector}") } }
         if (position == null) { ResearchBody("You no longer hold shares in this company."); Button(onClick = { onTrade("BUY") }) { Text("Buy shares") }; return }

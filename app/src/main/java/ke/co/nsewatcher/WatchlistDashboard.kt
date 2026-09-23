@@ -43,6 +43,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import ke.co.nsewatcher.data.AlertStore
 import ke.co.nsewatcher.data.MyStocksCache
+import ke.co.nsewatcher.data.MarketHistoryCache
 import ke.co.nsewatcher.data.NewsCache
 import ke.co.nsewatcher.data.WatchlistStore
 import ke.co.nsewatcher.domain.AlertType
@@ -83,6 +84,7 @@ fun WatchlistDashboard(
     var busy by remember { mutableStateOf(false) }
     var refreshError by remember { mutableStateOf<String?>(null) }
     var refreshTick by remember { mutableIntStateOf(0) }
+    var handledHistoryRefreshTick by remember { mutableIntStateOf(0) }
     var mutating by remember { mutableStateOf(emptySet<String>()) }
     var histories by remember { mutableStateOf<Map<String, List<MyStocksCache.HistoryPoint>>>(emptyMap()) }
     val scope = rememberCoroutineScope()
@@ -142,15 +144,17 @@ fun WatchlistDashboard(
     val visible = remember(companies, query, alertsOnly, alerts) { WatchlistPresentation.filter(companies, query, alertsOnly, alerts) }
     val keys = companies.map { it.symbol }
     LaunchedEffect(keys, refreshTick) {
+        val forceHistoryRefresh = refreshTick > handledHistoryRefreshTick && histories.isNotEmpty()
         val limiter = Semaphore(4)
         coroutineScope {
             keys.forEach { symbol -> launch {
                 limiter.withPermit {
-                    val result = MyStocksCache.loadHistoryDetails(symbol, "1m")
+                    val result = MarketHistoryCache.load(symbol, "1M", forceRefresh = forceHistoryRefresh)
                     histories = histories + (symbol to WatchlistPresentation.trend(result.points))
                 }
             } }
         }
+        handledHistoryRefreshTick = refreshTick
     }
     fun statusFor(rule: PriceAlert): String {
         val stock = companies.firstOrNull { it.symbol == WatchlistPresentation.symbol(rule.symbol) }

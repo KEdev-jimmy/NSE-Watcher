@@ -6,6 +6,7 @@ import ke.co.nsewatcher.data.AnalystCache
 import ke.co.nsewatcher.data.CompanyIntelligenceCache
 import ke.co.nsewatcher.data.CompanyIntelligenceEngine
 import ke.co.nsewatcher.data.MovementIntelligenceCache
+import ke.co.nsewatcher.data.MarketHistoryCache
 import ke.co.nsewatcher.data.MyStocksCache
 import ke.co.nsewatcher.data.NewsCache
 import kotlinx.coroutines.CancellationException
@@ -106,7 +107,11 @@ fun CompanyIntelligence(
             CompanyResearchPresentation.ranges.forEach { range ->
                 launch {
                     try {
-                        val result = MyStocksCache.loadHistoryDetails(s.symbol, if (range == "1D") range else range.lowercase())
+                        val result = MarketHistoryCache.load(
+                            symbol = s.symbol,
+                            period = range,
+                            forceRefresh = refresh > 0
+                        )
                         ranges = ranges + (range to result)
                     } catch (cancelled: CancellationException) {
                         throw cancelled
