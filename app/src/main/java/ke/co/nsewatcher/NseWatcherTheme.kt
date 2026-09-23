@@ -4,7 +4,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 
 private val NseWatcherLightColors = lightColorScheme(
     primary = Color(0xFF008F5B),
@@ -49,10 +52,18 @@ private val NseWatcherDarkColors = darkColorScheme(
 @Composable
 internal fun NseWatcherTheme(
     darkTheme: Boolean,
+    fontScaleMultiplier: Float = 1f,
     content: @Composable () -> Unit
 ) {
-    MaterialTheme(
-        colorScheme = if (darkTheme) NseWatcherDarkColors else NseWatcherLightColors,
-        content = content
+    val density = LocalDensity.current
+    val adjustedDensity = Density(
+        density = density.density,
+        fontScale = density.fontScale * fontScaleMultiplier.coerceIn(0.85f, 1.20f)
     )
+    CompositionLocalProvider(LocalDensity provides adjustedDensity) {
+        MaterialTheme(
+            colorScheme = if (darkTheme) NseWatcherDarkColors else NseWatcherLightColors,
+            content = content
+        )
+    }
 }

@@ -31,7 +31,7 @@ import java.util.Locale
 import kotlin.math.abs
 
 @Composable
-internal fun CompanyResearchChart(points: List<MyStocksCache.HistoryPoint>, range: String, loading: Boolean, retry: () -> Unit, title: String? = null, purchaseMarkers: List<Pair<Long, Double>> = emptyList(), allowZero: Boolean = false) {
+internal fun CompanyResearchChart(points: List<MyStocksCache.HistoryPoint>, range: String, loading: Boolean, retry: () -> Unit, title: String? = null, purchaseMarkers: List<Pair<Long, Double>> = emptyList(), allowZero: Boolean = false, showGrid: Boolean = true) {
     val dated = remember(points, allowZero) {
         points.mapNotNull { point ->
             CompanyResearchPresentation.timestamp(point.date)?.takeIf { point.close.isFinite() && (point.close > 0.0 || (allowZero && point.close == 0.0)) }
@@ -126,7 +126,7 @@ internal fun CompanyResearchChart(points: List<MyStocksCache.HistoryPoint>, rang
                     repeat(4) { i ->
                         val value = maxY - (maxY - minY) * i / 3
                         val at = y(value)
-                        drawLine(chartBorder, Offset(left, at), Offset(right, at), strokeWidth = 1.dp.toPx())
+                        if (showGrid) drawLine(chartBorder, Offset(left, at), Offset(right, at), strokeWidth = 1.dp.toPx())
                         val label = String.format(Locale.US, if (high < 100) "%.2f" else if (high < 1000) "%.1f" else "%.0f", value)
                         drawContext.canvas.nativeCanvas.drawText(label, left - 6.dp.toPx(), at + 3.dp.toPx(), paint)
                     }
