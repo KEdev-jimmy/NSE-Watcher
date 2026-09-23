@@ -1,5 +1,7 @@
 package ke.co.nsewatcher
 
+import ke.co.nsewatcher.data.CompanyDataChangeEvent
+import ke.co.nsewatcher.data.CompanyDataChangeKind
 import ke.co.nsewatcher.domain.AlertEvent
 import java.time.Instant
 import java.time.Duration
@@ -27,7 +29,13 @@ internal object HomePresentation {
     fun companyNews(news: List<NewsItem>, watched: List<Stock>): List<NewsItem> =
         WatchlistPresentation.linkedNews(news, watched).sortedByDescending { CompanyResearchPresentation.timestamp(it.publishedAt) }
 
-    fun changes(watched: List<Stock>, news: List<NewsItem>, events: List<AlertEvent>, now: Instant): List<HomeBriefItem> {
+    fun changes(
+        watched: List<Stock>,
+        news: List<NewsItem>,
+        events: List<AlertEvent>,
+        now: Instant,
+        companyDataEvents: List<CompanyDataChangeEvent> = emptyList()
+    ): List<HomeBriefItem> {
         val bySymbol = watched.associateBy { WatchlistPresentation.symbol(it.symbol) }
         val byName = watched.associateBy { it.name.trim().lowercase(java.util.Locale.US) }
         val articles = companyNews(news, watched).filter { recent(it.publishedAt, now) }
@@ -72,8 +80,46 @@ internal object HomePresentation {
                     stock = bySymbol[symbol]
                 )
             }.toList()
-        return (articleChanges + alertChanges).distinctBy { it.id }
+        val companyChanges = companyDataEvents.asSequence()
+            .filter { WatchlistPresentation.symbol(it.symbol) in bySymbol && recent(it.observedAt, now) }
+            .filterNot { event ->
+                event.kind == CompanyDataChangeKind.DIVIDEND &&
+                    articles.any { article ->
+                        val articleSymbol = WatchlistPresentation.symbol(article.symbol)
+                        articleSymbol == WatchlistPresentation.symbol(event.symbol) &&
+                            (
+                                article.category.contains("dividend", ignoreCase = true) ||
+                                    article.dividendAmount.isNotBlank() ||
+                                    article.exDate.isNotBlank()
+                            )
+                    }
+            }
+            .map { event ->
+                val symbol = WatchlistPresentation.symbol(event.symbol)
+                HomeBriefItem(
+                    id = event.id,
+                    symbol = symbol,
+                    title = event.title,
+                    detail = event.detail,
+                    whyItMayMatter = companyDataWhyItMayMatter(event.kind, symbol),
+                    uncertainty = "This records when NSE Watcher detected a change in provider data. It does not establish when the issuer changed or disclosed the information, why it changed, or what the share price will do.",
+                    source = event.source.ifBlank { "Company intelligence source" },
+                    time = event.observedAt,
+                    action = "Research $symbol",
+                    stock = bySymbol[symbol]
+                )
+            }.toList()
+        return (articleChanges + alertChanges + companyChanges).distinctBy { it.id }
             .sortedByDescending { CompanyResearchPresentation.timestamp(it.time) ?: Instant.MIN }
+    }
+
+    private fun companyDataWhyItMayMatter(kind: CompanyDataChangeKind, symbol: String): String = when (kind) {
+        CompanyDataChangeKind.REPORTING_PERIOD ->
+            "A newly observed reporting period can change the basis for understanding $symbol's revenue, profit and earnings. Review the sourced figures before comparing periods."
+        CompanyDataChangeKind.REPORTED_FIGURES ->
+            "A reported figure for the same period differs from the previous provider observation. This may reflect a source correction, revision or update worth checking."
+        CompanyDataChangeKind.DIVIDEND ->
+            "Dividend records now differ from the previous provider observation. Review the amount, ex-date, payment date and source before relying on it."
     }
 
     private fun newsWhyItMayMatter(item: NewsItem): String {
@@ -88,8 +134,9 @@ internal object HomePresentation {
         news: List<NewsItem>,
         events: List<AlertEvent>,
         now: Instant,
-        reviewedIds: Set<String> = emptySet()
-    ): List<HomeBriefItem> = changes(watched, news, events, now)
+        reviewedIds: Set<String> = emptySet(),
+        companyDataEvents: List<CompanyDataChangeEvent> = emptyList()
+    ): List<HomeBriefItem> = changes(watched, news, events, now, companyDataEvents)
         .filter { it.id !in reviewedIds }
         .take(3)
 

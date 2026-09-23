@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import ke.co.nsewatcher.data.AlertStore
+import ke.co.nsewatcher.data.CompanyChangeStore
 import ke.co.nsewatcher.data.HomeChangeState
 import ke.co.nsewatcher.data.HomeChangeStore
 import ke.co.nsewatcher.data.MyStocksCache
@@ -54,15 +55,21 @@ fun HomeDashboard(
     val scope = rememberCoroutineScope()
     val watchlist = remember { WatchlistStore(context) }
     val alertStore = remember { AlertStore(context) }
+    val companyChangeStore = remember { CompanyChangeStore(context) }
     val changeStore = remember { HomeChangeStore(context) }
     var changeState by remember { mutableStateOf<HomeChangeState?>(null) }
     var changeStateError by remember { mutableStateOf(false) }
     var watchlistError by remember { mutableStateOf(false) }
     var alertError by remember { mutableStateOf(false) }
+    var companyChangeError by remember { mutableStateOf(false) }
     val savedFlow = remember(watchlist) { watchlist.symbols.catch { watchlistError = true } }
     val saved by savedFlow.collectAsState<List<String>, List<String>?>(initial = null)
     val eventFlow = remember(alertStore) { alertStore.events.catch { alertError = true } }
     val events by eventFlow.collectAsState(initial = emptyList())
+    val companyEventFlow = remember(companyChangeStore) {
+        companyChangeStore.events.catch { companyChangeError = true }
+    }
+    val companyDataEvents by companyEventFlow.collectAsState(initial = emptyList())
     var newsLoading by remember { mutableStateOf(newsFeed.isEmpty()) }
     var newsError by remember { mutableStateOf(false) }
     var catalog by remember { mutableStateOf(initialCatalog) }
@@ -120,7 +127,15 @@ fun HomeDashboard(
     }
     val watched = remember(saved, catalog, currentStocks) { WatchlistPresentation.companies(saved.orEmpty(), catalog, currentStocks) }
     val watchedSymbols = remember(watched) { watched.map { WatchlistPresentation.symbol(it.symbol) }.toSet() }
-    val changes = remember(watched, newsFeed, events, now) { HomePresentation.changes(watched, newsFeed, events, now) }
+    val changes = remember(watched, newsFeed, events, companyDataEvents, now) {
+        HomePresentation.changes(
+            watched = watched,
+            news = newsFeed,
+            events = events,
+            now = now,
+            companyDataEvents = companyDataEvents
+        )
+    }
     LaunchedEffect(saved, watchedSymbols, changes.map { it.id }) {
         if (saved == null) return@LaunchedEffect
         try {
@@ -240,13 +255,13 @@ fun HomeDashboard(
                             brief.isEmpty() && newsLoading -> ResearchLoading("Checking for new company developments…")
                             brief.isEmpty() -> {
                                 ResearchBody(when {
-                                    newsError || alertError || changeStateError -> "Some change tracking is unavailable"
+                                    newsError || alertError || companyChangeError || changeStateError -> "Some change tracking is unavailable"
                                     changes.isNotEmpty() -> "You’re caught up"
                                     else -> "No new changes detected"
                                 })
                                 ResearchCaption(if (changes.isNotEmpty())
-                                    "No unreviewed changes remain in the available 7-day company news and alert history."
-                                else "NSE Watcher is tracking later published updates and recorded alerts for your followed companies.")
+                                    "No unreviewed changes remain in the available 7-day company news, recorded alerts and detected company-data updates."
+                                else "NSE Watcher is tracking later published updates, recorded alerts and observed company-data changes for your followed companies.")
                                 TextButton(onClick = openWatchlist) { Text("Review your watchlist →", color = ResearchGreen) }
                             }
                         }
@@ -261,6 +276,7 @@ fun HomeDashboard(
                         }
                         if (newsError) ResearchCaption("News refresh failed; available stories retain their publication dates.")
                         if (alertError) ResearchCaption("Recorded alerts could not be read.")
+                        if (companyChangeError) ResearchCaption("Detected company-data changes could not be read.")
                         if (changeStateError) ResearchCaption("Review state could not be saved; items may reappear until storage succeeds.")
                     }
                 }

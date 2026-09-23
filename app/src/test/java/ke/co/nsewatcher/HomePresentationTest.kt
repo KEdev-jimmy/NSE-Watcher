@@ -1,5 +1,7 @@
 package ke.co.nsewatcher
 
+import ke.co.nsewatcher.data.CompanyDataChangeEvent
+import ke.co.nsewatcher.data.CompanyDataChangeKind
 import ke.co.nsewatcher.domain.AlertEvent
 import ke.co.nsewatcher.domain.mergeAlertEvents
 import org.junit.Assert.*
@@ -56,6 +58,61 @@ class HomePresentationTest {
         assertTrue(alertChange.whyItMayMatter.contains("condition you configured"))
         assertTrue(alertChange.uncertainty.contains("does not establish why"))
         assertEquals("Research KCB", alertChange.action)
+    }
+
+    @Test fun structuredCompanyDataChangeAppearsInBriefAndOpensResearch() {
+        val companyChange = CompanyDataChangeEvent(
+            id = "company-data:kcb:reporting_period:1",
+            symbol = "KCB",
+            kind = CompanyDataChangeKind.REPORTING_PERIOD,
+            title = "New reported period for KCB",
+            detail = "The provider now reports FY 2026 for KCB.",
+            source = "Verified provider",
+            observedAt = "2026-09-22T09:30:00Z"
+        )
+
+        val changes = HomePresentation.changes(
+            watched = listOf(quote()),
+            news = emptyList(),
+            events = emptyList(),
+            now = now,
+            companyDataEvents = listOf(companyChange)
+        )
+
+        assertEquals(1, changes.size)
+        assertEquals(companyChange.id, changes.single().id)
+        assertEquals("Research KCB", changes.single().action)
+        assertEquals(quote(), changes.single().stock)
+        assertTrue(changes.single().whyItMayMatter.contains("reporting period"))
+        assertTrue(changes.single().uncertainty.contains("when NSE Watcher detected"))
+    }
+
+    @Test fun dividendDataChangeIsSuppressedWhenDividendArticleAlreadyRepresentsIt() {
+        val dividendStory = story().copy(
+            category = "Dividends",
+            dividendAmount = "1.50",
+            exDate = "2026-10-01"
+        )
+        val companyChange = CompanyDataChangeEvent(
+            id = "company-data:kcb:dividend:1",
+            symbol = "KCB",
+            kind = CompanyDataChangeKind.DIVIDEND,
+            title = "Reported dividend data updated for KCB",
+            detail = "Dividend records differ.",
+            source = "Verified provider",
+            observedAt = "2026-09-22T09:30:00Z"
+        )
+
+        val changes = HomePresentation.changes(
+            watched = listOf(quote()),
+            news = listOf(dividendStory),
+            events = emptyList(),
+            now = now,
+            companyDataEvents = listOf(companyChange)
+        )
+
+        assertEquals(1, changes.size)
+        assertEquals("news:news", changes.single().id)
     }
 
     @Test fun CurrentPriceAloneNeverCreatesAnAlert() {
