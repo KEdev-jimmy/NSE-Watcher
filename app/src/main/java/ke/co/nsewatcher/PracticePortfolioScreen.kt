@@ -27,10 +27,16 @@ import kotlinx.coroutines.*
 import java.time.Instant
 import java.util.UUID
 
+internal object PracticeLaunch {
+    fun symbol(raw: String): String = WatchlistPresentation.symbol(raw)
+    fun shouldOpenOrder(enabled: Boolean, initialSymbol: String, handled: Boolean): Boolean =
+        enabled && !handled && symbol(initialSymbol).isNotBlank()
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock>, initialMarket: MyStocksCache.MarketStatus,
-    news: List<NewsItem>, onQuotes: (List<Stock>) -> Unit, onCatalog: (List<Stock>) -> Unit,
+    news: List<NewsItem>, initialSymbol: String = "", onQuotes: (List<Stock>) -> Unit, onCatalog: (List<Stock>) -> Unit,
     openCompany: (Stock) -> Unit, openNews: (NewsItem) -> Unit, back: () -> Unit) {
     val context = LocalContext.current
     val store = remember { PracticeStore(context) }
@@ -43,7 +49,8 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
     var page by rememberSaveable { mutableStateOf("MAIN") }
     var tab by rememberSaveable { mutableStateOf("Overview") }
     var activityTab by rememberSaveable { mutableStateOf("Orders") }
-    var symbol by rememberSaveable { mutableStateOf("") }
+    var symbol by rememberSaveable(initialSymbol) { mutableStateOf(PracticeLaunch.symbol(initialSymbol)) }
+    var launchHandled by rememberSaveable(initialSymbol) { mutableStateOf(false) }
     var side by rememberSaveable { mutableStateOf("BUY") }
     var editId by rememberSaveable { mutableStateOf("") }
     var sheet by rememberSaveable { mutableStateOf<String?>(null) }
@@ -70,6 +77,16 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
         try { state = withContext(Dispatchers.IO) { store.read() } }
         catch (e: Exception) { error = "Could not read the saved portfolio: ${e.message}. Your stored account has not been replaced." }
         if (catalog.isEmpty()) { val rows = MyStocksCache.loadCompanies(); if (rows.isNotEmpty()) onCatalog(rows) }
+    }
+    LaunchedEffect(state?.enabled, initialSymbol) {
+        if (PracticeLaunch.shouldOpenOrder(state?.enabled == true, initialSymbol, launchHandled)) {
+            symbol = PracticeLaunch.symbol(initialSymbol)
+            side = "BUY"
+            editId = ""
+            sheet = null
+            page = "ORDER"
+            launchHandled = true
+        }
     }
     LaunchedEffect(resumed) {
         if (!resumed) return@LaunchedEffect
