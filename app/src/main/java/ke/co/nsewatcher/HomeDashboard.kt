@@ -160,7 +160,11 @@ fun HomeDashboard(
             } catch (_: Exception) {
                 changeStateError = true
             } finally {
-                if (item.story != null) openNews(item.story) else showAlerts = true
+                when {
+                    item.story != null -> openNews(item.story)
+                    item.stock != null -> openCompany(item.stock)
+                    else -> showAlerts = true
+                }
             }
         }
     }
@@ -393,15 +397,20 @@ private fun HomeHeading(title: String, action: String? = null, onAction: () -> U
 
 @Composable
 private fun HomeBriefRow(item: HomeBriefItem, open: () -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+    Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Box(Modifier.size(40.dp).background(ResearchRaised, CircleShape), contentAlignment = Alignment.Center) {
             Icon(if (item.alert != null) Icons.Default.NotificationsNone else Icons.Default.Description, null, tint = ResearchMuted, modifier = Modifier.size(23.dp))
         }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Text("WHAT CHANGED", color = ResearchGreen, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.6.sp)
             Text(item.title, color = ResearchText, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 3, overflow = TextOverflow.Ellipsis)
-            Text(item.detail, color = ResearchMuted, fontSize = 13.sp, lineHeight = 19.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
-            ResearchCaption("${item.source} · ${CompanyResearchPresentation.date(item.time)}")
-            TextButton(onClick = open, contentPadding = PaddingValues(0.dp)) { Text("${item.action} ↗", color = ResearchGreen, fontSize = 13.sp) }
+            Text(item.detail, color = ResearchMuted, fontSize = 13.sp, lineHeight = 19.sp, maxLines = 4, overflow = TextOverflow.Ellipsis)
+            Text("WHY IT MAY MATTER", color = ResearchMuted, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+            Text(item.whyItMayMatter, color = ResearchText, fontSize = 12.sp, lineHeight = 18.sp, maxLines = 4, overflow = TextOverflow.Ellipsis)
+            ResearchCaption("Evidence · ${item.source} · ${CompanyResearchPresentation.date(item.time)}")
+            Text("UNCERTAINTY", color = ResearchMuted, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+            Text(item.uncertainty, color = ResearchMuted, fontSize = 12.sp, lineHeight = 18.sp)
+            TextButton(onClick = open, contentPadding = PaddingValues(0.dp)) { Text("${item.action} →", color = ResearchGreen, fontSize = 13.sp) }
         }
     }
 }

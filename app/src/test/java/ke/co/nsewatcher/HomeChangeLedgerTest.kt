@@ -10,7 +10,7 @@ import java.time.Instant
 class HomeChangeLedgerTest {
     private val now = Instant.parse("2026-09-23T10:00:00Z")
     private fun change(id: String, symbol: String = "KCB") =
-        HomeBriefItem(id, symbol, "Title", "Detail", "Source", now.toString(), "Review")
+        HomeBriefItem(id, symbol, "Title", "Detail", "Why it may matter", "Uncertainty", "Source", now.toString(), "Review")
 
     @Test fun firstTrackingSeedsExistingItemsAsKnownInsteadOfCallingThemNew() {
         val state = HomeChangeLedger.reconcile(HomeChangeState(), setOf("KCB"), listOf(change("news:a")), now)

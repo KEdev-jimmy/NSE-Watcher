@@ -41,6 +41,23 @@ class HomePresentationTest {
         assertEquals("news:news", changes.single().id)
     }
 
+    @Test fun briefExplainsWhyItMayMatterAndStatesUncertainty() {
+        val relevantStory = story().copy(
+            intelligenceRelevance = "market",
+            intelligenceRelevanceReason = "Issuer announced a material operational update"
+        )
+        val newsChange = HomePresentation.changes(listOf(quote()), listOf(relevantStory), emptyList(), now).single()
+        assertTrue(newsChange.whyItMayMatter.contains("Feed relevance note"))
+        assertTrue(newsChange.whyItMayMatter.contains("material operational update"))
+        assertTrue(newsChange.uncertainty.contains("does not prove"))
+        assertEquals("Read evidence", newsChange.action)
+
+        val alertChange = HomePresentation.changes(listOf(quote()), emptyList(), listOf(event()), now).single()
+        assertTrue(alertChange.whyItMayMatter.contains("condition you configured"))
+        assertTrue(alertChange.uncertainty.contains("does not establish why"))
+        assertEquals("Research KCB", alertChange.action)
+    }
+
     @Test fun CurrentPriceAloneNeverCreatesAnAlert() {
         assertTrue(HomePresentation.brief(listOf(quote().copy(price = 100.0)), emptyList(), emptyList(), now).isEmpty())
     }
