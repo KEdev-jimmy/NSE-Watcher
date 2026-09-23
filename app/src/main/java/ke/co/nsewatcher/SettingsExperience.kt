@@ -474,3 +474,41 @@ private fun SettingsFact(icon: androidx.compose.ui.graphics.vector.ImageVector, 
         Text(text, fontSize = 11.sp, lineHeight = 16.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
     }
 }
+
+
+@Composable
+internal fun MarketDataSettingsScreen(
+    autoRefresh: Boolean,
+    onAutoRefresh: (Boolean) -> Unit,
+    back: () -> Unit
+) {
+    LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        item { SettingsHeader("Market & Data", back) }
+        item {
+            SettingsSection("Refresh") {
+                SettingsSwitchRow(
+                    "Auto refresh",
+                    "Refresh eligible market observations while the app is open using the shared refresh cadence.",
+                    autoRefresh,
+                    onAutoRefresh
+                )
+            }
+        }
+        item {
+            SettingsSection("Current data setup") {
+                SettingsValueRow("Market quotes", "MyStocks Africa via NSE Watcher gateway")
+                SettingsValueRow("Quote delay", "About 15 minutes where supplied")
+                SettingsValueRow("Market timezone", "Africa/Nairobi · EAT")
+                SettingsValueRow("Official NSE indices", "Unavailable until verified source is configured")
+            }
+        }
+        item {
+            Text(
+                "NSE Watcher keeps missing observations unavailable rather than inventing values. Refreshing cannot make the upstream provider more real-time than its supplied delay.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 11.sp,
+                lineHeight = 17.sp
+            )
+        }
+    }
+}
