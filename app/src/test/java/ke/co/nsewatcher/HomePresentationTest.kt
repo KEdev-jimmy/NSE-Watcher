@@ -132,6 +132,35 @@ class HomePresentationTest {
         assertEquals(listOf(fresh, older), HomePresentation.companyNews(listOf(older, fresh), listOf(quote())))
     }
 
+    @Test fun attentionDigestSummarizesAffectedCompaniesAndDevelopmentTypes() {
+        val companyChange = CompanyDataChangeEvent(
+            id = "company-data:kcb:figures:1",
+            symbol = "KCB",
+            kind = CompanyDataChangeKind.REPORTED_FIGURES,
+            title = "Reported figures updated for KCB",
+            detail = "Provider observation changed.",
+            source = "Verified provider",
+            observedAt = "2026-09-22T09:30:00Z"
+        )
+        val changes = HomePresentation.changes(
+            watched = listOf(quote("KCB"), quote("EQTY")),
+            news = listOf(story("EQTY", "2026-09-22T09:10:00Z")),
+            events = listOf(event(symbol = "KCB", at = "2026-09-22T09:20:00Z")),
+            now = now,
+            companyDataEvents = listOf(companyChange)
+        )
+
+        val digest = HomePresentation.attentionDigest(changes)
+
+        assertNotNull(digest)
+        assertEquals("3 new developments across 2 followed companies", digest?.summary)
+        assertEquals(
+            listOf("1 news update", "1 alert", "1 company-data update"),
+            digest?.breakdown
+        )
+        assertNull(HomePresentation.attentionDigest(emptyList()))
+    }
+
     @Test fun marketSummaryDoesNotTreatMissingDataAsBalance() {
         assertEquals("Daily market movement is unavailable.", HomePresentation.marketSummary(HomeMarketBreadth(0, 0, 0, 0)))
         assertEquals("Available daily changes are unchanged.", HomePresentation.marketSummary(HomeMarketBreadth(0, 0, 4, 0)))

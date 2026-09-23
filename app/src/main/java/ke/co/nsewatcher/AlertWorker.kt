@@ -18,8 +18,7 @@ import androidx.work.WorkerParameters
 import ke.co.nsewatcher.data.AlertStore
 import ke.co.nsewatcher.data.CompanyChangeStore
 import ke.co.nsewatcher.data.CompanyIntelligenceCache
-import ke.co.nsewatcher.data.MyStocksCache
-import ke.co.nsewatcher.data.NewsCache
+import ke.co.nsewatcher.data.MarketData
 import ke.co.nsewatcher.data.WatchlistStore
 import ke.co.nsewatcher.domain.AlertType
 import kotlinx.coroutines.CancellationException
@@ -71,10 +70,10 @@ class AlertWorker(appContext: Context, workerParams: WorkerParameters) : Corouti
             val quotesNeeded = priceAlertsEnabled || practicePending
 
             // Announcement checks remain independent from quote/status availability.
-            val newsResult = if (newsEnabled) NewsCache.loadFeedResult() else NewsCache.FeedResult(emptyList())
-            val status = if (quotesNeeded) MyStocksCache.loadMarketStatus() else MyStocksCache.MarketStatus()
+            val newsResult = if (newsEnabled) MarketData.newsFeed() else ke.co.nsewatcher.data.NewsCache.FeedResult(emptyList())
+            val status = if (quotesNeeded) MarketData.status() else ke.co.nsewatcher.data.MyStocksCache.MarketStatus()
             val marketSession = quotesNeeded && status.isKnown && status.isOpen
-            val stocks = if (marketSession) MyStocksCache.loadStocks() else emptyList()
+            val stocks = if (marketSession) MarketData.stocks() else emptyList()
 
             for (symbol in companyChecks) {
                 val result = CompanyIntelligenceCache.load(symbol)
