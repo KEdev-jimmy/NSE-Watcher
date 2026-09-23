@@ -78,7 +78,7 @@ import java.util.UUID
         text = { Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("${order.shares} ${order.symbol} shares • Limit ${practiceMoney(order.limit)}")
             Text(if (order.side == "BUY") "Reserve up to ${practiceMoney(PracticeEngine.money(order.shares * order.limit) + PracticeEngine.money(order.shares * order.limit * PracticeEngine.FEE))}, including the practice fee." else "Reserve ${order.shares} shares until filled or cancelled.")
-            Text("This queues an order; it does not confirm a fill. Orders are checked while Practice Portfolio is active.")
+            Text("This queues an order; it does not confirm a fill. Orders are checked while Practice Portfolio is active and periodically when Android runs scheduled background work.")
         } }, confirmButton = { TextButton(enabled = !working, onClick = { review = null; onSubmit(order.copy(created = System.currentTimeMillis())) }) { Text("Confirm practice order") } }, dismissButton = { TextButton(onClick = { review = null }) { Text("Go back") } }) }
 }
 
@@ -104,7 +104,7 @@ import java.util.UUID
                         TextButton(onClick = { onDetails(o.id) }) { Text("View price and costs →") }
                     }
                 }
-                ResearchPanel { ResearchTitle("How practice fills work"); ResearchCaption("We check eligible quotes against your limit. Real queue position and liquidity are not reproduced."); TextButton(onClick = onRules) { Text("Read the simulation rules →") } }
+                ResearchPanel { ResearchTitle("How practice fills work"); ResearchCaption("We check eligible quotes against your limit in the active screen and during scheduled background work. Background timing is not exact; real queue position and liquidity are not reproduced."); TextButton(onClick = onRules) { Text("Read the simulation rules →") } }
                 ResearchTitle("Completed activity")
                 s.entries.filter { it.kind != "NOTE" }.takeLast(3).reversed().forEach { PracticeEntryCard(it) }
             }
