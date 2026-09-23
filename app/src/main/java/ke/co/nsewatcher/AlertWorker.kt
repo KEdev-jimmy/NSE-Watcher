@@ -40,14 +40,16 @@ internal fun automaticWatchlistAlertRules(
     watchedSymbols: Set<String>,
     configured: List<PriceAlert>,
     newsEnabled: Boolean,
-    corporateEnabled: Boolean
+    corporateEnabled: Boolean,
+    newsSinceMillis: Long = 0L,
+    corporateSinceMillis: Long = 0L
 ): List<PriceAlert> = buildList {
     watchedSymbols.map { it.trim().uppercase(Locale.ROOT) }.filter { it.isNotBlank() }.distinct().forEach { symbol ->
         if (newsEnabled && configured.none { it.enabled && it.symbol.equals(symbol, true) && it.type == AlertType.NEWS }) {
-            add(PriceAlert("watchlist-news:$symbol", symbol, AlertType.NEWS, null, true))
+            add(PriceAlert("watchlist-news:$symbol", symbol, AlertType.NEWS, newsSinceMillis.takeIf { it > 0 }?.toDouble(), true))
         }
         if (corporateEnabled && configured.none { it.enabled && it.symbol.equals(symbol, true) && it.type == AlertType.CORPORATE_ACTION }) {
-            add(PriceAlert("watchlist-corporate:$symbol", symbol, AlertType.CORPORATE_ACTION, null, true))
+            add(PriceAlert("watchlist-corporate:$symbol", symbol, AlertType.CORPORATE_ACTION, corporateSinceMillis.takeIf { it > 0 }?.toDouble(), true))
         }
     }
 }
@@ -60,15 +62,16 @@ class AlertWorker(appContext: Context, workerParams: WorkerParameters) : Corouti
             val practiceStore = PracticeStore(applicationContext)
             val prefs = applicationContext.getSharedPreferences("nse_watcher_preferences", Context.MODE_PRIVATE)
             val configuredAlerts = alertStore.alerts.first()
+            val now = Instant.now()
             val watchedSymbols = WatchlistStore(applicationContext).symbols.first()
                 .map { it.trim().uppercase(Locale.ROOT) }.filter { it.isNotBlank() }.toSet()
-            val corporateAlertsEnabled = if (prefs.contains("corporate_action_alerts")) {
+            val configuredCorporateEnabled = if (prefs.contains("corporate_action_alerts")) {
                 prefs.getBoolean("corporate_action_alerts", true)
             } else prefs.getBoolean("news_alerts", true)
             val practiceAlertsEnabled = if (prefs.contains("practice_alerts")) {
                 prefs.getBoolean("practice_alerts", true)
             } else prefs.getBoolean("app_alerts", true)
-            val activeTypes = buildSet {
+            val configuredTypes = buildSet {
                 if (prefs.getBoolean("price_alerts", true)) {
                     add(AlertType.PRICE_ABOVE)
                     add(AlertType.PRICE_BELOW)
@@ -79,19 +82,22 @@ class AlertWorker(appContext: Context, workerParams: WorkerParameters) : Corouti
                     add(AlertType.HIGH_VOLUME)
                 }
                 if (prefs.getBoolean("news_alerts", true)) add(AlertType.NEWS)
-                if (corporateAlertsEnabled) add(AlertType.CORPORATE_ACTION)
+                if (configuredCorporateEnabled) add(AlertType.CORPORATE_ACTION)
             }
-            val activeConfigured = configuredAlerts.filter { it.enabled && it.type in activeTypes }
+            val activeConfigured = configuredAlerts.filter { it.enabled && it.type in configuredTypes }
+            val watchlistNewsEnabled = prefs.getBoolean("watchlist_news_alerts", false)
+            val watchlistCorporateEnabled = prefs.getBoolean("watchlist_corporate_alerts", false)
             val automaticWatchlistAlerts = automaticWatchlistAlertRules(
                 watchedSymbols = watchedSymbols,
                 configured = activeConfigured,
-                newsEnabled = AlertType.NEWS in activeTypes,
-                corporateEnabled = AlertType.CORPORATE_ACTION in activeTypes
+                newsEnabled = watchlistNewsEnabled,
+                corporateEnabled = watchlistCorporateEnabled,
+                newsSinceMillis = prefs.getLong("watchlist_news_enabled_at", now.toEpochMilli()),
+                corporateSinceMillis = prefs.getLong("watchlist_corporate_enabled_at", now.toEpochMilli())
             )
             val alerts = activeConfigured + automaticWatchlistAlerts
             val initialPractice = practiceStore.read()
             val practicePending = initialPractice.enabled && initialPractice.orders.any { it.status == "PENDING" }
-            val now = Instant.now()
             val companyChecks = companyChangeStore.syncAndDue(watchedSymbols, now)
             if (alerts.isEmpty() && !practicePending && companyChecks.isEmpty()) return Result.success()
 
