@@ -859,3 +859,247 @@ private fun HomeNairobiSkyline(modifier: Modifier = Modifier) {
         )
     }
 }
+
+@Composable
+private fun HomeH3MarketSnapshot(
+    breadth: HomeMarketBreadth,
+    total: Int,
+    sector: HomeSectorPulse?,
+    topMover: Stock?,
+    openMarket: () -> Unit,
+    openMover: (Stock) -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = ResearchCard,
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, ResearchBorder)
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            HomeH3SectionHeader("Market snapshot", "See more", openMarket)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                HomeH3BreadthStat(breadth.advancing, "rising", ResearchGreen, Modifier.weight(1f))
+                HomeH3VerticalDivider()
+                HomeH3BreadthStat(breadth.unchanged, "unchanged", ResearchMuted, Modifier.weight(1f))
+                HomeH3VerticalDivider()
+                HomeH3BreadthStat(breadth.declining, "falling", ResearchRed, Modifier.weight(1f))
+            }
+            Row(Modifier.fillMaxWidth().height(7.dp).clip(RoundedCornerShape(7.dp))) {
+                if (total <= 0) {
+                    Box(Modifier.fillMaxSize().background(ResearchBorder))
+                } else {
+                    if (breadth.advancing > 0) Box(Modifier.weight(breadth.advancing.toFloat()).fillMaxHeight().background(ResearchGreen))
+                    if (breadth.unchanged > 0) Box(Modifier.weight(breadth.unchanged.toFloat()).fillMaxHeight().background(Color(0xFFB3C6DA)))
+                    if (breadth.declining > 0) Box(Modifier.weight(breadth.declining.toFloat()).fillMaxHeight().background(ResearchRed))
+                }
+            }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.BarChart, null, tint = ResearchGreen, modifier = Modifier.size(29.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Column {
+                        Text("Strongest sector", color = ResearchMuted, fontSize = 9.2.sp)
+                        Text(
+                            sector?.sector?.let(::homeH3SectorName) ?: "Unavailable",
+                            color = ResearchText,
+                            fontSize = 12.3.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
+                        )
+                        Text(
+                            sector?.let { "${it.memberCount} counters ${CompanyResearchPresentation.percent(it.averageChangePct)}" }
+                                ?: "No sector calculation",
+                            color = ResearchMuted,
+                            fontSize = 9.2.sp,
+                            maxLines = 1
+                        )
+                    }
+                }
+                Box(Modifier.padding(horizontal = 9.dp).width(1.dp).height(50.dp).background(ResearchBorder))
+                Row(
+                    Modifier.weight(1f).then(if (topMover != null) Modifier.clickable { openMover(topMover) } else Modifier),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.TrendingUp, null, tint = researchChangeColor(topMover?.change), modifier = Modifier.size(29.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Column {
+                        Text("Top mover", color = ResearchMuted, fontSize = 9.2.sp)
+                        Text(
+                            topMover?.name ?: "Unavailable",
+                            color = ResearchText,
+                            fontSize = 12.3.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            topMover?.let { "${CompanyResearchPresentation.money(it.price)}  ${CompanyResearchPresentation.percent(it.change)}" }
+                                ?: "No daily mover",
+                            color = researchChangeColor(topMover?.change),
+                            fontSize = 9.2.sp,
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeH3BreadthStat(value: Int, label: String, color: Color, modifier: Modifier) {
+    Row(modifier, horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+        Text(value.toString(), color = color, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
+        Spacer(Modifier.width(5.dp))
+        Box(Modifier.size(8.dp).background(color, CircleShape))
+        Spacer(Modifier.width(5.dp))
+        Text(label, color = color, fontSize = 9.2.sp)
+    }
+}
+
+@Composable
+private fun HomeH3MoversCard(
+    selectedGainers: Boolean,
+    movers: List<Stock>,
+    quotesAvailable: Boolean,
+    select: (Boolean) -> Unit,
+    openMarket: () -> Unit,
+    openCompany: (Stock) -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = ResearchCard,
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, ResearchBorder)
+    ) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 9.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("Market movers", Modifier.weight(1f), color = ResearchText, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
+                HomeH3MoverChip("Gainers", selectedGainers) { select(true) }
+                Spacer(Modifier.width(4.dp))
+                HomeH3MoverChip("Losers", !selectedGainers) { select(false) }
+                TextButton(onClick = openMarket, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) {
+                    Text("View all →", color = ResearchGreen, fontSize = 9.2.sp)
+                }
+            }
+            if (movers.isEmpty()) {
+                HomeH3Message(
+                    if (!quotesAvailable) "Market quotes are unavailable."
+                    else "No ${if (selectedGainers) "gainers" else "losers"} in the available daily changes."
+                )
+            } else {
+                movers.forEachIndexed { index, stock ->
+                    if (index > 0) HorizontalDivider(color = ResearchBorder.copy(alpha = 0.7f))
+                    Row(
+                        Modifier.fillMaxWidth().clickable { openCompany(stock) }.padding(vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text((index + 1).toString(), color = ResearchMuted, fontSize = 10.2.sp, modifier = Modifier.width(24.dp))
+                        Text(stock.symbol, color = ResearchText, fontSize = 11.7.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.width(50.dp))
+                        Text(
+                            stock.name,
+                            Modifier.weight(1f),
+                            color = ResearchMuted,
+                            fontSize = 9.2.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(CompanyResearchPresentation.money(stock.price), color = ResearchText, fontSize = 10.2.sp, fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.width(7.dp))
+                        HomeH3ChangeBadge(stock.change.takeIf { stock.changeAvailable && it.isFinite() })
+                        Spacer(Modifier.width(4.dp))
+                        Icon(Icons.Default.ChevronRight, null, tint = ResearchMuted, modifier = Modifier.size(15.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeH3MoverChip(label: String, selected: Boolean, click: () -> Unit) {
+    Surface(
+        modifier = Modifier.clip(RoundedCornerShape(9.dp)).clickable(onClick = click),
+        color = if (selected) ResearchGreen.copy(alpha = 0.08f) else ResearchCard,
+        shape = RoundedCornerShape(9.dp),
+        border = BorderStroke(1.dp, if (selected) ResearchGreen else ResearchBorder)
+    ) {
+        Text(
+            label,
+            Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            color = if (selected) ResearchGreen else ResearchMuted,
+            fontSize = 9.2.sp,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+}
+
+@Composable
+private fun HomeH3PracticeCard(enabled: Boolean, cash: Double, openPractice: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = ResearchCard,
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, ResearchBorder)
+    ) {
+        BoxWithConstraints(Modifier.fillMaxWidth().padding(12.dp)) {
+            val stack = maxWidth < 320.dp
+            if (stack) {
+                Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    HomeH3PracticeIdentity(enabled, cash)
+                    Button(
+                        onClick = openPractice,
+                        modifier = Modifier.fillMaxWidth().height(42.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = ResearchGreen, contentColor = Color(0xFF061625))
+                    ) {
+                        Text(if (enabled) "Open portfolio →" else "Start practising →", fontWeight = FontWeight.Bold)
+                    }
+                }
+            } else {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    HomeH3PracticeIdentity(enabled, cash, Modifier.weight(1f))
+                    Spacer(Modifier.width(8.dp))
+                    Button(
+                        onClick = openPractice,
+                        modifier = Modifier.widthIn(min = 126.dp).height(43.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = ResearchGreen, contentColor = Color(0xFF061625))
+                    ) {
+                        Text(if (enabled) "Open portfolio →" else "Start practising →", fontSize = 10.2.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeH3PracticeIdentity(enabled: Boolean, cash: Double, modifier: Modifier = Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier.size(36.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFFB6C9DC).copy(alpha = 0.16f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(Icons.Default.AccountBalanceWallet, null, tint = Color(0xFFB6C9DC), modifier = Modifier.size(22.dp))
+        }
+        Spacer(Modifier.width(8.dp))
+        Column {
+            Text("PRACTICE PORTFOLIO", color = ResearchGreen, fontSize = 9.2.sp, fontWeight = FontWeight.Bold)
+            Text("Build confidence with virtual money", color = ResearchText, fontSize = 10.2.sp, maxLines = 1)
+            Text(
+                if (enabled && cash.isFinite() && cash >= 0) String.format(Locale.US, "KSh %,.0f", cash) else "KSh 1,000,000",
+                color = ResearchText,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.ExtraBold
+            )
+        }
+    }
+}
+
+private fun homeH3SectorName(sector: String): String = when (sector.lowercase(Locale.US)) {
+    "banks" -> "Banking"
+    "telecommunication", "telecommunications" -> "Telecom"
+    "oil & gas", "oil and gas" -> "Energy"
+    else -> sector
+}
