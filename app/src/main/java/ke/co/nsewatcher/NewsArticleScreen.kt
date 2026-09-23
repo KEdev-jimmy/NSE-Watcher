@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import ke.co.nsewatcher.data.MyStocksCache
+import ke.co.nsewatcher.data.MarketData
 import ke.co.nsewatcher.data.NewsCache
 import ke.co.nsewatcher.data.SavedNewsStore
 import ke.co.nsewatcher.data.WatchlistStore
@@ -88,7 +89,7 @@ private fun ArticleReader(item: NewsItem, catalog: List<Stock>, quotes: List<Sto
     val blocks = remember(detail, hasBody) { ArticlePresentation.blocks(if (hasBody) detail.body else detail.summary.ifBlank { detail.body }) }
     val linkColor = Color(0xFF8CCBFF)
 
-    LaunchedEffect(Unit) { if (localCatalog.isEmpty()) localCatalog = MyStocksCache.loadCompanies() }
+    LaunchedEffect(Unit) { if (localCatalog.isEmpty()) localCatalog = MarketData.loadCompanies() }
     LaunchedEffect(retry) {
         loading = true
         try {
