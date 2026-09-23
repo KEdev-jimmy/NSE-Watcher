@@ -30,3 +30,4 @@ internal object HomeMarketIndexPresentation {
                 }
             )
         }.distinctBy { it.symbol }
+}
