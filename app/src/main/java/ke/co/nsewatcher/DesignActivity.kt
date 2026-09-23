@@ -53,6 +53,7 @@ import java.util.Locale
 import org.json.JSONArray
 import org.json.JSONObject
 import ke.co.nsewatcher.data.MyStocksCache
+import ke.co.nsewatcher.data.MarketData
 import ke.co.nsewatcher.data.NewsCache
 import ke.co.nsewatcher.data.AlertStore
 import ke.co.nsewatcher.domain.AlertType
@@ -155,21 +156,21 @@ private fun App(
         val completed = withTimeoutOrNull(12_000L) {
             coroutineScope {
                 val stocksDeferred = async {
-                    runCatching { MyStocksCache.loadStocks() }.getOrDefault(emptyList())
+                    runCatching { MarketData.stocks() }.getOrDefault(emptyList())
                 }
                 val newsDeferred = async {
-                    runCatching { NewsCache.loadFeed() }.getOrDefault(emptyList())
+                    runCatching { MarketData.newsFeed().items }.getOrDefault(emptyList())
                 }
                 val companiesDeferred = async {
-                    runCatching { MyStocksCache.loadCompanies() }.getOrDefault(emptyList())
+                    runCatching { MarketData.companies() }.getOrDefault(emptyList())
                 }
                 val statusDeferred = async {
-                    runCatching { MyStocksCache.loadMarketStatus() }.getOrDefault(MyStocksCache.MarketStatus())
+                    runCatching { MarketData.status() }.getOrDefault(MyStocksCache.MarketStatus())
                 }
                 val indicesDeferred = async {
                     val status = statusDeferred.await()
                     runCatching {
-                        MyStocksCache.loadMarketIndices(status.isKnown && status.isOpen)
+                        MarketData.indices(status.isKnown && status.isOpen)
                     }.getOrDefault(emptyList())
                 }
 
@@ -243,7 +244,7 @@ private fun App(
     }
     LaunchedEffect(page) {
         if (page == Page.COMPANIES && companyCatalog.isEmpty()) {
-            MyStocksCache.loadCompanies().takeIf { it.isNotEmpty() }?.let { companyCatalog = it }
+            MarketData.companies().takeIf { it.isNotEmpty() }?.let { companyCatalog = it }
         }
     }
     LaunchedEffect(autoRefresh) {
@@ -257,7 +258,7 @@ private fun App(
             // Status is real-time and must not wait for the 15-minute quote cadence.
             // This lets an app that is already open recognize the Nairobi session
             // transition around 09:30 EAT even when the user is physically abroad.
-            val refreshedStatus = MyStocksCache.loadMarketStatus()
+            val refreshedStatus = MarketData.status()
             val marketStateChanged = refreshedStatus.isKnown &&
                 (!previousMarketKnown || refreshedStatus.isOpen != previousMarketOpen)
             val becameOpen = refreshedStatus.isKnown && refreshedStatus.isOpen && !previousMarketOpen
@@ -267,13 +268,13 @@ private fun App(
             val openingRefresh = becameOpen && !MarketRefreshController.state.value.refreshInProgress
 
             if (marketStateChanged || quoteRefreshDue) {
-                MyStocksCache.loadMarketIndices(refreshedStatus.isKnown && refreshedStatus.isOpen)
+                MarketData.indices(refreshedStatus.isKnown && refreshedStatus.isOpen)
                     .takeIf { it.isNotEmpty() }
                     ?.let { marketIndices = it }
             }
 
             if (openingRefresh || quoteRefreshDue) {
-                MyStocksCache.loadStocks().takeIf { it.isNotEmpty() }?.let { refreshed ->
+                MarketData.stocks().takeIf { it.isNotEmpty() }?.let { refreshed ->
                     liveStocks.value = refreshed
                     // Use the latest selected company without restarting the status timer
                     // when navigation changes the selection.
@@ -511,7 +512,7 @@ private fun News(open:(NewsItem)->Unit){
     var items by remember { mutableStateOf(emptyList<NewsItem>()) }
     var loading by remember { mutableStateOf(true) }
     var category by rememberSaveable { mutableStateOf("All") }
-    LaunchedEffect(Unit){ loading=true; items=NewsCache.loadFeed(); loading=false }
+    LaunchedEffect(Unit){ loading=true; items=MarketData.newsFeed().items; loading=false }
     val categories=listOf("All","Company News","Dividends","Market","Analysis","Corporate Actions")
     val filtered=if(category=="All") items else items.filter{it.category.equals(category,true)}
     val top=filtered.firstOrNull()
@@ -636,7 +637,7 @@ private fun AlertPage(back:()->Unit){
     val watchedSymbols by watchlistStore.symbols.collectAsState(initial=emptyList())
     LaunchedEffect(Unit) {
         if (MarketRefreshController.shouldRefreshQuotes(stocks.isNotEmpty())) {
-            MyStocksCache.loadStocks().takeIf { it.isNotEmpty() }?.let { liveStocks.value = it }
+            MarketData.stocks().takeIf { it.isNotEmpty() }?.let { liveStocks.value = it }
         }
     }
     val watched=stocks.filter{it.symbol.uppercase() in watchedSymbols.map(String::uppercase)}
