@@ -39,6 +39,7 @@ internal object PracticeLaunch {
 @Composable
 internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock>, initialMarket: MyStocksCache.MarketStatus,
     news: List<NewsItem>, initialSymbol: String = "", onQuotes: (List<Stock>) -> Unit, onCatalog: (List<Stock>) -> Unit,
+    onMarketStatusLoaded: (MyStocksCache.MarketStatus) -> Unit,
     openCompany: (Stock) -> Unit, openNews: (NewsItem) -> Unit, back: () -> Unit) {
     val context = LocalContext.current
     val store = remember { PracticeStore(context) }
@@ -99,7 +100,11 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
     LaunchedEffect(resumed) {
         if (!resumed) return@LaunchedEffect
         while (isActive) {
-            market = MyStocksCache.loadMarketStatus(); statusChecked = System.currentTimeMillis()
+            val refreshedStatus = MyStocksCache.loadMarketStatus()
+            val preferredStatus = SharedMarketStatus.preferred(market, refreshedStatus)
+            market = preferredStatus
+            onMarketStatusLoaded(preferredStatus)
+            statusChecked = System.currentTimeMillis()
             if (MarketRefreshController.shouldRefreshQuotes(quoteFeed.isNotEmpty())) {
                 val quotes = MyStocksCache.loadStocks(); if (quotes.isNotEmpty()) onQuotes(quotes)
             }
