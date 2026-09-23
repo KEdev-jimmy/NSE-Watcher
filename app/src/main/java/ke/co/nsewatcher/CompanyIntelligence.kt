@@ -7,6 +7,7 @@ import ke.co.nsewatcher.data.CompanyIntelligenceCache
 import ke.co.nsewatcher.data.CompanyIntelligenceEngine
 import ke.co.nsewatcher.data.MovementIntelligenceCache
 import ke.co.nsewatcher.data.MarketHistoryCache
+import ke.co.nsewatcher.data.MarketData
 import ke.co.nsewatcher.data.MyStocksCache
 import ke.co.nsewatcher.data.NewsCache
 import kotlinx.coroutines.CancellationException
@@ -64,7 +65,7 @@ fun CompanyIntelligence(
         }
         newsLoading = true
         try {
-            val result = NewsCache.loadFeedResult()
+            val result = MarketData.newsFeed()
             newsError = result.error
             if (result.error == null) onNewsLoaded(result.items)
         } catch (cancelled: CancellationException) {
@@ -83,11 +84,11 @@ fun CompanyIntelligence(
         if (refresh == 0) return@LaunchedEffect
         newsLoading = true
         try {
-            val result = NewsCache.loadFeedResult(forceRefresh = true)
+            val result = MarketData.newsFeed(forceRefresh = true)
             newsError = result.error
             if (result.error == null) onNewsLoaded(result.items)
 
-            val refreshedStatus = MyStocksCache.loadMarketStatus()
+            val refreshedStatus = MarketData.status()
             if (refreshedStatus.isKnown || !marketStatus.isKnown) {
                 onMarketStatusLoaded(refreshedStatus)
             }

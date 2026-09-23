@@ -31,6 +31,7 @@ import ke.co.nsewatcher.data.CompanyChangeStore
 import ke.co.nsewatcher.data.HomeChangeState
 import ke.co.nsewatcher.data.HomeChangeStore
 import ke.co.nsewatcher.data.MyStocksCache
+import ke.co.nsewatcher.data.MarketData
 import ke.co.nsewatcher.data.MarketHistoryCache
 import ke.co.nsewatcher.data.NewsCache
 import ke.co.nsewatcher.data.WatchlistStore
@@ -94,7 +95,7 @@ fun HomeDashboard(
     suspend fun refreshNews(force: Boolean = false) {
         newsLoading = true
         try {
-            val result = NewsCache.loadFeedResult(forceRefresh = force)
+            val result = MarketData.newsFeed(forceRefresh = force)
             newsError = result.error != null
             if (!newsError) onNewsLoaded(result.items)
         } catch (cancelled: CancellationException) { throw cancelled }
@@ -103,15 +104,15 @@ fun HomeDashboard(
     }
     LaunchedEffect(Unit) {
         refreshNews()
-        if (catalog.isEmpty()) catalog = MyStocksCache.loadCompanies()
+        if (catalog.isEmpty()) catalog = MarketData.companies()
         if (!startupDataLoaded && MarketRefreshController.shouldRefreshQuotes(currentStocks.isNotEmpty())) {
-            MyStocksCache.loadStocks().takeIf { it.isNotEmpty() }?.let(onQuotesLoaded)
-            val recoveredStatus = MyStocksCache.loadMarketStatus()
+            MarketData.stocks().takeIf { it.isNotEmpty() }?.let(onQuotesLoaded)
+            val recoveredStatus = MarketData.status()
             market = recoveredStatus
             if (recoveredStatus.isKnown || !initialMarketStatus.isKnown) {
                 onMarketStatusLoaded(recoveredStatus)
             }
-            MyStocksCache.loadMarketIndices(recoveredStatus.isKnown && recoveredStatus.isOpen)
+            MarketData.indices(recoveredStatus.isKnown && recoveredStatus.isOpen)
                 .takeIf { it.isNotEmpty() }
                 ?.let(onIndicesLoaded)
         }
@@ -122,22 +123,22 @@ fun HomeDashboard(
         refreshing = true
         scope.launch {
             try {
-                val refreshedStatus = MyStocksCache.loadMarketStatus()
+                val refreshedStatus = MarketData.status()
                 market = refreshedStatus
                 if (refreshedStatus.isKnown || !initialMarketStatus.isKnown) {
                     onMarketStatusLoaded(refreshedStatus)
                 }
-                MyStocksCache.loadMarketIndices(refreshedStatus.isKnown && refreshedStatus.isOpen)
+                MarketData.indices(refreshedStatus.isKnown && refreshedStatus.isOpen)
                     .takeIf { it.isNotEmpty() }
                     ?.let(onIndicesLoaded)
                 // All foreground screens share the same provider-aware quote cadence.
                 if (MarketRefreshController.shouldRefreshQuotes(currentStocks.isNotEmpty())) {
-                    val quotes = MyStocksCache.loadStocks()
+                    val quotes = MarketData.stocks()
                     if (quotes.isNotEmpty()) { onQuotesLoaded(quotes); refreshError = null }
                     else refreshError = "Quotes could not be updated. Available observations are still shown."
                 } else refreshError = null
                 refreshNews(force = true)
-                if (catalog.isEmpty()) catalog = MyStocksCache.loadCompanies()
+                if (catalog.isEmpty()) catalog = MarketData.companies()
                 historyRevision++
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { refreshError = "Could not refresh. Please try again." }

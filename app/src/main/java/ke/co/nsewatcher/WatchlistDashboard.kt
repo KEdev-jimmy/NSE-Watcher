@@ -43,6 +43,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import ke.co.nsewatcher.data.AlertStore
 import ke.co.nsewatcher.data.MyStocksCache
+import ke.co.nsewatcher.data.MarketData
 import ke.co.nsewatcher.data.MarketHistoryCache
 import ke.co.nsewatcher.data.NewsCache
 import ke.co.nsewatcher.data.WatchlistStore
@@ -120,10 +121,10 @@ fun WatchlistDashboard(
             try {
                 coroutineScope {
                     val quoteRequest = async {
-                        if (MarketRefreshController.shouldRefreshQuotes(quoteStocks.isNotEmpty())) MyStocksCache.loadStocks() else null
+                        if (MarketRefreshController.shouldRefreshQuotes(quoteStocks.isNotEmpty())) MarketData.stocks() else null
                     }
-                    val catalogRequest = async { MyStocksCache.loadCompanies() }
-                    val marketRequest = async { MyStocksCache.loadMarketStatus() }
+                    val catalogRequest = async { MarketData.companies() }
+                    val marketRequest = async { MarketData.status() }
                     val quotes = quoteRequest.await()
                     when {
                         quotes == null -> refreshError = null
@@ -446,7 +447,7 @@ private fun WatchlistNewsSheet(companies: List<Stock>, dismiss: () -> Unit, open
     var refresh by remember { mutableIntStateOf(0) }
     LaunchedEffect(refresh) {
         loading = true
-        try { val result = NewsCache.loadFeedResult(forceRefresh = refresh > 0); error = result.error != null; if (!error) feed = result.items }
+        try { val result = MarketData.newsFeed(forceRefresh = refresh > 0); error = result.error != null; if (!error) feed = result.items }
         catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) { error = true }
         finally { loading = false }
