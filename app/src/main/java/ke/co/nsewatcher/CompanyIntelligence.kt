@@ -10,7 +10,6 @@ import ke.co.nsewatcher.data.MyStocksCache
 import ke.co.nsewatcher.data.NewsCache
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
@@ -20,6 +19,10 @@ fun CompanyIntelligence(
     watched: Boolean = false,
     onWatchToggle: (() -> Unit)? = null,
     marketStocks: List<Stock>,
+    sharedNews: List<NewsItem>,
+    marketStatus: MyStocksCache.MarketStatus,
+    onNewsLoaded: (List<NewsItem>) -> Unit,
+    onMarketStatusLoaded: (MyStocksCache.MarketStatus) -> Unit,
     openPractice: () -> Unit,
     openNews: (NewsItem) -> Unit
 ) {
@@ -27,11 +30,9 @@ fun CompanyIntelligence(
     var selectedRange by rememberSaveable(s.symbol) { mutableStateOf("1D") }
     var ranges by remember(s.symbol) { mutableStateOf<Map<String, MyStocksCache.HistoryResult>>(emptyMap()) }
     var loadingRanges by remember(s.symbol) { mutableStateOf(CompanyResearchPresentation.ranges.toSet()) }
-    var status by remember(s.symbol) { mutableStateOf(MyStocksCache.MarketStatus()) }
     var intelligence by remember(s.symbol) { mutableStateOf(CompanyIntelligenceCache.Result()) }
     var fundamentalsLoading by remember(s.symbol) { mutableStateOf(true) }
-    var news by remember(s.symbol) { mutableStateOf(emptyList<NewsItem>()) }
-    var newsLoading by remember(s.symbol) { mutableStateOf(true) }
+    var newsLoading by remember(s.symbol) { mutableStateOf(sharedNews.isEmpty()) }
     var newsError by remember(s.symbol) { mutableStateOf<String?>(null) }
     var movement by remember(s.symbol) { mutableStateOf(MovementIntelligenceCache.Result()) }
     var movementLoading by remember(s.symbol) { mutableStateOf(false) }
@@ -50,22 +51,51 @@ fun CompanyIntelligence(
             intelligence = CompanyIntelligenceCache.Result(error = "Company information is temporarily unavailable.")
         } finally { fundamentalsLoading = false }
     }
-    LaunchedEffect(s.symbol, refresh) {
+    val news = remember(s, sharedNews) { CompanySharedData.companyNews(s, sharedNews) }
+
+    // The first company render consumes the app-owned news feed. If startup did
+    // not manage to load that feed, recover it here once and publish it back to
+    // the shared app state instead of creating a private company-news cache.
+    LaunchedEffect(s.symbol, sharedNews.isEmpty()) {
+        if (sharedNews.isNotEmpty()) {
+            newsLoading = false
+            return@LaunchedEffect
+        }
         newsLoading = true
         try {
-            val result = NewsCache.loadCompanyNews(s.symbol)
-            news = result.items.distinctBy { it.id }.sortedByDescending { it.publishedAt }
+            val result = NewsCache.loadFeedResult()
             newsError = result.error
+            if (result.error == null) onNewsLoaded(result.items)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
             newsError = "Company news is temporarily unavailable."
-        } finally { newsLoading = false }
+        } finally {
+            newsLoading = false
+        }
     }
-    LaunchedEffect(s.symbol, refresh) {
-        while (true) {
-            status = MyStocksCache.loadMarketStatus()
-            delay(60_000L)
+
+    // A manual Company Intelligence refresh updates the same news/status values
+    // used elsewhere in the app. This keeps Home, News and Company Intelligence
+    // on one observation instead of allowing screen-local copies to drift.
+    LaunchedEffect(refresh) {
+        if (refresh == 0) return@LaunchedEffect
+        newsLoading = true
+        try {
+            val result = NewsCache.loadFeedResult(forceRefresh = true)
+            newsError = result.error
+            if (result.error == null) onNewsLoaded(result.items)
+
+            val refreshedStatus = MyStocksCache.loadMarketStatus()
+            if (refreshedStatus.isKnown || !marketStatus.isKnown) {
+                onMarketStatusLoaded(refreshedStatus)
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            newsError = "Shared market data could not be refreshed."
+        } finally {
+            newsLoading = false
         }
     }
     // Each range becomes usable as soon as it arrives; a slow five-year response
@@ -132,7 +162,7 @@ fun CompanyIntelligence(
         CompanyAnalysisPresentation.movementContext(s, marketStocks)
     }
     CompanyResearchScreen(
-        stock = s, session = session, market = status, intelligence = intelligence,
+        stock = s, session = session, market = marketStatus, intelligence = intelligence,
         fundamentalsLoading = fundamentalsLoading, news = news, newsLoading = newsLoading,
         newsError = newsError, movement = movement, movementLoading = movementLoading,
         deterministic = deterministic, movementContext = movementContext,
