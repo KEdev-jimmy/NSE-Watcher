@@ -14,6 +14,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -31,7 +32,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -60,113 +60,163 @@ internal fun MoreHubScreen(
 ) {
     val context = LocalContext.current
     var emailError by remember { mutableStateOf(false) }
+    val displayName = name.trim().ifBlank { ProfileDefaults.displayName }
+    val completedProfile = name.trim().isNotBlank() && name.trim() != ProfileDefaults.displayName &&
+        (email.isNotBlank() || username.isNotBlank())
+    val statusLabel = if (completedProfile) "Active Investor" else "Investor"
+    val greeting = remember {
+        val hour = java.time.LocalTime.now(java.time.ZoneId.of("Africa/Nairobi")).hour
+        when (hour) {
+            in 5..11 -> "Good morning,"
+            in 12..16 -> "Good afternoon,"
+            else -> "Good evening,"
+        }
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(22.dp),
                 color = MaterialTheme.colorScheme.primaryContainer,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.65f))
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f))
             ) {
-                Row(
-                    Modifier.padding(18.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    HubAvatar(name, 62)
-                    Spacer(Modifier.width(14.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            name.trim().ifBlank { ProfileDefaults.displayName },
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            email.trim().ifBlank { username.trim().takeIf { it.isNotEmpty() }?.let { "@$it" } ?: "Local profile" },
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 11.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Spacer(Modifier.height(7.dp))
-                        FilledTonalButton(
-                            onClick = openProfile,
-                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 7.dp)
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    // Decorative layers from the approved mockup.
+                    Surface(
+                        modifier = Modifier.size(132.dp).offset(x = maxWidth - 104.dp, y = (-28).dp),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.055f)
+                    ) {}
+                    Surface(
+                        modifier = Modifier.size(96.dp).offset(x = maxWidth - 70.dp, y = 34.dp),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.045f)
+                    ) {}
+
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        HubAvatar(displayName, 58)
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(greeting, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
+                            Text(
+                                displayName,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                email.trim().ifBlank {
+                                    username.trim().takeIf { it.isNotEmpty() }?.let { "@$it" } ?: "Local profile"
+                                },
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 10.5.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Button(
+                                onClick = openProfile,
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                shape = RoundedCornerShape(18.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.76f),
+                                    contentColor = MaterialTheme.colorScheme.primary
+                                )
+                            ) {
+                                Text("View profile", fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.width(3.dp))
+                                Icon(Icons.Default.ChevronRight, null, Modifier.size(14.dp))
+                            }
+                        }
+                        Spacer(Modifier.width(7.dp))
+                        Column(
+                            modifier = Modifier.widthIn(min = 78.dp, max = 96.dp),
+                            horizontalAlignment = Alignment.End
                         ) {
-                            Text("View profile", fontSize = 11.sp)
-                            Spacer(Modifier.width(5.dp))
-                            Icon(Icons.Default.ChevronRight, null, Modifier.size(15.dp))
+                            Surface(
+                                shape = RoundedCornerShape(30.dp),
+                                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.82f)
+                            ) {
+                                Row(
+                                    Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(Modifier.size(7.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary))
+                                    Spacer(Modifier.width(5.dp))
+                                    Text(statusLabel, fontSize = 8.5.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                                }
+                            }
+                            Spacer(Modifier.height(13.dp))
+                            Row(verticalAlignment = Alignment.Top) {
+                                Icon(Icons.Default.Eco, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(15.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    "Keep learning\nKeep growing",
+                                    fontSize = 8.5.sp,
+                                    lineHeight = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }
             }
         }
-        item { HubSectionTitle("Quick tools", "Tools that help you investigate and learn") }
+
         item {
-            BoxWithConstraints(Modifier.fillMaxWidth()) {
-                val stack = maxWidth < 360.dp || LocalDensity.current.fontScale > 1.15f
-                if (stack) {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        HubToolCard("Practice Portfolio", "Practice with virtual money", Icons.Default.AccountBalanceWallet, openPractice, Modifier.fillMaxWidth())
-                        HubToolCard("Watchlist", "Track companies you follow", Icons.Default.Bookmark, openWatchlist, Modifier.fillMaxWidth())
-                        HubToolCard("Alerts", "Price, news and company events", Icons.Default.NotificationsActive, openAlerts, Modifier.fillMaxWidth())
-                        HubToolCard("Compare companies", "Review sourced figures side by side", Icons.Default.CompareArrows, openCompare, Modifier.fillMaxWidth())
-                    }
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            HubToolCard("Practice Portfolio", "Practice with virtual money", Icons.Default.AccountBalanceWallet, openPractice, Modifier.weight(1f))
-                            HubToolCard("Watchlist", "Track companies you follow", Icons.Default.Bookmark, openWatchlist, Modifier.weight(1f))
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            HubToolCard("Alerts", "Price, news and company events", Icons.Default.NotificationsActive, openAlerts, Modifier.weight(1f))
-                            HubToolCard("Compare companies", "Review sourced figures side by side", Icons.Default.CompareArrows, openCompare, Modifier.weight(1f))
-                        }
-                    }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+                HubSectionTitle("Quick tools", "Tools to help you invest smarter", Modifier.weight(1f))
+            }
+        }
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                    HubToolCard("Practice Portfolio", "Practice with virtual money", Icons.Default.AccountBalanceWallet, openPractice, Modifier.weight(1f))
+                    HubToolCard("Watchlist", "Track your favourite stocks", Icons.Default.Bookmark, openWatchlist, Modifier.weight(1f))
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                    HubToolCard("Alerts", "Price, news and company events", Icons.Default.NotificationsActive, openAlerts, Modifier.weight(1f), accent = HubToolAccent.ALERT)
+                    HubToolCard("Compare Companies", "Analyse companies side by side", Icons.Default.BarChart, openCompare, Modifier.weight(1f), accent = HubToolAccent.COMPARE)
                 }
             }
         }
+
         item {
             HubListCard(
                 title = "App & Preferences",
-                subtitle = "Personalize your NSE Watcher experience",
+                subtitle = "Personalize your experience",
                 rows = listOf(
-                    HubRow("All settings", "Account, privacy and preferences", Icons.Default.Settings, openSettings),
-                    HubRow("Notifications", "Alerts, sound and delivery controls", Icons.Default.Notifications, openNotifications),
-                    HubRow("Market & Data", "Refresh cadence, source and market timing", Icons.Default.Storage, openMarketData),
-                    HubRow("Appearance", "Theme, font size and display", Icons.Default.Palette, openAppearance)
+                    HubRow("Settings", "Account, privacy and preferences", Icons.Default.Settings, openSettings),
+                    HubRow("Notifications", "Manage alerts, sound and updates", Icons.Default.Notifications, openNotifications),
+                    HubRow("Market & Data", "Data preferences and market settings", Icons.Default.Storage, openMarketData),
+                    HubRow("Appearance", "Theme, language and display", Icons.Default.Palette, openAppearance)
                 )
             )
         }
         item {
             HubListCard(
                 title = "Support",
-                subtitle = "Help, feedback and product information",
+                subtitle = "We're here to help",
                 rows = listOf(
-                    HubRow("Help & Support", "FAQs, contact and report issues", Icons.Default.HelpOutline, openHelp),
-                    HubRow("Send feedback", "Share an idea or tell us what is not working", Icons.Default.Email) {
+                    HubRow("Help & Support", "FAQs, contact us and report issues", Icons.Default.HelpOutline, openHelp),
+                    HubRow("Send Feedback", "Share your thoughts with us", Icons.Default.Email) {
                         emailError = !launchSupportEmail(
                             context,
                             "NSE Watcher Feedback",
                             "Hi James,\n\nI have feedback about NSE Watcher:\n\n"
                         )
                     },
-                    HubRow("About NSE Watcher", "Version, data notes and product information", Icons.Default.Info, openAbout)
+                    HubRow("About NSE Watcher", "Version, legal and product information", Icons.Default.Info, openAbout)
                 )
-            )
-        }
-        item {
-            Text(
-                "NSE Watcher is an analysis and education product. Practice Portfolio uses virtual money and no trade is sent to a broker.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 10.sp,
-                lineHeight = 15.sp
             )
         }
     }
@@ -316,26 +366,14 @@ internal fun SettingsOverviewScreen(
         item { HubHeader("Settings", back) }
         item { HubSectionTitle("Quick access", "Common settings, one tap away") }
         item {
-            BoxWithConstraints(Modifier.fillMaxWidth()) {
-                val stack = maxWidth < 360.dp || LocalDensity.current.fontScale > 1.15f
-                if (stack) {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        HubToolCard("Account & sign in", "Identity and future sync", Icons.Default.AccountCircle, openAccount, Modifier.fillMaxWidth())
-                        HubToolCard("Notifications", "Alerts and sounds", Icons.Default.Notifications, openNotifications, Modifier.fillMaxWidth())
-                        HubToolCard("Market & Data", "Sources and refresh", Icons.Default.Storage, openMarketData, Modifier.fillMaxWidth())
-                        HubToolCard("Appearance", "Theme and text", Icons.Default.Palette, openAppearance, Modifier.fillMaxWidth())
-                    }
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            HubToolCard("Account & sign in", "Identity and future sync", Icons.Default.AccountCircle, openAccount, Modifier.weight(1f))
-                            HubToolCard("Notifications", "Alerts and sounds", Icons.Default.Notifications, openNotifications, Modifier.weight(1f))
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            HubToolCard("Market & Data", "Sources and refresh", Icons.Default.Storage, openMarketData, Modifier.weight(1f))
-                            HubToolCard("Appearance", "Theme and text", Icons.Default.Palette, openAppearance, Modifier.weight(1f))
-                        }
-                    }
+            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                    HubToolCard("Account & sign in", "Identity and future sync", Icons.Default.AccountCircle, openAccount, Modifier.weight(1f))
+                    HubToolCard("Notifications", "Alerts and sounds", Icons.Default.Notifications, openNotifications, Modifier.weight(1f), accent = HubToolAccent.ALERT)
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                    HubToolCard("Market & Data", "Sources and refresh", Icons.Default.Storage, openMarketData, Modifier.weight(1f), accent = HubToolAccent.COMPARE)
+                    HubToolCard("Appearance", "Theme and text", Icons.Default.Palette, openAppearance, Modifier.weight(1f))
                 }
             }
         }
@@ -602,27 +640,74 @@ internal fun AboutNseWatcherExperienceScreen(back: () -> Unit) {
 private data class HubRow(val title: String, val subtitle: String, val icon: ImageVector, val action: () -> Unit)
 
 @Composable
-private fun HubSectionTitle(title: String, subtitle: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+private fun HubSectionTitle(title: String, subtitle: String, modifier: Modifier = Modifier) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(title, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
         Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
     }
 }
 
+private enum class HubToolAccent { DEFAULT, ALERT, COMPARE }
+
 @Composable
-private fun HubToolCard(title: String, subtitle: String, icon: ImageVector, action: () -> Unit, modifier: Modifier) {
+private fun HubToolCard(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    action: () -> Unit,
+    modifier: Modifier,
+    accent: HubToolAccent = HubToolAccent.DEFAULT
+) {
+    val iconContainer = when (accent) {
+        HubToolAccent.ALERT -> MaterialTheme.colorScheme.tertiaryContainer
+        HubToolAccent.COMPARE -> MaterialTheme.colorScheme.secondaryContainer
+        HubToolAccent.DEFAULT -> MaterialTheme.colorScheme.primaryContainer
+    }
+    val iconTint = when (accent) {
+        HubToolAccent.ALERT -> MaterialTheme.colorScheme.tertiary
+        HubToolAccent.COMPARE -> MaterialTheme.colorScheme.secondary
+        HubToolAccent.DEFAULT -> MaterialTheme.colorScheme.primary
+    }
     Surface(
-        modifier = modifier.heightIn(min = 112.dp).clip(RoundedCornerShape(18.dp)).clickable(role = Role.Button, onClick = action),
-        shape = RoundedCornerShape(18.dp),
+        modifier = modifier.height(94.dp).clip(RoundedCornerShape(17.dp))
+            .clickable(role = Role.Button, onClick = action),
+        shape = RoundedCornerShape(17.dp),
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
     ) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Surface(Modifier.size(38.dp), RoundedCornerShape(12.dp), MaterialTheme.colorScheme.primaryContainer) {
-                Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(8.dp))
+        Row(
+            Modifier.fillMaxSize().padding(horizontal = 9.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(Modifier.size(36.dp), RoundedCornerShape(11.dp), iconContainer) {
+                Icon(icon, null, tint = iconTint, modifier = Modifier.padding(8.dp))
             }
-            Text(title, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-            Text(subtitle, fontSize = 10.sp, lineHeight = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.width(7.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
+                Text(
+                    title,
+                    fontSize = 11.5.sp,
+                    lineHeight = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    subtitle,
+                    fontSize = 8.8.sp,
+                    lineHeight = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Icon(
+                Icons.Default.ChevronRight,
+                null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(15.dp)
+            )
         }
     }
 }
