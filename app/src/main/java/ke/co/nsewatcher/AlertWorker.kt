@@ -16,8 +16,11 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import ke.co.nsewatcher.data.AlertStore
+import ke.co.nsewatcher.data.CompanyChangeStore
+import ke.co.nsewatcher.data.CompanyIntelligenceCache
 import ke.co.nsewatcher.data.MyStocksCache
 import ke.co.nsewatcher.data.NewsCache
+import ke.co.nsewatcher.data.WatchlistStore
 import ke.co.nsewatcher.domain.AlertType
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
@@ -25,7 +28,8 @@ import java.time.Instant
 import java.util.concurrent.TimeUnit
 
 /**
- * Shared 15-minute background monitor for user alerts and pending Practice orders.
+ * Shared 15-minute background monitor for user alerts, pending Practice orders and
+ * periodic watched-company data checks.
  *
  * Practice fills deliberately use only the current fetched quote. Stored quotes and
  * chart history are never replayed to infer a fill that may have happened while the
@@ -35,6 +39,7 @@ class AlertWorker(appContext: Context, workerParams: WorkerParameters) : Corouti
     override suspend fun doWork(): Result {
         try {
             val alertStore = AlertStore(applicationContext)
+            val companyChangeStore = CompanyChangeStore(applicationContext)
             val practiceStore = PracticeStore(applicationContext)
             val prefs = applicationContext.getSharedPreferences("nse_watcher_preferences", Context.MODE_PRIVATE)
             val configuredAlerts = alertStore.alerts.first()
@@ -56,7 +61,10 @@ class AlertWorker(appContext: Context, workerParams: WorkerParameters) : Corouti
             val alerts = configuredAlerts.filter { it.enabled && it.type in activeTypes }
             val initialPractice = practiceStore.read()
             val practicePending = initialPractice.enabled && initialPractice.orders.any { it.status == "PENDING" }
-            if (alerts.isEmpty() && !practicePending) return Result.success()
+            val now = Instant.now()
+            val watchedSymbols = WatchlistStore(applicationContext).symbols.first().toSet()
+            val companyChecks = companyChangeStore.syncAndDue(watchedSymbols, now)
+            if (alerts.isEmpty() && !practicePending && companyChecks.isEmpty()) return Result.success()
 
             val newsEnabled = alerts.any { AlertEvaluator.isNews(it.type) }
             val priceAlertsEnabled = alerts.any { !AlertEvaluator.isNews(it.type) }
@@ -67,7 +75,17 @@ class AlertWorker(appContext: Context, workerParams: WorkerParameters) : Corouti
             val status = if (quotesNeeded) MyStocksCache.loadMarketStatus() else MyStocksCache.MarketStatus()
             val marketSession = quotesNeeded && status.isKnown && status.isOpen
             val stocks = if (marketSession) MyStocksCache.loadStocks() else emptyList()
-            val now = Instant.now()
+
+            for (symbol in companyChecks) {
+                val result = CompanyIntelligenceCache.load(symbol)
+                if (result.error == null) {
+                    companyChangeStore.recordObservation(symbol, result, now)
+                } else {
+                    // A failed source check is not a company change. Back off until the next
+                    // scheduled company-data check instead of hammering the endpoint every 15 minutes.
+                    companyChangeStore.markChecked(symbol, now)
+                }
+            }
 
             if (practicePending) {
                 var filledOrders = emptyList<PracticeOrder>()
