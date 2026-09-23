@@ -17,7 +17,8 @@ import java.util.Locale
 internal class MarketHistoryRepository(
     private val loader: suspend (String, String) -> MyStocksCache.HistoryResult,
     private val nowMs: () -> Long = System::currentTimeMillis,
-    private val maxAgeMs: Long = MarketRefreshController.REFRESH_INTERVAL_MS
+    private val maxAgeMs: Long = MarketRefreshController.REFRESH_INTERVAL_MS,
+    private val maxEntries: Int = 128
 ) {
     private data class Key(val symbol: String, val period: String)
     private data class Entry(val result: MyStocksCache.HistoryResult, val loadedAtMs: Long)
@@ -52,6 +53,10 @@ internal class MarketHistoryRepository(
                 mutex.withLock {
                     if (usable(result)) {
                         entries[key] = Entry(result, nowMs())
+                        while (entries.size > maxEntries) {
+                            val oldest = entries.minByOrNull { it.value.loadedAtMs }?.key ?: break
+                            entries.remove(oldest)
+                        }
                     }
                     inFlight.remove(key)
                 }
