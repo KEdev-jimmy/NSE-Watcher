@@ -60,7 +60,7 @@ internal fun CompanyResearchScreen(
     fundamentalsLoading: Boolean, news: List<NewsItem>, newsLoading: Boolean, newsError: String?,
     movement: MovementIntelligenceCache.Result, movementLoading: Boolean, onAnalysis: () -> Unit,
     watched: Boolean, onWatchToggle: (() -> Unit)?, back: () -> Unit, openNews: (NewsItem) -> Unit,
-    onRefresh: () -> Unit, refreshing: Boolean, selectedRange: String, onRange: (String) -> Unit,
+    openPractice: () -> Unit, onRefresh: () -> Unit, refreshing: Boolean, selectedRange: String, onRange: (String) -> Unit,
     chart: MyStocksCache.HistoryResult, chartLoading: Boolean, rangeReturns: Map<String, Double?>,
     sessionLoading: Boolean
 ) {
@@ -108,6 +108,16 @@ internal fun CompanyResearchScreen(
             }
             when (tab) {
                 "Overview" -> {
+                    item {
+                        ResearchPanel {
+                            ResearchTitle("Test your investment idea")
+                            ResearchBody("Move this company into Practice Portfolio with the company already selected.")
+                            ResearchCaption("You can record why you would trade it before confirming. Practice orders use virtual money and are never sent to a broker.")
+                            OutlinedButton(onClick = openPractice, modifier = Modifier.fillMaxWidth()) {
+                                Text("Practice ${stock.symbol} →")
+                            }
+                        }
+                    }
                     item {
                         ResearchPanel {
                             ResearchTitle("Session at a glance")
