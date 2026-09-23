@@ -78,12 +78,33 @@ class AlertEvaluatorTest {
         val next = AlertEvaluator.evaluate(alerts, emptyList(), persisted, feed + article("c"), now)
         assertEquals(listOf("c"), next.map { it.articleId })
     }
+    @Test fun automaticWatchlistNewsStartsAtTheOptInBaseline() {
+        val enabledAt = now.minusSeconds(1800)
+        val automatic = PriceAlert("watchlist-news:SCOM", "SCOM", AlertType.NEWS, enabledAt.toEpochMilli().toDouble(), true)
+        val oldStory = article("old-before-opt-in", enabledAt.minusSeconds(1))
+        val newStory = article("new-after-opt-in", enabledAt.plusSeconds(1))
+        val result = AlertEvaluator.evaluate(listOf(automatic), emptyList(), AlertMonitorState(), listOf(oldStory, newStory), now)
+        assertEquals(listOf("new-after-opt-in"), result.map { it.articleId })
+    }
+
     @Test fun migrationRespectsPreviouslySentNewsAndDailyAlerts() {
         assertTrue(AlertEvaluator.evaluate(listOf(rule(AlertType.NEWS, null)), emptyList(), AlertMonitorState(),
             listOf(article()), now, legacyNewsIds = mapOf("rule" to "a")).isEmpty())
         assertTrue(AlertEvaluator.evaluate(listOf(rule(AlertType.DAILY_GAIN, 5.0)), listOf(stock()), AlertMonitorState(),
             now = now, marketOpen = true, legacyDailyDates = mapOf("rule" to "2026-09-23")).isEmpty())
     }
+    @Test fun newsAndCorporateActionRulesStayInSeparateCategories() {
+        val ordinary = article("ordinary", category = "Company News")
+        val dividend = article("dividend", category = "Dividends")
+        val action = article("action", category = "Corporate Actions")
+        val news = AlertEvaluator.evaluate(listOf(rule(AlertType.NEWS, null)), emptyList(), AlertMonitorState(),
+            listOf(ordinary, dividend, action), now)
+        val corporate = AlertEvaluator.evaluate(listOf(rule(AlertType.CORPORATE_ACTION, null, "corp")), emptyList(), AlertMonitorState(),
+            listOf(ordinary, dividend, action), now)
+        assertEquals(listOf("ordinary"), news.map { it.articleId })
+        assertEquals(setOf("dividend", "action"), corporate.map { it.articleId }.toSet())
+    }
+
     @Test fun corporateActionsFilterCategoryAndCompany() {
         val feed = listOf(article("ordinary"), article("dividend", category = "Dividends"),
             article("action", category = "Corporate Actions"), article("other", category = "Dividends").copy(symbol = "KCB"))

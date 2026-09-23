@@ -235,8 +235,12 @@ private fun App(
     var description by rememberSaveable { mutableStateOf(prefs.getString("description", ProfileDefaults.description) ?: ProfileDefaults.description) }
     var marketAlerts by rememberSaveable { mutableStateOf(prefs.getBoolean("market_alerts", true)) }
     var priceAlerts by rememberSaveable { mutableStateOf(prefs.getBoolean("price_alerts", true)) }
-    var newsAlerts by rememberSaveable { mutableStateOf(prefs.getBoolean("news_alerts", true)) }
-    var appAlerts by rememberSaveable { mutableStateOf(prefs.getBoolean("app_alerts", true)) }
+    var watchlistNewsAlerts by rememberSaveable { mutableStateOf(prefs.getBoolean("watchlist_news_alerts", false)) }
+    var watchlistCorporateAlerts by rememberSaveable { mutableStateOf(prefs.getBoolean("watchlist_corporate_alerts", false)) }
+    var practiceAlerts by rememberSaveable {
+        mutableStateOf(if (prefs.contains("practice_alerts")) prefs.getBoolean("practice_alerts", true) else prefs.getBoolean("app_alerts", true))
+    }
+    var notificationSound by rememberSaveable { mutableStateOf(prefs.getString("notification_sound", "Default") ?: "Default") }
     var autoRefresh by rememberSaveable { mutableStateOf(prefs.getBoolean("auto_refresh", true)) }
     var fontSizeSetting by rememberSaveable { mutableStateOf(prefs.getString("font_size", "Medium") ?: "Medium") }
     var chartDefaultRange by rememberSaveable { mutableStateOf(prefs.getString("chart_default_range", "1D") ?: "1D") }
@@ -340,7 +344,7 @@ private fun App(
             color = MaterialTheme.colorScheme.background
         ) {
         when(page){
-            Page.HOME,Page.MARKET,Page.NEWS,Page.COMPANIES,Page.PAPER,Page.MORE -> Scaffold(topBar={if(page!=Page.PAPER && page!=Page.HOME && page!=Page.MARKET && page!=Page.NEWS && page!=Page.COMPANIES) TopBar(name,::go)},bottomBar={BottomNav(when(page){Page.HOME->0;Page.MARKET->1;Page.NEWS->2;Page.COMPANIES->3;else->4}, newsStyle=page==Page.NEWS, homeStyle=page==Page.PAPER || page==Page.MARKET || page==Page.HOME || page==Page.COMPANIES){tab=it;if(it==3)directorySector="All";history=emptyList();page=when(it){0->Page.HOME;1->Page.MARKET;2->Page.NEWS;3->Page.COMPANIES;else->Page.MORE}}}){pad->Box(Modifier.fillMaxSize().padding(pad)){when(page){Page.HOME->HomeDashboard(stocks,{selected=it;go(Page.COMPANY)},{selectedNews=it;go(Page.NEWS_DETAIL)},{go(Page.MARKET)},{go(Page.WATCHLIST)},newsFeed,marketIndices,startupMarketStatus,startupComplete,name=name,initialCatalog=companyCatalog,practiceEnabled=PaperPortfolioStore.isEnabled(context),practiceCash=PaperPortfolioStore.cash(context),openAllNews={go(Page.NEWS)},openPractice={practiceSymbol="";go(Page.PAPER)},openProfile={go(Page.PROFILE)},openAlertSettings={go(Page.NOTIFICATIONS)},onQuotesLoaded={liveStocks.value=it},onNewsLoaded={newsFeed=it},onIndicesLoaded={marketIndices=it},onMarketStatusLoaded={startupMarketStatus=it});Page.MARKET->directoryState.SaveableStateProvider("market"){MarketDashboard(stocks,companyCatalog,startupMarketStatus,marketIndices,openCompany={selected=it;go(Page.COMPANY)},openCompanies={directorySector=it;go(Page.COMPANIES)},onQuotesLoaded={liveStocks.value=it},onCatalogLoaded={companyCatalog=it},onIndicesLoaded={marketIndices=it},onMarketStatusLoaded={startupMarketStatus=it})};Page.NEWS->directoryState.SaveableStateProvider("news"){NewsDashboard(newsFeed,onNewsLoaded={newsFeed=it}){selectedNews=it;go(Page.NEWS_DETAIL)}};Page.COMPANIES->directoryState.SaveableStateProvider("companies:$directorySector"){CompaniesDirectory(catalog=companyCatalog,quotes=stocks,name=name,initialSector=directorySector,openCompany={selected=it;go(Page.COMPANY)},openWatchlist={go(Page.WATCHLIST)},openCompare={comparisonSymbols=it;go(Page.COMPARE)},openNews={selectedNews=it;go(Page.NEWS_DETAIL)},openProfile={go(Page.PROFILE)},onCatalogLoaded={companyCatalog=it},onQuotesLoaded={liveStocks.value=it})};Page.PAPER->directoryState.SaveableStateProvider("practice"){PracticePortfolioScreen(quoteFeed=stocks,catalog=companyCatalog,initialMarket=startupMarketStatus,news=newsFeed,initialSymbol=practiceSymbol,onQuotes={liveStocks.value=it},onCatalog={companyCatalog=it},openCompany={selected=it;go(Page.COMPANY)},openNews={selectedNews=it;go(Page.NEWS_DETAIL)},back=::back)};else->More(::go)}}}
+            Page.HOME,Page.MARKET,Page.NEWS,Page.COMPANIES,Page.PAPER,Page.MORE -> Scaffold(topBar={if(page!=Page.PAPER && page!=Page.HOME && page!=Page.MARKET && page!=Page.NEWS && page!=Page.COMPANIES) TopBar(name,::go)},bottomBar={BottomNav(when(page){Page.HOME->0;Page.MARKET->1;Page.NEWS->2;Page.COMPANIES->3;else->4}, newsStyle=page==Page.NEWS, homeStyle=page==Page.PAPER || page==Page.MARKET || page==Page.HOME || page==Page.COMPANIES){tab=it;if(it==3)directorySector="All";history=emptyList();page=when(it){0->Page.HOME;1->Page.MARKET;2->Page.NEWS;3->Page.COMPANIES;else->Page.MORE}}}){pad->Box(Modifier.fillMaxSize().padding(pad)){when(page){Page.HOME->HomeDashboard(stocks,{selected=it;go(Page.COMPANY)},{selectedNews=it;go(Page.NEWS_DETAIL)},{go(Page.MARKET)},{go(Page.WATCHLIST)},newsFeed,marketIndices,startupMarketStatus,startupComplete,name=name,initialCatalog=companyCatalog,practiceEnabled=PaperPortfolioStore.isEnabled(context),practiceCash=PaperPortfolioStore.cash(context),openAllNews={go(Page.NEWS)},openPractice={practiceSymbol="";go(Page.PAPER)},openProfile={go(Page.PROFILE)},openAlertSettings={go(Page.NOTIFICATIONS)},onQuotesLoaded={liveStocks.value=it},onNewsLoaded={newsFeed=it},onIndicesLoaded={marketIndices=it},onMarketStatusLoaded={startupMarketStatus=it});Page.MARKET->directoryState.SaveableStateProvider("market"){MarketDashboard(stocks,companyCatalog,startupMarketStatus,marketIndices,openCompany={selected=it;go(Page.COMPANY)},openCompanies={directorySector=it;go(Page.COMPANIES)},onQuotesLoaded={liveStocks.value=it},onCatalogLoaded={companyCatalog=it},onIndicesLoaded={marketIndices=it},onMarketStatusLoaded={startupMarketStatus=it})};Page.NEWS->directoryState.SaveableStateProvider("news"){NewsDashboard(newsFeed,onNewsLoaded={newsFeed=it}){selectedNews=it;go(Page.NEWS_DETAIL)}};Page.COMPANIES->directoryState.SaveableStateProvider("companies:$directorySector"){CompaniesDirectory(catalog=companyCatalog,quotes=stocks,name=name,initialSector=directorySector,openCompany={selected=it;go(Page.COMPANY)},openWatchlist={go(Page.WATCHLIST)},openCompare={comparisonSymbols=it;go(Page.COMPARE)},openNews={selectedNews=it;go(Page.NEWS_DETAIL)},openProfile={go(Page.PROFILE)},onCatalogLoaded={companyCatalog=it},onQuotesLoaded={liveStocks.value=it})};Page.PAPER->directoryState.SaveableStateProvider("practice"){PracticePortfolioScreen(quoteFeed=stocks,catalog=companyCatalog,initialMarket=startupMarketStatus,news=newsFeed,initialSymbol=practiceSymbol,onQuotes={liveStocks.value=it},onCatalog={companyCatalog=it},openCompany={selected=it;go(Page.COMPANY)},openNews={selectedNews=it;go(Page.NEWS_DETAIL)},back=::back)};else->MoreHubScreen(name=name,username=username,email=email,openProfile={go(Page.PROFILE)},openPractice={practiceSymbol="";go(Page.PAPER)},openWatchlist={go(Page.WATCHLIST)},openAlerts={go(Page.ALERTS)},openCompare={comparisonSymbols=emptyList();go(Page.COMPARE)},openSettings={go(Page.SETTINGS)},openNotifications={go(Page.NOTIFICATIONS)},openMarketData={go(Page.LIVE_DATA)},openAppearance={go(Page.DISPLAY)},openHelp={go(Page.HELP)},openAbout={go(Page.ABOUT)})}}}
             Page.COMPANY->Company(
                 s=selected,
                 sharedNews=newsFeed,
@@ -353,15 +357,33 @@ private fun App(
             Page.WATCHLIST->WatchlistDashboard(quoteStocks=stocks, initialCatalog=companyCatalog, initialMarket=startupMarketStatus, onQuotesLoaded={liveStocks.value=it}, openCompany={selected=it;go(Page.COMPANY)}, openNews={selectedNews=it;go(Page.NEWS_DETAIL)}, openPreferences={go(Page.NOTIFICATIONS)}, back=::back)
             Page.COMPARE->CompanyComparison(CompaniesPresentation.companies(companyCatalog, stocks),::back,comparisonSymbols)
             Page.NEWS_DETAIL->key(alertNavigationRevision) { selectedNews?.let { NewsArticleScreen(it,companyCatalog,stocks,::back){company->selected=company;go(Page.COMPANY)} } }
-            Page.PROFILE->Profile(name,username,email,description,{name=it;put("profile_name",it)},{username=it;put("username",it)},{email=it;put("email",it)},{description=it;put("description",it)},pickAvatar,::back,::go)
-            Page.SETTINGS->SettingsHomeScreen(
-                name=name,username=username,back=::back,openProfile={go(Page.PROFILE)},openAccount={go(Page.ACCOUNT)},
-                openNotifications={go(Page.NOTIFICATIONS)},openMarketData={go(Page.LIVE_DATA)},openDisplay={go(Page.DISPLAY)},
-                openCharts={go(Page.CHARTS)},openLanguage={go(Page.LANGUAGE)},openPrivacy={go(Page.PRIVACY)},openAbout={go(Page.ABOUT)}
+            Page.PROFILE->ProfileHubScreen(name,username,email,description,{name=it;put("profile_name",it)},{username=it;put("username",it)},{email=it;put("email",it)},{description=it;put("description",it)},pickAvatar,::back,{go(Page.ACCOUNT)},{go(Page.WATCHLIST)},{practiceSymbol="";go(Page.PAPER)})
+            Page.SETTINGS->SettingsOverviewScreen(
+                back=::back,openAccount={go(Page.ACCOUNT)},openNotifications={go(Page.NOTIFICATIONS)},
+                openMarketData={go(Page.LIVE_DATA)},openAppearance={go(Page.DISPLAY)},openCharts={go(Page.CHARTS)},
+                openLanguage={go(Page.LANGUAGE)},openPrivacy={go(Page.PRIVACY)},openHelp={go(Page.HELP)},openAbout={go(Page.ABOUT)}
             )
             Page.ACCOUNT->AccountSignInScreen(name,username,::back){go(Page.PROFILE)}
             Page.THEME->DisplayAppearanceScreen(dark,fontSizeSetting,{dark=it;put("dark_mode",it)},{fontSizeSetting=it;put("font_size",it)},::back)
-            Page.NOTIFICATIONS->NotificationsPage(marketAlerts,priceAlerts,newsAlerts,appAlerts,{marketAlerts=it;put("market_alerts",it)},{priceAlerts=it;put("price_alerts",it)},{newsAlerts=it;put("news_alerts",it)},{appAlerts=it;put("app_alerts",it)},::back)
+            Page.NOTIFICATIONS->NotificationCenterScreen(
+                marketAlerts=marketAlerts,priceAlerts=priceAlerts,newsAlerts=watchlistNewsAlerts,corporateAlerts=watchlistCorporateAlerts,
+                practiceAlerts=practiceAlerts,soundMode=notificationSound,
+                onMarketAlerts={marketAlerts=it;put("market_alerts",it)},
+                onPriceAlerts={priceAlerts=it;put("price_alerts",it)},
+                onNewsAlerts={enabled->
+                    watchlistNewsAlerts=enabled
+                    prefs.edit().putBoolean("watchlist_news_alerts",enabled).apply()
+                    if(enabled) prefs.edit().putLong("watchlist_news_enabled_at",System.currentTimeMillis()).apply()
+                },
+                onCorporateAlerts={enabled->
+                    watchlistCorporateAlerts=enabled
+                    prefs.edit().putBoolean("watchlist_corporate_alerts",enabled).apply()
+                    if(enabled) prefs.edit().putLong("watchlist_corporate_enabled_at",System.currentTimeMillis()).apply()
+                },
+                onPracticeAlerts={practiceAlerts=it;put("practice_alerts",it)},
+                onSoundMode={notificationSound=it;put("notification_sound",it)},
+                openAlertRules={go(Page.ALERTS)},back=::back
+            )
             Page.LIVE_DATA->MarketDataSettingsScreen(autoRefresh,{autoRefresh=it;put("auto_refresh",it)},::back)
             Page.CHARTS->ChartSettingsScreen(chartDefaultRange,chartShowGrid,{chartDefaultRange=it;put("chart_default_range",it)},{chartShowGrid=it;put("chart_show_grid",it)},::back)
             Page.ALERTS->AlertPage(::back)
@@ -369,8 +391,8 @@ private fun App(
             Page.SECURITY->AccountSignInScreen(name,username,::back){go(Page.PROFILE)}
             Page.PRIVACY->PrivacyDataScreen(::back)
             Page.DISPLAY->DisplayAppearanceScreen(dark,fontSizeSetting,{dark=it;put("dark_mode",it)},{fontSizeSetting=it;put("font_size",it)},::back)
-            Page.HELP->HelpPage(::back)
-            Page.ABOUT->AboutPage(::back)
+            Page.HELP->HelpSupportExperienceScreen(::back)
+            Page.ABOUT->AboutNseWatcherExperienceScreen(::back)
             else->{page=Page.HOME}
         }
     }}

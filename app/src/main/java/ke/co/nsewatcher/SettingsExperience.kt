@@ -489,23 +489,40 @@ internal fun MarketDataSettingsScreen(
             SettingsSection("Refresh") {
                 SettingsSwitchRow(
                     "Auto refresh",
-                    "Refresh eligible market observations while the app is open using the shared refresh cadence.",
+                    "Keep eligible market observations current while NSE Watcher is open.",
                     autoRefresh,
                     onAutoRefresh
                 )
+                SettingsValueRow("Quote refresh cadence", "About every 15 minutes")
+                SettingsValueRow("Market-status checks", "Polled separately from quote refresh")
             }
         }
         item {
-            SettingsSection("Current data setup") {
-                SettingsValueRow("Market quotes", "MyStocks Africa via NSE Watcher gateway")
-                SettingsValueRow("Quote delay", "About 15 minutes where supplied")
+            SettingsSection("NSE session") {
+                SettingsValueRow("Regular session", "09:30–15:00 EAT · Monday–Friday")
                 SettingsValueRow("Market timezone", "Africa/Nairobi · EAT")
-                SettingsValueRow("Official NSE indices", "Unavailable until verified source is configured")
+                SettingsValueRow("Quote presentation", "Provider observation time is shown")
+                SettingsValueRow("Typical quote delay", "About 15 minutes where supplied")
+            }
+        }
+        item {
+            SettingsSection("Data sources") {
+                SettingsValueRow("Quotes, companies & history", "MyStocks Africa via NSE Watcher gateway")
+                SettingsValueRow("News", "NSE Watcher news service · original source shown per story")
+                SettingsValueRow("Company intelligence", "Evidence/source labels shown with company data")
+                SettingsValueRow("Official NSE indices", "Unavailable until a verified source is configured")
+            }
+        }
+        item {
+            SettingsSection("Data integrity") {
+                SettingsValueRow("Missing values", "Remain unavailable")
+                SettingsValueRow("Previous close", "Provider or actual prior-session observation only")
+                SettingsValueRow("Historical charts", "Dated provider observations only")
             }
         }
         item {
             Text(
-                "NSE Watcher keeps missing observations unavailable rather than inventing values. Refreshing cannot make the upstream provider more real-time than its supplied delay.",
+                "Refreshing cannot make an upstream feed more real-time than the source permits. NSE Watcher keeps missing or unverified values unavailable instead of filling them with estimates.",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 11.sp,
                 lineHeight = 17.sp
