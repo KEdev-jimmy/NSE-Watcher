@@ -66,6 +66,7 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
     var notice by remember { mutableStateOf<String?>(null) }
     var resumed by remember { mutableStateOf(true) }
     val owner = LocalLifecycleOwner.current
+    LaunchedEffect(initialMarket) { market = initialMarket }
     DisposableEffect(owner) {
         val observer = LifecycleEventObserver { _, _ -> resumed = owner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) }
         resumed = owner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
