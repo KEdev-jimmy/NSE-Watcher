@@ -41,11 +41,12 @@ import java.util.Locale
 @Composable
 fun HomeDashboard(
     currentStocks: List<Stock>, openCompany: (Stock) -> Unit, openNews: (NewsItem) -> Unit,
-    openMarket: () -> Unit, openWatchlist: () -> Unit, initialNews: List<NewsItem>,
+    openMarket: () -> Unit, openWatchlist: () -> Unit, newsFeed: List<NewsItem>,
     initialMarketStatus: MyStocksCache.MarketStatus, startupDataLoaded: Boolean,
     name: String, initialCatalog: List<Stock>, practiceEnabled: Boolean, practiceCash: Double,
     openAllNews: () -> Unit, openPractice: () -> Unit, openProfile: () -> Unit,
-    openAlertSettings: () -> Unit, onQuotesLoaded: (List<Stock>) -> Unit
+    openAlertSettings: () -> Unit, onQuotesLoaded: (List<Stock>) -> Unit,
+    onNewsLoaded: (List<NewsItem>) -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -57,8 +58,7 @@ fun HomeDashboard(
     val saved by savedFlow.collectAsState<List<String>, List<String>?>(initial = null)
     val eventFlow = remember(alertStore) { alertStore.events.catch { alertError = true } }
     val events by eventFlow.collectAsState(initial = emptyList())
-    var news by remember { mutableStateOf(initialNews) }
-    var newsLoading by remember { mutableStateOf(initialNews.isEmpty()) }
+    var newsLoading by remember { mutableStateOf(newsFeed.isEmpty()) }
     var newsError by remember { mutableStateOf(false) }
     var catalog by remember { mutableStateOf(initialCatalog) }
     var market by remember { mutableStateOf(initialMarketStatus) }
@@ -79,7 +79,7 @@ fun HomeDashboard(
         try {
             val result = NewsCache.loadFeedResult(forceRefresh = force)
             newsError = result.error != null
-            if (!newsError) news = result.items
+            if (!newsError) onNewsLoaded(result.items)
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) { newsError = true }
         finally { newsLoading = false }
@@ -122,12 +122,12 @@ fun HomeDashboard(
             catch (_: Exception) { histories = histories + (stock.symbol to emptyList()) }
         }
     }
-    val intelligence = remember(currentStocks, news) {
-        HomeIntelligenceEngine.build(currentStocks.filter { it.price.isFinite() && it.price > 0.0 }, news)
+    val intelligence = remember(currentStocks, newsFeed) {
+        HomeIntelligenceEngine.build(currentStocks.filter { it.price.isFinite() && it.price > 0.0 }, newsFeed)
     }
-    val brief = remember(watched, news, events, now) { HomePresentation.brief(watched, news, events, now) }
-    val relevantNews = remember(news, watched) { HomePresentation.companyNews(news, watched) }
-    val displayedNews = if (watched.isEmpty()) news.distinctBy { it.id }.sortedByDescending { CompanyResearchPresentation.timestamp(it.publishedAt) } else relevantNews
+    val brief = remember(watched, newsFeed, events, now) { HomePresentation.brief(watched, newsFeed, events, now) }
+    val relevantNews = remember(newsFeed, watched) { HomePresentation.companyNews(newsFeed, watched) }
+    val displayedNews = if (watched.isEmpty()) newsFeed.distinctBy { it.id }.sortedByDescending { CompanyResearchPresentation.timestamp(it.publishedAt) } else relevantNews
 
     MaterialTheme(colorScheme = CompanyResearchColors) {
         Column(Modifier.fillMaxSize().background(ResearchBackground)) {

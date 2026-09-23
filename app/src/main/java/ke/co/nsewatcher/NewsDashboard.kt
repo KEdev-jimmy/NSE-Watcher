@@ -87,14 +87,13 @@ private fun matchesNewsCategory(item: NewsItem, category: String): Boolean = whe
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NewsDashboard(open: (NewsItem) -> Unit) {
+fun NewsDashboard(newsFeed: List<NewsItem>, onNewsLoaded: (List<NewsItem>) -> Unit, open: (NewsItem) -> Unit) {
     val context = LocalContext.current
     val savedStore = remember { SavedNewsStore(context) }
     var savedError by remember { mutableStateOf(false) }
     val savedFlow = remember { savedStore.articles.catch { savedError = true } }
     val saved by savedFlow.collectAsState<List<NewsItem>, List<NewsItem>?>(null)
-    var feed by remember { mutableStateOf(emptyList<NewsItem>()) }
-    var loading by remember { mutableStateOf(true) }
+    var loading by remember { mutableStateOf(newsFeed.isEmpty()) }
     var refreshing by remember { mutableStateOf(false) }
     var requestActive by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -115,7 +114,7 @@ fun NewsDashboard(open: (NewsItem) -> Unit) {
                 val result = NewsCache.loadFeedResult(forceRefresh = force)
                 // Keep the last successful feed visible if a subsequent refresh fails.
                 if (result.error == null) {
-                    feed = result.items.distinctBy { it.id }.sortedByDescending { it.publishedAt }
+                    onNewsLoaded(result.items.distinctBy { it.id }.sortedByDescending { it.publishedAt })
                 }
                 error = result.error
             } catch (cancelled: CancellationException) {
@@ -138,11 +137,13 @@ fun NewsDashboard(open: (NewsItem) -> Unit) {
         scope.launch { listState.animateScrollToItem(0) }
     }
 
-    LaunchedEffect(Unit) { refreshNews(false) }
+    LaunchedEffect(Unit) {
+        if (newsFeed.isEmpty()) refreshNews(false) else loading = false
+    }
 
-    val filtered = remember(feed, saved, category, query) {
+    val filtered = remember(newsFeed, saved, category, query) {
         val term = query.trim()
-        (if (category == "Saved") saved.orEmpty() else feed).filter { item ->
+        (if (category == "Saved") saved.orEmpty() else newsFeed).filter { item ->
             (category == "Saved" || matchesNewsCategory(item, category)) && (term.isEmpty() ||
                 listOf(item.title, item.summary, item.companyName, item.symbol, item.source)
                     .any { it.contains(term, ignoreCase = true) })
@@ -216,7 +217,7 @@ fun NewsDashboard(open: (NewsItem) -> Unit) {
                     }
                 }
             }
-            if (category != "Saved" && error != null && feed.isNotEmpty()) {
+            if (category != "Saved" && error != null && newsFeed.isNotEmpty()) {
                 item {
                     NewsMessage(
                         "Refresh unavailable", "Showing previously loaded stories. Try refreshing again.",
@@ -242,7 +243,7 @@ fun NewsDashboard(open: (NewsItem) -> Unit) {
                     }
                 }
                 filtered.isEmpty() -> item {
-                    val unavailable = error != null && feed.isEmpty()
+                    val unavailable = error != null && newsFeed.isEmpty()
                     val hasFilter = query.isNotBlank() || category != "All"
                     NewsMessage(
                         if (unavailable) "News temporarily unavailable" else if (hasFilter) "No matching stories" else "No stories yet",
