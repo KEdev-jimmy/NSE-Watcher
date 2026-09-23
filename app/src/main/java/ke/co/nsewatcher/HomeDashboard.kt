@@ -31,6 +31,7 @@ import ke.co.nsewatcher.data.CompanyChangeStore
 import ke.co.nsewatcher.data.HomeChangeState
 import ke.co.nsewatcher.data.HomeChangeStore
 import ke.co.nsewatcher.data.MyStocksCache
+import ke.co.nsewatcher.data.MarketHistoryCache
 import ke.co.nsewatcher.data.NewsCache
 import ke.co.nsewatcher.data.WatchlistStore
 import kotlinx.coroutines.CancellationException
@@ -83,6 +84,7 @@ fun HomeDashboard(
     var refreshError by remember { mutableStateOf<String?>(null) }
     var now by remember { mutableStateOf(Instant.now()) }
     var historyRevision by remember { mutableIntStateOf(0) }
+    var handledHistoryRevision by remember { mutableIntStateOf(0) }
     var histories by remember { mutableStateOf<Map<String, List<MyStocksCache.HistoryPoint>>>(emptyMap()) }
     val avatar = context.getSharedPreferences("nse_watcher_preferences", 0).getString("avatar_uri", null)
     LaunchedEffect(initialMarketStatus) { market = initialMarketStatus }
@@ -202,11 +204,18 @@ fun HomeDashboard(
     }
     val preview = watched.take(3)
     LaunchedEffect(preview.map { it.symbol }, historyRevision) {
+        val forceHistoryRefresh = historyRevision > handledHistoryRevision
         preview.forEach { stock ->
-            try { histories = histories + (stock.symbol to WatchlistPresentation.trend(MyStocksCache.loadHistoryDetails(stock.symbol, "1m").points)) }
-            catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { histories = histories + (stock.symbol to emptyList()) }
+            try {
+                val result = MarketHistoryCache.load(stock.symbol, "1M", forceRefresh = forceHistoryRefresh)
+                histories = histories + (stock.symbol to WatchlistPresentation.trend(result.points))
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                histories = histories + (stock.symbol to emptyList())
+            }
         }
+        if (forceHistoryRefresh) handledHistoryRevision = historyRevision
     }
     val homeIndices = remember(marketIndices) { HomeMarketIndexPresentation.fromProvider(marketIndices) }
     val intelligence = remember(currentStocks, newsFeed, homeIndices) {
