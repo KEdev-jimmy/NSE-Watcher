@@ -105,7 +105,13 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
             val previousFilled = state!!.orders.count { it.status == "FILLED" }
             val next = withContext(Dispatchers.IO) { store.update { s ->
                 val now = System.currentTimeMillis()
-                PracticeEngine.snapshot(PracticeEngine.observe(PracticeEngine.evaluate(s, quoteFeed, market.isOpen, market.isKnown && now - statusChecked < 60_000, now), quoteFeed, now), now)
+                PracticeBackground.evaluate(
+                    s,
+                    quoteFeed,
+                    marketOpen = market.isOpen,
+                    marketKnown = market.isKnown && now - statusChecked < 60_000,
+                    now = now
+                )
             } }
             state = next
             if (next.orders.count { it.status == "FILLED" } > previousFilled) notice = "Practice order filled. View Activity for the observed price and simulated costs."
@@ -195,7 +201,7 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
                             onDetails = { id -> editId = id; sheet = "Order details" }, onNote = { symbol = ""; sheet = "Trade journal" }, onRules = { sheet = "Practice rules" }, working = working)
                     }
                 }
-                item { ResearchCaption("Practice only • Orders are checked while this screen is active. Delayed quotes, fees and fills are simulations; real queue position and liquidity are not reproduced.") }
+                item { ResearchCaption("Practice only • Orders are checked while this screen is active and periodically when Android runs scheduled background work. Background timing is not exact. Delayed quotes, fees and fills are simulations; real queue position and liquidity are not reproduced.") }
             }
         }
         if (notice != null) AlertDialog(onDismissRequest = { notice = null }, icon = { Icon(Icons.Outlined.CheckCircle, null, tint = ResearchGreen) }, title = { Text("Practice account updated") }, text = { Text(notice.orEmpty()) }, confirmButton = { TextButton(onClick = { notice = null }) { Text("Done") } })
@@ -251,7 +257,7 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
                             ResearchBody("Practice limit orders")
                             ResearchCaption("Buy at the limit or lower; sell at the limit or higher. Whole shares only. Cash or shares are reserved until filled or cancelled. Orders remain pending until you cancel them; editing restarts their observation eligibility time.")
                             ResearchBody("When an order fills")
-                            ResearchCaption("While this screen is active, a known open market and a timed same-day continuous-session quote are required. The quote must be no older than 30 minutes and observed after submission. Checks pause in the background; no retrospective fills are inferred from missed prices.")
+                            ResearchCaption("A known open market and a timed same-day continuous-session quote are required. The quote must be no older than 30 minutes and observed after submission. The screen checks while active, and Android may run scheduled background checks about every 15 minutes. No retrospective fills are inferred from missed prices.")
                             ResearchBody("Costs and settlement")
                             ResearchCaption("A 2% simulated fee applies to each buy and sell. This is an educational assumption, not a broker tariff. Fills use eligible observed prices, not a real order book. Exchange-specific price bands, ticks, partial fills and settlement delays are not simulated. Sale proceeds become available immediately in this practice account.")
                             ResearchBody("Market closure and data")
