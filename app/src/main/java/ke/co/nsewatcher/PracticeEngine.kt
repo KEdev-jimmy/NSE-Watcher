@@ -107,3 +107,30 @@ internal object PracticeEngine {
         return s.copy(snapshots = (s.snapshots + PracticeSnapshot(now, v, s.contributed)).takeLast(4000))
     }
 }
+
+
+internal data class PracticeProcessingResult(
+    val state: PracticeState,
+    val filledOrders: List<PracticeOrder>
+)
+
+internal object PracticeOrderProcessor {
+    fun process(
+        initial: PracticeState,
+        quotes: List<Stock>,
+        marketOpen: Boolean,
+        marketKnown: Boolean,
+        now: Long
+    ): PracticeProcessingResult {
+        val pendingBefore = initial.orders
+            .filter { it.status == "PENDING" }
+            .mapTo(mutableSetOf()) { it.id }
+
+        val evaluated = PracticeEngine.evaluate(initial, quotes, marketOpen, marketKnown, now)
+        val observed = PracticeEngine.observe(evaluated, quotes, now)
+        val next = PracticeEngine.snapshot(observed, now)
+        val filled = next.orders.filter { it.id in pendingBefore && it.status == "FILLED" }
+
+        return PracticeProcessingResult(next, filled)
+    }
+}
