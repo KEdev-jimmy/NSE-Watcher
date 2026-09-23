@@ -59,8 +59,9 @@ import kotlinx.coroutines.sync.withPermit
 @Composable
 fun WatchlistDashboard(
     quoteStocks: List<Stock>, initialCatalog: List<Stock>, initialMarket: MyStocksCache.MarketStatus,
-    onQuotesLoaded: (List<Stock>) -> Unit, openCompany: (Stock) -> Unit,
-    openNews: (NewsItem) -> Unit, openPreferences: () -> Unit, back: () -> Unit
+    onQuotesLoaded: (List<Stock>) -> Unit, onMarketStatusLoaded: (MyStocksCache.MarketStatus) -> Unit,
+    openCompany: (Stock) -> Unit, openNews: (NewsItem) -> Unit,
+    openPreferences: () -> Unit, back: () -> Unit
 ) {
     val context = LocalContext.current
     val store = remember { WatchlistStore(context) }
@@ -129,7 +130,10 @@ fun WatchlistDashboard(
                         else -> refreshError = "Quotes could not be updated. Each company shows its available observation time."
                     }
                     catalogRequest.await().takeIf { it.isNotEmpty() }?.let { catalog = it }
-                    market = marketRequest.await()
+                    val refreshedStatus = marketRequest.await()
+                    val preferredStatus = SharedMarketStatus.preferred(market, refreshedStatus)
+                    market = preferredStatus
+                    onMarketStatusLoaded(preferredStatus)
                 }
                 refreshTick++
             } catch (cancelled: CancellationException) { throw cancelled }
