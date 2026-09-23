@@ -80,9 +80,7 @@ fun MarketDashboard(stockFeed: List<Stock>, catalog: List<Stock>, initialStatus:
                 val data = MyStocksCache.loadCompanies()
                 if (data.isNotEmpty()) onCatalogLoaded(data)
             }
-            val state = MarketRefreshController.state.value
-            val due = state.lastSuccessfulRefreshMs?.let { System.currentTimeMillis() - it >= MarketRefreshController.REFRESH_INTERVAL_MS } ?: true
-            if (!state.refreshInProgress && (stockFeed.isEmpty() || (force && due))) {
+            if (MarketRefreshController.shouldRefreshQuotes(stockFeed.isNotEmpty()) && (stockFeed.isEmpty() || force)) {
                 val data = MyStocksCache.loadStocks()
                 if (data.isNotEmpty()) { onQuotesLoaded(data); error = null }
                 else error = "Quotes could not be refreshed. Available observations keep their original dates."
