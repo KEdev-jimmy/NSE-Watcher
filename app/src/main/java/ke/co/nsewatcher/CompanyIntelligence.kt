@@ -2,6 +2,7 @@ package ke.co.nsewatcher
 
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.platform.LocalContext
 import ke.co.nsewatcher.data.AnalystCache
 import ke.co.nsewatcher.data.CompanyIntelligenceCache
 import ke.co.nsewatcher.data.CompanyIntelligenceEngine
@@ -28,8 +29,13 @@ fun CompanyIntelligence(
     openPractice: () -> Unit,
     openNews: (NewsItem) -> Unit
 ) {
+    val context = LocalContext.current
+    val preferences = remember { context.getSharedPreferences("nse_watcher_preferences", android.content.Context.MODE_PRIVATE) }
+    val configuredDefaultRange = preferences.getString("chart_default_range", "1D")
+        ?.takeIf { it in CompanyResearchPresentation.ranges } ?: "1D"
+    val showChartGrid = preferences.getBoolean("chart_show_grid", true)
     var refresh by remember(s.symbol) { mutableIntStateOf(0) }
-    var selectedRange by rememberSaveable(s.symbol) { mutableStateOf("1D") }
+    var selectedRange by rememberSaveable(s.symbol) { mutableStateOf(configuredDefaultRange) }
     var ranges by remember(s.symbol) { mutableStateOf<Map<String, MyStocksCache.HistoryResult>>(emptyMap()) }
     var loadingRanges by remember(s.symbol) { mutableStateOf(CompanyResearchPresentation.ranges.toSet()) }
     var intelligence by remember(s.symbol) { mutableStateOf(CompanyIntelligenceCache.Result()) }
@@ -180,6 +186,6 @@ fun CompanyIntelligence(
         selectedRange = selectedRange, onRange = { selectedRange = it },
         chart = ranges[selectedRange] ?: MyStocksCache.HistoryResult(),
         chartLoading = selectedRange in loadingRanges, rangeReturns = returns,
-        sessionLoading = "1D" in loadingRanges
+        sessionLoading = "1D" in loadingRanges, showChartGrid = showChartGrid
     )
 }
