@@ -82,9 +82,7 @@ fun CompaniesDirectory(
                 if (result.isNotEmpty()) { onCatalogLoaded(result); loadError = null }
                 else loadError = "Company catalogue could not be updated. Available companies are still shown."
             }
-            val state = MarketRefreshController.state.value
-            val due = state.lastSuccessfulRefreshMs?.let { System.currentTimeMillis() - it >= MarketRefreshController.REFRESH_INTERVAL_MS } ?: true
-            if (!state.refreshInProgress && (quotes.isEmpty() || (force && due))) {
+            if (MarketRefreshController.shouldRefreshQuotes(quotes.isNotEmpty()) && (quotes.isEmpty() || force)) {
                 val result = MyStocksCache.loadStocks()
                 if (result.isNotEmpty()) onQuotesLoaded(result)
                 else loadError = "Quotes could not be updated. Companies remain available for research."
