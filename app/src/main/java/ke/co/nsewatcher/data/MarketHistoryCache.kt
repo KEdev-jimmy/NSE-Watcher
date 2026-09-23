@@ -104,7 +104,7 @@ internal class MarketHistoryRepository(
 
 internal object MarketHistoryCache {
     private val repository = MarketHistoryRepository(
-        loader = MyStocksCache::loadHistoryDetails
+        loader = MarketData::history
     )
 
     suspend fun load(
