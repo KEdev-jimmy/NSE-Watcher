@@ -38,7 +38,8 @@ import java.util.Locale
 @Composable
 fun MarketDashboard(stockFeed: List<Stock>, catalog: List<Stock>, initialStatus: MyStocksCache.MarketStatus,
     openCompany: (Stock) -> Unit, openCompanies: (String) -> Unit,
-    onQuotesLoaded: (List<Stock>) -> Unit, onCatalogLoaded: (List<Stock>) -> Unit) {
+    onQuotesLoaded: (List<Stock>) -> Unit, onCatalogLoaded: (List<Stock>) -> Unit,
+    onMarketStatusLoaded: (MyStocksCache.MarketStatus) -> Unit) {
     var tab by rememberSaveable { mutableStateOf("Overview") }
     var mover by rememberSaveable { mutableStateOf("Gainers") }
     var status by remember { mutableStateOf(initialStatus) }
@@ -74,8 +75,11 @@ fun MarketDashboard(stockFeed: List<Stock>, catalog: List<Stock>, initialStatus:
     suspend fun refreshData(force: Boolean) {
         busy = true
         try {
-            status = MyStocksCache.loadMarketStatus()
-            indices = MyStocksCache.loadMarketIndices(status.isKnown && status.isOpen)
+            val refreshedStatus = MyStocksCache.loadMarketStatus()
+            val preferredStatus = SharedMarketStatus.preferred(status, refreshedStatus)
+            status = preferredStatus
+            onMarketStatusLoaded(preferredStatus)
+            indices = MyStocksCache.loadMarketIndices(preferredStatus.isKnown && preferredStatus.isOpen)
             if (catalog.isEmpty() || force) {
                 val data = MyStocksCache.loadCompanies()
                 if (data.isNotEmpty()) onCatalogLoaded(data)
