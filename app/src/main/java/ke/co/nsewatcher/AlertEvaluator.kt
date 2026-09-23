@@ -76,6 +76,11 @@ object AlertEvaluator {
                         }
                     }
                     .filter { item -> newsTime(item.publishedAt)?.let { !it.isAfter(now) && Duration.between(it, now) <= newsWindow } == true }
+                    .filter { item ->
+                        val since = alert.threshold?.takeIf { alert.id.startsWith("watchlist-") && it.isFinite() && it > 0 }
+                            ?.toLong()?.let(Instant::ofEpochMilli)
+                        since == null || newsTime(item.publishedAt)?.let { !it.isBefore(since) } == true
+                    }
                     .filter { it.id != legacyNewsIds[alert.id] }
                     .distinctBy { it.id }.sortedByDescending { newsTime(it.publishedAt) }
                     .map { item -> TriggeredAlert(alert.id, symbol,
