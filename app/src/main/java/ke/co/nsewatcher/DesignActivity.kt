@@ -103,6 +103,7 @@ private enum class Page { HOME, MARKET, NEWS, COMPANIES, PAPER, MORE, COMPANY, W
 
 class DesignActivity : ComponentActivity() {
     private var alertDestination by mutableStateOf<AlertDestination?>(null)
+    private var practiceDestination by mutableStateOf(false)
     private val picker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         uri ?: return@registerForActivityResult
         try { contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
@@ -113,17 +114,33 @@ class DesignActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         AlertWorker.schedule(this)
         alertDestination = AlertNotifications.destination(intent)
-        setContent { App(alertDestination, { alertDestination = null; intent.action = null }) { picker.launch(arrayOf("image/*")) } }
+        practiceDestination = PracticeNotifications.opensPractice(intent)
+        setContent {
+            App(
+                alertDestination = alertDestination,
+                consumeAlert = { alertDestination = null; intent.action = null },
+                practiceDestination = practiceDestination,
+                consumePractice = { practiceDestination = false; intent.action = null },
+                pickAvatar = { picker.launch(arrayOf("image/*")) }
+            )
+        }
     }
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         alertDestination = AlertNotifications.destination(intent)
+        practiceDestination = PracticeNotifications.opensPractice(intent)
     }
 }
 
 @Composable
-private fun App(alertDestination: AlertDestination?, consumeAlert: () -> Unit, pickAvatar:()->Unit) {
+private fun App(
+    alertDestination: AlertDestination?,
+    consumeAlert: () -> Unit,
+    practiceDestination: Boolean,
+    consumePractice: () -> Unit,
+    pickAvatar: () -> Unit
+) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     var showOpeningScreen by rememberSaveable { mutableStateOf(true) }
@@ -208,6 +225,13 @@ private fun App(alertDestination: AlertDestination?, consumeAlert: () -> Unit, p
             page = Page.COMPANY
         }
         consumeAlert()
+    }
+    LaunchedEffect(practiceDestination) {
+        if (!practiceDestination) return@LaunchedEffect
+        history = listOf(Page.HOME)
+        practiceSymbol = ""
+        page = Page.PAPER
+        consumePractice()
     }
     LaunchedEffect(page) {
         if (page == Page.COMPANIES && companyCatalog.isEmpty()) {
