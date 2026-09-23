@@ -75,9 +75,9 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
         if (!resumed) return@LaunchedEffect
         while (isActive) {
             market = MyStocksCache.loadMarketStatus(); statusChecked = System.currentTimeMillis()
-            val refresh = MarketRefreshController.state.value
-            val due = refresh.lastSuccessfulRefreshMs?.let { System.currentTimeMillis() - it >= MarketRefreshController.REFRESH_INTERVAL_MS } ?: true
-            if (due && !refresh.refreshInProgress) { val quotes = MyStocksCache.loadStocks(); if (quotes.isNotEmpty()) onQuotes(quotes) }
+            if (MarketRefreshController.shouldRefreshQuotes(quoteFeed.isNotEmpty())) {
+                val quotes = MyStocksCache.loadStocks(); if (quotes.isNotEmpty()) onQuotes(quotes)
+            }
             delay(30_000L)
         }
     }
