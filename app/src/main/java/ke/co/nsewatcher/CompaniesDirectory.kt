@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import ke.co.nsewatcher.data.MyStocksCache
+import ke.co.nsewatcher.data.MarketData
 import ke.co.nsewatcher.data.AlertStore
 import ke.co.nsewatcher.data.NewsCache
 import ke.co.nsewatcher.data.WatchlistStore
@@ -78,12 +79,12 @@ fun CompaniesDirectory(
         busy = true
         try {
             if (catalog.isEmpty() || force) {
-                val result = MyStocksCache.loadCompanies()
+                val result = MarketData.loadCompanies()
                 if (result.isNotEmpty()) { onCatalogLoaded(result); loadError = null }
                 else loadError = "Company catalogue could not be updated. Available companies are still shown."
             }
             if (MarketRefreshController.shouldRefreshQuotes(quotes.isNotEmpty()) && (quotes.isEmpty() || force)) {
-                val result = MyStocksCache.loadStocks()
+                val result = MarketData.loadStocks()
                 if (result.isNotEmpty()) onQuotesLoaded(result)
                 else loadError = "Quotes could not be updated. Companies remain available for research."
             }
