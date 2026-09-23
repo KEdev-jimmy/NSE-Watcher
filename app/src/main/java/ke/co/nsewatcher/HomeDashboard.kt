@@ -279,6 +279,8 @@ fun HomeDashboard(
                 item {
                     Box(Modifier.padding(horizontal = 14.dp)) {
                         HomeH3BriefCard(
+                            hasWatchlist = watched.isNotEmpty(),
+                            hasChanges = unreviewedChanges.isNotEmpty(),
                             newsCompanies = unreviewedNewsCompanies,
                             dividendUpdates = unreviewedDividendUpdates,
                             alertCount = unreviewedAlertCount,
@@ -611,6 +613,8 @@ private fun HomeH3VerticalDivider() {
 
 @Composable
 private fun HomeH3BriefCard(
+    hasWatchlist: Boolean,
+    hasChanges: Boolean,
     newsCompanies: Int,
     dividendUpdates: Int,
     alertCount: Int,
@@ -640,27 +644,64 @@ private fun HomeH3BriefCard(
                     Text("See all →", color = ResearchGreen, fontSize = 10.5.sp)
                 }
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                HomeH3Metric(Icons.Default.Article, Color(0xFF2EA7F5), if (loading) "-" else newsCompanies.toString(), "watched\ncompanies\nin the news", Modifier.weight(1f))
-                HomeH3Metric(Icons.Default.EventAvailable, Color(0xFFB55CF6), if (loading) "-" else dividendUpdates.toString(), "dividend\nupdate", Modifier.weight(1f))
-                HomeH3Metric(Icons.Default.Notifications, Color(0xFFFFC857), if (loading) "-" else alertCount.toString(), "alerts ready\nto review", Modifier.weight(1f))
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                Button(
-                    onClick = review,
-                    modifier = Modifier.weight(1f).height(42.dp),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = ResearchGreen, contentColor = Color(0xFF061625))
-                ) {
-                    Text("Review changes →", fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+            when {
+                !hasWatchlist -> {
+                    Text(
+                        "Follow companies to turn Home into your personalised daily brief.",
+                        color = ResearchText,
+                        fontSize = 12.sp,
+                        lineHeight = 17.sp
+                    )
+                    Button(
+                        onClick = manageWatchlist,
+                        modifier = Modifier.fillMaxWidth().height(42.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = ResearchGreen, contentColor = Color(0xFF061625))
+                    ) {
+                        Text("Choose companies →", fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
-                OutlinedButton(
-                    onClick = manageWatchlist,
-                    modifier = Modifier.weight(1f).height(42.dp),
-                    shape = RoundedCornerShape(10.dp),
-                    border = BorderStroke(1.dp, ResearchBorder)
-                ) {
-                    Text("Manage watchlist →", color = ResearchText, fontSize = 10.sp, maxLines = 1)
+                !loading && !hasChanges -> {
+                    Text("You're caught up.", color = ResearchText, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        "No new watched-company developments are waiting for review.",
+                        color = ResearchMuted,
+                        fontSize = 10.5.sp,
+                        lineHeight = 15.sp
+                    )
+                    OutlinedButton(
+                        onClick = manageWatchlist,
+                        modifier = Modifier.fillMaxWidth().height(42.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, ResearchBorder)
+                    ) {
+                        Text("Manage watchlist →", color = ResearchText, fontSize = 10.sp)
+                    }
+                }
+                else -> {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        HomeH3Metric(Icons.Default.Article, Color(0xFF2EA7F5), if (loading) "-" else newsCompanies.toString(), "watched\ncompanies\nin the news", Modifier.weight(1f))
+                        HomeH3Metric(Icons.Default.EventAvailable, Color(0xFFB55CF6), if (loading) "-" else dividendUpdates.toString(), "dividend\nupdate", Modifier.weight(1f))
+                        HomeH3Metric(Icons.Default.Notifications, Color(0xFFFFC857), if (loading) "-" else alertCount.toString(), "alerts ready\nto review", Modifier.weight(1f))
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        Button(
+                            onClick = review,
+                            modifier = Modifier.weight(1f).height(42.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = ResearchGreen, contentColor = Color(0xFF061625))
+                        ) {
+                            Text("Review changes →", fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                        }
+                        OutlinedButton(
+                            onClick = manageWatchlist,
+                            modifier = Modifier.weight(1f).height(42.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, ResearchBorder)
+                        ) {
+                            Text("Manage watchlist →", color = ResearchText, fontSize = 10.sp, maxLines = 1)
+                        }
+                    }
                 }
             }
             if (hasError) {
