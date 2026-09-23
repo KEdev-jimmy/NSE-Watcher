@@ -6,7 +6,8 @@ import java.time.Duration
 import java.time.ZoneId
 
 internal data class HomeBriefItem(
-    val id: String, val symbol: String, val title: String, val detail: String, val source: String,
+    val id: String, val symbol: String, val title: String, val detail: String,
+    val whyItMayMatter: String, val uncertainty: String, val source: String,
     val time: String, val action: String, val story: NewsItem? = null,
     val stock: Stock? = null, val alert: AlertEvent? = null
 )
@@ -40,10 +41,12 @@ internal object HomePresentation {
                 symbol = symbol,
                 title = item.title,
                 detail = item.summary.takeIf(String::isNotBlank)
-                    ?: "Read the published update and its source before drawing a conclusion.",
+                    ?: "The feed returned a published update without a summary.",
+                whyItMayMatter = newsWhyItMayMatter(item),
+                uncertainty = "Published timing does not prove this update caused a price move or that any investment action is appropriate.",
                 source = item.source.ifBlank { "Source unavailable" },
                 time = item.publishedAt,
-                action = "Read the update",
+                action = "Read evidence",
                 story = item
             )
         }
@@ -58,15 +61,26 @@ internal object HomePresentation {
                     symbol = symbol,
                     title = "${event.symbol} · ${event.title}",
                     detail = event.message,
-                    source = "Your alert · detected",
+                    whyItMayMatter = "A condition you configured was detected for $symbol, so it may deserve a fresh look at the company and the underlying observation.",
+                    uncertainty = if (event.observedAt.isBlank())
+                        "This recorded alert has no quote observation time. It should not be treated as a live price signal or explanation of cause."
+                    else "The alert records that a condition was detected; it does not establish why the price moved or what will happen next.",
+                    source = event.source.ifBlank { "Your alert · detected" },
                     time = event.recordedAt,
-                    action = "Review this alert",
+                    action = "Research $symbol",
                     alert = event,
                     stock = bySymbol[symbol]
                 )
             }.toList()
         return (articleChanges + alertChanges).distinctBy { it.id }
             .sortedByDescending { CompanyResearchPresentation.timestamp(it.time) ?: Instant.MIN }
+    }
+
+    private fun newsWhyItMayMatter(item: NewsItem): String {
+        val reason = item.intelligenceRelevanceReason.trim()
+        if (reason.isNotBlank()) return "Feed relevance note: $reason"
+        val category = item.category.trim().ifBlank { "company" }
+        return "This is a new $category update for a company you follow. Read the source to decide whether it changes your understanding of the company."
     }
 
     fun brief(
