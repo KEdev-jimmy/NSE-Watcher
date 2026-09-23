@@ -17,6 +17,7 @@ fun CompanyIntelligence(
     back: () -> Unit,
     watched: Boolean = false,
     onWatchToggle: (() -> Unit)? = null,
+    openPractice: () -> Unit,
     openNews: (NewsItem) -> Unit
 ) {
     var refresh by remember(s.symbol) { mutableIntStateOf(0) }
@@ -105,7 +106,7 @@ fun CompanyIntelligence(
         fundamentalsLoading = fundamentalsLoading, news = news, newsLoading = newsLoading,
         newsError = newsError, movement = movement, movementLoading = movementLoading,
         onAnalysis = { analysisRequested = true }, watched = watched, onWatchToggle = onWatchToggle,
-        back = back, openNews = openNews,
+        back = back, openNews = openNews, openPractice = openPractice,
         onRefresh = { refresh++ },
         refreshing = fundamentalsLoading || newsLoading || loadingRanges.isNotEmpty() || movementLoading,
         selectedRange = selectedRange, onRange = { selectedRange = it },
