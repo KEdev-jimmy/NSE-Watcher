@@ -22,8 +22,10 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import ke.co.nsewatcher.data.CompanyChangeStore
 import ke.co.nsewatcher.data.MyStocksCache
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.catch
 import java.time.Instant
 import java.util.UUID
 
@@ -40,7 +42,13 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
     openCompany: (Stock) -> Unit, openNews: (NewsItem) -> Unit, back: () -> Unit) {
     val context = LocalContext.current
     val store = remember { PracticeStore(context) }
+    val companyChangeStore = remember { CompanyChangeStore(context) }
     val scope = rememberCoroutineScope()
+    var companyChangeError by remember { mutableStateOf(false) }
+    val companyChangeFlow = remember(companyChangeStore) {
+        companyChangeStore.events.catch { companyChangeError = true }
+    }
+    val companyDataEvents by companyChangeFlow.collectAsState(initial = emptyList())
     var state by remember { mutableStateOf<PracticeState?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var working by remember { mutableStateOf(false) }
@@ -198,7 +206,9 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
                     tab == "Activity" -> item {
                         PracticeActivity(s, activityTab, onTab = { activityTab = it }, onCancel = { id -> operation({ store.update { PracticeEngine.cancel(it, id) } }) },
                             onEdit = { o -> trade(companies.firstOrNull { it.symbol == o.symbol } ?: Stock(o.symbol, o.symbol, Double.NaN, 0.0, emptyList()), o.side, o.id) },
-                            onDetails = { id -> editId = id; sheet = "Order details" }, onNote = { symbol = ""; sheet = "Trade journal" }, onRules = { sheet = "Practice rules" }, working = working)
+                            onDetails = { id -> editId = id; sheet = "Order details" },
+                            onReview = { o -> editId = o.id; symbol = o.symbol; sheet = "Decision review" },
+                            onNote = { symbol = ""; sheet = "Trade journal" }, onRules = { sheet = "Practice rules" }, working = working)
                     }
                 }
                 item { ResearchCaption("Practice only • Pending orders are checked here while active and periodically in the background when Android can run connected work. Delayed quotes, fees and fills are simulations; real queue position and liquidity are not reproduced.") }
@@ -228,7 +238,12 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
                             ResearchCaption(if (symbol.isBlank()) "Record why you made a decision and what would change your mind." else "$symbol • Record why you bought and what changed.")
                             OutlinedTextField(note, { note = it.take(2000) }, label = { Text("Your note") }, modifier = Modifier.fillMaxWidth(), minLines = 3)
                             Button(enabled = note.isNotBlank() && !working, onClick = { operation({ store.update { it.copy(entries = it.entries + PracticeEntry(UUID.randomUUID().toString(), System.currentTimeMillis(), "NOTE", note.trim(), symbol = symbol)) } }) { sheet = null } }) { Text("Save note") }
-                            s?.entries?.filter { it.kind == "NOTE" && (symbol.isBlank() || it.symbol == symbol) }?.reversed()?.forEach { ResearchPanel { ResearchCaption(practiceTime(it.time)); ResearchBody(it.text) } }
+                            s?.entries?.filter { (it.kind == "NOTE" || it.kind == "REVIEW") && (symbol.isBlank() || it.symbol == symbol) }?.reversed()?.forEach {
+                                ResearchPanel {
+                                    ResearchCaption(if (it.kind == "REVIEW") "Decision review • ${practiceTime(it.time)}" else practiceTime(it.time))
+                                    ResearchBody(it.text)
+                                }
+                            }
                             s?.orders?.filter { it.note.isNotBlank() && (symbol.isBlank() || it.symbol == symbol) }?.reversed()?.forEach { ResearchPanel { ResearchCaption("${it.symbol} • ${practiceTime(it.created)}"); ResearchBody(it.note) } }
                         }
                         "Related news" -> {
@@ -247,6 +262,56 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
                             ResearchBody("This removes all practice cash, holdings, orders, history and notes on this device. Type RESET to continue.")
                             OutlinedTextField(confirmation, { confirmation = it }, label = { Text("Type RESET") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                             Button(onClick = { operation({ store.reset() }) { sheet = null; page = "MAIN"; tab = "Overview" } }, enabled = confirmation == "RESET" && !working, colors = ButtonDefaults.buttonColors(containerColor = ResearchRed)) { Text("Reset practice portfolio") }
+                        }
+                        "Decision review" -> item {
+                            val order = s?.orders?.firstOrNull { it.id == editId }
+                            if (s == null || order == null) {
+                                ResearchCaption("This saved order could not be found.")
+                            } else {
+                                val reviewStock = companies.firstOrNull { it.symbol == order.symbol }
+                                    ?: s.quotes.firstOrNull { it.symbol == order.symbol }?.let {
+                                        Stock(
+                                            it.symbol,
+                                            it.name.ifBlank { it.symbol },
+                                            it.price,
+                                            0.0,
+                                            emptyList(),
+                                            sector = it.sector,
+                                            observedAt = it.at,
+                                            changeAvailable = false
+                                        )
+                                    }
+                                    ?: Stock(order.symbol, order.symbol, Double.NaN, 0.0, emptyList(), changeAvailable = false, volumeAvailable = false)
+                                PracticeDecisionReviewPanel(
+                                    state = s,
+                                    order = order,
+                                    stock = reviewStock,
+                                    news = news,
+                                    companyEvents = companyDataEvents,
+                                    companyChangesUnavailable = companyChangeError,
+                                    working = working,
+                                    onNews = { story -> sheet = null; openNews(story) },
+                                    onResearch = { sheet = null; openCompany(reviewStock) },
+                                    onSaveReview = { reflection ->
+                                        operation({
+                                            store.update { current ->
+                                                current.copy(
+                                                    entries = current.entries + PracticeEntry(
+                                                        id = "review:${order.id}:${UUID.randomUUID()}",
+                                                        time = System.currentTimeMillis(),
+                                                        kind = "REVIEW",
+                                                        text = reflection,
+                                                        symbol = order.symbol
+                                                    )
+                                                )
+                                            }
+                                        }) {
+                                            sheet = null
+                                            notice = "Decision review saved. You can revisit it in Activity → Notes."
+                                        }
+                                    }
+                                )
+                            }
                         }
                         "Order details" -> item { s?.orders?.firstOrNull { it.id == editId }?.let { PracticeOrderReceipt(it) } }
                         "Valuation" -> item {
