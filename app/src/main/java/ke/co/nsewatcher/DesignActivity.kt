@@ -112,6 +112,7 @@ class DesignActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         AlertWorker.schedule(this)
+        PracticeOrderWorker.schedule(this)
         alertDestination = AlertNotifications.destination(intent)
         setContent { App(alertDestination, { alertDestination = null; intent.action = null }) { picker.launch(arrayOf("image/*")) } }
     }
