@@ -2,7 +2,9 @@ package ke.co.nsewatcher
 
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import ke.co.nsewatcher.data.AnalystCache
 import ke.co.nsewatcher.data.CompanyIntelligenceCache
+import ke.co.nsewatcher.data.CompanyIntelligenceEngine
 import ke.co.nsewatcher.data.MovementIntelligenceCache
 import ke.co.nsewatcher.data.MyStocksCache
 import ke.co.nsewatcher.data.NewsCache
@@ -17,6 +19,7 @@ fun CompanyIntelligence(
     back: () -> Unit,
     watched: Boolean = false,
     onWatchToggle: (() -> Unit)? = null,
+    marketStocks: List<Stock>,
     openPractice: () -> Unit,
     openNews: (NewsItem) -> Unit
 ) {
@@ -32,6 +35,8 @@ fun CompanyIntelligence(
     var newsError by remember(s.symbol) { mutableStateOf<String?>(null) }
     var movement by remember(s.symbol) { mutableStateOf(MovementIntelligenceCache.Result()) }
     var movementLoading by remember(s.symbol) { mutableStateOf(false) }
+    var analyst by remember(s.symbol) { mutableStateOf(AnalystCache.Result()) }
+    var analystLoading by remember(s.symbol) { mutableStateOf(false) }
     var analysisRequested by remember(s.symbol) { mutableStateOf(false) }
     val lastMarketRefreshMs = MarketRefreshController.state.value.lastSuccessfulRefreshMs
 
@@ -93,6 +98,20 @@ fun CompanyIntelligence(
             movement = MovementIntelligenceCache.Result(error = "Movement evidence is temporarily unavailable.")
         } finally { movementLoading = false }
     }
+    LaunchedEffect(s.symbol, analysisRequested, refresh) {
+        if (!analysisRequested) return@LaunchedEffect
+        analystLoading = true
+        try {
+            analyst = AnalystCache.ask(
+                s.symbol,
+                "Using only the supplied evidence, explain what changed, what may matter, and what remains uncertain. Do not give investment instructions."
+            )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            analyst = AnalystCache.Result(error = "AI explanation is temporarily unavailable.")
+        } finally { analystLoading = false }
+    }
 
     val day = ranges["1D"] ?: MyStocksCache.HistoryResult()
     val session = remember(s, day) { CompanyResearchPresentation.session(s, day) }
@@ -101,14 +120,27 @@ fun CompanyIntelligence(
             CompanyChartAccuracy.periodReturn(range, result, if (range == "1D") session.dailyChange else null)
         } + ("1D" to session.dailyChange)
     }
+    val deterministic = remember(s, intelligence, ranges["1M"], news) {
+        CompanyIntelligenceEngine.build(
+            stock = s,
+            source = intelligence,
+            priceHistory = ranges["1M"]?.prices.orEmpty(),
+            news = news
+        )
+    }
+    val movementContext = remember(s, marketStocks) {
+        CompanyAnalysisPresentation.movementContext(s, marketStocks)
+    }
     CompanyResearchScreen(
         stock = s, session = session, market = status, intelligence = intelligence,
         fundamentalsLoading = fundamentalsLoading, news = news, newsLoading = newsLoading,
         newsError = newsError, movement = movement, movementLoading = movementLoading,
+        deterministic = deterministic, movementContext = movementContext,
+        analyst = analyst, analystLoading = analystLoading,
         onAnalysis = { analysisRequested = true }, watched = watched, onWatchToggle = onWatchToggle,
         back = back, openNews = openNews, openPractice = openPractice,
         onRefresh = { refresh++ },
-        refreshing = fundamentalsLoading || newsLoading || loadingRanges.isNotEmpty() || movementLoading,
+        refreshing = fundamentalsLoading || newsLoading || loadingRanges.isNotEmpty() || movementLoading || analystLoading,
         selectedRange = selectedRange, onRange = { selectedRange = it },
         chart = ranges[selectedRange] ?: MyStocksCache.HistoryResult(),
         chartLoading = selectedRange in loadingRanges, rangeReturns = returns,

@@ -137,7 +137,8 @@ object CompanyIntelligenceEngine {
             risks += "The company intelligence service reported an error: ${source.error}."
         }
 
-        val evidenceRecords = (source.evidence.mapNotNull { EvidenceAdapters.fromCompanyEvidence(it) } +
+        val evidenceRecords = (listOfNotNull(EvidenceAdapters.fromStock(stock)) +
+            source.evidence.mapNotNull { EvidenceAdapters.fromCompanyEvidence(it) } +
             news.mapNotNull { EvidenceAdapters.fromNews(it) })
             .distinctBy { it.id }
         val evidenceGraph = EvidenceGraph.of(evidenceRecords, emptyList())
@@ -148,7 +149,7 @@ object CompanyIntelligenceEngine {
             dividends = source.dividends.isNotEmpty(),
             news = news.isNotEmpty(),
             priceHistory = priceHistory.count { it.isFinite() && it > 0.0 } >= 2,
-            evidenceCount = source.evidence.size
+            evidenceCount = evidenceRecords.size
         )
 
         val evidenceCoverage = when {

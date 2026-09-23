@@ -356,6 +356,7 @@ private fun Company(s: Stock, back: () -> Unit, openPractice: () -> Unit, openNe
         back = back,
         openNews = openNews,
         watched = watched,
+        marketStocks = stocks,
         onWatchToggle = {
             scope.launch {
                 if (watched) watchlistStore.remove(s.symbol)
