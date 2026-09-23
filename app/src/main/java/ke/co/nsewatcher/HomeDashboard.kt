@@ -49,7 +49,8 @@ fun HomeDashboard(
     name: String, initialCatalog: List<Stock>, practiceEnabled: Boolean, practiceCash: Double,
     openAllNews: () -> Unit, openPractice: () -> Unit, openProfile: () -> Unit,
     openAlertSettings: () -> Unit, onQuotesLoaded: (List<Stock>) -> Unit,
-    onNewsLoaded: (List<NewsItem>) -> Unit
+    onNewsLoaded: (List<NewsItem>) -> Unit,
+    onMarketStatusLoaded: (MyStocksCache.MarketStatus) -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -101,7 +102,10 @@ fun HomeDashboard(
         if (catalog.isEmpty()) catalog = MyStocksCache.loadCompanies()
         if (!startupDataLoaded && MarketRefreshController.shouldRefreshQuotes(currentStocks.isNotEmpty())) {
             MyStocksCache.loadStocks().takeIf { it.isNotEmpty() }?.let(onQuotesLoaded)
-            market = MyStocksCache.loadMarketStatus()
+            val refreshedStatus = MyStocksCache.loadMarketStatus()
+            val preferredStatus = SharedMarketStatus.preferred(market, refreshedStatus)
+            market = preferredStatus
+            onMarketStatusLoaded(preferredStatus)
         }
         while (true) { delay(MarketRefreshController.REFRESH_INTERVAL_MS); refreshNews(); historyRevision++ }
     }
@@ -110,7 +114,10 @@ fun HomeDashboard(
         refreshing = true
         scope.launch {
             try {
-                market = MyStocksCache.loadMarketStatus()
+                val refreshedStatus = MyStocksCache.loadMarketStatus()
+                val preferredStatus = SharedMarketStatus.preferred(market, refreshedStatus)
+                market = preferredStatus
+                onMarketStatusLoaded(preferredStatus)
                 // All foreground screens share the same provider-aware quote cadence.
                 if (MarketRefreshController.shouldRefreshQuotes(currentStocks.isNotEmpty())) {
                     val quotes = MyStocksCache.loadStocks()
