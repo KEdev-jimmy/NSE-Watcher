@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 15142)
-Total output lines: 696
-
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package ke.co.nsewatcher
 
@@ -413,7 +410,80 @@ private fun CompanyNewsSection(
 }
 
 @Composable
-private f…1142 tokens truncated…s.Default.Business)
+private fun CompanyHistoryChart(values: List<Double>, tint: Color) {
+    val valid = values.filter { it.isFinite() && it > 0.0 }
+    if (valid.size < 2) return
+
+    Canvas(
+        Modifier
+            .fillMaxWidth()
+            .height(150.dp)
+            .padding(vertical = 8.dp)
+    ) {
+        val min = valid.minOrNull() ?: return@Canvas
+        val max = valid.maxOrNull() ?: return@Canvas
+        val range = (max - min).takeIf { it > 0.0 } ?: 1.0
+        val path = Path()
+
+        valid.forEachIndexed { index, value ->
+            val x = size.width * index / (valid.lastIndex.coerceAtLeast(1))
+            val y = size.height - (((value - min) / range).toFloat() * size.height)
+            if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
+
+        drawPath(
+            path = path,
+            color = tint,
+            style = Stroke(width = 4f, cap = StrokeCap.Round)
+        )
+    }
+}
+
+@Composable private fun InfoRow(i:ImageVector,a:String,b:String){Row(Modifier.fillMaxWidth().padding(vertical=7.dp),verticalAlignment=Alignment.CenterVertically){Icon(i,null,tint=Green,modifier=Modifier.size(20.dp));Spacer(Modifier.width(10.dp));Text(a,Modifier.weight(1f),fontSize=11.sp);Text(b,fontSize=11.sp,fontWeight=FontWeight.Bold)}}
+
+@Composable
+private fun News(open:(NewsItem)->Unit){
+    var items by remember { mutableStateOf(emptyList<NewsItem>()) }
+    var loading by remember { mutableStateOf(true) }
+    var category by rememberSaveable { mutableStateOf("All") }
+    LaunchedEffect(Unit){ loading=true; items=NewsCache.loadFeed(); loading=false }
+    val categories=listOf("All","Company News","Dividends","Market","Analysis","Corporate Actions")
+    val filtered=if(category=="All") items else items.filter{it.category.equals(category,true)}
+    val top=filtered.firstOrNull()
+    val trending=filtered.drop(1).take(3)
+    val latest=filtered.drop(4)
+    LazyColumn(contentPadding=PaddingValues(16.dp,8.dp,16.dp,20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+        item{Header("News","NSE companies, dividends & market intelligence")}
+        item{Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(7.dp)){categories.forEach{c->FilterChip(selected=category==c,onClick={category=c},label={Text(c,fontSize=10.sp)})}}}
+        if(loading){item{Box(Modifier.fillMaxWidth().height(180.dp),contentAlignment=Alignment.Center){CircularProgressIndicator(color=Green)}}}
+        else if(filtered.isEmpty()){
+            item{Card(Modifier.fillMaxWidth(),RoundedCornerShape(18.dp),border=BorderStroke(1.dp,Border)){Column(Modifier.fillMaxWidth().padding(20.dp),horizontalAlignment=Alignment.CenterHorizontally){Icon(Icons.Default.Article,null,tint=Green,modifier=Modifier.size(36.dp));Spacer(Modifier.height(8.dp));Text("News unavailable",fontWeight=FontWeight.ExtraBold,fontSize=16.sp);Text("The live news provider did not return any articles right now. No placeholder news is shown.",color=Muted,fontSize=10.sp,textAlign=TextAlign.Center)}}}
+        } else {
+            top?.let{item{Text("Top News",fontWeight=FontWeight.ExtraBold,fontSize=17.sp)};item{NewsFeatured(it,open)}}
+            if(trending.isNotEmpty()){
+                item{Text("Most Trending News",fontWeight=FontWeight.ExtraBold,fontSize=17.sp)}
+                items(trending){item->NewsListCard(item,open)}
+            }
+            if(latest.isNotEmpty()){
+                item{Text("Latest News",fontWeight=FontWeight.ExtraBold,fontSize=17.sp)}
+                items(latest){item->NewsListCard(item,open)}
+            }
+        }
+        item{Text("News and corporate-action information is sourced through the MyStocks market-intelligence feed. Market data may be delayed; always verify important announcements against the issuer or exchange source.",color=Muted,fontSize=9.sp)}
+    }
+}
+
+private data class NewsDisplayMeta(val symbol:String,val company:String,val logoUrl:String,val label:String,val icon:ImageVector)
+
+private fun newsDisplayMeta(item:NewsItem):NewsDisplayMeta{
+    val raw=item.symbol.trim().uppercase(Locale.US)
+    val normalized=raw.removeSuffix(".KE")
+    val stock=stocks.firstOrNull{it.symbol.equals(normalized,true)}
+    val company=item.companyName.trim().ifBlank{stock?.name.orEmpty()}
+    val symbol=stock?.symbol?:normalized
+    if(company.isNotBlank()||symbol.isNotBlank()){
+        val logo=stock?.logoUrl?.takeIf{it.isNotBlank()} ?: "https://mystocks.africa/logos/${symbol.lowercase(Locale.US)}-ke.svg"
+        return NewsDisplayMeta(symbol,company,logo,symbol.ifBlank{"COMPANY"},Icons.Default.Business)
     }
     val c=item.category.lowercase(Locale.US)
     return when{
