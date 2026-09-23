@@ -1,5 +1,6 @@
 package ke.co.nsewatcher
 
+import ke.co.nsewatcher.data.MyStocksCache
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -73,6 +74,53 @@ class HomeMarketContextPresentationTest {
         val context = HomeMarketContextPresentation.items(snapshot)
 
         assertEquals(listOf("market-index-pulse", "sector-banking"), context.map { it.id })
+    }
+
+    @Test fun providerIndicesMapIntoHomeFreshnessWithoutInventingInvalidRows() {
+        val rows = HomeMarketIndexPresentation.fromProvider(
+            listOf(
+                MyStocksCache.MarketIndex(
+                    symbol = "^NASI",
+                    name = "NASI",
+                    value = 235.5,
+                    changePct = 1.25,
+                    asOf = "2026-09-23T09:30:00Z",
+                    freshnessMode = "CURRENT_SESSION"
+                ),
+                MyStocksCache.MarketIndex(
+                    symbol = "^N20I",
+                    name = "NSE 20",
+                    value = Double.NaN,
+                    changePct = null,
+                    asOf = "",
+                    freshnessMode = "UNKNOWN"
+                )
+            )
+        )
+
+        assertEquals(1, rows.size)
+        assertEquals("^NASI", rows.single().symbol)
+        assertEquals(HomeMarketDataMode.CURRENT_SESSION, rows.single().dataMode)
+        assertEquals(1.25, rows.single().changePct ?: Double.NaN, 0.0001)
+    }
+
+    @Test fun providerIndexFreshnessModesArePreservedForHomeEvidence() {
+        val rows = HomeMarketIndexPresentation.fromProvider(
+            listOf(
+                MyStocksCache.MarketIndex("^NASI", "NASI", 235.0, null, "2026-09-23", "END_OF_DAY"),
+                MyStocksCache.MarketIndex("^N20I", "NSE 20", 1900.0, -0.5, "2026-09-22", "STALE"),
+                MyStocksCache.MarketIndex("^N25I", "NSE 25", 4100.0, 0.2, "", "UNRECOGNIZED")
+            )
+        )
+
+        assertEquals(
+            listOf(
+                HomeMarketDataMode.END_OF_DAY,
+                HomeMarketDataMode.STALE,
+                HomeMarketDataMode.UNKNOWN
+            ),
+            rows.map { it.dataMode }
+        )
     }
 
     @Test fun noContextCardIsInventedWithoutSectorOrVerifiedIndexData() {
