@@ -140,6 +140,35 @@ internal object HomePresentation {
         .filter { it.id !in reviewedIds }
         .take(3)
 
+    data class AttentionDigest(
+        val summary: String,
+        val breakdown: List<String>
+    )
+
+    fun attentionDigest(changes: List<HomeBriefItem>): AttentionDigest? {
+        if (changes.isEmpty()) return null
+        val companies = changes.map { WatchlistPresentation.symbol(it.symbol) }
+            .filter(String::isNotBlank)
+            .distinct()
+            .size
+        val newsCount = changes.count { it.story != null }
+        val alertCount = changes.count { it.alert != null }
+        val companyDataCount = changes.size - newsCount - alertCount
+
+        fun label(count: Int, singular: String, plural: String = singular + "s") =
+            "${count} ${if (count == 1) singular else plural}"
+
+        return AttentionDigest(
+            summary = "${changes.size} new ${if (changes.size == 1) "development" else "developments"} across " +
+                "${companies} followed ${if (companies == 1) "company" else "companies"}",
+            breakdown = buildList {
+                if (newsCount > 0) add(label(newsCount, "news update"))
+                if (alertCount > 0) add(label(alertCount, "alert"))
+                if (companyDataCount > 0) add(label(companyDataCount, "company-data update"))
+            }
+        )
+    }
+
     fun marketSummary(breadth: HomeMarketBreadth): String = when {
         breadth.advancing + breadth.declining + breadth.unchanged == 0 -> "Daily market movement is unavailable."
         breadth.advancing > breadth.declining -> "More shares are rising than falling."
