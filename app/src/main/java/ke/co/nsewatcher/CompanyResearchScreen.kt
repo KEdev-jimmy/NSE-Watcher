@@ -39,21 +39,26 @@ import ke.co.nsewatcher.data.MyStocksCache
 import kotlinx.coroutines.launch
 import java.util.Locale
 
-internal val ResearchBackground = Color(0xFF061625)
-internal val ResearchCard = Color(0xFF0A1F32)
-internal val ResearchRaised = Color(0xFF10283D)
-internal val ResearchBorder = Color(0xFF17364F)
-internal val ResearchGreen = Color(0xFF00D084)
-internal val ResearchText = Color(0xFFF4F7FA)
-internal val ResearchMuted = Color(0xFFA9BCD0)
-internal val ResearchRed = Color(0xFFFF6971)
-private val ResearchLinkBlue = Color(0xFF75C5FF)
-internal val CompanyResearchColors = darkColorScheme(
-    primary = ResearchGreen, onPrimary = ResearchBackground,
-    background = ResearchBackground, onBackground = ResearchText,
-    surface = ResearchCard, onSurface = ResearchText,
-    surfaceVariant = ResearchRaised, onSurfaceVariant = ResearchMuted, outline = ResearchBorder
-)
+internal val ResearchBackground: Color
+    @Composable get() = MaterialTheme.colorScheme.background
+internal val ResearchCard: Color
+    @Composable get() = MaterialTheme.colorScheme.surface
+internal val ResearchRaised: Color
+    @Composable get() = MaterialTheme.colorScheme.surfaceVariant
+internal val ResearchBorder: Color
+    @Composable get() = MaterialTheme.colorScheme.outline
+internal val ResearchGreen: Color
+    @Composable get() = MaterialTheme.colorScheme.primary
+internal val ResearchText: Color
+    @Composable get() = MaterialTheme.colorScheme.onBackground
+internal val ResearchMuted: Color
+    @Composable get() = MaterialTheme.colorScheme.onSurfaceVariant
+internal val ResearchRed: Color
+    @Composable get() = MaterialTheme.colorScheme.error
+private val ResearchLinkBlue: Color
+    @Composable get() = MaterialTheme.colorScheme.tertiary
+internal val CompanyResearchColors: ColorScheme
+    @Composable get() = MaterialTheme.colorScheme
 
 @Composable
 internal fun CompanyResearchScreen(
@@ -104,7 +109,7 @@ internal fun CompanyResearchScreen(
                             modifier = Modifier.heightIn(min = 44.dp), shape = RoundedCornerShape(22.dp),
                             colors = FilterChipDefaults.filterChipColors(
                                 containerColor = ResearchCard, labelColor = ResearchMuted,
-                                selectedContainerColor = ResearchGreen, selectedLabelColor = ResearchBackground
+                                selectedContainerColor = ResearchGreen, selectedLabelColor = MaterialTheme.colorScheme.onPrimary
                             ), border = BorderStroke(1.dp, if (tab == label) ResearchGreen else ResearchBorder)
                         )
                     }
@@ -142,7 +147,7 @@ internal fun CompanyResearchScreen(
                                         modifier = Modifier.heightIn(min = 44.dp), shape = RoundedCornerShape(16.dp),
                                         colors = FilterChipDefaults.filterChipColors(
                                             containerColor = ResearchRaised, labelColor = ResearchMuted,
-                                            selectedContainerColor = ResearchGreen, selectedLabelColor = ResearchBackground
+                                            selectedContainerColor = ResearchGreen, selectedLabelColor = MaterialTheme.colorScheme.onPrimary
                                         ), border = BorderStroke(1.dp, Color.Transparent)
                                     )
                                 }
@@ -284,6 +289,7 @@ private fun ResearchCompanyHeader(stock: Stock, profile: CompanyIntelligenceCach
     }
 }
 
+@Composable
 internal fun researchChangeColor(value: Double?): Color = when { value == null -> ResearchMuted; value < 0 -> ResearchRed; value > 0 -> ResearchGreen; else -> ResearchMuted }
 
 @Composable
