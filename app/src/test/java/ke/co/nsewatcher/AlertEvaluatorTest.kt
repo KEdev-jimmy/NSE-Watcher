@@ -84,6 +84,18 @@ class AlertEvaluatorTest {
         assertTrue(AlertEvaluator.evaluate(listOf(rule(AlertType.DAILY_GAIN, 5.0)), listOf(stock()), AlertMonitorState(),
             now = now, marketOpen = true, legacyDailyDates = mapOf("rule" to "2026-09-23")).isEmpty())
     }
+    @Test fun newsAndCorporateActionRulesStayInSeparateCategories() {
+        val ordinary = article("ordinary", category = "Company News")
+        val dividend = article("dividend", category = "Dividends")
+        val action = article("action", category = "Corporate Actions")
+        val news = AlertEvaluator.evaluate(listOf(rule(AlertType.NEWS, null)), emptyList(), AlertMonitorState(),
+            listOf(ordinary, dividend, action), now)
+        val corporate = AlertEvaluator.evaluate(listOf(rule(AlertType.CORPORATE_ACTION, null, "corp")), emptyList(), AlertMonitorState(),
+            listOf(ordinary, dividend, action), now)
+        assertEquals(listOf("ordinary"), news.map { it.articleId })
+        assertEquals(setOf("dividend", "action"), corporate.map { it.articleId }.toSet())
+    }
+
     @Test fun corporateActionsFilterCategoryAndCompany() {
         val feed = listOf(article("ordinary"), article("dividend", category = "Dividends"),
             article("action", category = "Corporate Actions"), article("other", category = "Dividends").copy(symbol = "KCB"))
