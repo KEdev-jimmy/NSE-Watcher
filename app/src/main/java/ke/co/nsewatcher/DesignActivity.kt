@@ -248,6 +248,7 @@ private fun App(
     }
     LaunchedEffect(autoRefresh) {
         if (!autoRefresh) return@LaunchedEffect
+        var previousMarketKnown = startupMarketStatus.isKnown
         var previousMarketOpen = startupMarketStatus.isKnown && startupMarketStatus.isOpen
 
         while (isActive) {
@@ -257,7 +258,8 @@ private fun App(
             // This lets an app that is already open recognize the Nairobi session
             // transition around 09:30 EAT even when the user is physically abroad.
             val refreshedStatus = MyStocksCache.loadMarketStatus()
-            val marketStateChanged = refreshedStatus.isKnown && refreshedStatus.isOpen != previousMarketOpen
+            val marketStateChanged = refreshedStatus.isKnown &&
+                (!previousMarketKnown || refreshedStatus.isOpen != previousMarketOpen)
             val becameOpen = refreshedStatus.isKnown && refreshedStatus.isOpen && !previousMarketOpen
             startupMarketStatus = refreshedStatus
 
@@ -281,6 +283,7 @@ private fun App(
                 }
             }
 
+            previousMarketKnown = refreshedStatus.isKnown
             previousMarketOpen = refreshedStatus.isKnown && refreshedStatus.isOpen
         }
     }
