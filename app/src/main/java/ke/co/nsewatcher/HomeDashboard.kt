@@ -50,7 +50,9 @@ fun HomeDashboard(
     name: String, initialCatalog: List<Stock>, practiceEnabled: Boolean, practiceCash: Double,
     openAllNews: () -> Unit, openPractice: () -> Unit, openProfile: () -> Unit,
     openAlertSettings: () -> Unit, onQuotesLoaded: (List<Stock>) -> Unit,
-    onNewsLoaded: (List<NewsItem>) -> Unit
+    onNewsLoaded: (List<NewsItem>) -> Unit,
+    onIndicesLoaded: (List<MyStocksCache.MarketIndex>) -> Unit,
+    onMarketStatusLoaded: (MyStocksCache.MarketStatus) -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -102,7 +104,14 @@ fun HomeDashboard(
         if (catalog.isEmpty()) catalog = MyStocksCache.loadCompanies()
         if (!startupDataLoaded && MarketRefreshController.shouldRefreshQuotes(currentStocks.isNotEmpty())) {
             MyStocksCache.loadStocks().takeIf { it.isNotEmpty() }?.let(onQuotesLoaded)
-            market = MyStocksCache.loadMarketStatus()
+            val recoveredStatus = MyStocksCache.loadMarketStatus()
+            market = recoveredStatus
+            if (recoveredStatus.isKnown || !initialMarketStatus.isKnown) {
+                onMarketStatusLoaded(recoveredStatus)
+            }
+            MyStocksCache.loadMarketIndices(recoveredStatus.isKnown && recoveredStatus.isOpen)
+                .takeIf { it.isNotEmpty() }
+                ?.let(onIndicesLoaded)
         }
         while (true) { delay(MarketRefreshController.REFRESH_INTERVAL_MS); refreshNews(); historyRevision++ }
     }
@@ -111,7 +120,14 @@ fun HomeDashboard(
         refreshing = true
         scope.launch {
             try {
-                market = MyStocksCache.loadMarketStatus()
+                val refreshedStatus = MyStocksCache.loadMarketStatus()
+                market = refreshedStatus
+                if (refreshedStatus.isKnown || !initialMarketStatus.isKnown) {
+                    onMarketStatusLoaded(refreshedStatus)
+                }
+                MyStocksCache.loadMarketIndices(refreshedStatus.isKnown && refreshedStatus.isOpen)
+                    .takeIf { it.isNotEmpty() }
+                    ?.let(onIndicesLoaded)
                 // All foreground screens share the same provider-aware quote cadence.
                 if (MarketRefreshController.shouldRefreshQuotes(currentStocks.isNotEmpty())) {
                     val quotes = MyStocksCache.loadStocks()
