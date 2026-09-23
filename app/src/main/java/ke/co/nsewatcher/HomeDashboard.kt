@@ -476,3 +476,200 @@ private fun HomeNewsRow(story: NewsItem, open: () -> Unit) {
         }
     }
 }
+
+@Composable
+private fun HomeNairobiHeader(
+    name: String,
+    avatar: String?,
+    market: MyStocksCache.MarketStatus,
+    stocks: List<Stock>,
+    now: Instant,
+    refreshing: Boolean,
+    hasAttention: Boolean,
+    onRefresh: () -> Unit,
+    openAlerts: () -> Unit,
+    openProfile: () -> Unit
+) {
+    Box(Modifier.fillMaxWidth().height(205.dp)) {
+        HomeNairobiSkyline(Modifier.matchParentSize())
+        Column(Modifier.fillMaxSize().padding(start = 16.dp, end = 12.dp, top = 8.dp, bottom = 10.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.ShowChart, null, tint = ResearchGreen, modifier = Modifier.size(27.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("NSE Watcher", Modifier.weight(1f), color = ResearchText, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+                Box {
+                    IconButton(onClick = openAlerts) { Icon(Icons.Default.NotificationsNone, "Open recorded alerts", tint = ResearchText) }
+                    if (hasAttention) {
+                        Box(
+                            Modifier.size(7.dp).clip(CircleShape).background(ResearchGreen)
+                                .align(Alignment.TopEnd).offset(x = (-7).dp, y = 7.dp)
+                        )
+                    }
+                }
+                IconButton(onClick = openProfile) {
+                    Box(Modifier.size(38.dp).clip(CircleShape).background(Color(0xFF0C2A43)), contentAlignment = Alignment.Center) {
+                        Text(name.trim().take(1).uppercase().ifBlank { "I" }, color = ResearchText, fontWeight = FontWeight.Bold)
+                        if (avatar != null) AsyncImage(avatar, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(
+                HomePresentation.greeting(name, now),
+                color = ResearchText,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text("Here's what changed in your market today.", color = ResearchMuted, fontSize = 12.5.sp)
+            Spacer(Modifier.weight(1f))
+            val latest = stocks.filter { it.price.isFinite() && it.price > 0.0 }
+                .mapNotNull { CompanyResearchPresentation.timestamp(it.observedAt) }
+                .maxOrNull()
+            HomeH3StatusStrip(
+                status = when {
+                    !market.isKnown -> "Market status unavailable"
+                    market.isOpen -> "Market open"
+                    else -> "Market closed"
+                },
+                freshness = HomePresentation.freshness(stocks, now),
+                latest = latest?.let { CompanyResearchPresentation.date(it.toString()) } ?: "Observation time unavailable",
+                known = market.isKnown,
+                refreshing = refreshing,
+                onRefresh = onRefresh
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeH3StatusStrip(
+    status: String,
+    freshness: String,
+    latest: String,
+    known: Boolean,
+    refreshing: Boolean,
+    onRefresh: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Color(0xE00A2032),
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, Color(0xFF23465F))
+    ) {
+        Row(
+            Modifier.heightIn(min = 45.dp).padding(start = 11.dp, end = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(Modifier.size(8.dp).background(if (known) ResearchGreen else ResearchMuted, CircleShape))
+            Spacer(Modifier.width(6.dp))
+            Text(status, color = ResearchText, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+            HomeH3VerticalDivider()
+            Text(freshness, Modifier.weight(0.78f), color = ResearchMuted, fontSize = 9.2.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            HomeH3VerticalDivider()
+            Text(latest, Modifier.weight(1f), color = ResearchMuted, fontSize = 9.2.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            IconButton(onClick = onRefresh, enabled = !refreshing, modifier = Modifier.size(38.dp)) {
+                if (refreshing) CircularProgressIndicator(Modifier.size(16.dp), color = ResearchGreen, strokeWidth = 2.dp)
+                else Icon(Icons.Default.Refresh, "Refresh Home", tint = ResearchMuted, modifier = Modifier.size(21.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeH3VerticalDivider() {
+    Box(Modifier.padding(horizontal = 7.dp).width(1.dp).height(20.dp).background(ResearchBorder))
+}
+
+@Composable
+private fun HomeH3BriefCard(
+    newsCompanies: Int,
+    dividendUpdates: Int,
+    alertCount: Int,
+    loading: Boolean,
+    hasError: Boolean,
+    review: () -> Unit,
+    manageWatchlist: () -> Unit,
+    seeAll: () -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = ResearchCard,
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, ResearchBorder)
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "WHAT CHANGED FOR YOU",
+                    Modifier.weight(1f),
+                    color = ResearchGreen,
+                    fontSize = 10.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.55.sp
+                )
+                TextButton(onClick = seeAll, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) {
+                    Text("See all →", color = ResearchGreen, fontSize = 10.5.sp)
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                HomeH3Metric(Icons.Default.Article, Color(0xFF2EA7F5), if (loading) "-" else newsCompanies.toString(), "watched\ncompanies\nin the news", Modifier.weight(1f))
+                HomeH3Metric(Icons.Default.EventAvailable, Color(0xFFB55CF6), if (loading) "-" else dividendUpdates.toString(), "dividend\nupdate", Modifier.weight(1f))
+                HomeH3Metric(Icons.Default.Notifications, Color(0xFFFFC857), if (loading) "-" else alertCount.toString(), "alerts ready\nto review", Modifier.weight(1f))
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                Button(
+                    onClick = review,
+                    modifier = Modifier.weight(1f).height(42.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = ResearchGreen, contentColor = Color(0xFF061625))
+                ) {
+                    Text("Review changes →", fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                }
+                OutlinedButton(
+                    onClick = manageWatchlist,
+                    modifier = Modifier.weight(1f).height(42.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, ResearchBorder)
+                ) {
+                    Text("Manage watchlist →", color = ResearchText, fontSize = 10.sp, maxLines = 1)
+                }
+            }
+            if (hasError) {
+                Text("Some Home sources are temporarily unavailable; available observations remain visible.", color = ResearchMuted, fontSize = 8.8.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeH3Metric(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    accent: Color,
+    value: String,
+    label: String,
+    modifier: Modifier
+) {
+    Surface(
+        modifier = modifier.heightIn(min = 91.dp),
+        color = ResearchRaised.copy(alpha = 0.72f),
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, ResearchBorder)
+    ) {
+        Row(Modifier.padding(8.dp), verticalAlignment = Alignment.Top) {
+            Box(
+                Modifier.size(32.dp).clip(RoundedCornerShape(9.dp)).background(accent.copy(alpha = 0.14f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, null, tint = accent, modifier = Modifier.size(19.dp))
+            }
+            Spacer(Modifier.width(6.dp))
+            Column(Modifier.weight(1f)) {
+                Text(value, color = ResearchText, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold)
+                Text(label, color = ResearchMuted, fontSize = 9.2.sp, lineHeight = 11.5.sp)
+            }
+            Icon(Icons.Default.ChevronRight, null, tint = ResearchMuted, modifier = Modifier.size(13.dp).align(Alignment.Bottom))
+        }
+    }
+}
