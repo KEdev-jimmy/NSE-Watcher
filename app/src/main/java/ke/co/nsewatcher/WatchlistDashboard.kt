@@ -43,6 +43,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import ke.co.nsewatcher.data.AlertStore
 import ke.co.nsewatcher.data.MyStocksCache
+import ke.co.nsewatcher.data.MarketData
 import ke.co.nsewatcher.data.MarketHistoryCache
 import ke.co.nsewatcher.data.NewsCache
 import ke.co.nsewatcher.data.WatchlistStore
@@ -120,10 +121,10 @@ fun WatchlistDashboard(
             try {
                 coroutineScope {
                     val quoteRequest = async {
-                        if (MarketRefreshController.shouldRefreshQuotes(quoteStocks.isNotEmpty())) MyStocksCache.loadStocks() else null
+                        if (MarketRefreshController.shouldRefreshQuotes(quoteStocks.isNotEmpty())) MarketData.loadStocks() else null
                     }
-                    val catalogRequest = async { MyStocksCache.loadCompanies() }
-                    val marketRequest = async { MyStocksCache.loadMarketStatus() }
+                    val catalogRequest = async { MarketData.loadCompanies() }
+                    val marketRequest = async { MarketData.loadMarketStatus() }
                     val quotes = quoteRequest.await()
                     when {
                         quotes == null -> refreshError = null
