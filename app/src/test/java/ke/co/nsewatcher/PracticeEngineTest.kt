@@ -83,6 +83,39 @@ class PracticeEngineTest {
         val added = PracticeEngine.snapshot(s.copy(cash = 110000.0, contributed = 110000.0), now + 2000)
         assertEquals(0.0, added.snapshots.last().value - added.snapshots.last().contributed, 0.0)
     }
+    @Test fun sharedProcessorReportsNewFillsAndStoresTheObservedQuote() {
+        val pending = PracticeEngine.submit(account(), order())
+        val result = PracticeOrderProcessor.process(pending, listOf(quote()), true, true, now)
+
+        assertEquals(listOf("a"), result.filledOrders.map { it.id })
+        assertEquals("FILLED", result.state.orders.single().status)
+        assertEquals("2026-09-22T07:10:00Z", result.state.orders.single().quoteAt)
+        assertEquals("2026-09-22T07:10:00Z", result.state.quotes.single().at)
+    }
+
+    @Test fun sharedProcessorNeverUsesASavedQuoteAsARetrospectiveFill() {
+        val pending = PracticeEngine.submit(account(), order()).copy(
+            quotes = listOf(PracticeQuote("KCB", 95.0, "2026-09-22T07:10:00Z", "KCB Group"))
+        )
+        val result = PracticeOrderProcessor.process(pending, emptyList(), true, true, now)
+
+        assertTrue(result.filledOrders.isEmpty())
+        assertEquals("PENDING", result.state.orders.single().status)
+        assertEquals("Waiting for a valid company quote", result.state.orders.single().reason)
+        assertEquals("2026-09-22T07:10:00Z", result.state.quotes.single().at)
+    }
+
+    @Test fun sharedProcessorIsIdempotentAfterARecordedFill() {
+        val pending = PracticeEngine.submit(account(), order())
+        val first = PracticeOrderProcessor.process(pending, listOf(quote()), true, true, now)
+        val second = PracticeOrderProcessor.process(first.state, listOf(quote()), true, true, now + 1000)
+
+        assertTrue(second.filledOrders.isEmpty())
+        assertEquals(first.state.cash, second.state.cash, 0.0)
+        assertEquals(first.state.holdings, second.state.holdings)
+        assertEquals(1, second.state.orders.count { it.status == "FILLED" })
+    }
+
     @Test fun zeroBalancesAndZeroGainsAreAmountsNotMissingPrices() {
         assertEquals("KSh 0.00", practiceMoney(0.0))
         assertEquals("KSh 0.00", practiceGain(0.0))
