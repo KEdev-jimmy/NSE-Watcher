@@ -87,9 +87,7 @@ fun CompanyIntelligence(
             if (result.error == null) onNewsLoaded(result.items)
 
             val refreshedStatus = MyStocksCache.loadMarketStatus()
-            if (refreshedStatus.isKnown || !marketStatus.isKnown) {
-                onMarketStatusLoaded(refreshedStatus)
-            }
+            onMarketStatusLoaded(SharedMarketStatus.preferred(marketStatus, refreshedStatus))
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
