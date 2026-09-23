@@ -8,6 +8,7 @@ import ke.co.nsewatcher.data.CompanyIntelligenceEngine
 import ke.co.nsewatcher.data.MovementIntelligenceCache
 import ke.co.nsewatcher.data.MarketHistoryCache
 import ke.co.nsewatcher.data.MyStocksCache
+import ke.co.nsewatcher.data.MarketData
 import ke.co.nsewatcher.data.NewsCache
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
@@ -87,7 +88,7 @@ fun CompanyIntelligence(
             newsError = result.error
             if (result.error == null) onNewsLoaded(result.items)
 
-            val refreshedStatus = MyStocksCache.loadMarketStatus()
+            val refreshedStatus = MarketData.loadMarketStatus()
             if (refreshedStatus.isKnown || !marketStatus.isKnown) {
                 onMarketStatusLoaded(refreshedStatus)
             }
