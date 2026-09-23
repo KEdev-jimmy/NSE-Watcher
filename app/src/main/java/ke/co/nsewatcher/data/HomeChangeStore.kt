@@ -24,6 +24,7 @@ internal data class HomeChangeRecord(
 
 internal data class HomeChangeState(
     val trackedSymbols: Set<String> = emptySet(),
+    val baselineAtBySymbol: Map<String, String> = emptyMap(),
     val entries: Map<String, HomeChangeRecord> = emptyMap()
 ) {
     val reviewedIds: Set<String>
@@ -44,6 +45,11 @@ internal object HomeChangeLedger {
 
         val newlyTracked = watched - current.trackedSymbols
         val cutoff = now.minus(retention)
+        val baselines = watched.associateWith { symbol ->
+            current.baselineAtBySymbol[symbol]
+                ?.takeIf { runCatching { Instant.parse(it) }.isSuccess }
+                ?: now.toString()
+        }
         val kept = current.entries.values.filter { record ->
             record.symbol in watched &&
                 runCatching { Instant.parse(record.firstSeenAt) }.getOrNull()?.let { !it.isBefore(cutoff) } == true
@@ -55,16 +61,23 @@ internal object HomeChangeLedger {
             .forEach { change ->
                 if (change.id !in kept) {
                     val symbol = WatchlistPresentation.symbol(change.symbol)
+                    val baseline = baselines[symbol]?.let { runCatching { Instant.parse(it) }.getOrNull() }
+                    val eventTime = runCatching { Instant.parse(change.time) }.getOrNull()
+                    val existedBeforeBaseline = baseline == null || eventTime == null || !eventTime.isAfter(baseline)
                     kept[change.id] = HomeChangeRecord(
                         id = change.id,
                         symbol = symbol,
                         firstSeenAt = now.toString(),
-                        reviewedAt = if (symbol in newlyTracked) now.toString() else ""
+                        reviewedAt = if (symbol in newlyTracked || existedBeforeBaseline) now.toString() else ""
                     )
                 }
             }
 
-        return HomeChangeState(watched, kept)
+        return HomeChangeState(
+            trackedSymbols = watched,
+            baselineAtBySymbol = baselines,
+            entries = kept
+        )
     }
 
     fun markReviewed(current: HomeChangeState, ids: Set<String>, now: Instant): HomeChangeState {
@@ -106,6 +119,11 @@ internal class HomeChangeStore(private val context: Context) {
 
     private fun encode(state: HomeChangeState): String = JSONObject().apply {
         put("trackedSymbols", JSONArray(state.trackedSymbols.sorted()))
+        put("baselineAtBySymbol", JSONObject().apply {
+            state.baselineAtBySymbol.toSortedMap().forEach { (symbol, baselineAt) ->
+                put(symbol, baselineAt)
+            }
+        })
         put("entries", JSONArray().apply {
             state.entries.values.forEach { record ->
                 put(JSONObject().apply {
@@ -122,12 +140,24 @@ internal class HomeChangeStore(private val context: Context) {
         if (raw.isBlank()) return@runCatching HomeChangeState()
         val root = JSONObject(raw)
         val symbols = root.optJSONArray("trackedSymbols") ?: JSONArray()
+        val baselineObject = root.optJSONObject("baselineAtBySymbol") ?: JSONObject()
         val entries = root.optJSONArray("entries") ?: JSONArray()
         HomeChangeState(
             trackedSymbols = buildSet {
                 for (i in 0 until symbols.length()) {
                     symbols.optString(i).trim().takeIf(String::isNotBlank)?.let {
                         add(WatchlistPresentation.symbol(it))
+                    }
+                }
+            },
+            baselineAtBySymbol = buildMap {
+                val keys = baselineObject.keys()
+                while (keys.hasNext()) {
+                    val rawSymbol = keys.next()
+                    val symbol = WatchlistPresentation.symbol(rawSymbol)
+                    val baselineAt = baselineObject.optString(rawSymbol).trim()
+                    if (symbol.isNotBlank() && runCatching { Instant.parse(baselineAt) }.isSuccess) {
+                        put(symbol, baselineAt)
                     }
                 }
             },
