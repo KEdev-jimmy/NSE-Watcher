@@ -78,13 +78,13 @@ import java.util.UUID
         text = { Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("${order.shares} ${order.symbol} shares • Limit ${practiceMoney(order.limit)}")
             Text(if (order.side == "BUY") "Reserve up to ${practiceMoney(PracticeEngine.money(order.shares * order.limit) + PracticeEngine.money(order.shares * order.limit * PracticeEngine.FEE))}, including the practice fee." else "Reserve ${order.shares} shares until filled or cancelled.")
-            Text("This queues an order; it does not confirm a fill. Orders are checked while Practice Portfolio is active.")
+            Text("This queues an order; it does not confirm a fill. Orders are checked while Practice Portfolio is active and periodically in the background when Android can run connected work.")
         } }, confirmButton = { TextButton(enabled = !working, onClick = { review = null; onSubmit(order.copy(created = System.currentTimeMillis())) }) { Text("Confirm practice order") } }, dismissButton = { TextButton(onClick = { review = null }) { Text("Go back") } }) }
 }
 
 @Composable internal fun PracticeActivity(s: PracticeState, tab: String, onTab: (String) -> Unit,
     onCancel: (String) -> Unit, onEdit: (PracticeOrder) -> Unit, onDetails: (String) -> Unit,
-    onNote: () -> Unit, onRules: () -> Unit, working: Boolean) {
+    onReview: (PracticeOrder) -> Unit, onNote: () -> Unit, onRules: () -> Unit, working: Boolean) {
     var cancelling by remember { mutableStateOf<String?>(null) }
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         MarketChoiceRow(listOf("Orders", "Transactions", "Notes"), tab, onTab)
@@ -101,7 +101,12 @@ import java.util.UUID
                             ResearchCaption(o.reason); ResearchCaption("Your shares have not changed for this order.")
                             Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) { OutlinedButton(enabled = !working, onClick = { onEdit(o) }) { Text("Edit order") }; OutlinedButton(enabled = !working, onClick = { cancelling = o.id }) { Text("Cancel order", color = ResearchRed) } }
                         } else ResearchCaption(o.reason)
-                        TextButton(onClick = { onDetails(o.id) }) { Text("View price and costs →") }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TextButton(onClick = { onDetails(o.id) }) { Text("View price and costs →") }
+                            if (o.status == "FILLED") {
+                                TextButton(onClick = { onReview(o) }) { Text("Review decision →", color = ResearchGreen) }
+                            }
+                        }
                     }
                 }
                 ResearchPanel { ResearchTitle("How practice fills work"); ResearchCaption("We check eligible quotes against your limit. Real queue position and liquidity are not reproduced."); TextButton(onClick = onRules) { Text("Read the simulation rules →") } }
@@ -115,7 +120,7 @@ import java.util.UUID
             }
             else -> {
                 ResearchTitle("Trade journal")
-                val notes = s.entries.filter { it.kind == "NOTE" }
+                val notes = s.entries.filter { it.kind == "NOTE" || it.kind == "REVIEW" }
                 val orders = s.orders.filter { it.note.isNotBlank() }
                 if (notes.isEmpty() && orders.isEmpty()) ResearchCaption("Write why you bought and what would change your mind.")
                 notes.reversed().forEach { PracticeEntryCard(it) }
@@ -128,11 +133,17 @@ import java.util.UUID
 }
 @Composable private fun PracticeEntryCard(e: PracticeEntry) {
     ResearchPanel {
-        ResearchCaption(if (e.kind == "LEGACY") "Legacy activity • Date retained below" else practiceTime(e.time))
+        ResearchCaption(
+            when (e.kind) {
+                "LEGACY" -> "Legacy activity • Date retained below"
+                "REVIEW" -> "Decision review • ${practiceTime(e.time)}"
+                else -> practiceTime(e.time)
+            }
+        )
         ResearchBody(e.text)
         if (e.amount != 0.0) Text(practiceGain(e.amount), color = if (e.kind == "CAPITAL") ResearchText else researchChangeColor(e.amount), fontSize = 15.sp)
         if (e.kind == "CAPITAL") ResearchCaption("Contribution • Not investment profit")
-        if (e.symbol.isNotBlank() && e.kind == "NOTE") ResearchCaption(e.symbol)
+        if (e.symbol.isNotBlank() && (e.kind == "NOTE" || e.kind == "REVIEW")) ResearchCaption(e.symbol)
     }
 }
 @Composable internal fun PracticeOrderReceipt(o: PracticeOrder) {
