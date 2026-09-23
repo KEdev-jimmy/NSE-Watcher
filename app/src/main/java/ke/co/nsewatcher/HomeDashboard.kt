@@ -172,6 +172,9 @@ fun HomeDashboard(
         if (changeState == null) emptyList() else changes.filter { it.id !in reviewed }
     }
     val brief = unreviewedChanges.take(3)
+    val attentionDigest = remember(unreviewedChanges) {
+        HomePresentation.attentionDigest(unreviewedChanges)
+    }
     fun markReviewed(ids: Set<String>) {
         if (ids.isEmpty()) return
         scope.launch {
@@ -273,6 +276,18 @@ fun HomeDashboard(
                             Text("What needs your attention?", Modifier.weight(1f), color = ResearchText, fontSize = 19.sp, fontWeight = FontWeight.Bold)
                             if (unreviewedChanges.isNotEmpty()) Surface(color = ResearchGreen.copy(alpha = 0.12f), shape = RoundedCornerShape(10.dp), border = BorderStroke(1.dp, ResearchGreen.copy(alpha = 0.45f))) {
                                 Text("${unreviewedChanges.size} new", Modifier.padding(7.dp), color = ResearchText, fontSize = 11.sp)
+                            }
+                        }
+                        attentionDigest?.let { digest ->
+                            Spacer(Modifier.height(6.dp))
+                            ResearchCaption(digest.summary)
+                            if (digest.breakdown.isNotEmpty()) {
+                                Text(
+                                    digest.breakdown.joinToString(" · "),
+                                    color = ResearchGreen,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
                             }
                         }
                         when {
