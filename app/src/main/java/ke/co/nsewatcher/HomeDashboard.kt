@@ -87,7 +87,7 @@ fun HomeDashboard(
     LaunchedEffect(Unit) {
         refreshNews()
         if (catalog.isEmpty()) catalog = MyStocksCache.loadCompanies()
-        if (!startupDataLoaded && currentStocks.isEmpty()) {
+        if (!startupDataLoaded && MarketRefreshController.shouldRefreshQuotes(currentStocks.isNotEmpty())) {
             MyStocksCache.loadStocks().takeIf { it.isNotEmpty() }?.let(onQuotesLoaded)
             market = MyStocksCache.loadMarketStatus()
         }
@@ -99,10 +99,8 @@ fun HomeDashboard(
         scope.launch {
             try {
                 market = MyStocksCache.loadMarketStatus()
-                // Respect the existing 15-minute quote cadence, including manual refreshes.
-                val state = MarketRefreshController.state.value
-                val due = state.lastSuccessfulRefreshMs?.let { System.currentTimeMillis() - it >= MarketRefreshController.REFRESH_INTERVAL_MS } ?: true
-                if (!state.refreshInProgress && (currentStocks.isEmpty() || due)) {
+                // All foreground screens share the same provider-aware quote cadence.
+                if (MarketRefreshController.shouldRefreshQuotes(currentStocks.isNotEmpty())) {
                     val quotes = MyStocksCache.loadStocks()
                     if (quotes.isNotEmpty()) { onQuotesLoaded(quotes); refreshError = null }
                     else refreshError = "Quotes could not be updated. Available observations are still shown."
