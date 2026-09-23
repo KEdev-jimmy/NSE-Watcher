@@ -135,8 +135,13 @@ private fun observationTime(stock: Stock): String {
 private fun value(raw: String): String = raw.trim().ifBlank { "Unavailable" }
 private fun percent(raw: String): String { val v = raw.trim(); if (v.isBlank()) return "Unavailable"; return if (v.contains("%")) v else v + "%" }
 private fun financial(raw: String, unit: String): String { val v = raw.trim(); if (v.isBlank()) return "Unavailable"; return if (unit.isBlank()) v else v + " " + unit }
-private val CompareGreen = ResearchGreen
-private val CompareLight = ResearchCard
-private val CompareText = ResearchText
-private val CompareMuted = ResearchMuted
-private val CompareBorder = ResearchBorder
+private val CompareGreen: Color
+    @Composable get() = ResearchGreen
+private val CompareLight: Color
+    @Composable get() = ResearchCard
+private val CompareText: Color
+    @Composable get() = ResearchText
+private val CompareMuted: Color
+    @Composable get() = ResearchMuted
+private val CompareBorder: Color
+    @Composable get() = ResearchBorder
