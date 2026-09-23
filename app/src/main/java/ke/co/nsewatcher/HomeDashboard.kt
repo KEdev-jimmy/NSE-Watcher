@@ -323,6 +323,41 @@ fun HomeDashboard(
                         ResearchCaption("Source: ${sources.joinToString().ifBlank { "Unavailable" }}")
                     }
                 }
+                val marketContext = HomeMarketContextPresentation.items(intelligence)
+                if (marketContext.isNotEmpty()) item {
+                    HomeHeading("Market context")
+                    Spacer(Modifier.height(8.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        marketContext.forEach { insight ->
+                            ResearchPanel {
+                                Text("OBSERVED CONTEXT", color = ResearchGreen, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.6.sp)
+                                ResearchBody(insight.fact)
+                                if (insight.calculation.isNotBlank()) ResearchCaption(insight.calculation)
+                                if (insight.interpretation.isNotBlank()) {
+                                    Text("HOW TO READ IT", color = ResearchMuted, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                                    ResearchCaption(insight.interpretation)
+                                }
+                                val evidence = insight.evidence.firstOrNull()
+                                if (evidence != null) {
+                                    val evidenceDate = evidence.date.takeIf(String::isNotBlank)
+                                        ?.let(CompanyResearchPresentation::date)
+                                    ResearchCaption(
+                                        listOfNotNull(
+                                            "Evidence",
+                                            evidence.source.takeIf(String::isNotBlank),
+                                            evidenceDate
+                                        ).joinToString(" · ")
+                                    )
+                                } else if (insight.source.isNotBlank()) {
+                                    ResearchCaption("Evidence · ${insight.source}")
+                                }
+                                TextButton(onClick = openMarket, contentPadding = PaddingValues(0.dp)) {
+                                    Text("Inspect market evidence →", color = ResearchGreen, fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+                }
                 item {
                     HomeHeading("Market movers")
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
