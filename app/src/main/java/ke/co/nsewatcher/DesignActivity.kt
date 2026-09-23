@@ -102,6 +102,7 @@ private val stocks: List<Stock> get() = liveStocks.value
 private enum class Page { HOME, MARKET, NEWS, COMPANIES, PAPER, MORE, COMPANY, WATCHLIST, COMPARE, NEWS_DETAIL, PROFILE, SETTINGS, THEME, NOTIFICATIONS, LIVE_DATA, CHARTS, ALERTS, LANGUAGE, SECURITY, PRIVACY, DISPLAY, HELP, ABOUT }
 
 class DesignActivity : ComponentActivity() {
+    private var alertDestination by mutableStateOf<AlertDestination?>(null)
     private val picker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         uri ?: return@registerForActivityResult
         try { contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
@@ -111,12 +112,18 @@ class DesignActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         AlertWorker.schedule(this)
-        setContent { App { picker.launch(arrayOf("image/*")) } }
+        alertDestination = AlertNotifications.destination(intent)
+        setContent { App(alertDestination, { alertDestination = null; intent.action = null }) { picker.launch(arrayOf("image/*")) } }
+    }
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        alertDestination = AlertNotifications.destination(intent)
     }
 }
 
 @Composable
-private fun App(pickAvatar:()->Unit) {
+private fun App(alertDestination: AlertDestination?, consumeAlert: () -> Unit, pickAvatar:()->Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     var showOpeningScreen by rememberSaveable { mutableStateOf(true) }
@@ -164,6 +171,7 @@ private fun App(pickAvatar:()->Unit) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var selected by remember { mutableStateOf(Stock("", "", 0.0, 0.0, emptyList())) }
     var selectedNews by remember { mutableStateOf<NewsItem?>(null) }
+    var alertNavigationRevision by remember { mutableIntStateOf(0) }
     val directoryState = rememberSaveableStateHolder()
     var directorySector by rememberSaveable { mutableStateOf("All") }
     var comparisonSymbols by rememberSaveable { mutableStateOf(emptyList<String>()) }
@@ -185,6 +193,20 @@ private fun App(pickAvatar:()->Unit) {
             onFinished = { showOpeningScreen = false }
         )
         return
+    }
+    LaunchedEffect(alertDestination) {
+        val target = alertDestination ?: return@LaunchedEffect
+        history = listOf(Page.HOME)
+        val article = target.article()
+        if (article != null) {
+            alertNavigationRevision++
+            selectedNews = article
+            page = Page.NEWS_DETAIL
+        } else {
+            selected = target.company(CompaniesPresentation.companies(companyCatalog, stocks))
+            page = Page.COMPANY
+        }
+        consumeAlert()
     }
     LaunchedEffect(page) {
         if (page == Page.COMPANIES && companyCatalog.isEmpty()) {
@@ -239,7 +261,7 @@ private fun App(pickAvatar:()->Unit) {
             Page.COMPANY->Company(selected,::back){selectedNews=it;go(Page.NEWS_DETAIL)}
             Page.WATCHLIST->WatchlistDashboard(quoteStocks=stocks, initialCatalog=companyCatalog, initialMarket=startupMarketStatus, onQuotesLoaded={liveStocks.value=it}, openCompany={selected=it;go(Page.COMPANY)}, openNews={selectedNews=it;go(Page.NEWS_DETAIL)}, openPreferences={go(Page.NOTIFICATIONS)}, back=::back)
             Page.COMPARE->CompanyComparison(CompaniesPresentation.companies(companyCatalog, stocks),::back,comparisonSymbols)
-            Page.NEWS_DETAIL->selectedNews?.let { NewsArticleScreen(it,companyCatalog,stocks,::back){company->selected=company;go(Page.COMPANY)} }
+            Page.NEWS_DETAIL->key(alertNavigationRevision) { selectedNews?.let { NewsArticleScreen(it,companyCatalog,stocks,::back){company->selected=company;go(Page.COMPANY)} } }
             Page.PROFILE->Profile(name,username,email,description,{name=it;put("profile_name",it)},{username=it;put("username",it)},{email=it;put("email",it)},{description=it;put("description",it)},pickAvatar,::back,::go)
             Page.SETTINGS->Settings(dark,marketAlerts,priceAlerts,newsAlerts,appAlerts,autoRefresh,showVolume,showChanges,{dark=it;put("dark_mode",it)},{marketAlerts=it;put("market_alerts",it)},{priceAlerts=it;put("price_alerts",it)},{newsAlerts=it;put("news_alerts",it)},{appAlerts=it;put("app_alerts",it)},{autoRefresh=it;put("auto_refresh",it)},{showVolume=it;put("show_volume",it)},{showChanges=it;put("show_changes",it)},::back,::go)
             Page.THEME->ThemePage(dark,{dark=it;put("dark_mode",it)},::back)
@@ -540,7 +562,7 @@ private fun Settings(dark:Boolean,market:Boolean,price:Boolean,news:Boolean,app:
 @Composable private fun RowItem(icon:ImageVector,title:String,sub:String,onClick:()->Unit={}){Row(Modifier.fillMaxWidth().clickable(onClick=onClick).padding(vertical=9.dp),verticalAlignment=Alignment.CenterVertically){Icon(icon,null,tint=Green,modifier=Modifier.size(22.dp));Spacer(Modifier.width(11.dp));Column(Modifier.weight(1f)){Text(title,fontSize=12.sp,fontWeight=FontWeight.Bold);Text(sub,fontSize=9.sp,color=Muted)};Icon(Icons.Default.ChevronRight,null,tint=Muted,modifier=Modifier.size(19.dp))}}
 @Composable private fun ThemePage(dark:Boolean,set:(Boolean)->Unit,back:()->Unit){LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){item{Header("Theme","Choose how NSE Watcher looks",back)};item{ThemeChoice("Light","Bright white interface",!dark){set(false)}};item{ThemeChoice("Dark","Low-light interface",dark){set(true)}};}}
 @Composable private fun ThemeChoice(title:String,sub:String,selected:Boolean,onClick:()->Unit){Card(Modifier.fillMaxWidth().clickable(onClick=onClick),RoundedCornerShape(16.dp),border=BorderStroke(if(selected)2.dp else 1.dp,if(selected)Green else Border),colors=CardDefaults.cardColors(containerColor=if(selected)LightGreen else MaterialTheme.colorScheme.surface)){Row(Modifier.padding(15.dp),verticalAlignment=Alignment.CenterVertically){Icon(if(title=="Light")Icons.Default.LightMode else if(title=="Dark")Icons.Default.DarkMode else Icons.Default.SettingsSystemDaydream,null,tint=Green);Spacer(Modifier.width(12.dp));Column(Modifier.weight(1f)){Text(title,fontWeight=FontWeight.Bold);Text(sub,fontSize=10.sp,color=Muted)};if(selected)Icon(Icons.Default.CheckCircle,null,tint=Green)}}}
-@Composable private fun NotificationsPage(m:Boolean,p:Boolean,n:Boolean,a:Boolean,sm:(Boolean)->Unit,sp:(Boolean)->Unit,sn:(Boolean)->Unit,sa:(Boolean)->Unit,back:()->Unit){LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){item{Header("Notifications","Choose what you want to hear about",back)};item{SettingsCard("Notification Types",Icons.Default.Notifications){ToggleRow(Icons.Default.ShowChart,"Market updates","NSE-wide movements and daily briefs",m,sm);ToggleRow(Icons.Default.PriceChange,"Price alerts","Your watchlist thresholds",p,sp);ToggleRow(Icons.Default.Article,"News alerts","Company and market news",n,sn);ToggleRow(Icons.Default.Apps,"App notifications","Product updates",a,sa)}};item{Note("Price, news, and corporate-action alerts are monitored from provider-backed market data. Background checks run no more often than every 15 minutes when the market is open.")}}}
+@Composable private fun NotificationsPage(m:Boolean,p:Boolean,n:Boolean,a:Boolean,sm:(Boolean)->Unit,sp:(Boolean)->Unit,sn:(Boolean)->Unit,sa:(Boolean)->Unit,back:()->Unit){LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){item{Header("Notifications","Choose what you want to hear about",back)};item{SettingsCard("Notification Types",Icons.Default.Notifications){ToggleRow(Icons.Default.ShowChart,"Market updates","NSE-wide movements and daily briefs",m,sm);ToggleRow(Icons.Default.PriceChange,"Price alerts","Your watchlist thresholds",p,sp);ToggleRow(Icons.Default.Article,"News alerts","Company and market news",n,sn);ToggleRow(Icons.Default.Apps,"App notifications","Product updates",a,sa)}};item{Note("Price, news, and corporate-action alerts are monitored from provider-backed market data. Background checks are scheduled about every 15 minutes; Android may delay them. News checks run outside market hours and catch up on available stories from the last 7 days. Price alerts require an open market and quotes no more than 30 minutes old. Daily gain, loss and volume alerts notify once per rule per Nairobi day.")}}}
 @Composable private fun LiveData(refresh:Boolean,volume:Boolean,changes:Boolean,sr:(Boolean)->Unit,sv:(Boolean)->Unit,sc:(Boolean)->Unit,back:()->Unit){LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){item{Header("Live Data","Market-data display preferences",back)};item{SettingsCard("Data Display",Icons.Default.ShowChart){ToggleRow(Icons.Default.Sync,"Auto refresh","Keep market information current",refresh,sr);ToggleRow(Icons.Default.BarChart,"Show volume","Display trading activity",volume,sv);ToggleRow(Icons.Default.TrendingUp,"Show price changes","Display daily percentage moves",changes,sc)}}}}
 @Composable
 private fun AlertPage(back:()->Unit){
@@ -668,6 +690,7 @@ private fun selectedTypeLabel(type:AlertType):String=when(type){
             Text("License: creativecommons.org/licenses/by-sa/4.0/ • Image bundled with the app; crop/overlay applied.",fontSize=8.sp,color=Muted,modifier=Modifier.padding(top=2.dp))
         }}}}
 @Composable private fun Note(text:String){Card(Modifier.fillMaxWidth(),RoundedCornerShape(14.dp),colors=CardDefaults.cardColors(containerColor=LightGreen)){Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically){Icon(Icons.Default.Info,null,tint=Green);Spacer(Modifier.width(9.dp));Text(text,fontSize=9.sp,color=Muted)}}}
+
 
 
 

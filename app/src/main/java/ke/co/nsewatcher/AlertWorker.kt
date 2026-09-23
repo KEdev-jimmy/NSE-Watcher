@@ -2,6 +2,8 @@ package ke.co.nsewatcher
 
 import ke.co.nsewatcher.data.MyStocksCache
 import android.Manifest
+import android.os.Build
+import kotlinx.coroutines.CancellationException
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
@@ -18,12 +20,8 @@ import androidx.work.WorkerParameters
 import ke.co.nsewatcher.data.AlertStore
 import ke.co.nsewatcher.data.NewsCache
 import kotlinx.coroutines.flow.first
-import ke.co.nsewatcher.domain.AlertEvent
 import ke.co.nsewatcher.domain.AlertType
 import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
-import java.time.format.DateTimeParseException
 import java.util.concurrent.TimeUnit
 
 class AlertWorker(appContext: Context, workerParams: WorkerParameters) : CoroutineWorker(appContext, workerParams) {
@@ -48,68 +46,48 @@ class AlertWorker(appContext: Context, workerParams: WorkerParameters) : Corouti
         }
         val alerts = configuredAlerts.filter { it.enabled && it.type in activeTypes }
         if (alerts.isEmpty()) return Result.success()
-        val marketStatus = MyStocksCache.loadMarketStatus()
-        if (!marketStatus.isKnown || !marketStatus.isOpen) return Result.success()
-        val stocks = MyStocksCache.loadStocks()
-        if (stocks.isEmpty()) return Result.retry()
+        try {
+            val newsEnabled = alerts.any { AlertEvaluator.isNews(it.type) }
+            val pricesEnabled = alerts.any { !AlertEvaluator.isNews(it.type) }
+            // A quote/status failure must not prevent announcement processing.
+            val newsResult = if (newsEnabled) NewsCache.loadFeedResult() else NewsCache.FeedResult(emptyList())
+            val status = if (pricesEnabled) MyStocksCache.loadMarketStatus() else MyStocksCache.MarketStatus()
+            val priceSession = pricesEnabled && status.isKnown && status.isOpen
+            val stocks = if (priceSession) MyStocksCache.loadStocks() else emptyList()
+            val now = Instant.now()
+            val state = store.monitorState()
+            val evaluated = AlertEvaluator.evaluate(alerts, stocks, state, newsResult.items, now, priceSession,
+                store.lastNewsTriggerIds(), store.lastDailyTriggerDates())
+            val accepted = store.recordEvaluation(evaluated.map { it.event(now) },
+                AlertEvaluator.nextQuotes(state.quotes, stocks, now), now)
 
-        val previous = store.previousPrices()
-        val newsAlertsEnabled = alerts.any { it.type in setOf(AlertType.NEWS, AlertType.CORPORATE_ACTION) }
-        val news = if (newsAlertsEnabled) NewsCache.loadFeed() else emptyList()
-        val lastNews = store.lastNewsTriggerIds()
-        val evaluated = AlertEvaluator.evaluate(alerts, stocks, previous, news, lastNews)
-        val today = LocalDate.now(ZoneId.of("Africa/Nairobi")).toString()
-        val lastDaily = store.lastDailyTriggerDates()
-        val triggered = evaluated.filter { item ->
-            val source = alerts.firstOrNull { it.id == item.alertId }
-            source?.type !in setOf(AlertType.DAILY_GAIN, AlertType.DAILY_LOSS) || lastDaily[item.alertId] != today
-        }
-        val detectedAt = Instant.now().toString()
-        store.recordEvents(triggered.map { item ->
-            val observedAt = stocks.firstOrNull { it.symbol.equals(item.symbol, true) }?.observedAt.orEmpty()
-            AlertEvent(
-                id = listOf(item.alertId, observedAt.ifBlank { today }, item.message).joinToString("|"),
-                ruleId = item.alertId, symbol = item.symbol, title = item.title, message = item.message,
-                recordedAt = detectedAt, observedAt = observedAt
-            )
-        })
-        store.recordNewsTriggers(
-            triggered.filter { item -> alerts.firstOrNull { it.id == item.alertId }?.type in setOf(AlertType.NEWS, AlertType.CORPORATE_ACTION) }
-                .associate { it.alertId to (news.firstOrNull { n -> n.symbol.equals(it.symbol, true) && isPublishedToday(n.publishedAt) && (it.message.endsWith(n.title) || it.message.contains(n.title)) }?.id ?: "") }
-                .filterValues { it.isNotBlank() }
-        )
-        store.recordDailyTriggers(
-            triggered.filter { item -> alerts.firstOrNull { it.id == item.alertId }?.type in setOf(AlertType.DAILY_GAIN, AlertType.DAILY_LOSS) }
-                .map { it.alertId }.toSet(), today
-        )
-        store.recordPrices(stocks.filter { it.price.isFinite() && it.price > 0.0 }.associate { it.symbol.uppercase() to it.price })
-
-        if (triggered.isNotEmpty()) {
-            ensureChannel()
-            if (ContextCompat.checkSelfPermission(applicationContext, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
-                val manager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                triggered.forEach { item ->
-                    val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
-                        .setSmallIcon(R.drawable.ic_nse_watcher)
-                        .setContentTitle(item.title)
-                        .setContentText(item.symbol + ": " + item.message)
-                        .setStyle(NotificationCompat.BigTextStyle().bigText(item.message))
-                        .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-                        .setAutoCancel(true)
-                        .build()
-                    manager.notify(item.alertId.hashCode(), notification)
+            if (accepted.isNotEmpty()) {
+                ensureChannel()
+                val allowed = Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(
+                    applicationContext, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                if (allowed) {
+                    val manager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                    accepted.forEach { event ->
+                        val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
+                            .setSmallIcon(R.drawable.ic_nse_watcher)
+                            .setContentTitle(event.title)
+                            .setContentText("${event.symbol}: ${event.message}")
+                            .setStyle(NotificationCompat.BigTextStyle().bigText(event.message))
+                            .setContentIntent(AlertNotifications.pendingIntent(applicationContext, AlertDestination.from(event)))
+                            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                            .setOnlyAlertOnce(true)
+                            .setAutoCancel(true)
+                            .build()
+                        manager.notify(event.id, 0, notification)
+                    }
                 }
             }
-        }
-        return Result.success()
-    }
-
-    private fun isPublishedToday(publishedAt: String): Boolean {
-        if (publishedAt.isBlank()) return false
-        return try {
-            Instant.parse(publishedAt).atZone(ZoneId.of("Africa/Nairobi")).toLocalDate() == LocalDate.now(ZoneId.of("Africa/Nairobi"))
-        } catch (_: DateTimeParseException) {
-            publishedAt.take(10) == LocalDate.now(ZoneId.of("Africa/Nairobi")).toString()
+            return if (newsResult.error != null || (pricesEnabled && !status.isKnown) || (priceSession && stocks.isEmpty())) Result.retry() else Result.success()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // Persistent checkpoints mean retries cannot rotate between old stories.
+            return Result.retry()
         }
     }
 
@@ -129,4 +107,5 @@ class AlertWorker(appContext: Context, workerParams: WorkerParameters) : Corouti
         }
     }
 }
+
 

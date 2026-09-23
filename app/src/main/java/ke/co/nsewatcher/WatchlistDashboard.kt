@@ -286,7 +286,7 @@ fun WatchlistDashboard(
                                 Text(statusFor(rule), Modifier.padding(horizontal = 10.dp, vertical = 5.dp), color = if (statusFor(rule) == "Watching") ResearchGreen else ResearchMuted, fontSize = 12.sp)
                             }
                         }
-                        ResearchCaption("Background checks run about every 15 minutes while the market is open. Price rules detect crossings between available quotes; Android may delay checks.")
+                        ResearchCaption("Checks are scheduled about every 15 minutes; Android may delay them. News checks continue after hours with a 7-day catch-up window. Price rules require recent, timed quotes while the market is open.")
                         TextButton(onClick = { manage() }) { Text("Manage alerts →", color = ResearchGreen) }
                         if (!notificationsEnabled && alerts.any { it.enabled }) {
                             ResearchCaption("Android notifications are off. Rules are saved, but notifications cannot be shown.")
@@ -467,4 +467,5 @@ private fun WatchlistNewsSheet(companies: List<Stock>, dismiss: () -> Unit, open
         }
     }
 }
+
 
