@@ -111,12 +111,12 @@ import java.util.UUID
                 }
                 ResearchPanel { ResearchTitle("How practice fills work"); ResearchCaption("We check eligible quotes against your limit. Real queue position and liquidity are not reproduced."); TextButton(onClick = onRules) { Text("Read the simulation rules →") } }
                 ResearchTitle("Completed activity")
-                s.entries.filter { it.kind != "NOTE" }.takeLast(3).reversed().forEach { PracticeEntryCard(it) }
+                s.entries.filter { it.kind != "NOTE" && it.kind != "REVIEW" }.takeLast(3).reversed().forEach { PracticeEntryCard(it) }
             }
             "Transactions" -> {
                 ResearchTitle("Account activity")
-                if (s.entries.none { it.kind != "NOTE" }) ResearchCaption("No transactions yet.")
-                s.entries.filter { it.kind != "NOTE" }.reversed().forEach { e -> PracticeEntryCard(e); if (e.kind == "TRADE") TextButton(onClick = { onDetails(e.id) }) { Text("View trade receipt →") } }
+                if (s.entries.none { it.kind != "NOTE" && it.kind != "REVIEW" }) ResearchCaption("No transactions yet.")
+                s.entries.filter { it.kind != "NOTE" && it.kind != "REVIEW" }.reversed().forEach { e -> PracticeEntryCard(e); if (e.kind == "TRADE") TextButton(onClick = { onDetails(e.id) }) { Text("View trade receipt →") } }
             }
             else -> {
                 ResearchTitle("Trade journal")
