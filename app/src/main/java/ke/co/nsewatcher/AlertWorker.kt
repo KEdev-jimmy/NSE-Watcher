@@ -19,6 +19,7 @@ import ke.co.nsewatcher.data.AlertStore
 import ke.co.nsewatcher.data.CompanyChangeStore
 import ke.co.nsewatcher.data.CompanyIntelligenceCache
 import ke.co.nsewatcher.data.MyStocksCache
+import ke.co.nsewatcher.data.MarketData
 import ke.co.nsewatcher.data.NewsCache
 import ke.co.nsewatcher.data.WatchlistStore
 import ke.co.nsewatcher.domain.AlertType
@@ -72,9 +73,9 @@ class AlertWorker(appContext: Context, workerParams: WorkerParameters) : Corouti
 
             // Announcement checks remain independent from quote/status availability.
             val newsResult = if (newsEnabled) NewsCache.loadFeedResult() else NewsCache.FeedResult(emptyList())
-            val status = if (quotesNeeded) MyStocksCache.loadMarketStatus() else MyStocksCache.MarketStatus()
+            val status = if (quotesNeeded) MarketData.loadMarketStatus() else MyStocksCache.MarketStatus()
             val marketSession = quotesNeeded && status.isKnown && status.isOpen
-            val stocks = if (marketSession) MyStocksCache.loadStocks() else emptyList()
+            val stocks = if (marketSession) MarketData.loadStocks() else emptyList()
 
             for (symbol in companyChecks) {
                 val result = CompanyIntelligenceCache.load(symbol)
