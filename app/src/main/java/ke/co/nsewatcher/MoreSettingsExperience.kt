@@ -14,6 +14,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -61,12 +62,6 @@ internal fun MoreHubScreen(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("More", fontSize = 27.sp, fontWeight = FontWeight.ExtraBold)
-                Text("Your NSE Watcher hub", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
-            }
-        }
         item {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
