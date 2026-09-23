@@ -78,6 +78,15 @@ class AlertEvaluatorTest {
         val next = AlertEvaluator.evaluate(alerts, emptyList(), persisted, feed + article("c"), now)
         assertEquals(listOf("c"), next.map { it.articleId })
     }
+    @Test fun automaticWatchlistNewsStartsAtTheOptInBaseline() {
+        val enabledAt = now.minusSeconds(1800)
+        val automatic = PriceAlert("watchlist-news:SCOM", "SCOM", AlertType.NEWS, enabledAt.toEpochMilli().toDouble(), true)
+        val oldStory = article("old-before-opt-in", enabledAt.minusSeconds(1))
+        val newStory = article("new-after-opt-in", enabledAt.plusSeconds(1))
+        val result = AlertEvaluator.evaluate(listOf(automatic), emptyList(), AlertMonitorState(), listOf(oldStory, newStory), now)
+        assertEquals(listOf("new-after-opt-in"), result.map { it.articleId })
+    }
+
     @Test fun migrationRespectsPreviouslySentNewsAndDailyAlerts() {
         assertTrue(AlertEvaluator.evaluate(listOf(rule(AlertType.NEWS, null)), emptyList(), AlertMonitorState(),
             listOf(article()), now, legacyNewsIds = mapOf("rule" to "a")).isEmpty())
