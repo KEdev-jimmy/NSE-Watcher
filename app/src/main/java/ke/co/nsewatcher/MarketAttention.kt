@@ -226,12 +226,18 @@ internal object MarketAttentionEngine {
             }
         }
 
-        val evidence = WatchlistPresentation.linkedNews(news, listOf(stock))
-            .filter { item ->
-                val published = CompanyResearchPresentation.timestamp(item.publishedAt) ?: return@filter false
-                !published.isAfter(now) && Duration.between(published, now) <= Duration.ofDays(3)
-            }
-            .maxByOrNull { CompanyResearchPresentation.timestamp(it.publishedAt) ?: Instant.MIN }
+        val observedAt = CompanyResearchPresentation.timestamp(stock.observedAt)
+        val evidence = if (observedAt == null) {
+            null
+        } else {
+            WatchlistPresentation.linkedNews(news, listOf(stock))
+                .filter { item ->
+                    val published = CompanyResearchPresentation.timestamp(item.publishedAt) ?: return@filter false
+                    !published.isAfter(observedAt) &&
+                        Duration.between(published, observedAt) <= Duration.ofDays(3)
+                }
+                .maxByOrNull { CompanyResearchPresentation.timestamp(it.publishedAt) ?: Instant.MIN }
+        }
 
         if (evidence != null) {
             score += 1
