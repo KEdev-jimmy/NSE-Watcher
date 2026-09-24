@@ -74,7 +74,7 @@ fun NSEWatcherOpeningScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(Modifier.weight(1f))
-            NseWatcherBarsMark(Modifier.size(86.dp))
+            NseWatcherNMark(Modifier.size(86.dp))
             Spacer(Modifier.height(24.dp))
             Text(
                 "NSE Watcher",
@@ -155,7 +155,7 @@ fun NSEWatcherOnboardingScreen(onFinished: () -> Unit) {
             ) {
                 Spacer(Modifier.height(28.dp))
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    NseWatcherBarsMark(Modifier.size(36.dp))
+                    NseWatcherNMark(Modifier.size(36.dp))
                     Spacer(Modifier.width(10.dp))
                     Text("NSE Watcher", color = LaunchText, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 }
@@ -173,7 +173,7 @@ fun NSEWatcherOnboardingScreen(onFinished: () -> Unit) {
                             shape = CircleShape,
                             color = LaunchGreen
                         ) {
-                            NseWatcherBarsMark(Modifier.size(30.dp), darkBackground = false)
+                            NseWatcherNMark(Modifier.size(30.dp), contentDescription = null)
                         }
                     }
                 }

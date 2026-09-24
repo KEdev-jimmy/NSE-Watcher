@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -364,7 +365,7 @@ private fun App(
             color = MaterialTheme.colorScheme.background
         ) {
         when(page){
-            Page.HOME,Page.MARKET,Page.NEWS,Page.COMPANIES,Page.PAPER,Page.MORE -> Scaffold(topBar={if(page!=Page.PAPER && page!=Page.HOME && page!=Page.MARKET && page!=Page.NEWS && page!=Page.COMPANIES) TopBar(name,::go)},bottomBar={BottomNav(when(page){Page.HOME->0;Page.MARKET->1;Page.NEWS->2;Page.COMPANIES->3;else->4}, newsStyle=page==Page.NEWS, homeStyle=page==Page.PAPER || page==Page.MARKET || page==Page.HOME || page==Page.COMPANIES){tab=it;if(it==3)directorySector="All";history=emptyList();page=when(it){0->Page.HOME;1->Page.MARKET;2->Page.NEWS;3->Page.COMPANIES;else->Page.MORE}}}){pad->Box(Modifier.fillMaxSize().padding(pad)){when(page){Page.HOME->HomeDashboard(stocks,{selected=it;go(Page.COMPANY)},{selectedNews=it;go(Page.NEWS_DETAIL)},{go(Page.MARKET)},{go(Page.WATCHLIST)},newsFeed,marketIndices,startupMarketStatus,startupComplete,name=name,initialCatalog=companyCatalog,practiceEnabled=PaperPortfolioStore.isEnabled(context),practiceCash=PaperPortfolioStore.cash(context),openAllNews={go(Page.NEWS)},openPractice={launchPractice()},openPracticeReview={launchPracticeReview(it)},openProfile={go(Page.PROFILE)},openAlertSettings={go(Page.NOTIFICATIONS)},onQuotesLoaded={liveStocks.value=it},onNewsLoaded={newsFeed=it},onIndicesLoaded={marketIndices=it},onMarketStatusLoaded={startupMarketStatus=it});Page.MARKET->directoryState.SaveableStateProvider("market"){MarketDashboard(stocks,companyCatalog,startupMarketStatus,marketIndices,newsFeed,openCompany={selected=it;go(Page.COMPANY)},openCompanies={directorySector=it;go(Page.COMPANIES)},onQuotesLoaded={liveStocks.value=it},onCatalogLoaded={companyCatalog=it},onIndicesLoaded={marketIndices=it},onMarketStatusLoaded={startupMarketStatus=it})};Page.NEWS->directoryState.SaveableStateProvider("news"){NewsDashboard(newsFeed,onNewsLoaded={newsFeed=it}){selectedNews=it;go(Page.NEWS_DETAIL)}};Page.COMPANIES->directoryState.SaveableStateProvider("companies:$directorySector"){CompaniesDirectory(catalog=companyCatalog,quotes=stocks,name=name,initialSector=directorySector,openCompany={selected=it;go(Page.COMPANY)},openWatchlist={go(Page.WATCHLIST)},openCompare={comparisonSymbols=it;go(Page.COMPARE)},openNews={selectedNews=it;go(Page.NEWS_DETAIL)},openProfile={go(Page.PROFILE)},onCatalogLoaded={companyCatalog=it},onQuotesLoaded={liveStocks.value=it})};Page.PAPER->directoryState.SaveableStateProvider("practice"){PracticePortfolioScreen(quoteFeed=stocks,catalog=companyCatalog,initialMarket=startupMarketStatus,news=newsFeed,initialSymbol=practiceSymbol,initialReviewOrderId=practiceReviewOrderId,launchRevision=practiceLaunchRevision,launchSource=practiceLaunchSource,onQuotes={liveStocks.value=it},onCatalog={companyCatalog=it},openCompany={selected=it;go(Page.COMPANY)},openNews={selectedNews=it;go(Page.NEWS_DETAIL)},back=::back)};else->MoreHubScreen(name=name,username=username,email=email,openProfile={go(Page.PROFILE)},openPractice={launchPractice()},openWatchlist={go(Page.WATCHLIST)},openAlerts={go(Page.ALERTS)},openCompare={comparisonSymbols=emptyList();go(Page.COMPARE)},openSettings={go(Page.SETTINGS)},openNotifications={go(Page.NOTIFICATIONS)},openMarketData={go(Page.LIVE_DATA)},openAppearance={go(Page.DISPLAY)},openHelp={go(Page.HELP)},openAbout={go(Page.ABOUT)})}}}
+            Page.HOME,Page.MARKET,Page.NEWS,Page.COMPANIES,Page.PAPER,Page.MORE -> Scaffold(topBar={if(page!=Page.PAPER && page!=Page.HOME && page!=Page.MARKET && page!=Page.NEWS && page!=Page.COMPANIES) TopBar(name,::go)},bottomBar={BottomNav(when(page){Page.HOME->0;Page.MARKET->1;Page.NEWS->2;Page.COMPANIES->3;else->4}, newsStyle=page==Page.NEWS, homeStyle=page==Page.PAPER || page==Page.MARKET || page==Page.HOME || page==Page.COMPANIES){tab=it;if(it==3)directorySector="All";history=emptyList();page=when(it){0->Page.HOME;1->Page.MARKET;2->Page.NEWS;3->Page.COMPANIES;else->Page.MORE}}}){pad->Box(Modifier.fillMaxSize().padding(pad)){when(page){Page.HOME->HomeDashboard(stocks,{selected=it;go(Page.COMPANY)},{selectedNews=it;go(Page.NEWS_DETAIL)},{go(Page.MARKET)},{directorySector="All";go(Page.COMPANIES)},{go(Page.WATCHLIST)},newsFeed,marketIndices,startupMarketStatus,startupComplete,name=name,initialCatalog=companyCatalog,practiceEnabled=PaperPortfolioStore.isEnabled(context),practiceCash=PaperPortfolioStore.cash(context),darkTheme=dark,openAllNews={go(Page.NEWS)},openPractice={launchPractice()},openPracticeReview={launchPracticeReview(it)},openProfile={go(Page.PROFILE)},openAlertSettings={go(Page.NOTIFICATIONS)},onQuotesLoaded={liveStocks.value=it},onNewsLoaded={newsFeed=it},onIndicesLoaded={marketIndices=it},onMarketStatusLoaded={startupMarketStatus=it});Page.MARKET->directoryState.SaveableStateProvider("market"){MarketDashboard(stocks,companyCatalog,startupMarketStatus,marketIndices,newsFeed,openCompany={selected=it;go(Page.COMPANY)},openCompanies={directorySector=it;go(Page.COMPANIES)},onQuotesLoaded={liveStocks.value=it},onCatalogLoaded={companyCatalog=it},onIndicesLoaded={marketIndices=it},onMarketStatusLoaded={startupMarketStatus=it})};Page.NEWS->directoryState.SaveableStateProvider("news"){NewsDashboard(newsFeed,onNewsLoaded={newsFeed=it}){selectedNews=it;go(Page.NEWS_DETAIL)}};Page.COMPANIES->directoryState.SaveableStateProvider("companies:$directorySector"){CompaniesDirectory(catalog=companyCatalog,quotes=stocks,name=name,initialSector=directorySector,openCompany={selected=it;go(Page.COMPANY)},openWatchlist={go(Page.WATCHLIST)},openCompare={comparisonSymbols=it;go(Page.COMPARE)},openNews={selectedNews=it;go(Page.NEWS_DETAIL)},openProfile={go(Page.PROFILE)},onCatalogLoaded={companyCatalog=it},onQuotesLoaded={liveStocks.value=it})};Page.PAPER->directoryState.SaveableStateProvider("practice"){PracticePortfolioScreen(quoteFeed=stocks,catalog=companyCatalog,initialMarket=startupMarketStatus,news=newsFeed,initialSymbol=practiceSymbol,initialReviewOrderId=practiceReviewOrderId,launchRevision=practiceLaunchRevision,launchSource=practiceLaunchSource,onQuotes={liveStocks.value=it},onCatalog={companyCatalog=it},openCompany={selected=it;go(Page.COMPANY)},openNews={selectedNews=it;go(Page.NEWS_DETAIL)},back=::back)};else->MoreHubScreen(name=name,username=username,email=email,openProfile={go(Page.PROFILE)},openPractice={launchPractice()},openWatchlist={go(Page.WATCHLIST)},openAlerts={go(Page.ALERTS)},openCompare={comparisonSymbols=emptyList();go(Page.COMPARE)},openSettings={go(Page.SETTINGS)},openNotifications={go(Page.NOTIFICATIONS)},openMarketData={go(Page.LIVE_DATA)},openAppearance={go(Page.DISPLAY)},openHelp={go(Page.HELP)},openAbout={go(Page.ABOUT)})}}}
             Page.COMPANY->Company(
                 s=selected,
                 sharedNews=newsFeed,
@@ -428,32 +429,110 @@ private fun App(
         }
     }
 }
-@Composable private fun TopBar(name:String,go:(Page)->Unit){Row(Modifier.fillMaxWidth().padding(horizontal=15.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically){Surface(Modifier.size(42.dp),RoundedCornerShape(12.dp),LightGreen){Icon(Icons.Default.ShowChart,null,Modifier.padding(7.dp),Green)};Spacer(Modifier.width(9.dp));Column(Modifier.weight(1f)){Text("NSE Watcher",fontSize=18.sp,fontWeight=FontWeight.ExtraBold);Text("Analyse • Understand • Invest Smarter",fontSize=10.sp,color=Muted)};Avatar(name){go(Page.PROFILE)}}}
+@Composable private fun TopBar(name:String,go:(Page)->Unit){
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal=15.dp,vertical=8.dp),
+        verticalAlignment=Alignment.CenterVertically
+    ){
+        NseWatcherBrandLockup(
+            modifier=Modifier.weight(1f),
+            dark=dark,
+            compact=true
+        )
+        Avatar(name){go(Page.PROFILE)}
+    }
+}
 @Composable private fun Avatar(name:String,onClick:()->Unit){val c=androidx.compose.ui.platform.LocalContext.current;val u=c.getSharedPreferences(PREFS,0).getString("avatar_uri",null);val b by produceState<Bitmap?>(null,u){value=try{u?.let{c.contentResolver.openInputStream(Uri.parse(it))?.use{stream->BitmapFactory.decodeStream(stream)}}}catch(_:Exception){null}};Surface(Modifier.size(38.dp).clip(CircleShape).clickable(onClick=onClick),CircleShape,Color(0xFFDDEFE6)){if(b!=null)Image(b!!.asImageBitmap(),"Profile",Modifier.fillMaxSize())else Box(Modifier.fillMaxSize(),Alignment.Center){Text(name.take(1).uppercase(),color=Green,fontWeight=FontWeight.Bold)}}}
 @Composable
 private fun BottomNav(selected: Int, newsStyle: Boolean = false, homeStyle: Boolean = false, onSelect: (Int) -> Unit) {
     val items = listOf(
-        "Home" to Icons.Default.Home, "Market" to Icons.Default.CandlestickChart,
-        "News" to Icons.Default.Article, "Companies" to Icons.Default.Business,
-        "More" to if (homeStyle) Icons.Default.MoreHoriz else Icons.Default.AutoGraph
+        "Home" to Icons.Default.Home,
+        "Market" to Icons.Default.CandlestickChart,
+        "News" to Icons.Default.Article,
+        "Companies" to Icons.Default.Business,
+        "More" to Icons.Default.MoreHoriz
     )
-    val accent = if (homeStyle) ResearchGreen else if (newsStyle) NewsColorScheme.primary else Green
-    NavigationBar(
-        containerColor = if (homeStyle) ResearchBackground else if (newsStyle) NewsColorScheme.background else NavigationBarDefaults.containerColor
-    ) {
-        items.forEachIndexed { index, item ->
-            NavigationBarItem(
-                selected = selected == index,
-                onClick = { onSelect(index) },
-                icon = { Icon(item.second, item.first) },
-                label = { Text(item.first, fontSize = if (newsStyle || homeStyle) 11.sp else 9.sp) },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = accent, selectedTextColor = accent,
-                    indicatorColor = if (homeStyle) ResearchBackground else if (newsStyle) NewsColorScheme.surfaceVariant else LightGreen,
-                    unselectedIconColor = if (homeStyle) ResearchMuted else if (newsStyle) NewsColorScheme.onSurfaceVariant else Muted,
-                    unselectedTextColor = if (homeStyle) ResearchMuted else if (newsStyle) NewsColorScheme.onSurfaceVariant else Muted
+    if (!homeStyle) {
+        val accent = if (newsStyle) NewsColorScheme.primary else Green
+        NavigationBar(
+            containerColor = if (newsStyle) NewsColorScheme.background else NavigationBarDefaults.containerColor
+        ) {
+            items.forEachIndexed { index, item ->
+                NavigationBarItem(
+                    selected = selected == index,
+                    onClick = { onSelect(index) },
+                    icon = { Icon(item.second, item.first) },
+                    label = { Text(item.first, fontSize = if (newsStyle) 11.sp else 9.sp) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = accent,
+                        selectedTextColor = accent,
+                        indicatorColor = if (newsStyle) NewsColorScheme.surfaceVariant else LightGreen,
+                        unselectedIconColor = if (newsStyle) NewsColorScheme.onSurfaceVariant else Muted,
+                        unselectedTextColor = if (newsStyle) NewsColorScheme.onSurfaceVariant else Muted
+                    )
                 )
-            )
+            }
+        }
+        return
+    }
+
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val palette = premiumHomePalette(dark)
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp, vertical = 5.dp),
+        shape = RoundedCornerShape(28.dp),
+        color = palette.nav,
+        border = BorderStroke(1.dp, palette.border),
+        tonalElevation = 0.dp,
+        shadowElevation = 7.dp
+    ) {
+        Row(
+            Modifier.fillMaxWidth().height(68.dp).padding(horizontal = 6.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            items.forEachIndexed { index, item ->
+                val isSelected = selected == index
+                val selectedModifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(23.dp))
+                    .background(
+                        if (isSelected) palette.primary.copy(alpha = if (dark) 0.13f else 0.10f)
+                        else Color.Transparent
+                    )
+                    .clickable { onSelect(index) }
+                Column(
+                    selectedModifier,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        item.second,
+                        contentDescription = item.first,
+                        tint = if (isSelected) palette.primary else palette.muted,
+                        modifier = Modifier.size(if (isSelected) 25.dp else 23.dp)
+                    )
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        item.first,
+                        color = if (isSelected) palette.primary else palette.muted,
+                        fontSize = 10.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                    )
+                    if (isSelected) {
+                        Spacer(Modifier.height(3.dp))
+                        Box(
+                            Modifier
+                                .size(4.dp)
+                                .clip(CircleShape)
+                                .background(palette.primary)
+                        )
+                    }
+                }
+            }
         }
     }
 }

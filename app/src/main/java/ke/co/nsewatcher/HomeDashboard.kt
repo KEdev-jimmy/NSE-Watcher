@@ -50,10 +50,11 @@ import kotlin.math.abs
 @Composable
 fun HomeDashboard(
     currentStocks: List<Stock>, openCompany: (Stock) -> Unit, openNews: (NewsItem) -> Unit,
-    openMarket: () -> Unit, openWatchlist: () -> Unit, newsFeed: List<NewsItem>,
+    openMarket: () -> Unit, openCompanies: () -> Unit, openWatchlist: () -> Unit, newsFeed: List<NewsItem>,
     marketIndices: List<MyStocksCache.MarketIndex>,
     initialMarketStatus: MyStocksCache.MarketStatus, startupDataLoaded: Boolean,
     name: String, initialCatalog: List<Stock>, practiceEnabled: Boolean, practiceCash: Double,
+    darkTheme: Boolean,
     openAllNews: () -> Unit, openPractice: () -> Unit, openPracticeReview: (String) -> Unit, openProfile: () -> Unit,
     openAlertSettings: () -> Unit, onQuotesLoaded: (List<Stock>) -> Unit,
     onNewsLoaded: (List<NewsItem>) -> Unit,
@@ -240,7 +241,7 @@ fun HomeDashboard(
             }
         }
     }
-    val preview = watched.take(3)
+    val preview = watched.take(6)
     LaunchedEffect(preview.map { it.symbol }, historyRevision) {
         val forceHistoryRefresh = historyRevision > handledHistoryRevision
         preview.forEach { stock ->
@@ -265,6 +266,34 @@ fun HomeDashboard(
     }
     val relevantNews = remember(newsFeed, watched) { HomePresentation.companyNews(newsFeed, watched) }
     val displayedNews = if (watched.isEmpty()) newsFeed.distinctBy { it.id }.sortedByDescending { CompanyResearchPresentation.timestamp(it.publishedAt) } else relevantNews
+    val marketAttention = remember(currentStocks, newsFeed, now) {
+        MarketAttentionEngine.rank(currentStocks, newsFeed, now, limit = 3)
+    }
+    val practiceDecisionItems = remember(practiceState, practiceCompanies, newsFeed, companyDataEvents) {
+        practiceState?.let {
+            PracticeDecisionCenterPresentation.items(
+                state = it,
+                companies = practiceCompanies,
+                news = newsFeed,
+                companyEvents = companyDataEvents
+            )
+        }.orEmpty()
+    }
+    val practiceInsights = remember(practiceState, practiceCompanies, practiceDecisionItems) {
+        practiceState?.let {
+            PracticeLearningInsightsPresentation.insights(
+                state = it,
+                companies = practiceCompanies,
+                items = practiceDecisionItems
+            )
+        } ?: PracticeLearningInsights(
+            totalDecisions = 0,
+            reasonsRecorded = 0,
+            reviewedAtLeastOnce = 0,
+            needsFirstReview = 0,
+            newEvidenceAfterReview = 0
+        )
+    }
 
     val unreviewedNewsCompanies = remember(unreviewedChanges) {
         unreviewedChanges.filter { it.story != null }.map { WatchlistPresentation.symbol(it.symbol) }.filter { it.isNotBlank() }.distinct().size
@@ -283,49 +312,39 @@ fun HomeDashboard(
     val strongestSector = intelligence.sectors.maxByOrNull { it.averageChangePct }
     val topMover = (intelligence.gainers + intelligence.losers).maxByOrNull { abs(it.change) }
 
-    MaterialTheme(colorScheme = CompanyResearchColors) {
-        HomeReferenceDashboard(
-            name = name,
-            avatar = avatar,
+    val inheritedHomeColors = MaterialTheme.colorScheme
+    MaterialTheme(colorScheme = if (darkTheme) CompanyResearchColors else inheritedHomeColors) {
+        HomePremiumDashboard(
+            darkTheme = darkTheme,
             market = market,
             stocks = currentStocks,
             now = now,
             refreshing = refreshing,
             hasAttention = unreviewedChanges.isNotEmpty(),
-            watched = watched,
             watchlistPreview = preview,
+            watchlistHistories = histories,
             watchlistLoading = saved == null,
             watchlistError = watchlistError,
-            relevantNews = relevantNews,
-            newsLoading = newsLoading,
-            newsError = newsError,
             briefItems = brief,
-            briefLoading = saved == null || (practiceEnabled && practiceState == null && !practiceStateError) || (watched.isNotEmpty() && changeState == null),
             briefHasError = changeStateError || watchlistError || alertError || companyChangeError || newsError || practiceStateError,
             intelligence = intelligence,
-            gainersSelected = gainersSelected,
-            onGainersSelected = { gainersSelected = it },
+            marketAttention = marketAttention,
+            practiceInsights = practiceInsights,
             practiceEnabled = practiceEnabled,
             practiceCash = practiceCash,
             onRefresh = ::refresh,
             openAlerts = { showAlerts = true },
-            openProfile = openProfile,
             openWatchlist = openWatchlist,
             openPractice = openPractice,
             openMarket = openMarket,
-            openAllNews = openAllNews,
-            openNews = openNews,
+            openCompanies = openCompanies,
             openCompany = openCompany,
-            openBriefItem = ::reviewAndOpen,
-            reviewBrief = {
-                if (brief.isEmpty()) openWatchlist()
-                else showChanges = true
-            }
+            openBriefItem = ::reviewAndOpen
         )
         if (showChanges) ModalBottomSheet(
             onDismissRequest = { showChanges = false },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = ResearchBackground
+            containerColor = MaterialTheme.colorScheme.surface
         ) {
             LazyColumn(
                 Modifier.fillMaxWidth().fillMaxHeight(0.78f),
@@ -348,7 +367,7 @@ fun HomeDashboard(
                 if (brief.isEmpty()) item { HomeH3Message("You're caught up.") }
             }
         }
-        if (showAlerts) ModalBottomSheet(onDismissRequest = { showAlerts = false }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = ResearchBackground) {
+        if (showAlerts) ModalBottomSheet(onDismissRequest = { showAlerts = false }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = MaterialTheme.colorScheme.surface) {
             LazyColumn(Modifier.fillMaxWidth().fillMaxHeight(0.85f), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 item {
                     ResearchTitle("Your recorded alerts")
