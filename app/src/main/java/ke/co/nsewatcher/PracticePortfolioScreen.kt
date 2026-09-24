@@ -32,14 +32,15 @@ import java.util.UUID
 
 internal object PracticeLaunch {
     fun symbol(raw: String): String = WatchlistPresentation.symbol(raw)
-    fun shouldOpenOrder(enabled: Boolean, initialSymbol: String, handled: Boolean): Boolean =
-        enabled && !handled && symbol(initialSymbol).isNotBlank()
+    fun shouldOpenOrder(enabled: Boolean, initialSymbol: String, launchRevision: Int, handledRevision: Int): Boolean =
+        enabled && symbol(initialSymbol).isNotBlank() && launchRevision > handledRevision
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock>, initialMarket: MyStocksCache.MarketStatus,
-    news: List<NewsItem>, initialSymbol: String = "", onQuotes: (List<Stock>) -> Unit, onCatalog: (List<Stock>) -> Unit,
+    news: List<NewsItem>, initialSymbol: String = "", launchRevision: Int = 0, launchSource: String = "",
+    onQuotes: (List<Stock>) -> Unit, onCatalog: (List<Stock>) -> Unit,
     openCompany: (Stock) -> Unit, openNews: (NewsItem) -> Unit, back: () -> Unit) {
     val context = LocalContext.current
     val store = remember { PracticeStore(context) }
@@ -58,8 +59,9 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
     var page by rememberSaveable { mutableStateOf("MAIN") }
     var tab by rememberSaveable { mutableStateOf("Overview") }
     var activityTab by rememberSaveable { mutableStateOf("Orders") }
-    var symbol by rememberSaveable(initialSymbol) { mutableStateOf(PracticeLaunch.symbol(initialSymbol)) }
-    var launchHandled by rememberSaveable(initialSymbol) { mutableStateOf(false) }
+    var symbol by rememberSaveable { mutableStateOf(PracticeLaunch.symbol(initialSymbol)) }
+    var handledLaunchRevision by rememberSaveable { mutableIntStateOf(-1) }
+    var orderLaunchSource by rememberSaveable { mutableStateOf("") }
     var side by rememberSaveable { mutableStateOf("BUY") }
     var editId by rememberSaveable { mutableStateOf("") }
     var sheet by rememberSaveable { mutableStateOf<String?>(null) }
@@ -87,14 +89,15 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
         catch (e: Exception) { error = "Could not read the saved portfolio: ${e.message}. Your stored account has not been replaced." }
         if (catalog.isEmpty()) { val rows = MarketData.companies(); if (rows.isNotEmpty()) onCatalog(rows) }
     }
-    LaunchedEffect(state?.enabled, initialSymbol) {
-        if (PracticeLaunch.shouldOpenOrder(state?.enabled == true, initialSymbol, launchHandled)) {
+    LaunchedEffect(state?.enabled, initialSymbol, launchRevision) {
+        if (PracticeLaunch.shouldOpenOrder(state?.enabled == true, initialSymbol, launchRevision, handledLaunchRevision)) {
             symbol = PracticeLaunch.symbol(initialSymbol)
             side = "BUY"
             editId = ""
             sheet = null
+            orderLaunchSource = launchSource.trim()
             page = "ORDER"
-            launchHandled = true
+            handledLaunchRevision = launchRevision
         }
     }
     LaunchedEffect(resumed) {
@@ -131,9 +134,23 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
     val s = state
     val selected = companies.firstOrNull { it.symbol == symbol } ?: s?.quotes?.firstOrNull { it.symbol == symbol }?.let { Stock(it.symbol, it.name.ifBlank { it.symbol }, it.price, 0.0, emptyList(), sector = it.sector, observedAt = it.at, changeAvailable = false) }
         ?: Stock(symbol, symbol, Double.NaN, 0.0, emptyList(), changeAvailable = false, volumeAvailable = false)
-    fun trade(stock: Stock, direction: String, id: String = "") { symbol = stock.symbol; side = direction; editId = id; page = "ORDER" }
-    fun goBack() { if (page != "MAIN") page = "MAIN" else back() }
-    BackHandler(page != "MAIN" && sheet == null) { page = "MAIN" }
+    fun trade(stock: Stock, direction: String, id: String = "") {
+        symbol = stock.symbol
+        side = direction
+        editId = id
+        orderLaunchSource = ""
+        page = "ORDER"
+    }
+    fun goBack() {
+        if (page != "MAIN") {
+            page = "MAIN"
+            orderLaunchSource = ""
+        } else back()
+    }
+    BackHandler(page != "MAIN" && sheet == null) {
+        page = "MAIN"
+        orderLaunchSource = ""
+    }
     MaterialTheme(colorScheme = CompanyResearchColors) {
         Column(Modifier.fillMaxSize().background(ResearchBackground)) {
             Row(Modifier.fillMaxWidth().padding(end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -151,9 +168,25 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
             if (working) LinearProgressIndicator(Modifier.fillMaxWidth(), color = ResearchGreen)
             if (s == null) { Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { ResearchCaption(if (error == null) "Loading your practice account…" else "Your saved account is unavailable.") } }
             else if (page == "ORDER") {
-                PracticeOrderTicket(s, selected, side, editId, market, working,
-                    onSubmit = { order -> operation({ store.update { PracticeEngine.submit(it, order) } }) { page = "MAIN"; tab = "Activity"; activityTab = "Orders"; notice = "Practice order queued. Cash or shares are reserved; no shares have traded yet." } },
-                    onSide = { side = it })
+                PracticeOrderTicket(
+                    s = s,
+                    stock = selected,
+                    side = side,
+                    editId = editId,
+                    market = market,
+                    working = working,
+                    launchSource = orderLaunchSource,
+                    onSubmit = { order ->
+                        operation({ store.update { PracticeEngine.submit(it, order) } }) {
+                            page = "MAIN"
+                            tab = "Activity"
+                            activityTab = "Orders"
+                            orderLaunchSource = ""
+                            notice = "Practice order queued. Cash or shares are reserved; no shares have traded yet."
+                        }
+                    },
+                    onSide = { side = it }
+                )
             } else LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 when {
                     page == "DIVIDENDS" -> item { Column(verticalArrangement = Arrangement.spacedBy(14.dp)) { PracticeDividends() } }
