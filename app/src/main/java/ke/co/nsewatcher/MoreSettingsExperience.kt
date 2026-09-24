@@ -79,6 +79,9 @@ internal fun MoreHubScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
+            NseWatcherBrandLockup(compact = true)
+        }
+        item {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(22.dp),
