@@ -116,7 +116,7 @@ fun MarketDashboard(
     }
     LaunchedEffect(Unit) { refreshData(false) }
 
-    LaunchedEffect(movementSymbol, movementRevision) {
+    LaunchedEffect(movementStock?.symbol, movementRevision) {
         val selected = movementStock ?: return@LaunchedEffect
         movementLoading = true
         movementResult = MovementIntelligenceCache.Result()
