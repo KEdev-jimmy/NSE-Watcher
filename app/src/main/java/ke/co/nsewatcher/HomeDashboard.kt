@@ -50,7 +50,7 @@ import kotlin.math.abs
 @Composable
 fun HomeDashboard(
     currentStocks: List<Stock>, openCompany: (Stock) -> Unit, openNews: (NewsItem) -> Unit,
-    openMarket: () -> Unit, openWatchlist: () -> Unit, newsFeed: List<NewsItem>,
+    openMarket: () -> Unit, openCompanies: () -> Unit, openWatchlist: () -> Unit, newsFeed: List<NewsItem>,
     marketIndices: List<MyStocksCache.MarketIndex>,
     initialMarketStatus: MyStocksCache.MarketStatus, startupDataLoaded: Boolean,
     name: String, initialCatalog: List<Stock>, practiceEnabled: Boolean, practiceCash: Double,
@@ -346,6 +346,7 @@ fun HomeDashboard(
             openWatchlist = openWatchlist,
             openPractice = openPractice,
             openMarket = openMarket,
+            openCompanies = openCompanies,
             openAllNews = openAllNews,
             openNews = openNews,
             openCompany = openCompany,
