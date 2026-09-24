@@ -312,54 +312,39 @@ fun HomeDashboard(
     val strongestSector = intelligence.sectors.maxByOrNull { it.averageChangePct }
     val topMover = (intelligence.gainers + intelligence.losers).maxByOrNull { abs(it.change) }
 
-    MaterialTheme(colorScheme = CompanyResearchColors) {
-        HomeReferenceDashboard(
-            name = name,
-            avatar = avatar,
+    val inheritedHomeColors = MaterialTheme.colorScheme
+    MaterialTheme(colorScheme = if (darkTheme) CompanyResearchColors else inheritedHomeColors) {
+        HomePremiumDashboard(
             darkTheme = darkTheme,
             market = market,
             stocks = currentStocks,
             now = now,
             refreshing = refreshing,
             hasAttention = unreviewedChanges.isNotEmpty(),
-            watched = watched,
             watchlistPreview = preview,
             watchlistHistories = histories,
             watchlistLoading = saved == null,
             watchlistError = watchlistError,
-            relevantNews = relevantNews,
-            newsLoading = newsLoading,
-            newsError = newsError,
             briefItems = brief,
-            briefLoading = saved == null || (practiceEnabled && practiceState == null && !practiceStateError) || (watched.isNotEmpty() && changeState == null),
             briefHasError = changeStateError || watchlistError || alertError || companyChangeError || newsError || practiceStateError,
             intelligence = intelligence,
             marketAttention = marketAttention,
             practiceInsights = practiceInsights,
-            gainersSelected = gainersSelected,
-            onGainersSelected = { gainersSelected = it },
             practiceEnabled = practiceEnabled,
             practiceCash = practiceCash,
             onRefresh = ::refresh,
             openAlerts = { showAlerts = true },
-            openProfile = openProfile,
             openWatchlist = openWatchlist,
             openPractice = openPractice,
             openMarket = openMarket,
             openCompanies = openCompanies,
-            openAllNews = openAllNews,
-            openNews = openNews,
             openCompany = openCompany,
-            openBriefItem = ::reviewAndOpen,
-            reviewBrief = {
-                if (brief.isEmpty()) openWatchlist()
-                else showChanges = true
-            }
+            openBriefItem = ::reviewAndOpen
         )
         if (showChanges) ModalBottomSheet(
             onDismissRequest = { showChanges = false },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = ResearchBackground
+            containerColor = MaterialTheme.colorScheme.surface
         ) {
             LazyColumn(
                 Modifier.fillMaxWidth().fillMaxHeight(0.78f),
@@ -382,7 +367,7 @@ fun HomeDashboard(
                 if (brief.isEmpty()) item { HomeH3Message("You're caught up.") }
             }
         }
-        if (showAlerts) ModalBottomSheet(onDismissRequest = { showAlerts = false }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = ResearchBackground) {
+        if (showAlerts) ModalBottomSheet(onDismissRequest = { showAlerts = false }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = MaterialTheme.colorScheme.surface) {
             LazyColumn(Modifier.fillMaxWidth().fillMaxHeight(0.85f), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 item {
                     ResearchTitle("Your recorded alerts")
