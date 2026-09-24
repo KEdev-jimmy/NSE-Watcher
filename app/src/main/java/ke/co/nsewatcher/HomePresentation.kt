@@ -11,7 +11,9 @@ internal data class HomeBriefItem(
     val id: String, val symbol: String, val title: String, val detail: String,
     val whyItMayMatter: String, val uncertainty: String, val source: String,
     val time: String, val action: String, val story: NewsItem? = null,
-    val stock: Stock? = null, val alert: AlertEvent? = null
+    val stock: Stock? = null, val alert: AlertEvent? = null,
+    val practiceOrderId: String? = null,
+    val relatedChangeId: String = ""
 )
 
 internal object HomePresentation {
@@ -34,13 +36,30 @@ internal object HomePresentation {
         news: List<NewsItem>,
         events: List<AlertEvent>,
         now: Instant,
-        companyDataEvents: List<CompanyDataChangeEvent> = emptyList()
+        companyDataEvents: List<CompanyDataChangeEvent> = emptyList(),
+        practiceState: PracticeState? = null,
+        companies: List<Stock> = watched
     ): List<HomeBriefItem> {
         val bySymbol = watched.associateBy { WatchlistPresentation.symbol(it.symbol) }
         val byName = watched.associateBy { it.name.trim().lowercase(java.util.Locale.US) }
+        val practiceChanges = practiceFollowUps(
+            state = practiceState,
+            companies = companies,
+            news = news,
+            companyDataEvents = companyDataEvents,
+            now = now
+        )
+        val practiceRelatedIds = practiceEvidenceIds(
+            state = practiceState,
+            companies = companies,
+            news = news,
+            companyDataEvents = companyDataEvents,
+            now = now
+        )
         val articles = companyNews(news, watched).filter { recent(it.publishedAt, now) }
         val articleIds = articles.map { it.id }.toSet()
         val articleChanges = articles.mapNotNull { item ->
+            if ("news:${item.id}" in practiceRelatedIds) return@mapNotNull null
             val symbol = WatchlistPresentation.symbol(item.symbol).takeIf { it in bySymbol }
                 ?: byName[item.companyName.trim().lowercase(java.util.Locale.US)]?.symbol?.let(WatchlistPresentation::symbol)
                 ?: return@mapNotNull null
@@ -94,6 +113,7 @@ internal object HomePresentation {
                             )
                     }
             }
+            .filter { it.id !in practiceRelatedIds }
             .map { event ->
                 val symbol = WatchlistPresentation.symbol(event.symbol)
                 HomeBriefItem(
@@ -109,8 +129,147 @@ internal object HomePresentation {
                     stock = bySymbol[symbol]
                 )
             }.toList()
-        return (articleChanges + alertChanges + companyChanges).distinctBy { it.id }
+        return (practiceChanges + articleChanges + alertChanges + companyChanges).distinctBy { it.id }
             .sortedByDescending { CompanyResearchPresentation.timestamp(it.time) ?: Instant.MIN }
+    }
+
+    fun practiceFollowUps(
+        state: PracticeState?,
+        companies: List<Stock>,
+        news: List<NewsItem>,
+        companyDataEvents: List<CompanyDataChangeEvent>,
+        now: Instant
+    ): List<HomeBriefItem> {
+        if (state?.enabled != true) return emptyList()
+        val stocksBySymbol = companies.associateBy { WatchlistPresentation.symbol(it.symbol) }
+        return state.orders.asSequence()
+            .filter { it.status == "FILLED" && it.filledAt > 0L }
+            .mapNotNull { order ->
+                val symbol = WatchlistPresentation.symbol(order.symbol)
+                if (symbol.isBlank()) return@mapNotNull null
+                val stock = stocksBySymbol[symbol]
+                    ?: state.quotes.firstOrNull { WatchlistPresentation.symbol(it.symbol) == symbol }?.let {
+                        Stock(
+                            symbol = it.symbol,
+                            name = it.name.ifBlank { it.symbol },
+                            price = it.price,
+                            change = 0.0,
+                            history = emptyList(),
+                            sector = it.sector,
+                            observedAt = it.at,
+                            changeAvailable = false
+                        )
+                    }
+                    ?: Stock(symbol, symbol, Double.NaN, 0.0, emptyList(), changeAvailable = false, volumeAvailable = false)
+
+                val fillTime = CompanyResearchPresentation.timestamp(order.quoteAt)
+                    ?: Instant.ofEpochMilli(order.filledAt)
+                if (fillTime.isAfter(now)) return@mapNotNull null
+                val fillIsRecent = Duration.between(fillTime, now) <= Duration.ofDays(7)
+
+                val lastSavedReviewAt = PracticeReviewPresentation.savedReviews(state, order)
+                    .maxOfOrNull { it.time }
+                    ?.let(Instant::ofEpochMilli)
+
+                val laterEvidence = PracticeReviewPresentation.evidence(
+                    order = order,
+                    stock = stock,
+                    news = news,
+                    companyEvents = companyDataEvents
+                ).filter {
+                    val evidenceAt = CompanyResearchPresentation.timestamp(it.time)
+                    evidenceAt != null &&
+                        evidenceAt.isAfter(fillTime) &&
+                        !evidenceAt.isAfter(now) &&
+                        Duration.between(evidenceAt, now) <= Duration.ofDays(7)
+                }
+
+                val latestEvidence = laterEvidence.maxByOrNull {
+                    CompanyResearchPresentation.timestamp(it.time) ?: Instant.MIN
+                }
+                val latestEvidenceAt = latestEvidence?.let {
+                    CompanyResearchPresentation.timestamp(it.time)
+                }
+
+                if (latestEvidence != null && latestEvidenceAt != null &&
+                    (lastSavedReviewAt == null || latestEvidenceAt.isAfter(lastSavedReviewAt))
+                ) {
+                    HomeBriefItem(
+                        id = "practice-evidence:${order.id}:${latestEvidence.id}",
+                        symbol = symbol,
+                        title = "New evidence since your $symbol practice decision",
+                        detail = latestEvidence.title,
+                        whyItMayMatter = "You recorded a practice decision for $symbol before this later evidence appeared. Reviewing both can help you compare your original reasoning with what became known afterward.",
+                        uncertainty = "Later evidence does not prove that it caused the price move or that your original decision was right or wrong.",
+                        source = latestEvidence.source.ifBlank { "Evidence source unavailable" },
+                        time = latestEvidence.time,
+                        action = "Review decision",
+                        stock = stock,
+                        practiceOrderId = order.id,
+                        relatedChangeId = latestEvidence.id
+                    )
+                } else if (fillIsRecent && (lastSavedReviewAt == null || fillTime.isAfter(lastSavedReviewAt))) {
+                    HomeBriefItem(
+                        id = "practice-fill:${order.id}",
+                        symbol = symbol,
+                        title = "$symbol practice order filled",
+                        detail = "${order.side} ${order.shares} shares at ${practiceMoney(order.price)} · ready to review",
+                        whyItMayMatter = "The simulated order has an observed fill, so you can now compare the saved decision-time context with what happened afterward.",
+                        uncertainty = "This is a simulated fill using eligible observed data. It does not reproduce real order-book queue position, liquidity or broker execution.",
+                        source = "Practice Portfolio · simulated fill",
+                        time = order.quoteAt.ifBlank { Instant.ofEpochMilli(order.filledAt).toString() },
+                        action = "Review decision",
+                        stock = stock,
+                        practiceOrderId = order.id
+                    )
+                } else null
+            }
+            .distinctBy { it.id }
+            .sortedByDescending { CompanyResearchPresentation.timestamp(it.time) ?: Instant.MIN }
+            .toList()
+    }
+
+    private fun practiceEvidenceIds(
+        state: PracticeState?,
+        companies: List<Stock>,
+        news: List<NewsItem>,
+        companyDataEvents: List<CompanyDataChangeEvent>,
+        now: Instant
+    ): Set<String> {
+        if (state?.enabled != true) return emptySet()
+        val stocksBySymbol = companies.associateBy { WatchlistPresentation.symbol(it.symbol) }
+        return state.orders.asSequence()
+            .filter { it.status == "FILLED" && it.filledAt > 0L }
+            .flatMap { order ->
+                val symbol = WatchlistPresentation.symbol(order.symbol)
+                val stock = stocksBySymbol[symbol]
+                    ?: state.quotes.firstOrNull { WatchlistPresentation.symbol(it.symbol) == symbol }?.let {
+                        Stock(
+                            symbol = it.symbol,
+                            name = it.name.ifBlank { it.symbol },
+                            price = it.price,
+                            change = 0.0,
+                            history = emptyList(),
+                            sector = it.sector,
+                            observedAt = it.at,
+                            changeAvailable = false
+                        )
+                    }
+                    ?: Stock(symbol, symbol, Double.NaN, 0.0, emptyList(), changeAvailable = false, volumeAvailable = false)
+                val fillTime = CompanyResearchPresentation.timestamp(order.quoteAt)
+                    ?: Instant.ofEpochMilli(order.filledAt)
+                PracticeReviewPresentation.evidence(order, stock, news, companyDataEvents)
+                    .asSequence()
+                    .filter {
+                        val evidenceAt = CompanyResearchPresentation.timestamp(it.time)
+                        evidenceAt != null &&
+                            evidenceAt.isAfter(fillTime) &&
+                            !evidenceAt.isAfter(now) &&
+                            Duration.between(evidenceAt, now) <= Duration.ofDays(7)
+                    }
+                    .map { it.id }
+            }
+            .toSet()
     }
 
     private fun companyDataWhyItMayMatter(kind: CompanyDataChangeKind, symbol: String): String = when (kind) {
@@ -148,10 +307,10 @@ internal object HomePresentation {
         hasError: Boolean,
         hasWatchlist: Boolean
     ): String = when {
-        !hasWatchlist -> "Build your daily brief"
         loading -> "Checking what changed…"
         items.size == 1 -> "1 thing needs your attention"
         items.size > 1 -> "${items.size} things need your attention"
+        !hasWatchlist -> "Build your daily brief"
         hasError -> "Some changes are unavailable"
         else -> "You're caught up"
     }
@@ -167,17 +326,19 @@ internal object HomePresentation {
             .filter(String::isNotBlank)
             .distinct()
             .size
-        val newsCount = changes.count { it.story != null }
-        val alertCount = changes.count { it.alert != null }
-        val companyDataCount = changes.size - newsCount - alertCount
+        val practiceCount = changes.count { it.practiceOrderId != null }
+        val newsCount = changes.count { it.practiceOrderId == null && it.story != null }
+        val alertCount = changes.count { it.practiceOrderId == null && it.alert != null }
+        val companyDataCount = changes.size - practiceCount - newsCount - alertCount
 
         fun label(count: Int, singular: String, plural: String = singular + "s") =
             "${count} ${if (count == 1) singular else plural}"
 
         return AttentionDigest(
             summary = "${changes.size} new ${if (changes.size == 1) "development" else "developments"} across " +
-                "${companies} followed ${if (companies == 1) "company" else "companies"}",
+                "${companies} ${if (companies == 1) "company" else "companies"}",
             breakdown = buildList {
+                if (practiceCount > 0) add(label(practiceCount, "practice follow-up"))
                 if (newsCount > 0) add(label(newsCount, "news update"))
                 if (alertCount > 0) add(label(alertCount, "alert"))
                 if (companyDataCount > 0) add(label(companyDataCount, "company-data update"))

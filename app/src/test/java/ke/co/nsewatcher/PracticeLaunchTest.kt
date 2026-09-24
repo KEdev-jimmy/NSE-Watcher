@@ -20,6 +20,13 @@ class PracticeLaunchTest {
         assertFalse(PracticeLaunch.shouldOpenOrder(true, "", launchRevision = 2, handledRevision = 1))
     }
 
+    @Test fun homeFollowUpOpensExactDecisionReviewOnlyOncePerLaunchRevision() {
+        assertTrue(PracticeLaunch.shouldOpenReview(true, "order-1", launchRevision = 4, handledRevision = 3))
+        assertFalse(PracticeLaunch.shouldOpenReview(true, "order-1", launchRevision = 4, handledRevision = 4))
+        assertFalse(PracticeLaunch.shouldOpenReview(true, "", launchRevision = 5, handledRevision = 4))
+        assertFalse(PracticeLaunch.shouldOpenReview(false, "order-1", launchRevision = 5, handledRevision = 4))
+    }
+
     @Test fun aNewLaunchRevisionReopensTheSameCompanyOrderTicket() {
         assertTrue(PracticeLaunch.shouldOpenOrder(true, "KCB", launchRevision = 2, handledRevision = 1))
         assertFalse(PracticeLaunch.shouldOpenOrder(true, "KCB", launchRevision = 2, handledRevision = 2))

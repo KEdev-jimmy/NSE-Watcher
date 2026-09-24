@@ -17,6 +17,30 @@ class HomeChangeLedgerTest {
         assertTrue("news:a" in state.reviewedIds)
     }
 
+    @Test fun firstSeenPracticeFollowUpIsNotSilentlySeededAsReviewed() {
+        val practice = HomeBriefItem(
+            id = "practice-fill:order-1",
+            symbol = "KCB",
+            title = "KCB practice order filled",
+            detail = "Ready to review",
+            whyItMayMatter = "Reason",
+            uncertainty = "Uncertainty",
+            source = "Practice Portfolio",
+            time = now.minusSeconds(60).toString(),
+            action = "Review decision",
+            practiceOrderId = "order-1"
+        )
+
+        val state = HomeChangeLedger.reconcile(
+            HomeChangeState(),
+            setOf("KCB"),
+            listOf(practice),
+            now
+        )
+
+        assertFalse("practice-fill:order-1" in state.reviewedIds)
+    }
+
     @Test fun laterArrivalsForAnAlreadyTrackedCompanyRemainUnreviewed() {
         val seeded = HomeChangeLedger.reconcile(HomeChangeState(), setOf("KCB"), listOf(change("news:a")), now)
         val laterAt = now.plusSeconds(900)

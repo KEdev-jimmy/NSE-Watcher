@@ -581,11 +581,13 @@ private fun ReferenceLedgerBriefRow(
     onClick: () -> Unit
 ) {
     val icon = when {
+        item.practiceOrderId != null -> Icons.Default.AccountBalanceWallet
         item.story != null -> Icons.Default.Article
         item.alert != null -> Icons.Default.Notifications
         else -> Icons.Default.AccountBalance
     }
     val accent = when {
+        item.practiceOrderId != null -> Color(0xFF9A68F7)
         item.story != null -> Color(0xFF58AFFF)
         item.alert != null -> Color(0xFFFFC857)
         else -> Color(0xFF9A68F7)

@@ -34,12 +34,16 @@ internal object PracticeLaunch {
     fun symbol(raw: String): String = WatchlistPresentation.symbol(raw)
     fun shouldOpenOrder(enabled: Boolean, initialSymbol: String, launchRevision: Int, handledRevision: Int): Boolean =
         enabled && symbol(initialSymbol).isNotBlank() && launchRevision > handledRevision
+
+    fun shouldOpenReview(enabled: Boolean, orderId: String, launchRevision: Int, handledRevision: Int): Boolean =
+        enabled && orderId.isNotBlank() && launchRevision > handledRevision
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock>, initialMarket: MyStocksCache.MarketStatus,
-    news: List<NewsItem>, initialSymbol: String = "", launchRevision: Int = 0, launchSource: String = "",
+    news: List<NewsItem>, initialSymbol: String = "", initialReviewOrderId: String = "",
+    launchRevision: Int = 0, launchSource: String = "",
     onQuotes: (List<Stock>) -> Unit, onCatalog: (List<Stock>) -> Unit,
     openCompany: (Stock) -> Unit, openNews: (NewsItem) -> Unit, back: () -> Unit) {
     val context = LocalContext.current
@@ -89,8 +93,25 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
         catch (e: Exception) { error = "Could not read the saved portfolio: ${e.message}. Your stored account has not been replaced." }
         if (catalog.isEmpty()) { val rows = MarketData.companies(); if (rows.isNotEmpty()) onCatalog(rows) }
     }
-    LaunchedEffect(state?.enabled, initialSymbol, launchRevision) {
-        if (PracticeLaunch.shouldOpenOrder(state?.enabled == true, initialSymbol, launchRevision, handledLaunchRevision)) {
+    LaunchedEffect(state?.enabled, initialReviewOrderId, launchRevision) {
+        if (PracticeLaunch.shouldOpenReview(state?.enabled == true, initialReviewOrderId, launchRevision, handledLaunchRevision)) {
+            val order = state?.orders?.firstOrNull { it.id == initialReviewOrderId }
+            if (order != null) {
+                symbol = order.symbol
+                editId = order.id
+                page = "MAIN"
+                orderLaunchSource = ""
+                sheet = "Decision review"
+            } else {
+                notice = "That saved practice decision is no longer available."
+            }
+            handledLaunchRevision = launchRevision
+        }
+    }
+    LaunchedEffect(state?.enabled, initialSymbol, initialReviewOrderId, launchRevision) {
+        if (initialReviewOrderId.isBlank() &&
+            PracticeLaunch.shouldOpenOrder(state?.enabled == true, initialSymbol, launchRevision, handledLaunchRevision)
+        ) {
             symbol = PracticeLaunch.symbol(initialSymbol)
             side = "BUY"
             editId = ""

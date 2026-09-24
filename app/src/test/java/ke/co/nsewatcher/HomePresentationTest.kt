@@ -153,12 +153,152 @@ class HomePresentationTest {
         val digest = HomePresentation.attentionDigest(changes)
 
         assertNotNull(digest)
-        assertEquals("3 new developments across 2 followed companies", digest?.summary)
+        assertEquals("3 new developments across 2 companies", digest?.summary)
         assertEquals(
             listOf("1 news update", "1 alert", "1 company-data update"),
             digest?.breakdown
         )
         assertNull(HomePresentation.attentionDigest(emptyList()))
+    }
+
+    @Test fun filledPracticeDecisionAppearsOnHomeEvenWithoutAWatchlist() {
+        val filledAt = Instant.parse("2026-09-22T09:00:00Z")
+        val order = PracticeOrder(
+            id = "practice-1",
+            symbol = "KCB",
+            side = "BUY",
+            shares = 10,
+            limit = 50.0,
+            created = Instant.parse("2026-09-22T08:00:00Z").toEpochMilli(),
+            status = "FILLED",
+            filledAt = filledAt.toEpochMilli(),
+            price = 49.5,
+            quoteAt = filledAt.toString()
+        )
+        val state = PracticeState(enabled = true, orders = listOf(order))
+
+        val changes = HomePresentation.changes(
+            watched = emptyList(),
+            news = emptyList(),
+            events = emptyList(),
+            now = now,
+            practiceState = state,
+            companies = listOf(quote())
+        )
+
+        assertEquals(1, changes.size)
+        assertEquals("practice-fill:practice-1", changes.single().id)
+        assertEquals("practice-1", changes.single().practiceOrderId)
+        assertEquals("Review decision", changes.single().action)
+        assertEquals(
+            "1 thing needs your attention",
+            HomePresentation.dailyBriefTitle(changes, loading = false, hasError = false, hasWatchlist = false)
+        )
+    }
+
+    @Test fun recentPostFillEvidenceBecomesOnePracticeFollowUpInsteadOfDuplicateWatchlistNews() {
+        val fillAt = Instant.parse("2026-09-22T09:00:00Z")
+        val order = PracticeOrder(
+            id = "practice-1",
+            symbol = "KCB",
+            side = "BUY",
+            shares = 10,
+            limit = 50.0,
+            created = Instant.parse("2026-09-22T08:00:00Z").toEpochMilli(),
+            status = "FILLED",
+            filledAt = fillAt.toEpochMilli(),
+            price = 49.5,
+            quoteAt = fillAt.toString()
+        )
+        val state = PracticeState(enabled = true, orders = listOf(order))
+        val laterStory = story(date = "2026-09-22T09:30:00Z")
+
+        val changes = HomePresentation.changes(
+            watched = listOf(quote()),
+            news = listOf(laterStory),
+            events = emptyList(),
+            now = now,
+            practiceState = state,
+            companies = listOf(quote())
+        )
+
+        assertEquals(1, changes.size)
+        assertTrue(changes.single().id.startsWith("practice-evidence:practice-1:"))
+        assertEquals("news:news", changes.single().relatedChangeId)
+        assertEquals("practice-1", changes.single().practiceOrderId)
+        assertTrue(changes.single().title.contains("New evidence"))
+    }
+
+    @Test fun olderPracticeDecisionCanResurfaceWhenFreshEvidenceAppears() {
+        val created = now.minusSeconds(12 * 24 * 3600L)
+        val fillAt = now.minusSeconds(10 * 24 * 3600L)
+        val order = PracticeOrder(
+            id = "older-practice",
+            symbol = "KCB",
+            side = "BUY",
+            shares = 10,
+            limit = 50.0,
+            created = created.toEpochMilli(),
+            status = "FILLED",
+            filledAt = fillAt.toEpochMilli(),
+            price = 49.5,
+            quoteAt = fillAt.toString()
+        )
+        val state = PracticeState(enabled = true, orders = listOf(order))
+        val freshStory = story(date = now.minusSeconds(3600).toString())
+
+        val changes = HomePresentation.changes(
+            watched = emptyList(),
+            news = listOf(freshStory),
+            events = emptyList(),
+            now = now,
+            practiceState = state,
+            companies = listOf(quote())
+        )
+
+        assertEquals(1, changes.size)
+        assertTrue(changes.single().id.startsWith("practice-evidence:older-practice:"))
+    }
+
+    @Test fun evidenceAlreadyCoveredByASavedDecisionReviewDoesNotReturnAsWatchlistNoise() {
+        val fillAt = Instant.parse("2026-09-22T09:00:00Z")
+        val evidenceAt = Instant.parse("2026-09-22T09:30:00Z")
+        val order = PracticeOrder(
+            id = "practice-1",
+            symbol = "KCB",
+            side = "BUY",
+            shares = 10,
+            limit = 50.0,
+            created = Instant.parse("2026-09-22T08:00:00Z").toEpochMilli(),
+            status = "FILLED",
+            filledAt = fillAt.toEpochMilli(),
+            price = 49.5,
+            quoteAt = fillAt.toString()
+        )
+        val state = PracticeState(
+            enabled = true,
+            orders = listOf(order),
+            entries = listOf(
+                PracticeEntry(
+                    id = "review:practice-1:a",
+                    time = evidenceAt.plusSeconds(60).toEpochMilli(),
+                    kind = "REVIEW",
+                    text = "I reviewed the later evidence.",
+                    symbol = "KCB"
+                )
+            )
+        )
+
+        val changes = HomePresentation.changes(
+            watched = listOf(quote()),
+            news = listOf(story(date = evidenceAt.toString())),
+            events = emptyList(),
+            now = now,
+            practiceState = state,
+            companies = listOf(quote())
+        )
+
+        assertTrue(changes.isEmpty())
     }
 
     @Test fun visibleDailyBriefUsesOnlyTheSameThreeUnreviewedChangesShownForReview() {
