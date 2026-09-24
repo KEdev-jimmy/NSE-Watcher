@@ -40,6 +40,7 @@ internal fun PremiumMarketOverview(
     sentiment: HomePremiumSentiment
 ) {
     PremiumResponsivePair(
+        forceHorizontal = true,
         first = {
             PremiumBreadthCard(
                 palette = palette,
