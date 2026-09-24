@@ -99,7 +99,11 @@ internal object MarketAttentionEngine {
         limit: Int = 3
     ): List<MarketAttentionItem> {
         if (limit <= 0) return emptyList()
-        val valid = stocks.filter(MarketPresentation::validChange)
+        val valid = stocks.filter(MarketPresentation::validChange).filter { stock ->
+            val observed = CompanyResearchPresentation.timestamp(stock.observedAt) ?: return@filter false
+            !observed.isAfter(now.plusSeconds(60)) &&
+                Duration.between(observed, now) <= Duration.ofDays(4)
+        }
         val latestDate = valid.mapNotNull {
             CompanyChartAccuracy.observationDate(it.observedAt)
         }.maxOrNull() ?: return emptyList()
