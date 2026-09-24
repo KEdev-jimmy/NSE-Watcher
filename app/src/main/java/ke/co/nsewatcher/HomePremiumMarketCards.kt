@@ -39,24 +39,22 @@ internal fun PremiumMarketOverview(
     breadth: HomeMarketBreadth,
     sentiment: HomePremiumSentiment
 ) {
-    PremiumResponsivePair(
-        forceHorizontal = true,
-        first = {
-            PremiumBreadthCard(
-                palette = palette,
-                breadth = breadth,
-                modifier = Modifier.fillMaxWidth()
-            )
-        },
-        second = {
-            PremiumSentimentCard(
-                palette = palette,
-                sentiment = sentiment,
-                reportedVolume = breadth.reportedVolume,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-    )
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        PremiumBreadthCard(
+            palette = palette,
+            breadth = breadth,
+            modifier = Modifier.fillMaxWidth()
+        )
+        PremiumSentimentCard(
+            palette = palette,
+            sentiment = sentiment,
+            reportedVolume = breadth.reportedVolume,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
 }
 
 @Composable
