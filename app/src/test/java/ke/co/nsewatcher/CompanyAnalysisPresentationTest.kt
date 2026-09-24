@@ -38,6 +38,13 @@ class CompanyAnalysisPresentationTest {
         assertTrue(result.interpretation.contains("session date"))
     }
 
+    @Test fun movementRelationshipLabelsStayNonCausal() {
+        assertEquals("Close in time", CompanyAnalysisPresentation.movementRelationshipLabel("related"))
+        assertEquals("Possible context", CompanyAnalysisPresentation.movementRelationshipLabel("possible"))
+        assertEquals("Not established", CompanyAnalysisPresentation.movementRelationshipLabel("not-established"))
+        assertEquals("Not established", CompanyAnalysisPresentation.movementRelationshipLabel(""))
+    }
+
     @Test fun analystViewRequiresEverySignalToReferenceReturnedEvidence() {
         val analysis = AnalystCache.Analysis(
             headline = "Evidence summary",
