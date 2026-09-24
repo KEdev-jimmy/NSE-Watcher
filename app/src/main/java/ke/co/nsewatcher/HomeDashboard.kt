@@ -37,9 +37,11 @@ import ke.co.nsewatcher.data.MarketHistoryCache
 import ke.co.nsewatcher.data.NewsCache
 import ke.co.nsewatcher.data.WatchlistStore
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.util.Locale
 import kotlin.math.abs
@@ -52,7 +54,7 @@ fun HomeDashboard(
     marketIndices: List<MyStocksCache.MarketIndex>,
     initialMarketStatus: MyStocksCache.MarketStatus, startupDataLoaded: Boolean,
     name: String, initialCatalog: List<Stock>, practiceEnabled: Boolean, practiceCash: Double,
-    openAllNews: () -> Unit, openPractice: () -> Unit, openProfile: () -> Unit,
+    openAllNews: () -> Unit, openPractice: () -> Unit, openPracticeReview: (String) -> Unit, openProfile: () -> Unit,
     openAlertSettings: () -> Unit, onQuotesLoaded: (List<Stock>) -> Unit,
     onNewsLoaded: (List<NewsItem>) -> Unit,
     onIndicesLoaded: (List<MyStocksCache.MarketIndex>) -> Unit,
@@ -64,6 +66,9 @@ fun HomeDashboard(
     val alertStore = remember { AlertStore(context) }
     val companyChangeStore = remember { CompanyChangeStore(context) }
     val changeStore = remember { HomeChangeStore(context) }
+    val practiceStore = remember { PracticeStore(context) }
+    var practiceState by remember { mutableStateOf<PracticeState?>(null) }
+    var practiceStateError by remember { mutableStateOf(false) }
     var changeState by remember { mutableStateOf<HomeChangeState?>(null) }
     var changeStateError by remember { mutableStateOf(false) }
     var watchlistError by remember { mutableStateOf(false) }
@@ -94,6 +99,21 @@ fun HomeDashboard(
     LaunchedEffect(initialMarketStatus) { market = initialMarketStatus }
     LaunchedEffect(initialCatalog) { if (initialCatalog.isNotEmpty()) catalog = initialCatalog }
     LaunchedEffect(Unit) { while (true) { now = Instant.now(); delay(60_000L) } }
+    LaunchedEffect(now, practiceEnabled) {
+        if (!practiceEnabled) {
+            practiceState = null
+            practiceStateError = false
+        } else {
+            try {
+                practiceState = withContext(Dispatchers.IO) { practiceStore.read() }
+                practiceStateError = false
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                practiceStateError = true
+            }
+        }
+    }
 
     suspend fun refreshNews(force: Boolean = false) {
         newsLoading = true
@@ -150,19 +170,29 @@ fun HomeDashboard(
     }
     val watched = remember(saved, catalog, currentStocks) { WatchlistPresentation.companies(saved.orEmpty(), catalog, currentStocks) }
     val watchedSymbols = remember(watched) { watched.map { WatchlistPresentation.symbol(it.symbol) }.toSet() }
-    val changes = remember(watched, newsFeed, events, companyDataEvents, now) {
+    val practiceCompanies = remember(catalog, currentStocks) { CompaniesPresentation.companies(catalog, currentStocks) }
+    val changes = remember(watched, newsFeed, events, companyDataEvents, practiceState, practiceCompanies, now) {
         HomePresentation.changes(
             watched = watched,
             news = newsFeed,
             events = events,
             now = now,
-            companyDataEvents = companyDataEvents
+            companyDataEvents = companyDataEvents,
+            practiceState = practiceState,
+            companies = practiceCompanies
         )
     }
-    LaunchedEffect(saved, watchedSymbols, changes.map { it.id }) {
+    val trackedSymbols = remember(watchedSymbols, changes) {
+        watchedSymbols + changes.asSequence()
+            .filter { it.practiceOrderId != null }
+            .map { WatchlistPresentation.symbol(it.symbol) }
+            .filter(String::isNotBlank)
+            .toSet()
+    }
+    LaunchedEffect(saved, trackedSymbols, changes.map { it.id }) {
         if (saved == null) return@LaunchedEffect
         try {
-            changeState = changeStore.reconcile(watchedSymbols, changes, Instant.now())
+            changeState = changeStore.reconcile(trackedSymbols, changes, Instant.now())
             changeStateError = false
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -202,6 +232,7 @@ fun HomeDashboard(
                 changeStateError = true
             } finally {
                 when {
+                    item.practiceOrderId != null -> openPracticeReview(item.practiceOrderId)
                     item.story != null -> openNews(item.story)
                     item.stock != null -> openCompany(item.stock)
                     else -> showAlerts = true
@@ -269,8 +300,8 @@ fun HomeDashboard(
             newsLoading = newsLoading,
             newsError = newsError,
             briefItems = brief,
-            briefLoading = saved == null || (watched.isNotEmpty() && changeState == null),
-            briefHasError = changeStateError || watchlistError || alertError || companyChangeError || newsError,
+            briefLoading = saved == null || (practiceEnabled && practiceState == null && !practiceStateError) || (watched.isNotEmpty() && changeState == null),
+            briefHasError = changeStateError || watchlistError || alertError || companyChangeError || newsError || practiceStateError,
             intelligence = intelligence,
             gainersSelected = gainersSelected,
             onGainersSelected = { gainersSelected = it },
