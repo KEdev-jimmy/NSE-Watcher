@@ -64,11 +64,12 @@ internal object HomeChangeLedger {
                     val baseline = baselines[symbol]?.let { runCatching { Instant.parse(it) }.getOrNull() }
                     val eventTime = runCatching { Instant.parse(change.time) }.getOrNull()
                     val existedBeforeBaseline = baseline == null || eventTime == null || !eventTime.isAfter(baseline)
+                    val practiceFollowUp = change.practiceOrderId != null
                     kept[change.id] = HomeChangeRecord(
                         id = change.id,
                         symbol = symbol,
                         firstSeenAt = now.toString(),
-                        reviewedAt = if (symbol in newlyTracked || existedBeforeBaseline) now.toString() else ""
+                        reviewedAt = if (!practiceFollowUp && (symbol in newlyTracked || existedBeforeBaseline)) now.toString() else ""
                     )
                 }
             }
