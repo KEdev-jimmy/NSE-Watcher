@@ -153,6 +153,19 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
     }
     val companies = remember(catalog, quoteFeed) { CompaniesPresentation.companies(catalog, quoteFeed) }
     val s = state
+    val decisionItems = remember(s, companies, news, companyDataEvents) {
+        s?.let {
+            PracticeDecisionCenterPresentation.items(
+                state = it,
+                companies = companies,
+                news = news,
+                companyEvents = companyDataEvents
+            )
+        }.orEmpty()
+    }
+    val decisionSummary = remember(decisionItems) {
+        PracticeDecisionCenterPresentation.summary(decisionItems)
+    }
     val selected = companies.firstOrNull { it.symbol == symbol } ?: s?.quotes?.firstOrNull { it.symbol == symbol }?.let { Stock(it.symbol, it.name.ifBlank { it.symbol }, it.price, 0.0, emptyList(), sector = it.sector, observedAt = it.at, changeAvailable = false) }
         ?: Stock(symbol, symbol, Double.NaN, 0.0, emptyList(), changeAvailable = false, volumeAvailable = false)
     fun trade(stock: Stock, direction: String, id: String = "") {
@@ -181,7 +194,7 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
             }
             if (page == "MAIN") {
                 Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) { ResearchTitle("Practice Portfolio"); PracticeBadge() }
-                MarketChoiceRow(listOf("Overview", "Holdings", "Activity"), tab) { tab = it }
+                MarketChoiceRow(listOf("Overview", "Holdings", "Decisions", "Activity"), tab) { tab = it }
             }
             if (error != null) Surface(color = ResearchRaised, modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp)) { Text(error.orEmpty(), color = PracticeAmber, fontSize = 13.sp); if (s == null) TextButton(onClick = { operation({ store.read() }) }) { Text("Retry saved account") } }
@@ -255,6 +268,12 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
                             OutlinedButton(onClick = { sheet = "Add virtual cash" }, modifier = Modifier.weight(1f)) { Text("Add virtual cash") }
                         } }
                         item { PracticeJourney(s) }
+                        item {
+                            PracticeDecisionProgressCard(
+                                summary = decisionSummary,
+                                onOpenCenter = { tab = "Decisions" }
+                            )
+                        }
                         val pending = s.orders.count { it.status == "PENDING" }
                         if (pending > 0) item { ResearchPanel {
                             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) { PracticeIcon(Icons.Outlined.Schedule, true); Column(Modifier.weight(1f)) { Text("$pending order${if (pending == 1) "" else "s"} waiting", color = PracticeAmber, fontWeight = FontWeight.Bold); ResearchCaption("View the reason for each order") } }
@@ -265,6 +284,16 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
                     }
                     tab == "Holdings" -> item {
                         PracticeHoldings(s, companies, onHolding = { symbol = it.symbol; page = "HOLDING" }, onTrade = { trade(it, "BUY") }, onResearch = openCompany, onBrowse = { sheet = "Choose company" }, onRules = { sheet = "Valuation" })
+                    }
+                    tab == "Decisions" -> item {
+                        PracticeDecisionReviewCenter(
+                            items = decisionItems,
+                            onReview = { order ->
+                                editId = order.id
+                                symbol = order.symbol
+                                sheet = "Decision review"
+                            }
+                        )
                     }
                     tab == "Activity" -> item {
                         PracticeActivity(s, activityTab, onTab = { activityTab = it }, onCancel = { id -> operation({ store.update { PracticeEngine.cancel(it, id) } }) },
@@ -370,7 +399,7 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
                                             }
                                         }) {
                                             sheet = null
-                                            notice = "Decision review saved. You can revisit it in Activity → Notes."
+                                            notice = "Decision review saved. You can revisit it in Decisions."
                                         }
                                     }
                                 )

@@ -174,4 +174,61 @@ class UsefulnessJourneyIntegrationTest {
         assertEquals(2, evidence.size)
         assertTrue(evidence.all { CompanyResearchPresentation.timestamp(it.time)!!.isAfter(orderCreated) })
     }
+    @Test fun filledDecisionMovesThroughNeedsReviewReviewedAndNewEvidenceStates() {
+        val createdAt = Instant.parse("2026-09-23T07:00:00Z")
+        val filledAt = Instant.parse("2026-09-23T07:15:00Z")
+        val baseOrder = PracticeOrder(
+            id = "practice-review-flow",
+            symbol = "KCB",
+            side = "BUY",
+            shares = 10,
+            limit = 50.0,
+            created = createdAt.toEpochMilli(),
+            note = "Testing the evidence.",
+            status = "FILLED",
+            filledAt = filledAt.toEpochMilli(),
+            price = 49.5,
+            quoteAt = filledAt.toString()
+        )
+        val company = stock(50.0, filledAt.toString())
+        val baseState = PracticeState(enabled = true, orders = listOf(baseOrder))
+
+        val needsReview = PracticeDecisionCenterPresentation.items(
+            state = baseState,
+            companies = listOf(company),
+            news = emptyList(),
+            companyEvents = emptyList()
+        )
+        assertEquals(PracticeDecisionReviewState.NEEDS_REVIEW, needsReview.single().state)
+
+        val reviewedAt = Instant.parse("2026-09-23T08:00:00Z")
+        val reviewedState = baseState.copy(
+            entries = listOf(
+                PracticeEntry(
+                    id = "review:practice-review-flow:1",
+                    time = reviewedAt.toEpochMilli(),
+                    kind = "REVIEW",
+                    text = "I reviewed the original decision.",
+                    symbol = "KCB"
+                )
+            )
+        )
+        val reviewed = PracticeDecisionCenterPresentation.items(
+            state = reviewedState,
+            companies = listOf(company),
+            news = emptyList(),
+            companyEvents = emptyList()
+        )
+        assertEquals(PracticeDecisionReviewState.REVIEWED, reviewed.single().state)
+
+        val laterEvidence = PracticeDecisionCenterPresentation.items(
+            state = reviewedState,
+            companies = listOf(company),
+            news = listOf(news("decision-later", "2026-09-23T08:30:00Z")),
+            companyEvents = emptyList()
+        )
+        assertEquals(PracticeDecisionReviewState.NEW_EVIDENCE, laterEvidence.single().state)
+        assertEquals("news:decision-later", laterEvidence.single().latestEvidence?.id)
+    }
+
 }
