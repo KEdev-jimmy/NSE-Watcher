@@ -590,19 +590,13 @@ private fun ReferenceLedgerBriefRow(
         item.alert != null -> Color(0xFFFFC857)
         else -> Color(0xFF9A68F7)
     }
-    val evidence = buildString {
-        append(item.source.ifBlank { "Source unavailable" })
-        if (item.time.isNotBlank()) {
-            append(" · ")
-            append(CompanyResearchPresentation.date(item.time))
-        }
-    }
-
     ReferenceBriefAttentionRow(
         icon = icon,
         accent = accent,
         title = item.title,
-        detail = evidence,
+        detail = item.detail.ifBlank {
+            item.source.ifBlank { "Open to review the available evidence" }
+        },
         onClick = onClick
     )
 }
