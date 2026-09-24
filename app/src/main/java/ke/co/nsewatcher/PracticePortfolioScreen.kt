@@ -176,6 +176,14 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
                     market = market,
                     working = working,
                     launchSource = orderLaunchSource,
+                    captureDecision = { confirmedAt ->
+                        PracticeReviewPresentation.captureDecision(
+                            stock = selected,
+                            news = news,
+                            companyEvents = companyDataEvents,
+                            capturedAt = confirmedAt
+                        )
+                    },
                     onSubmit = { order ->
                         operation({ store.update { PracticeEngine.submit(it, order) } }) {
                             page = "MAIN"

@@ -17,6 +17,7 @@ import java.util.UUID
 
 @Composable internal fun PracticeOrderTicket(s: PracticeState, stock: Stock, side: String, editId: String,
     market: MyStocksCache.MarketStatus, working: Boolean, launchSource: String = "",
+    captureDecision: (Long) -> PracticeDecisionSnapshot,
     onSubmit: (PracticeOrder) -> Unit, onSide: (String) -> Unit) {
     val editing = s.orders.firstOrNull { it.id == editId }
     var quantity by rememberSaveable(stock.symbol, editId) { mutableStateOf(editing?.shares?.toString() ?: "1") }
@@ -97,7 +98,11 @@ import java.util.UUID
             Text("${order.shares} ${order.symbol} shares • Limit ${practiceMoney(order.limit)}")
             Text(if (order.side == "BUY") "Reserve up to ${practiceMoney(PracticeEngine.money(order.shares * order.limit) + PracticeEngine.money(order.shares * order.limit * PracticeEngine.FEE))}, including the practice fee." else "Reserve ${order.shares} shares until filled or cancelled.")
             Text("This queues an order; it does not confirm a fill. Orders are checked while Practice Portfolio is active and periodically in the background when Android can run connected work.")
-        } }, confirmButton = { TextButton(enabled = !working, onClick = { review = null; onSubmit(order.copy(created = System.currentTimeMillis())) }) { Text("Confirm practice order") } }, dismissButton = { TextButton(onClick = { review = null }) { Text("Go back") } }) }
+        } }, confirmButton = { TextButton(enabled = !working, onClick = {
+            val confirmedAt = System.currentTimeMillis()
+            review = null
+            onSubmit(order.copy(created = confirmedAt, decisionSnapshot = captureDecision(confirmedAt)))
+        }) { Text("Confirm practice order") } }, dismissButton = { TextButton(onClick = { review = null }) { Text("Go back") } }) }
 }
 
 @Composable internal fun PracticeActivity(s: PracticeState, tab: String, onTab: (String) -> Unit,

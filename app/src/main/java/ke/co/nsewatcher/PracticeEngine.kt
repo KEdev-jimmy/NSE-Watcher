@@ -8,9 +8,27 @@ import java.math.RoundingMode
 
 internal data class PracticeHolding(val symbol: String, val shares: Long, val cost: Double, val legacy: Boolean = false)
 internal data class PracticeQuote(val symbol: String, val price: Double, val at: String, val name: String = "", val sector: String = "Other")
+internal data class PracticeDecisionEvidence(
+    val id: String,
+    val title: String,
+    val detail: String,
+    val source: String,
+    val time: String
+)
+internal data class PracticeDecisionSnapshot(
+    val capturedAt: Long = 0,
+    val quotePrice: Double = Double.NaN,
+    val quoteObservedAt: String = "",
+    val quoteSource: String = "",
+    val quoteDelayMinutes: Int? = null,
+    val dailyChangePct: Double? = null,
+    val previousClose: Double? = null,
+    val evidence: List<PracticeDecisionEvidence> = emptyList()
+)
 internal data class PracticeOrder(val id: String, val symbol: String, val side: String, val shares: Long, val limit: Double,
     val created: Long, val note: String = "", val status: String = "PENDING", val reason: String = "Waiting for an eligible quote",
-    val filledAt: Long = 0, val price: Double = 0.0, val fee: Double = 0.0, val realised: Double = 0.0, val quoteAt: String = "")
+    val filledAt: Long = 0, val price: Double = 0.0, val fee: Double = 0.0, val realised: Double = 0.0, val quoteAt: String = "",
+    val decisionSnapshot: PracticeDecisionSnapshot = PracticeDecisionSnapshot())
 internal data class PracticeEntry(val id: String, val time: Long, val kind: String, val text: String, val amount: Double = 0.0, val symbol: String = "")
 internal data class PracticeSnapshot(val time: Long, val value: Double, val contributed: Double)
 internal data class PracticeState(val enabled: Boolean = false, val cash: Double = 0.0, val contributed: Double = 0.0,

@@ -45,6 +45,79 @@ class PracticeReviewTest {
         paymentDate = ""
     )
 
+    @Test fun decisionSnapshotCapturesOnlyEvidenceAvailableAtConfirmation() {
+        val capturedAt = Instant.parse("2026-09-23T07:00:00Z").toEpochMilli()
+        val decisionStock = Stock(
+            symbol = "KCB",
+            name = "KCB Group",
+            price = 50.5,
+            change = 2.0,
+            history = emptyList(),
+            source = "Verified provider",
+            observedAt = "2026-09-23T06:45:00Z",
+            delayMinutes = 15,
+            previousClose = 49.5
+        )
+        val news = listOf(
+            story("before", "KCB", "2026-09-23T06:30:00Z"),
+            story("future", "KCB", "2026-09-23T07:30:00Z"),
+            story("other", "SCOM", "2026-09-23T06:40:00Z")
+        )
+        val events = listOf(
+            CompanyDataChangeEvent(
+                id = "company-data:kcb:before",
+                symbol = "KCB",
+                kind = CompanyDataChangeKind.REPORTED_FIGURES,
+                title = "Reported figures updated for KCB",
+                detail = "Provider observation changed.",
+                source = "Verified provider",
+                observedAt = "2026-09-23T06:50:00Z"
+            ),
+            CompanyDataChangeEvent(
+                id = "company-data:kcb:future",
+                symbol = "KCB",
+                kind = CompanyDataChangeKind.DIVIDEND,
+                title = "Later dividend update",
+                detail = "This was not known yet.",
+                source = "Verified provider",
+                observedAt = "2026-09-23T07:10:00Z"
+            )
+        )
+
+        val snapshot = PracticeReviewPresentation.captureDecision(
+            stock = decisionStock,
+            news = news,
+            companyEvents = events,
+            capturedAt = capturedAt
+        )
+
+        assertEquals(capturedAt, snapshot.capturedAt)
+        assertEquals(50.5, snapshot.quotePrice, 0.0)
+        assertEquals("2026-09-23T06:45:00Z", snapshot.quoteObservedAt)
+        assertEquals("Verified provider", snapshot.quoteSource)
+        assertEquals(15, snapshot.quoteDelayMinutes)
+        assertEquals(2.0, snapshot.dailyChangePct ?: Double.NaN, 0.0)
+        assertEquals(49.5, snapshot.previousClose ?: Double.NaN, 0.0)
+        assertEquals(
+            listOf("company-data:kcb:before", "news:before"),
+            snapshot.evidence.map { it.id }
+        )
+    }
+
+    @Test fun oldOrdersDefaultToAnEmptySnapshotInsteadOfReconstructingHistory() {
+        val legacyOrder = PracticeOrder(
+            id = "legacy",
+            symbol = "KCB",
+            side = "BUY",
+            shares = 1,
+            limit = 50.0,
+            created = created
+        )
+
+        assertEquals(0L, legacyOrder.decisionSnapshot.capturedAt)
+        assertTrue(legacyOrder.decisionSnapshot.evidence.isEmpty())
+    }
+
     @Test fun priceReviewRequiresAQuoteObservedAfterTheFillQuote() {
         assertNull(
             PracticeReviewPresentation.price(

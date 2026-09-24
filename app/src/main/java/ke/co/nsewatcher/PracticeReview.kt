@@ -34,6 +34,56 @@ internal data class PracticeReviewEvidence(
 )
 
 internal object PracticeReviewPresentation {
+    fun captureDecision(
+        stock: Stock,
+        news: List<NewsItem>,
+        companyEvents: List<CompanyDataChangeEvent>,
+        capturedAt: Long
+    ): PracticeDecisionSnapshot {
+        val decisionTime = Instant.ofEpochMilli(capturedAt)
+        val linkedNews = WatchlistPresentation.linkedNews(news, listOf(stock))
+            .mapNotNull { item ->
+                val published = CompanyResearchPresentation.timestamp(item.publishedAt) ?: return@mapNotNull null
+                if (published.isAfter(decisionTime)) return@mapNotNull null
+                PracticeDecisionEvidence(
+                    id = "news:${item.id}",
+                    title = item.title,
+                    detail = item.summary.ifBlank { "Published company update." },
+                    source = item.source.ifBlank { "Source unavailable" },
+                    time = item.publishedAt
+                )
+            }
+
+        val companyChanges = companyEvents.mapNotNull { event ->
+            if (!WatchlistPresentation.symbol(event.symbol).equals(stock.symbol, ignoreCase = true)) return@mapNotNull null
+            val detected = CompanyResearchPresentation.timestamp(event.observedAt) ?: return@mapNotNull null
+            if (detected.isAfter(decisionTime)) return@mapNotNull null
+            PracticeDecisionEvidence(
+                id = event.id,
+                title = event.title,
+                detail = event.detail,
+                source = event.source.ifBlank { "Company intelligence source" },
+                time = event.observedAt
+            )
+        }
+
+        val evidence = (linkedNews + companyChanges)
+            .distinctBy { it.id }
+            .sortedByDescending { CompanyResearchPresentation.timestamp(it.time) ?: Instant.MIN }
+            .take(5)
+
+        return PracticeDecisionSnapshot(
+            capturedAt = capturedAt,
+            quotePrice = stock.price.takeIf { it.isFinite() && it > 0.0 } ?: Double.NaN,
+            quoteObservedAt = stock.observedAt,
+            quoteSource = stock.source.ifBlank { "Source unavailable" },
+            quoteDelayMinutes = stock.delayMinutes?.takeIf { it >= 0 },
+            dailyChangePct = stock.change.takeIf { stock.changeAvailable && it.isFinite() },
+            previousClose = stock.previousClose?.takeIf { it.isFinite() && it > 0.0 },
+            evidence = evidence
+        )
+    }
+
     fun price(order: PracticeOrder, quote: PracticeQuote?): PracticeReviewPrice? {
         if (order.status != "FILLED" || order.price <= 0.0 || !order.price.isFinite()) return null
         val current = quote ?: return null
@@ -127,6 +177,46 @@ internal fun PracticeDecisionReviewPanel(
                 ResearchBody(order.note)
             }
             ResearchCaption("This is your saved reasoning, not an investment recommendation.")
+        }
+
+        ResearchPanel {
+            ResearchTitle("What you knew then")
+            val snapshot = order.decisionSnapshot
+            if (snapshot.capturedAt <= 0L) {
+                ResearchCaption("Decision-time evidence was not recorded for this older order. NSE Watcher does not reconstruct it retrospectively.")
+            } else {
+                ResearchCaption("Snapshot saved ${practiceTime(snapshot.capturedAt)} when you confirmed this practice decision.")
+                PracticeLine(
+                    "Observed price",
+                    snapshot.quotePrice.takeIf { it.isFinite() && it > 0.0 }?.let(::practiceMoney) ?: "Unavailable"
+                )
+                snapshot.dailyChangePct?.let {
+                    PracticeLine("Daily change then", CompanyResearchPresentation.percent(it))
+                }
+                snapshot.previousClose?.let {
+                    PracticeLine("Previous close then", practiceMoney(it))
+                }
+                val timing = buildString {
+                    append(
+                        if (snapshot.quoteObservedAt.isBlank()) "Observation time unavailable"
+                        else "Quote observed " + CompanyResearchPresentation.date(snapshot.quoteObservedAt)
+                    )
+                    snapshot.quoteDelayMinutes?.takeIf { it > 0 }?.let { append(" • ").append(it).append("-min delayed") }
+                }
+                ResearchCaption(timing)
+                ResearchCaption("Quote source: " + snapshot.quoteSource.ifBlank { "Source unavailable" })
+                if (snapshot.evidence.isEmpty()) {
+                    ResearchCaption("No matching loaded company news or detected company-data changes were available in the saved snapshot.")
+                } else {
+                    snapshot.evidence.forEachIndexed { index, item ->
+                        if (index > 0) HorizontalDivider(color = ResearchBorder)
+                        ResearchBody(item.title)
+                        if (item.detail.isNotBlank()) ResearchCaption(item.detail)
+                        ResearchCaption(item.source + " • " + CompanyResearchPresentation.date(item.time))
+                    }
+                }
+                ResearchCaption("This preserves the context that was loaded at decision time; it does not prove that the evidence caused a price move.")
+            }
         }
 
         ResearchPanel {
