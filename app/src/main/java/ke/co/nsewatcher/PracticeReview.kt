@@ -102,7 +102,7 @@ internal object PracticeLearningInsightsPresentation {
         val themes = themeKeywords.mapNotNull { (label, keywords) ->
             val count = reasons.count { reason ->
                 val text = reason.lowercase()
-                keywords.any(text::contains)
+                keywords.any { keyword -> text.contains(keyword) }
             }
             count.takeIf { it >= 2 }?.let { PracticeLearningTheme(label, it) }
         }.sortedWith(compareByDescending<PracticeLearningTheme> { it.count }.thenBy { it.label })
