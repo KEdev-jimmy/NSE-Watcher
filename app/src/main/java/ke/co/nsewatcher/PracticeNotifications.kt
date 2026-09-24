@@ -4,9 +4,23 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import ke.co.nsewatcher.data.CompanyDataChangeEvent
+import java.time.Duration
+import java.time.Instant
 
 internal data class PracticeNotificationDestination(
     val orderId: String = ""
+)
+
+internal data class PracticeEvidenceNotificationCandidate(
+    val orderId: String,
+    val symbol: String,
+    val evidenceId: String,
+    val title: String,
+    val detail: String,
+    val source: String,
+    val time: String,
+    val coveredKeys: Set<String>
 )
 
 internal object PracticeNotifications {
@@ -72,6 +86,75 @@ internal object PracticeNotifications {
         val value = raw.orEmpty().trim()
         return value.takeIf { it.matches(orderIdPattern) }.orEmpty()
     }
+
+    internal fun evidenceCandidates(
+        state: PracticeState,
+        news: List<NewsItem>,
+        companyEvents: List<CompanyDataChangeEvent>,
+        now: Instant,
+        baselineAt: Instant,
+        notifiedKeys: Set<String>
+    ): List<PracticeEvidenceNotificationCandidate> {
+        if (!state.enabled) return emptyList()
+        return state.orders.asSequence()
+            .filter { order -> practiceEvidenceOrderActive(state, order, now) }
+            .mapNotNull { order ->
+                val symbol = WatchlistPresentation.symbol(order.symbol)
+                if (symbol.isBlank()) return@mapNotNull null
+                val quote = state.quotes.firstOrNull {
+                    WatchlistPresentation.symbol(it.symbol) == symbol
+                }
+                val stock = Stock(
+                    symbol = symbol,
+                    name = quote?.name?.ifBlank { symbol } ?: symbol,
+                    price = quote?.price ?: Double.NaN,
+                    change = 0.0,
+                    history = emptyList(),
+                    sector = quote?.sector ?: "Other",
+                    observedAt = quote?.at.orEmpty(),
+                    changeAvailable = false,
+                    volumeAvailable = false
+                )
+                val latestReviewAt = PracticeReviewPresentation.savedReviews(state, order)
+                    .maxOfOrNull { it.time }
+                    ?.let(Instant::ofEpochMilli)
+                val unseen = PracticeReviewPresentation.evidence(
+                    order = order,
+                    stock = stock,
+                    news = news,
+                    companyEvents = companyEvents
+                ).filter { evidence ->
+                    val at = CompanyResearchPresentation.timestamp(evidence.time) ?: return@filter false
+                    val key = evidenceKey(order.id, evidence.id)
+                    at.isAfter(baselineAt) &&
+                        !at.isAfter(now) &&
+                        Duration.between(at, now) <= Duration.ofDays(7) &&
+                        (latestReviewAt == null || at.isAfter(latestReviewAt)) &&
+                        key !in notifiedKeys
+                }
+                if (unseen.isEmpty()) return@mapNotNull null
+                val latest = unseen.maxByOrNull {
+                    CompanyResearchPresentation.timestamp(it.time) ?: Instant.MIN
+                } ?: return@mapNotNull null
+                PracticeEvidenceNotificationCandidate(
+                    orderId = order.id,
+                    symbol = symbol,
+                    evidenceId = latest.id,
+                    title = latest.title,
+                    detail = latest.detail,
+                    source = latest.source,
+                    time = latest.time,
+                    coveredKeys = unseen.map { evidenceKey(order.id, it.id) }.toSet()
+                )
+            }
+            .sortedByDescending {
+                CompanyResearchPresentation.timestamp(it.time) ?: Instant.MIN
+            }
+            .toList()
+    }
+
+    internal fun evidenceKey(orderId: String, evidenceId: String): String =
+        normalizeOrderId(orderId) + "|" + evidenceId.trim()
 
     fun opensPractice(intent: Intent?): Boolean = destination(intent) != null
 }
