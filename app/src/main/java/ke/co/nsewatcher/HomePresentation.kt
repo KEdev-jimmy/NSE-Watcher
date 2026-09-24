@@ -254,10 +254,10 @@ internal object HomePresentation {
         hasError: Boolean,
         hasWatchlist: Boolean
     ): String = when {
-        !hasWatchlist -> "Build your daily brief"
         loading -> "Checking what changed…"
         items.size == 1 -> "1 thing needs your attention"
         items.size > 1 -> "${items.size} things need your attention"
+        !hasWatchlist -> "Build your daily brief"
         hasError -> "Some changes are unavailable"
         else -> "You're caught up"
     }
@@ -283,7 +283,7 @@ internal object HomePresentation {
 
         return AttentionDigest(
             summary = "${changes.size} new ${if (changes.size == 1) "development" else "developments"} across " +
-                "${companies} followed ${if (companies == 1) "company" else "companies"}",
+                "${companies} ${if (companies == 1) "company" else "companies"}",
             breakdown = buildList {
                 if (practiceCount > 0) add(label(practiceCount, "practice follow-up"))
                 if (newsCount > 0) add(label(newsCount, "news update"))
