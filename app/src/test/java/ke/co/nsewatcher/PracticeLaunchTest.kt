@@ -11,12 +11,18 @@ class PracticeLaunchTest {
     }
 
     @Test fun researchLaunchWaitsUntilPracticePortfolioIsEnabled() {
-        assertFalse(PracticeLaunch.shouldOpenOrder(false, "KCB", false))
-        assertTrue(PracticeLaunch.shouldOpenOrder(true, "KCB", false))
+        assertFalse(PracticeLaunch.shouldOpenOrder(false, "KCB", launchRevision = 1, handledRevision = 0))
+        assertTrue(PracticeLaunch.shouldOpenOrder(true, "KCB", launchRevision = 1, handledRevision = 0))
     }
 
     @Test fun handledResearchLaunchDoesNotReopenTheOrderTicket() {
-        assertFalse(PracticeLaunch.shouldOpenOrder(true, "KCB", true))
-        assertFalse(PracticeLaunch.shouldOpenOrder(true, "", false))
+        assertFalse(PracticeLaunch.shouldOpenOrder(true, "KCB", launchRevision = 1, handledRevision = 1))
+        assertFalse(PracticeLaunch.shouldOpenOrder(true, "", launchRevision = 2, handledRevision = 1))
+    }
+
+    @Test fun aNewLaunchRevisionReopensTheSameCompanyOrderTicket() {
+        assertTrue(PracticeLaunch.shouldOpenOrder(true, "KCB", launchRevision = 2, handledRevision = 1))
+        assertFalse(PracticeLaunch.shouldOpenOrder(true, "KCB", launchRevision = 2, handledRevision = 2))
+        assertTrue(PracticeLaunch.shouldOpenOrder(true, "KCB", launchRevision = 3, handledRevision = 2))
     }
 }
