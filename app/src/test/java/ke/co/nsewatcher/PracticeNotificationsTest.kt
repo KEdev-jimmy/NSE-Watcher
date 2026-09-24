@@ -25,6 +25,35 @@ class PracticeNotificationsTest {
         assertEquals("order:path_2", target?.orderId)
     }
 
+    @Test fun fillNotificationDeepLinkPreservesExactOrderId() {
+        val orderId = "order:path_2"
+        val deepLink = PracticeNotifications.deepLinkValue(orderId)
+
+        assertEquals("nsewatcher://practice/order/order%3Apath_2", deepLink)
+        assertEquals(
+            orderId,
+            PracticeNotifications.destination(
+                action = PracticeNotifications.practiceAction(),
+                extraOrderId = orderId,
+                pathOrderId = null
+            )?.orderId
+        )
+    }
+
+    @Test fun invalidOrderIdProducesGenericPracticeDeepLink() {
+        val deepLink = PracticeNotifications.deepLinkValue("../../bad order")
+
+        assertEquals("nsewatcher://practice/order/", deepLink)
+        assertEquals(
+            "",
+            PracticeNotifications.destination(
+                action = PracticeNotifications.practiceAction(),
+                extraOrderId = "../../bad order",
+                pathOrderId = null
+            )?.orderId
+        )
+    }
+
     @Test fun unrelatedIntentCannotOpenPractice() {
         assertNull(
             PracticeNotifications.destination(
