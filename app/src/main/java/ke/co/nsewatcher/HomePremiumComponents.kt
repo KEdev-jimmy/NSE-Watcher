@@ -28,12 +28,11 @@ import java.util.Locale
 
 @Composable
 internal fun PremiumResponsivePair(
-    forceHorizontal: Boolean = false,
     first: @Composable () -> Unit,
     second: @Composable () -> Unit
 ) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        if (forceHorizontal || maxWidth >= 370.dp) {
+        if (maxWidth >= 370.dp) {
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
