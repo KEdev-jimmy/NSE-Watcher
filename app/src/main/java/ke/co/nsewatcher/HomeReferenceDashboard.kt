@@ -69,6 +69,9 @@ internal fun HomeReferenceDashboard(
     relevantNews: List<NewsItem>,
     newsLoading: Boolean,
     newsError: Boolean,
+    briefItems: List<HomeBriefItem>,
+    briefLoading: Boolean,
+    briefHasError: Boolean,
     intelligence: HomeIntelligenceSnapshot,
     gainersSelected: Boolean,
     onGainersSelected: (Boolean) -> Unit,
@@ -83,12 +86,12 @@ internal fun HomeReferenceDashboard(
     openAllNews: () -> Unit,
     openNews: (NewsItem) -> Unit,
     openCompany: (Stock) -> Unit,
+    openBriefItem: (HomeBriefItem) -> Unit,
     reviewBrief: () -> Unit
 ) {
     val strongestSector = intelligence.sectors.maxByOrNull { it.averageChangePct }
-    val topGainer = intelligence.gainers.firstOrNull()
+    val topMover = (intelligence.gainers + intelligence.losers).maxByOrNull { kotlin.math.abs(it.change) }
     val breadth = intelligence.breadth
-    val leadCompanyNews = relevantNews.firstOrNull()
 
     MaterialTheme(colorScheme = HomeReferenceColors) {
         Column(
@@ -119,13 +122,16 @@ internal fun HomeReferenceDashboard(
                 item {
                     ReferenceDailyBrief(
                         sector = strongestSector,
-                        leadNews = leadCompanyNews,
-                        topGainer = topGainer,
+                        topMover = topMover,
                         breadth = breadth,
+                        briefItems = briefItems,
+                        briefLoading = briefLoading,
+                        briefHasError = briefHasError,
+                        hasWatchlist = watched.isNotEmpty(),
                         now = now,
                         review = reviewBrief,
                         exploreMarket = openMarket,
-                        openNews = openNews,
+                        openBriefItem = openBriefItem,
                         openCompany = openCompany
                     )
                 }
@@ -372,15 +378,30 @@ private fun ReferenceHomeHeader(
 @Composable
 private fun ReferenceDailyBrief(
     sector: HomeSectorPulse?,
-    leadNews: NewsItem?,
-    topGainer: Stock?,
+    topMover: Stock?,
     breadth: HomeMarketBreadth,
+    briefItems: List<HomeBriefItem>,
+    briefLoading: Boolean,
+    briefHasError: Boolean,
+    hasWatchlist: Boolean,
     now: Instant,
     review: () -> Unit,
     exploreMarket: () -> Unit,
-    openNews: (NewsItem) -> Unit,
+    openBriefItem: (HomeBriefItem) -> Unit,
     openCompany: (Stock) -> Unit
 ) {
+    val title = HomePresentation.dailyBriefTitle(
+        items = briefItems,
+        loading = briefLoading,
+        hasError = briefHasError,
+        hasWatchlist = hasWatchlist
+    )
+    val primaryLabel = when {
+        briefItems.isNotEmpty() -> "Review now  →"
+        !hasWatchlist -> "Choose companies  →"
+        else -> "Review watchlist  →"
+    }
+
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = Color(0xFF06263A),
@@ -406,10 +427,12 @@ private fun ReferenceDailyBrief(
 
             Spacer(Modifier.height(4.dp))
             Text(
-                "3 things need your attention",
+                title,
                 color = ResearchText,
                 fontSize = 20.sp,
-                fontWeight = FontWeight.ExtraBold
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             Spacer(Modifier.height(8.dp))
 
@@ -424,45 +447,71 @@ private fun ReferenceDailyBrief(
                         .fillMaxHeight(),
                     verticalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    ReferenceBriefAttentionRow(
-                        icon = Icons.Default.AccountBalance,
-                        accent = ResearchGreen,
-                        title = if (sector != null) referenceSectorName(sector.sector) + " leading the market" else "Sector leadership unavailable",
-                        detail = if (sector != null) {
-                            "Sector average " + CompanyResearchPresentation.percent(sector.averageChangePct) + " (" + sector.memberCount + " counters)"
-                        } else {
-                            "Waiting for enough sector observations"
-                        },
-                        onClick = exploreMarket
-                    )
-
-                    ReferenceBriefAttentionRow(
-                        icon = Icons.Default.Article,
-                        accent = Color(0xFF58AFFF),
-                        title = leadNews?.title ?: "No watched-company news yet",
-                        detail = if (leadNews != null) {
-                            leadNews.source.ifBlank { "Source unavailable" } + " · " + CompanyResearchPresentation.date(leadNews.publishedAt)
-                        } else {
-                            "Follow companies to personalise this feed"
-                        },
-                        onClick = {
-                            if (leadNews != null) openNews(leadNews) else exploreMarket()
+                    when {
+                        briefItems.isNotEmpty() -> briefItems.take(3).forEach { item ->
+                            ReferenceLedgerBriefRow(item) { openBriefItem(item) }
                         }
-                    )
 
-                    ReferenceBriefAttentionRow(
-                        icon = if (topGainer == null) Icons.Default.PriorityHigh else Icons.Default.TrendingUp,
-                        accent = if (topGainer == null) ResearchRed else ResearchGreen,
-                        title = if (topGainer != null) topGainer.symbol + " leads today's gainers" else "No significant gainers today",
-                        detail = if (topGainer != null) {
-                            CompanyResearchPresentation.percent(topGainer.change) + " · " + CompanyResearchPresentation.money(topGainer.price)
-                        } else {
-                            breadth.unchanged.toString() + " unchanged · " + breadth.declining + " falling"
-                        },
-                        onClick = {
-                            if (topGainer != null) openCompany(topGainer) else exploreMarket()
+                        briefLoading -> {
+                            ReferenceBriefAttentionRow(
+                                icon = Icons.Default.Bookmark,
+                                accent = ResearchGreen,
+                                title = "Checking your watchlist",
+                                detail = "Looking for later company developments",
+                                onClick = review
+                            )
+                            ReferenceBriefAttentionRow(
+                                icon = Icons.Default.Notifications,
+                                accent = Color(0xFFFFC857),
+                                title = "Checking recorded alerts",
+                                detail = "Only detected conditions become attention items",
+                                onClick = review
+                            )
+                            ReferenceBriefAttentionRow(
+                                icon = Icons.Default.Article,
+                                accent = Color(0xFF58AFFF),
+                                title = "Checking company updates",
+                                detail = "Published evidence is matched to followed companies",
+                                onClick = review
+                            )
                         }
-                    )
+
+                        else -> {
+                            ReferenceBriefAttentionRow(
+                                icon = Icons.Default.AccountBalance,
+                                accent = ResearchGreen,
+                                title = if (sector != null) referenceSectorName(sector.sector) + " leading the market" else "Sector context unavailable",
+                                detail = if (sector != null) {
+                                    "Sector average " + CompanyResearchPresentation.percent(sector.averageChangePct) + " (" + sector.memberCount + " counters)"
+                                } else {
+                                    "Waiting for enough sector observations"
+                                },
+                                onClick = exploreMarket
+                            )
+
+                            ReferenceBriefAttentionRow(
+                                icon = Icons.Default.Equalizer,
+                                accent = Color(0xFF58AFFF),
+                                title = HomePresentation.marketSummary(breadth),
+                                detail = breadth.advancing.toString() + " rising · " + breadth.unchanged + " unchanged · " + breadth.declining + " falling",
+                                onClick = exploreMarket
+                            )
+
+                            ReferenceBriefAttentionRow(
+                                icon = if (topMover == null) Icons.Default.ShowChart else if (topMover.change >= 0.0) Icons.Default.TrendingUp else Icons.Default.TrendingDown,
+                                accent = if (topMover == null) ResearchMuted else referenceChangeColor(topMover.change),
+                                title = if (topMover != null) topMover.symbol + " is the strongest available mover" else "Top mover unavailable",
+                                detail = if (topMover != null) {
+                                    CompanyResearchPresentation.percent(topMover.change) + " · " + CompanyResearchPresentation.money(topMover.price)
+                                } else {
+                                    "No eligible daily mover in the available observations"
+                                },
+                                onClick = {
+                                    if (topMover != null) openCompany(topMover) else exploreMarket()
+                                }
+                            )
+                        }
+                    }
                 }
 
                 Spacer(Modifier.width(8.dp))
@@ -490,7 +539,7 @@ private fun ReferenceDailyBrief(
                     )
                 ) {
                     Text(
-                        "Review now  →",
+                        primaryLabel,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.ExtraBold
                     )
@@ -512,8 +561,44 @@ private fun ReferenceDailyBrief(
                     )
                 }
             }
+
+            if (briefHasError && briefItems.isNotEmpty()) {
+                Spacer(Modifier.height(5.dp))
+                Text(
+                    "Some change sources are temporarily unavailable; the items shown above are backed by the available change ledger.",
+                    color = ResearchMuted,
+                    fontSize = 7.8.sp,
+                    maxLines = 2
+                )
+            }
         }
     }
+}
+
+@Composable
+private fun ReferenceLedgerBriefRow(
+    item: HomeBriefItem,
+    onClick: () -> Unit
+) {
+    val icon = when {
+        item.story != null -> Icons.Default.Article
+        item.alert != null -> Icons.Default.Notifications
+        else -> Icons.Default.AccountBalance
+    }
+    val accent = when {
+        item.story != null -> Color(0xFF58AFFF)
+        item.alert != null -> Color(0xFFFFC857)
+        else -> Color(0xFF9A68F7)
+    }
+    ReferenceBriefAttentionRow(
+        icon = icon,
+        accent = accent,
+        title = item.title,
+        detail = item.detail.ifBlank {
+            item.source.ifBlank { "Open to review the available evidence" }
+        },
+        onClick = onClick
+    )
 }
 
 @Composable

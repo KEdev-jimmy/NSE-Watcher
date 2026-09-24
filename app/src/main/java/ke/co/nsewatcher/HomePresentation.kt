@@ -140,6 +140,22 @@ internal object HomePresentation {
         .filter { it.id !in reviewedIds }
         .take(3)
 
+    fun visibleBrief(changes: List<HomeBriefItem>): List<HomeBriefItem> = changes.take(3)
+
+    fun dailyBriefTitle(
+        items: List<HomeBriefItem>,
+        loading: Boolean,
+        hasError: Boolean,
+        hasWatchlist: Boolean
+    ): String = when {
+        !hasWatchlist -> "Build your daily brief"
+        loading -> "Checking what changed…"
+        items.size == 1 -> "1 thing needs your attention"
+        items.size > 1 -> "${items.size} things need your attention"
+        hasError -> "Some changes are unavailable"
+        else -> "You're caught up"
+    }
+
     data class AttentionDigest(
         val summary: String,
         val breakdown: List<String>

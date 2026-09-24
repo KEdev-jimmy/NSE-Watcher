@@ -161,6 +161,66 @@ class HomePresentationTest {
         assertNull(HomePresentation.attentionDigest(emptyList()))
     }
 
+    @Test fun visibleDailyBriefUsesOnlyTheSameThreeUnreviewedChangesShownForReview() {
+        val changes = (1..4).map { index ->
+            HomeBriefItem(
+                id = "change:$index",
+                symbol = "KCB",
+                title = "Change $index",
+                detail = "Detail $index",
+                whyItMayMatter = "Reason",
+                uncertainty = "Uncertainty",
+                source = "Verified source",
+                time = "2026-09-22T09:0$index:00Z",
+                action = "Research KCB"
+            )
+        }
+
+        val visible = HomePresentation.visibleBrief(changes)
+
+        assertEquals(listOf("change:1", "change:2", "change:3"), visible.map { it.id })
+        assertEquals(3, visible.size)
+    }
+
+    @Test fun dailyBriefTitleReflectsLedgerStateWithoutCallingFallbackContextNew() {
+        val item = HomeBriefItem(
+            id = "change:1",
+            symbol = "KCB",
+            title = "KCB changed",
+            detail = "Detail",
+            whyItMayMatter = "Reason",
+            uncertainty = "Uncertainty",
+            source = "Verified source",
+            time = "2026-09-22T09:00:00Z",
+            action = "Research KCB"
+        )
+
+        assertEquals(
+            "Build your daily brief",
+            HomePresentation.dailyBriefTitle(emptyList(), loading = false, hasError = false, hasWatchlist = false)
+        )
+        assertEquals(
+            "Checking what changed…",
+            HomePresentation.dailyBriefTitle(emptyList(), loading = true, hasError = false, hasWatchlist = true)
+        )
+        assertEquals(
+            "1 thing needs your attention",
+            HomePresentation.dailyBriefTitle(listOf(item), loading = false, hasError = false, hasWatchlist = true)
+        )
+        assertEquals(
+            "2 things need your attention",
+            HomePresentation.dailyBriefTitle(listOf(item, item.copy(id = "change:2")), loading = false, hasError = false, hasWatchlist = true)
+        )
+        assertEquals(
+            "Some changes are unavailable",
+            HomePresentation.dailyBriefTitle(emptyList(), loading = false, hasError = true, hasWatchlist = true)
+        )
+        assertEquals(
+            "You're caught up",
+            HomePresentation.dailyBriefTitle(emptyList(), loading = false, hasError = false, hasWatchlist = true)
+        )
+    }
+
     @Test fun marketSummaryDoesNotTreatMissingDataAsBalance() {
         assertEquals("Daily market movement is unavailable.", HomePresentation.marketSummary(HomeMarketBreadth(0, 0, 0, 0)))
         assertEquals("Available daily changes are unchanged.", HomePresentation.marketSummary(HomeMarketBreadth(0, 0, 4, 0)))
