@@ -135,6 +135,8 @@ fun MarketDashboard(
 
     fun explainMovement(stock: Stock) {
         movementSymbol = stock.symbol
+        movementResult = MovementIntelligenceCache.Result()
+        movementLoading = true
         movementRevision++
         sheet = "Movement"
     }
@@ -304,7 +306,10 @@ fun MarketDashboard(
                                     ResearchMovement(
                                         result = movementResult,
                                         loading = movementLoading,
-                                        retry = { movementRevision++ }
+                                        retry = {
+                                            movementLoading = true
+                                            movementRevision++
+                                        }
                                     )
                                 }
                                 item {
