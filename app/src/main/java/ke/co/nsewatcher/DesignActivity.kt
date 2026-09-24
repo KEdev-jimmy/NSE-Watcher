@@ -111,7 +111,7 @@ private enum class Page { HOME, MARKET, NEWS, COMPANIES, PAPER, MORE, COMPANY, W
 
 class DesignActivity : ComponentActivity() {
     private var alertDestination by mutableStateOf<AlertDestination?>(null)
-    private var practiceDestination by mutableStateOf(false)
+    private var practiceDestination by mutableStateOf<PracticeNotificationDestination?>(null)
     private val picker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         uri ?: return@registerForActivityResult
         try { contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
@@ -122,13 +122,13 @@ class DesignActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         AlertWorker.schedule(this)
         alertDestination = AlertNotifications.destination(intent)
-        practiceDestination = PracticeNotifications.opensPractice(intent)
+        practiceDestination = PracticeNotifications.destination(intent)
         setContent {
             App(
                 alertDestination = alertDestination,
                 consumeAlert = { alertDestination = null; intent.action = null },
                 practiceDestination = practiceDestination,
-                consumePractice = { practiceDestination = false; intent.action = null },
+                consumePractice = { practiceDestination = null; intent.action = null; intent.data = null },
                 pickAvatar = { picker.launch(arrayOf("image/*")) }
             )
         }
@@ -137,7 +137,7 @@ class DesignActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         alertDestination = AlertNotifications.destination(intent)
-        practiceDestination = PracticeNotifications.opensPractice(intent)
+        practiceDestination = PracticeNotifications.destination(intent)
     }
 }
 
@@ -145,7 +145,7 @@ class DesignActivity : ComponentActivity() {
 private fun App(
     alertDestination: AlertDestination?,
     consumeAlert: () -> Unit,
-    practiceDestination: Boolean,
+    practiceDestination: PracticeNotificationDestination?,
     consumePractice: () -> Unit,
     pickAvatar: () -> Unit
 ) {
@@ -279,11 +279,11 @@ private fun App(
         consumeAlert()
     }
     LaunchedEffect(practiceDestination) {
-        if (!practiceDestination) return@LaunchedEffect
+        val target = practiceDestination ?: return@LaunchedEffect
         history = listOf(Page.HOME)
         practiceSymbol = ""
-        practiceReviewOrderId = ""
-        practiceLaunchSource = ""
+        practiceReviewOrderId = target.orderId
+        practiceLaunchSource = if (target.orderId.isBlank()) "" else "Practice fill notification"
         practiceLaunchRevision++
         page = Page.PAPER
         consumePractice()
