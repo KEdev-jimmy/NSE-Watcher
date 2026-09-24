@@ -13,6 +13,13 @@ class MarketPresentationTest {
         val dates = generateSequence(start) { it.plusDays(days) }.takeWhile { it < finish }.toList() + finish
         return HistoryResult(points = dates.mapIndexed { i, date -> HistoryPoint(100.0 + i, date.toString()) })
     }
+    @Test fun whyMovingActionRequiresARealDailyChange() {
+        assertTrue(MarketPresentation.movementQuestionAvailable(stock(2.0)))
+        assertFalse(MarketPresentation.movementQuestionAvailable(stock(Double.NaN)))
+        assertFalse(MarketPresentation.movementQuestionAvailable(stock().copy(changeAvailable = false)))
+        assertFalse(MarketPresentation.movementQuestionAvailable(stock().copy(price = 0.0)))
+    }
+
     @Test fun missingChangesAreNotFlatAndInvalidPricesAreExcluded() {
         val b = MarketPresentation.breadth(listOf(stock(), stock(0.0), stock(-1.0), stock().copy(changeAvailable = false), stock(Double.NaN), stock().copy(price = 0.0)))
         assertEquals(MarketBreadth(1, 1, 1, 6), b)

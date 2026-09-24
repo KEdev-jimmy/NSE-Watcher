@@ -70,6 +70,13 @@ internal object CompanyAnalysisPresentation {
         )
     }
 
+    fun movementRelationshipLabel(raw: String): String = when (raw.trim().lowercase(Locale.US)) {
+        "related" -> "Close in time"
+        "possible" -> "Possible context"
+        "not-established" -> "Not established"
+        else -> "Not established"
+    }
+
     fun verifiedAnalyst(result: AnalystCache.Result): VerifiedAnalystView? {
         if (result.error.isNotBlank()) return null
         val analysis = result.analysis ?: return null

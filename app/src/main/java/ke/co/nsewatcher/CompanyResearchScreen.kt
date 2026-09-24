@@ -169,7 +169,7 @@ internal fun CompanyResearchScreen(
                             ResearchBody(CompanyResearchPresentation.meaning(session.dailyChange))
                             ResearchCaption("A price change alone does not explain why. Check company announcements and financial results for context.")
                             TextButton(onClick = { selectTab("Analysis") }) {
-                                Text("View supporting evidence", color = ResearchLinkBlue, fontSize = 13.sp)
+                                Text("Why is ${stock.symbol} moving?", color = ResearchLinkBlue, fontSize = 13.sp)
                                 Spacer(Modifier.width(6.dp)); Icon(Icons.Default.ArrowForward, null, tint = ResearchLinkBlue, modifier = Modifier.size(17.dp))
                             }
                         }
@@ -485,7 +485,7 @@ private fun ResearchDeterministicAnalysis(result: CompanyIntelligenceEngine.Resu
 }
 
 @Composable
-private fun ResearchMovementContext(context: CompanyMovementContext) {
+internal fun ResearchMovementContext(context: CompanyMovementContext) {
     ResearchPanel {
         ResearchTitle("Broader movement context")
         if (context.companyChange == null) {
@@ -555,7 +555,7 @@ private fun ResearchAnalyst(result: AnalystCache.Result, loading: Boolean) {
 }
 
 @Composable
-private fun ResearchMovement(result: MovementIntelligenceCache.Result, loading: Boolean, retry: () -> Unit) {
+internal fun ResearchMovement(result: MovementIntelligenceCache.Result, loading: Boolean, retry: () -> Unit) {
     ResearchPanel {
         ResearchTitle("Company-specific movement evidence")
         when {
@@ -575,7 +575,7 @@ private fun ResearchMovement(result: MovementIntelligenceCache.Result, loading: 
                     ResearchBody(evidence.title)
                     ResearchCaption("${evidence.source.ifBlank { "Source unavailable" }} · ${CompanyResearchPresentation.date(evidence.date)}")
                     if (evidence.description.isNotBlank()) ResearchCaption(evidence.description)
-                    ResearchCaption("Evidence relationship: ${evidence.relationship.ifBlank { "Not established" }}")
+                    ResearchCaption("Timing relationship: ${CompanyAnalysisPresentation.movementRelationshipLabel(evidence.relationship)}")
                     ResearchSourceLink("Open source", evidence.sourceUrl)
                 }
                 if (result.evidence.isEmpty()) ResearchCaption("No dated company event was returned for this movement window.")
