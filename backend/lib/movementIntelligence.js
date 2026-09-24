@@ -266,7 +266,7 @@ async function handler(req, res) {
         limitations: [
           'A time correlation does not prove that an event caused a price move.',
           'Only dated evidence returned by the connected providers is included.',
-          'Market-wide and sector-wide drivers are not yet attributed in this first evidence pass.',
+          'Company-specific evidence is returned here; same-date sector and broader-market peer context is calculated from the loaded quote feed in the app.',
         ],
         sources,
         partial: [quoteResult, historyResult, newsResult, dividendsResult].some(result => result.status === 'rejected'),

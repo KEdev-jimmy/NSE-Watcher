@@ -43,6 +43,7 @@ fun MarketDashboard(
     catalog: List<Stock>,
     initialStatus: MyStocksCache.MarketStatus,
     marketIndices: List<MyStocksCache.MarketIndex>,
+    newsFeed: List<NewsItem>,
     openCompany: (Stock) -> Unit,
     openCompanies: (String) -> Unit,
     onQuotesLoaded: (List<Stock>) -> Unit,
@@ -75,6 +76,9 @@ fun MarketDashboard(
     }
     val breadth = remember(companies) { MarketPresentation.breadth(companies) }
     val sectors = remember(companies) { MarketPresentation.sectors(companies) }
+    val attention = remember(companies, newsFeed, now) {
+        MarketAttentionEngine.rank(companies, newsFeed, now)
+    }
     val volumeStocks = companies.filter { it.volumeAvailable && it.volume >= 0 }
     val volume = volumeStocks.sumOf { it.volume.toDouble() }
     val latest = companies.filter(MarketPresentation::validChange).mapNotNull { CompanyResearchPresentation.timestamp(it.observedAt) }.maxOrNull()
@@ -199,6 +203,61 @@ fun MarketDashboard(
                             MarketBreadthBar(breadth)
                             ResearchCaption("${breadth.covered} daily changes · ${breadth.total - breadth.covered} unavailable")
                             TextButton(onClick = { sheet = "Market participation" }) { Text("What does this mean? ⓘ", color = ResearchGreen, fontSize = 12.sp) }
+                        }
+                    }
+                    item {
+                        ResearchPanel {
+                            ResearchTitle("What deserves attention")
+                            ResearchCaption(
+                                "A deterministic shortlist from the latest comparable observations. " +
+                                    "It highlights unusual movement, peer divergence, reported volume and recent company evidence — not what to buy."
+                            )
+                            if (attention.isEmpty()) {
+                                ResearchCaption("No current movement stands out strongly enough from the available evidence and peer context.")
+                            } else {
+                                attention.forEachIndexed { index, item ->
+                                    if (index > 0) HorizontalDivider(color = ResearchBorder)
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Box(
+                                            Modifier.size(32.dp).background(ResearchRaised, CircleShape),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(item.stock.symbol.take(1), color = ResearchGreen, fontWeight = FontWeight.Bold)
+                                        }
+                                        Column(Modifier.weight(1f)) {
+                                            ResearchBody("${item.stock.symbol} · ${item.stock.name}")
+                                            ResearchCaption("Observed ${CompanyResearchPresentation.date(item.stock.observedAt)}")
+                                        }
+                                        Text(
+                                            CompanyResearchPresentation.percent(item.stock.change),
+                                            color = researchChangeColor(item.stock.change),
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                    item.reasons.take(2).forEach { reason ->
+                                        ResearchBody("• ${reason.title}")
+                                        ResearchCaption(reason.detail)
+                                    }
+                                    item.latestEvidence?.let { evidence ->
+                                        ResearchCaption(
+                                            "Recent evidence: ${evidence.title} · ${evidence.source.ifBlank { "Source unavailable" }}"
+                                        )
+                                    }
+                                    TextButton(
+                                        onClick = { explainMovement(item.stock) },
+                                        contentPadding = PaddingValues(horizontal = 0.dp, vertical = 4.dp)
+                                    ) {
+                                        Text("Why is ${item.stock.symbol} moving? →", color = ResearchGreen, fontSize = 12.sp)
+                                    }
+                                }
+                            }
+                            ResearchCaption(
+                                "Peer averages use available same-date stock observations and are not official NSE market or sector indices."
+                            )
                         }
                     }
                     item {
