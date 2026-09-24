@@ -88,6 +88,16 @@ internal object PracticeLearningInsightsPresentation {
         companies: List<Stock>,
         items: List<PracticeDecisionReviewItem>
     ): PracticeLearningInsights {
+        if (!state.enabled) {
+            return PracticeLearningInsights(
+                totalDecisions = 0,
+                reasonsRecorded = 0,
+                reviewedAtLeastOnce = 0,
+                needsFirstReview = 0,
+                newEvidenceAfterReview = 0
+            )
+        }
+
         val reasons = items.map { it.order.note.trim() }.filter(String::isNotBlank)
         val themes = themeKeywords.mapNotNull { (label, keywords) ->
             val count = reasons.count { reason ->
