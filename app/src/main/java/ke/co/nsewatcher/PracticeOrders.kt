@@ -16,7 +16,8 @@ import ke.co.nsewatcher.data.MyStocksCache
 import java.util.UUID
 
 @Composable internal fun PracticeOrderTicket(s: PracticeState, stock: Stock, side: String, editId: String,
-    market: MyStocksCache.MarketStatus, working: Boolean, onSubmit: (PracticeOrder) -> Unit, onSide: (String) -> Unit) {
+    market: MyStocksCache.MarketStatus, working: Boolean, launchSource: String = "",
+    onSubmit: (PracticeOrder) -> Unit, onSide: (String) -> Unit) {
     val editing = s.orders.firstOrNull { it.id == editId }
     var quantity by rememberSaveable(stock.symbol, editId) { mutableStateOf(editing?.shares?.toString() ?: "1") }
     var limit by rememberSaveable(stock.symbol, editId) { mutableStateOf(editing?.limit?.toString() ?: stock.price.takeIf { it.isFinite() && it > 0 }?.let { PracticeEngine.money(it).toString() }.orEmpty()) }
@@ -32,6 +33,23 @@ import java.util.UUID
     Column(Modifier.fillMaxSize()) {
         LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             item { Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) { PracticeCompanyIcon(stock); Column { ResearchTitle(stock.name); ResearchCaption(stock.symbol) } } }
+            if (launchSource.isNotBlank() && editId.isBlank()) {
+                item {
+                    ResearchPanel {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            PracticeIcon(Icons.Outlined.Science)
+                            Column(Modifier.weight(1f)) {
+                                ResearchTitle("Continuing from " + launchSource)
+                                ResearchCaption(stock.symbol + " stayed selected so you can test the idea without losing the company you were researching.")
+                            }
+                        }
+                        ResearchCaption("Your research is context, not a trade instruction. Write your own reason below before you confirm this practice decision.")
+                    }
+                }
+            }
             item { MarketChoiceRow(listOf("Buy", "Sell"), if (side == "BUY") "Buy" else "Sell") { onSide(it.uppercase()); error = null } }
             item { ResearchPanel {
                 ResearchCaption("Last observed price"); ResearchTitle(stock.price.takeIf { it.isFinite() && it > 0 }?.let(::practiceMoney) ?: "Unavailable")
