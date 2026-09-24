@@ -63,6 +63,22 @@ class MarketAttentionEngineTest {
         assertFalse(attention.any { it.stock.symbol == "OLD" })
     }
 
+    @Test fun staleAndFutureQuotesCannotBecomeAttentionItems() {
+        val rows = listOf(
+            stock("KCB", 5.0, "Banking", observedAt = "2026-09-24T11:00:00Z"),
+            stock("EQTY", 0.2, "Banking", observedAt = "2026-09-24T11:00:00Z"),
+            stock("ABSA", -0.2, "Banking", observedAt = "2026-09-24T11:00:00Z"),
+            stock("FUT", 20.0, "Banking", observedAt = "2026-09-25T11:00:00Z"),
+            stock("OLD", 20.0, "Banking", observedAt = "2026-09-18T11:00:00Z")
+        )
+
+        val attention = MarketAttentionEngine.rank(rows, emptyList(), now, limit = 10)
+
+        assertTrue(attention.any { it.stock.symbol == "KCB" })
+        assertFalse(attention.any { it.stock.symbol == "FUT" })
+        assertFalse(attention.any { it.stock.symbol == "OLD" })
+    }
+
     @Test fun sectorDivergenceVolumeAndFreshEvidenceIncreaseAttentionTransparently() {
         val kcb = stock(
             "KCB",
