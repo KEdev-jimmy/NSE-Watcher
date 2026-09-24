@@ -280,6 +280,92 @@ class PracticeReviewTest {
         assertEquals(1, summary.reviewed)
     }
 
+    @Test fun learningInsightsSummariseReasonsReviewsEvidenceAndRepeatedPatterns() {
+        val second = order.copy(
+            id = "order-2",
+            symbol = "EQTY",
+            note = "Profit growth and financial results are why I am testing this."
+        )
+        val third = order.copy(
+            id = "order-3",
+            symbol = "SCOM",
+            note = ""
+        )
+        val items = listOf(
+            PracticeDecisionReviewItem(
+                order = order.copy(note = "I expect better earnings and profit results."),
+                state = PracticeDecisionReviewState.NEEDS_REVIEW
+            ),
+            PracticeDecisionReviewItem(
+                order = second,
+                state = PracticeDecisionReviewState.NEW_EVIDENCE,
+                lastReviewAt = created + 10_000,
+                evidenceSinceReview = 1
+            ),
+            PracticeDecisionReviewItem(
+                order = third,
+                state = PracticeDecisionReviewState.REVIEWED,
+                lastReviewAt = created + 20_000
+            )
+        )
+        val state = PracticeState(enabled = true, orders = items.map { it.order })
+        val companies = listOf(
+            stock.copy(symbol = "KCB", name = "KCB Group", sector = "Banking"),
+            stock.copy(symbol = "EQTY", name = "Equity Group", sector = "Banking"),
+            stock.copy(symbol = "SCOM", name = "Safaricom", sector = "Telecommunications")
+        )
+
+        val insights = PracticeLearningInsightsPresentation.insights(
+            state = state,
+            companies = companies,
+            items = items
+        )
+
+        assertEquals(3, insights.totalDecisions)
+        assertEquals(2, insights.reasonsRecorded)
+        assertEquals(2, insights.reviewedAtLeastOnce)
+        assertEquals(1, insights.needsFirstReview)
+        assertEquals(1, insights.newEvidenceAfterReview)
+        assertEquals("Company results", insights.recurringThemes.single().label)
+        assertEquals(2, insights.recurringThemes.single().count)
+        assertEquals("Banking", insights.topSector)
+        assertEquals(2, insights.topSectorCount)
+    }
+
+    @Test fun learningInsightsDoNotInventARecurringThemeFromOneDecision() {
+        val item = PracticeDecisionReviewItem(
+            order = order.copy(note = "I am testing the dividend announcement."),
+            state = PracticeDecisionReviewState.NEEDS_REVIEW
+        )
+        val insights = PracticeLearningInsightsPresentation.insights(
+            state = PracticeState(enabled = true, orders = listOf(item.order)),
+            companies = listOf(stock.copy(sector = "Banking")),
+            items = listOf(item)
+        )
+
+        assertEquals(1, insights.reasonsRecorded)
+        assertTrue(insights.recurringThemes.isEmpty())
+        assertEquals(null, insights.topSector)
+        assertEquals(0, insights.topSectorCount)
+    }
+
+    @Test fun learningInsightsAreEmptyWhenPracticeIsDisabled() {
+        val item = PracticeDecisionReviewItem(
+            order = order,
+            state = PracticeDecisionReviewState.NEEDS_REVIEW
+        )
+        val insights = PracticeLearningInsightsPresentation.insights(
+            state = PracticeState(enabled = false, orders = listOf(order)),
+            companies = listOf(stock.copy(sector = "Banking")),
+            items = listOf(item)
+        )
+
+        assertEquals(0, insights.totalDecisions)
+        assertEquals(0, insights.reasonsRecorded)
+        assertEquals(0, insights.reviewedAtLeastOnce)
+        assertTrue(insights.recurringThemes.isEmpty())
+    }
+
     @Test fun savedDecisionReviewsRemainLinkedToTheirOrder() {
         val state = PracticeState(
             enabled = true,

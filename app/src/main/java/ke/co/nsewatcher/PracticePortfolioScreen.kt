@@ -163,8 +163,20 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
             )
         }.orEmpty()
     }
-    val decisionSummary = remember(decisionItems) {
-        PracticeDecisionCenterPresentation.summary(decisionItems)
+    val learningInsights = remember(s, companies, decisionItems) {
+        s?.let {
+            PracticeLearningInsightsPresentation.insights(
+                state = it,
+                companies = companies,
+                items = decisionItems
+            )
+        } ?: PracticeLearningInsights(
+            totalDecisions = 0,
+            reasonsRecorded = 0,
+            reviewedAtLeastOnce = 0,
+            needsFirstReview = 0,
+            newEvidenceAfterReview = 0
+        )
     }
     val selected = companies.firstOrNull { it.symbol == symbol } ?: s?.quotes?.firstOrNull { it.symbol == symbol }?.let { Stock(it.symbol, it.name.ifBlank { it.symbol }, it.price, 0.0, emptyList(), sector = it.sector, observedAt = it.at, changeAvailable = false) }
         ?: Stock(symbol, symbol, Double.NaN, 0.0, emptyList(), changeAvailable = false, volumeAvailable = false)
@@ -269,8 +281,8 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
                         } }
                         item { PracticeJourney(s) }
                         item {
-                            PracticeDecisionProgressCard(
-                                summary = decisionSummary,
+                            PracticeLearningInsightsCard(
+                                insights = learningInsights,
                                 onOpenCenter = { tab = "Decisions" }
                             )
                         }

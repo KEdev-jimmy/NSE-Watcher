@@ -58,6 +58,80 @@ internal data class PracticeDecisionReviewSummary(
     val reviewed: Int
 )
 
+internal data class PracticeLearningTheme(
+    val label: String,
+    val count: Int
+)
+
+internal data class PracticeLearningInsights(
+    val totalDecisions: Int,
+    val reasonsRecorded: Int,
+    val reviewedAtLeastOnce: Int,
+    val needsFirstReview: Int,
+    val newEvidenceAfterReview: Int,
+    val recurringThemes: List<PracticeLearningTheme> = emptyList(),
+    val topSector: String? = null,
+    val topSectorCount: Int = 0
+)
+
+internal object PracticeLearningInsightsPresentation {
+    private val themeKeywords = linkedMapOf(
+        "Company results" to listOf("result", "earnings", "profit", "revenue", "eps", "margin", "financial"),
+        "Dividends" to listOf("dividend", "payout", "yield"),
+        "Price / valuation" to listOf("price", "valuation", "value", "cheap", "expensive", "undervalued", "overvalued"),
+        "Growth" to listOf("growth", "expand", "expansion"),
+        "News / announcements" to listOf("news", "announcement", "announced", "update")
+    )
+
+    fun insights(
+        state: PracticeState,
+        companies: List<Stock>,
+        items: List<PracticeDecisionReviewItem>
+    ): PracticeLearningInsights {
+        if (!state.enabled) {
+            return PracticeLearningInsights(
+                totalDecisions = 0,
+                reasonsRecorded = 0,
+                reviewedAtLeastOnce = 0,
+                needsFirstReview = 0,
+                newEvidenceAfterReview = 0
+            )
+        }
+
+        val reasons = items.map { it.order.note.trim() }.filter(String::isNotBlank)
+        val themes = themeKeywords.mapNotNull { (label, keywords) ->
+            val count = reasons.count { reason ->
+                val text = reason.lowercase()
+                keywords.any { keyword -> text.contains(keyword) }
+            }
+            count.takeIf { it >= 2 }?.let { PracticeLearningTheme(label, it) }
+        }.sortedWith(compareByDescending<PracticeLearningTheme> { it.count }.thenBy { it.label })
+
+        val sectorBySymbol = companies.associate { stock ->
+            WatchlistPresentation.symbol(stock.symbol) to stock.sector.trim()
+        }
+        val sectorCounts = items.mapNotNull { item ->
+            sectorBySymbol[WatchlistPresentation.symbol(item.order.symbol)]
+                ?.takeIf { it.isNotBlank() && !it.equals("Other", ignoreCase = true) }
+        }.groupingBy { it }.eachCount()
+        val topSector = sectorCounts.entries
+            .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
+            .firstOrNull()
+            ?.takeIf { it.value >= 2 }
+
+        return PracticeLearningInsights(
+            totalDecisions = items.size,
+            reasonsRecorded = reasons.size,
+            reviewedAtLeastOnce = items.count { it.lastReviewAt != null },
+            needsFirstReview = items.count { it.state == PracticeDecisionReviewState.NEEDS_REVIEW },
+            newEvidenceAfterReview = items.count { it.state == PracticeDecisionReviewState.NEW_EVIDENCE },
+            recurringThemes = themes.take(2),
+            topSector = topSector?.key,
+            topSectorCount = topSector?.value ?: 0
+        )
+    }
+}
+
 internal object PracticeDecisionCenterPresentation {
     fun items(
         state: PracticeState,
@@ -258,8 +332,8 @@ internal object PracticeReviewPresentation {
 }
 
 @Composable
-internal fun PracticeDecisionProgressCard(
-    summary: PracticeDecisionReviewSummary,
+internal fun PracticeLearningInsightsCard(
+    insights: PracticeLearningInsights,
     onOpenCenter: () -> Unit
 ) {
     ResearchPanel {
@@ -269,21 +343,42 @@ internal fun PracticeDecisionProgressCard(
         ) {
             PracticeIcon(Icons.Outlined.CheckCircle)
             Column(Modifier.weight(1f)) {
-                ResearchTitle("Decision learning")
+                ResearchTitle("Your learning so far")
                 ResearchCaption(
-                    if (summary.total == 0) {
-                        "Filled practice decisions will appear here for later review."
+                    if (insights.totalDecisions == 0) {
+                        "Filled practice decisions will build your learning history here."
                     } else {
-                        "${summary.total} filled decision${if (summary.total == 1) "" else "s"} in your learning history."
+                        "${insights.totalDecisions} filled decision${if (insights.totalDecisions == 1) "" else "s"} in your learning history."
                     }
                 )
             }
         }
-        PracticeLine("Needs review", summary.needsReview.toString())
-        PracticeLine("New evidence", summary.newEvidence.toString())
-        PracticeLine("Reviewed", summary.reviewed.toString())
+
+        PracticeLine("Reasons recorded", "${insights.reasonsRecorded} / ${insights.totalDecisions}")
+        PracticeLine("Reviewed at least once", "${insights.reviewedAtLeastOnce} / ${insights.totalDecisions}")
+        PracticeLine("Still need first review", insights.needsFirstReview.toString())
+        PracticeLine("New evidence after review", insights.newEvidenceAfterReview.toString())
+
+        if (insights.recurringThemes.isNotEmpty() || insights.topSector != null) {
+            HorizontalDivider()
+            ResearchTitle("Patterns from your history")
+            insights.recurringThemes.forEach { theme ->
+                ResearchCaption(
+                    "${theme.label} appears in ${theme.count} written reason" +
+                        if (theme.count == 1) "." else "s."
+                )
+            }
+            insights.topSector?.let { sector ->
+                ResearchCaption(
+                    "Most practised sector: $sector • ${insights.topSectorCount} decision" +
+                        if (insights.topSectorCount == 1) "." else "s."
+                )
+            }
+            ResearchCaption("These patterns describe your saved Practice history; they do not judge the quality of a decision.")
+        }
+
         TextButton(onClick = onOpenCenter, modifier = Modifier.fillMaxWidth()) {
-            Text(if (summary.total == 0) "Open decision center →" else "Review your decisions →")
+            Text(if (insights.totalDecisions == 0) "Open decision center →" else "Review your decisions →")
         }
     }
 }
