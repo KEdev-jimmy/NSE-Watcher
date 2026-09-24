@@ -49,7 +49,13 @@ internal object HomePresentation {
             companyDataEvents = companyDataEvents,
             now = now
         )
-        val practiceRelatedIds = practiceChanges.map { it.relatedChangeId }.filter(String::isNotBlank).toSet()
+        val practiceRelatedIds = practiceEvidenceIds(
+            state = practiceState,
+            companies = companies,
+            news = news,
+            companyDataEvents = companyDataEvents,
+            now = now
+        )
         val articles = companyNews(news, watched).filter { recent(it.publishedAt, now) }
         val articleIds = articles.map { it.id }.toSet()
         val articleChanges = articles.mapNotNull { item ->
@@ -158,7 +164,8 @@ internal object HomePresentation {
 
                 val fillTime = CompanyResearchPresentation.timestamp(order.quoteAt)
                     ?: Instant.ofEpochMilli(order.filledAt)
-                if (fillTime.isAfter(now) || Duration.between(fillTime, now) > Duration.ofDays(7)) return@mapNotNull null
+                if (fillTime.isAfter(now)) return@mapNotNull null
+                val fillIsRecent = Duration.between(fillTime, now) <= Duration.ofDays(7)
 
                 val lastSavedReviewAt = PracticeReviewPresentation.savedReviews(state, order)
                     .maxOfOrNull { it.time }
@@ -171,7 +178,10 @@ internal object HomePresentation {
                     companyEvents = companyDataEvents
                 ).filter {
                     val evidenceAt = CompanyResearchPresentation.timestamp(it.time)
-                    evidenceAt != null && evidenceAt.isAfter(fillTime) && !evidenceAt.isAfter(now)
+                    evidenceAt != null &&
+                        evidenceAt.isAfter(fillTime) &&
+                        !evidenceAt.isAfter(now) &&
+                        Duration.between(evidenceAt, now) <= Duration.ofDays(7)
                 }
 
                 val latestEvidence = laterEvidence.maxByOrNull {
@@ -198,7 +208,7 @@ internal object HomePresentation {
                         practiceOrderId = order.id,
                         relatedChangeId = latestEvidence.id
                     )
-                } else if (lastSavedReviewAt == null || fillTime.isAfter(lastSavedReviewAt)) {
+                } else if (fillIsRecent && (lastSavedReviewAt == null || fillTime.isAfter(lastSavedReviewAt))) {
                     HomeBriefItem(
                         id = "practice-fill:${order.id}",
                         symbol = symbol,
@@ -217,6 +227,49 @@ internal object HomePresentation {
             .distinctBy { it.id }
             .sortedByDescending { CompanyResearchPresentation.timestamp(it.time) ?: Instant.MIN }
             .toList()
+    }
+
+    private fun practiceEvidenceIds(
+        state: PracticeState?,
+        companies: List<Stock>,
+        news: List<NewsItem>,
+        companyDataEvents: List<CompanyDataChangeEvent>,
+        now: Instant
+    ): Set<String> {
+        if (state?.enabled != true) return emptySet()
+        val stocksBySymbol = companies.associateBy { WatchlistPresentation.symbol(it.symbol) }
+        return state.orders.asSequence()
+            .filter { it.status == "FILLED" && it.filledAt > 0L }
+            .flatMap { order ->
+                val symbol = WatchlistPresentation.symbol(order.symbol)
+                val stock = stocksBySymbol[symbol]
+                    ?: state.quotes.firstOrNull { WatchlistPresentation.symbol(it.symbol) == symbol }?.let {
+                        Stock(
+                            symbol = it.symbol,
+                            name = it.name.ifBlank { it.symbol },
+                            price = it.price,
+                            change = 0.0,
+                            history = emptyList(),
+                            sector = it.sector,
+                            observedAt = it.at,
+                            changeAvailable = false
+                        )
+                    }
+                    ?: Stock(symbol, symbol, Double.NaN, 0.0, emptyList(), changeAvailable = false, volumeAvailable = false)
+                val fillTime = CompanyResearchPresentation.timestamp(order.quoteAt)
+                    ?: Instant.ofEpochMilli(order.filledAt)
+                PracticeReviewPresentation.evidence(order, stock, news, companyDataEvents)
+                    .asSequence()
+                    .filter {
+                        val evidenceAt = CompanyResearchPresentation.timestamp(it.time)
+                        evidenceAt != null &&
+                            evidenceAt.isAfter(fillTime) &&
+                            !evidenceAt.isAfter(now) &&
+                            Duration.between(evidenceAt, now) <= Duration.ofDays(7)
+                    }
+                    .map { it.id }
+            }
+            .toSet()
     }
 
     private fun companyDataWhyItMayMatter(kind: CompanyDataChangeKind, symbol: String): String = when (kind) {
