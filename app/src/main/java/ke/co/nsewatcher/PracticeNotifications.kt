@@ -18,7 +18,7 @@ internal object PracticeNotifications {
         val normalized = normalizeOrderId(orderId)
         val intent = Intent(context, DesignActivity::class.java).apply {
             action = ACTION_OPEN_PRACTICE
-            data = deepLink(normalized)
+            data = Uri.parse(deepLinkValue(normalized))
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             putExtra(EXTRA_ORDER_ID, normalized)
         }
@@ -54,14 +54,9 @@ internal object PracticeNotifications {
 
     internal fun practiceAction(): String = ACTION_OPEN_PRACTICE
 
-    internal fun deepLink(orderId: String): Uri {
+    internal fun deepLinkValue(orderId: String): String {
         val normalized = normalizeOrderId(orderId)
-        return Uri.Builder()
-            .scheme("nsewatcher")
-            .authority("practice")
-            .appendPath("order")
-            .appendPath(normalized)
-            .build()
+        return "nsewatcher://practice/order/" + Uri.encode(normalized)
     }
 
     fun normalizeOrderId(raw: String?): String {
