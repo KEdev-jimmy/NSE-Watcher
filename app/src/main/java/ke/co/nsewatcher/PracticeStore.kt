@@ -54,15 +54,91 @@ internal class PracticeStore(context: Context) {
     private fun decode(o: JSONObject): PracticeState = PracticeState(
         enabled = o.getBoolean("enabled"), cash = o.getDouble("cash"), contributed = o.getDouble("contributed"),
         holdings = o.getJSONArray("holdings").mapObjects { PracticeHolding(it.getString("symbol"), it.getLong("shares"), it.getDouble("cost"), it.optBoolean("legacy")) },
-        orders = o.getJSONArray("orders").mapObjects { PracticeOrder(it.getString("id"), it.getString("symbol"), it.getString("side"), it.getLong("shares"), it.getDouble("limit"), it.getLong("created"), it.optString("note"), it.getString("status"), it.optString("reason"), it.optLong("filledAt"), it.optDouble("price", 0.0), it.optDouble("fee", 0.0), it.optDouble("realised", 0.0), it.optString("quoteAt")) },
+        orders = o.getJSONArray("orders").mapObjects {
+            PracticeOrder(
+                it.getString("id"),
+                it.getString("symbol"),
+                it.getString("side"),
+                it.getLong("shares"),
+                it.getDouble("limit"),
+                it.getLong("created"),
+                it.optString("note"),
+                it.getString("status"),
+                it.optString("reason"),
+                it.optLong("filledAt"),
+                it.optDouble("price", 0.0),
+                it.optDouble("fee", 0.0),
+                it.optDouble("realised", 0.0),
+                it.optString("quoteAt"),
+                decodeDecisionSnapshot(it.optJSONObject("decisionSnapshot"))
+            )
+        },
         quotes = o.getJSONArray("quotes").mapObjects { PracticeQuote(it.getString("symbol"), it.getDouble("price"), it.getString("at"), it.optString("name"), it.optString("sector", "Other")) },
         entries = o.getJSONArray("entries").mapObjects { PracticeEntry(it.getString("id"), it.getLong("time"), it.getString("kind"), it.getString("text"), it.optDouble("amount", 0.0), it.optString("symbol")) },
         snapshots = o.getJSONArray("snapshots").mapObjects { PracticeSnapshot(it.getLong("time"), it.getDouble("value"), it.getDouble("contributed")) }
     )
+    private fun decodeDecisionSnapshot(o: JSONObject?): PracticeDecisionSnapshot {
+        if (o == null) return PracticeDecisionSnapshot()
+        val evidence = o.optJSONArray("evidence")?.mapObjects {
+            PracticeDecisionEvidence(
+                id = it.optString("id"),
+                title = it.optString("title"),
+                detail = it.optString("detail"),
+                source = it.optString("source"),
+                time = it.optString("time")
+            )
+        }.orEmpty()
+        return PracticeDecisionSnapshot(
+            capturedAt = o.optLong("capturedAt", 0L),
+            quotePrice = if (o.has("quotePrice")) o.optDouble("quotePrice", Double.NaN) else Double.NaN,
+            quoteObservedAt = o.optString("quoteObservedAt"),
+            quoteSource = o.optString("quoteSource"),
+            quoteDelayMinutes = if (o.has("quoteDelayMinutes") && !o.isNull("quoteDelayMinutes")) o.optInt("quoteDelayMinutes") else null,
+            dailyChangePct = if (o.has("dailyChangePct") && !o.isNull("dailyChangePct")) o.optDouble("dailyChangePct") else null,
+            previousClose = if (o.has("previousClose") && !o.isNull("previousClose")) o.optDouble("previousClose") else null,
+            evidence = evidence
+        )
+    }
+
+    private fun encodeDecisionSnapshot(snapshot: PracticeDecisionSnapshot) = JSONObject().apply {
+        put("capturedAt", snapshot.capturedAt)
+        if (snapshot.quotePrice.isFinite()) put("quotePrice", snapshot.quotePrice)
+        put("quoteObservedAt", snapshot.quoteObservedAt)
+        put("quoteSource", snapshot.quoteSource)
+        snapshot.quoteDelayMinutes?.let { put("quoteDelayMinutes", it) }
+        snapshot.dailyChangePct?.takeIf { it.isFinite() }?.let { put("dailyChangePct", it) }
+        snapshot.previousClose?.takeIf { it.isFinite() }?.let { put("previousClose", it) }
+        put("evidence", arrayOf(snapshot.evidence) {
+            JSONObject()
+                .put("id", it.id)
+                .put("title", it.title)
+                .put("detail", it.detail)
+                .put("source", it.source)
+                .put("time", it.time)
+        })
+    }
+
     private fun encode(s: PracticeState) = JSONObject().apply {
-        put("version", 2); put("enabled", s.enabled); put("cash", s.cash); put("contributed", s.contributed)
+        put("version", 3); put("enabled", s.enabled); put("cash", s.cash); put("contributed", s.contributed)
         put("holdings", arrayOf(s.holdings) { JSONObject().put("symbol", it.symbol).put("shares", it.shares).put("cost", it.cost).put("legacy", it.legacy) })
-        put("orders", arrayOf(s.orders) { JSONObject().put("id", it.id).put("symbol", it.symbol).put("side", it.side).put("shares", it.shares).put("limit", it.limit).put("created", it.created).put("note", it.note).put("status", it.status).put("reason", it.reason).put("filledAt", it.filledAt).put("price", it.price).put("fee", it.fee).put("realised", it.realised).put("quoteAt", it.quoteAt) })
+        put("orders", arrayOf(s.orders) {
+            JSONObject()
+                .put("id", it.id)
+                .put("symbol", it.symbol)
+                .put("side", it.side)
+                .put("shares", it.shares)
+                .put("limit", it.limit)
+                .put("created", it.created)
+                .put("note", it.note)
+                .put("status", it.status)
+                .put("reason", it.reason)
+                .put("filledAt", it.filledAt)
+                .put("price", it.price)
+                .put("fee", it.fee)
+                .put("realised", it.realised)
+                .put("quoteAt", it.quoteAt)
+                .put("decisionSnapshot", encodeDecisionSnapshot(it.decisionSnapshot))
+        })
         put("quotes", arrayOf(s.quotes) { JSONObject().put("symbol", it.symbol).put("price", it.price).put("at", it.at).put("name", it.name).put("sector", it.sector) })
         put("entries", arrayOf(s.entries) { JSONObject().put("id", it.id).put("time", it.time).put("kind", it.kind).put("text", it.text).put("amount", it.amount).put("symbol", it.symbol) })
         put("snapshots", arrayOf(s.snapshots) { JSONObject().put("time", it.time).put("value", it.value).put("contributed", it.contributed) })
