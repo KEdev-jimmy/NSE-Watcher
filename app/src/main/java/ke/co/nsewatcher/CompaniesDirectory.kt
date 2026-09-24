@@ -128,8 +128,7 @@ fun CompaniesDirectory(
         Scaffold(containerColor = ResearchBackground, snackbarHost = { SnackbarHost(snackbar) }, contentWindowInsets = WindowInsets(0, 0, 0, 0)) { padding ->
             Column(Modifier.fillMaxSize().padding(padding)) {
                 Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.ShowChart, null, tint = ResearchGreen, modifier = Modifier.size(24.dp))
-                    Spacer(Modifier.width(8.dp)); Text("NSE Watcher", Modifier.weight(1f), color = ResearchText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    NseWatcherBrandLockup(modifier = Modifier.weight(1f), compact = true)
                     IconButton(onClick = openProfile, modifier = Modifier.semantics { contentDescription = "Open profile" }) {
                         Box(Modifier.size(32.dp).clip(CircleShape).background(ResearchRaised), contentAlignment = Alignment.Center) {
                             Text(name.trim().take(1).uppercase().ifBlank { "?" }, color = ResearchText)
