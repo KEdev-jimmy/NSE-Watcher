@@ -575,7 +575,7 @@ internal fun ResearchMovement(result: MovementIntelligenceCache.Result, loading:
                     ResearchBody(evidence.title)
                     ResearchCaption("${evidence.source.ifBlank { "Source unavailable" }} · ${CompanyResearchPresentation.date(evidence.date)}")
                     if (evidence.description.isNotBlank()) ResearchCaption(evidence.description)
-                    ResearchCaption("Evidence relationship: ${evidence.relationship.ifBlank { "Not established" }}")
+                    ResearchCaption("Timing relationship: ${CompanyAnalysisPresentation.movementRelationshipLabel(evidence.relationship)}")
                     ResearchSourceLink("Open source", evidence.sourceUrl)
                 }
                 if (result.evidence.isEmpty()) ResearchCaption("No dated company event was returned for this movement window.")
