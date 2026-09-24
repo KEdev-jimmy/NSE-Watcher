@@ -4,7 +4,6 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import java.util.Locale
 
 internal data class PracticeNotificationDestination(
     val orderId: String = ""
@@ -31,17 +30,29 @@ internal object PracticeNotifications {
         )
     }
 
-    fun destination(intent: Intent?): PracticeNotificationDestination? {
-        if (intent?.action != ACTION_OPEN_PRACTICE) return null
-        val fromExtra = normalizeOrderId(intent.getStringExtra(EXTRA_ORDER_ID))
+    fun destination(intent: Intent?): PracticeNotificationDestination? =
+        destination(
+            action = intent?.action,
+            extraOrderId = intent?.getStringExtra(EXTRA_ORDER_ID),
+            pathOrderId = intent?.data?.lastPathSegment?.let(Uri::decode)
+        )
+
+    internal fun destination(
+        action: String?,
+        extraOrderId: String?,
+        pathOrderId: String?
+    ): PracticeNotificationDestination? {
+        if (action != ACTION_OPEN_PRACTICE) return null
+        val fromExtra = normalizeOrderId(extraOrderId)
         if (fromExtra.isNotBlank()) return PracticeNotificationDestination(fromExtra)
 
-        val pathOrder = intent.data?.lastPathSegment?.let(Uri::decode).orEmpty()
-        val fromPath = normalizeOrderId(pathOrder)
+        val fromPath = normalizeOrderId(pathOrderId)
         // Keep old already-posted notifications useful: they can still open Practice
         // even though they were created before an order id was embedded.
         return PracticeNotificationDestination(fromPath)
     }
+
+    internal fun practiceAction(): String = ACTION_OPEN_PRACTICE
 
     fun normalizeOrderId(raw: String?): String {
         val value = raw.orEmpty().trim()
