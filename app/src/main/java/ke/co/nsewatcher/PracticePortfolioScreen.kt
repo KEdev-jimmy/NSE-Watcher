@@ -201,7 +201,16 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
         Column(Modifier.fillMaxSize().background(ResearchBackground)) {
             Row(Modifier.fillMaxWidth().padding(end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = ::goBack) { Icon(Icons.Outlined.ArrowBack, "Back", tint = ResearchText) }
-                Text(when (page) { "HOLDING" -> "Your holding"; "ORDER" -> "Practice order"; "DIVIDENDS" -> "Dividends"; else -> "NSE Watcher" }, Modifier.weight(1f), color = ResearchText, fontWeight = FontWeight.SemiBold)
+                if (page == "MAIN") {
+                    NseWatcherBrandLockup(modifier = Modifier.weight(1f), compact = true)
+                } else {
+                    Text(
+                        when (page) { "HOLDING" -> "Your holding"; "ORDER" -> "Practice order"; "DIVIDENDS" -> "Dividends"; else -> "Practice Portfolio" },
+                        Modifier.weight(1f),
+                        color = ResearchText,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
                 if (page == "MAIN") IconButton(onClick = { sheet = "Settings" }) { Icon(Icons.Outlined.Settings, "Practice settings", tint = ResearchText) } else PracticeBadge()
             }
             if (page == "MAIN") {

@@ -29,50 +29,6 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.abs
 
-internal data class PremiumHomePalette(
-    val background: Color,
-    val surface: Color,
-    val raised: Color,
-    val border: Color,
-    val text: Color,
-    val muted: Color,
-    val primary: Color,
-    val secondary: Color,
-    val danger: Color,
-    val amber: Color,
-    val nav: Color
-)
-
-internal fun premiumHomePalette(dark: Boolean) = if (dark) {
-    PremiumHomePalette(
-        background = Color(0xFF031326),
-        surface = Color(0xFF071D35),
-        raised = Color(0xFF0B2743),
-        border = Color(0xFF173E61),
-        text = Color(0xFFF7FAFF),
-        muted = Color(0xFFA7B8CB),
-        primary = Color(0xFF20F0C1),
-        secondary = Color(0xFF27B6FF),
-        danger = Color(0xFFFF526B),
-        amber = Color(0xFFF6C65B),
-        nav = Color(0xFF061A31)
-    )
-} else {
-    PremiumHomePalette(
-        background = Color(0xFFFAF9F2),
-        surface = Color(0xFFFFFFFF),
-        raised = Color(0xFFF2F7F1),
-        border = Color(0xFFE1E8DF),
-        text = Color(0xFF0B2B31),
-        muted = Color(0xFF6D7D77),
-        primary = Color(0xFF008D5D),
-        secondary = Color(0xFF117A9B),
-        danger = Color(0xFFE23F50),
-        amber = Color(0xFFF0B531),
-        nav = Color(0xFFFFFEFA)
-    )
-}
-
 @Composable
 internal fun HomePremiumDashboard(
     darkTheme: Boolean,

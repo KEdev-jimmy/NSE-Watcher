@@ -1,7 +1,7 @@
 <resources>
     <style name="Theme.NSEWatcher" parent="android:style/Theme.Material.Light.NoActionBar" />
     <style name="Theme.NSEWatcher.Starting" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">#061625</item>
+        <item name="windowSplashScreenBackground">#031326</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/ic_nse_watcher</item>
         <item name="windowSplashScreenAnimationDuration">700</item>
         <item name="postSplashScreenTheme">@style/Theme.NSEWatcher</item>

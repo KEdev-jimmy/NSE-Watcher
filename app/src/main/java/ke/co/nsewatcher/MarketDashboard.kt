@@ -148,8 +148,7 @@ fun MarketDashboard(
     MaterialTheme(colorScheme = CompanyResearchColors) {
         Column(Modifier.fillMaxSize().background(ResearchBackground)) {
             Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.BarChart, null, tint = ResearchGreen, modifier = Modifier.size(25.dp))
-                Spacer(Modifier.width(7.dp)); Text("NSE Watcher", Modifier.weight(1f), color = ResearchGreen, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                NseWatcherBrandLockup(modifier = Modifier.weight(1f), compact = true)
                 IconButton(onClick = { if (!busy) scope.launch { refreshData(true) } }, enabled = !busy) {
                     if (busy) CircularProgressIndicator(Modifier.size(20.dp), color = ResearchGreen, strokeWidth = 2.dp)
                     else Icon(Icons.Default.Refresh, "Refresh market", tint = ResearchText)

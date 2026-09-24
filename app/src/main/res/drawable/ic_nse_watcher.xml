@@ -4,41 +4,25 @@
     android:viewportWidth="48"
     android:viewportHeight="48">
 
-    <!-- Clean light rim around the same NSE Watcher mark. -->
+    <!-- Launcher/splash version of the same N mark used by the Home header. -->
     <path
-        android:fillColor="#F7FFFB"
-        android:pathData="M8,1h32c3.87,0 7,3.13 7,7v32c0,3.87 -3.13,7 -7,7H8c-3.87,0 -7,-3.13 -7,-7V8c0,-3.87 3.13,-7 7,-7z" />
+        android:fillColor="#00B983"
+        android:pathData="M4,9 C4,6.8 5.8,5 8,5 L13,5 C15.2,5 17,6.8 17,9 L17,39 C17,41.2 15.2,43 13,43 L8,43 C5.8,43 4,41.2 4,39 Z" />
 
-    <!-- Lower/right extrusion. -->
     <path
-        android:fillColor="#020812"
-        android:pathData="M8,5h32c3.31,0 6,2.69 6,6v28c0,3.31 -2.69,6 -6,6H8c-3.31,0 -6,-2.69 -6,-6V11c0,-3.31 2.69,-6 6,-6z" />
+        android:fillColor="#18F0C1"
+        android:pathData="M31,6 C31,3.8 32.8,2 35,2 L40,2 C42.2,2 44,3.8 44,6 L44,39 C44,41.2 42.2,43 40,43 L35,43 C32.8,43 31,41.2 31,39 Z" />
 
-    <!-- Glossy navy face. -->
     <path
-        android:fillColor="#102744"
-        android:pathData="M8,3h32c3.31,0 6,2.69 6,6v28c0,3.31 -2.69,6 -6,6H8c-3.31,0 -6,-2.69 -6,-6V9c0,-3.31 2.69,-6 6,-6z" />
+        android:fillColor="#1677FF"
+        android:pathData="M11,6 L20,6 L38,34 L38,43 L28,43 L10,16 Z" />
 
-    <!-- Top glass highlight. -->
     <path
-        android:fillColor="#1D456F"
-        android:pathData="M8,3h32c3.31,0 6,2.69 6,6v4H2V9c0,-3.31 2.69,-6 6,-6z" />
+        android:fillColor="#20F0C1"
+        android:pathData="M13,10 L19,10 L35,35 L35,39 L31,39 L14,14 Z" />
 
-    <!-- Blue market bars. -->
     <path
-        android:fillColor="#8BC5FF"
-        android:pathData="M9,27h6v10H9zM19,20h6v17h-6zM29,15h6v22h-6z" />
-
-    <!-- Dark lower faces give the bars a small 3D edge. -->
-    <path
-        android:fillColor="#245CA8"
-        android:pathData="M9,34h6v3H9zM19,32h6v5h-6zM29,31h6v6h-6z" />
-
-    <!-- Rising green market line. -->
-    <path
-        android:fillColor="#54D6A5"
-        android:pathData="M8,33l10,-11 6,5 10,-14 3,3 -12,17 -6,-5 -8,9z" />
-    <path
-        android:fillColor="#B5FFDB"
-        android:pathData="M10,31l8,-9 6,5 10,-13 1,1 -11,15 -6,-5 -7,8z" />
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.22"
+        android:pathData="M7,9 C7,8.2 7.7,7.5 8.5,7.5 L9.5,7.5 C10.3,7.5 11,8.2 11,9 L11,31 C11,31.8 10.3,32.5 9.5,32.5 L8.5,32.5 C7.7,32.5 7,31.8 7,31 Z" />
 </vector>

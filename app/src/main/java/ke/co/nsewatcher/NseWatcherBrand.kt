@@ -16,6 +16,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.semantics.contentDescription
@@ -23,6 +24,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 
 private val BrandTeal = Color(0xFF18F0C1)
@@ -98,11 +100,13 @@ internal fun NseWatcherNMark(
 @Composable
 internal fun NseWatcherBrandLockup(
     modifier: Modifier = Modifier,
-    dark: Boolean,
+    dark: Boolean? = null,
     compact: Boolean = false
 ) {
-    val title = if (dark) Color(0xFFF6FAFF) else Color(0xFF08292E)
-    val muted = if (dark) Color(0xFFA6B8CC) else Color(0xFF748179)
+    val resolvedDark = dark ?: (MaterialTheme.colorScheme.background.luminance() < 0.5f)
+    val palette = premiumHomePalette(resolvedDark)
+    val title = palette.text
+    val muted = palette.muted
 
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         NseWatcherNMark(Modifier.size(if (compact) 36.dp else 46.dp))

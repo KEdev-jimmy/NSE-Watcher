@@ -306,6 +306,8 @@ fun NewsDashboard(newsFeed: List<NewsItem>, onNewsLoaded: (List<NewsItem>) -> Un
 @Composable
 private fun NewsDashboardHeader(searching: Boolean, refreshing: Boolean, onSearch: () -> Unit, onRefresh: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        NseWatcherBrandLockup(compact = true)
+        Spacer(Modifier.height(6.dp))
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("News & insights", Modifier.weight(1f), color = NewsText, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold)
             IconButton(onClick = onSearch, modifier = Modifier.size(48.dp)) {
