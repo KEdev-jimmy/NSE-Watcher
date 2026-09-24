@@ -56,7 +56,16 @@ internal object PracticeNotifications {
 
     internal fun deepLinkValue(orderId: String): String {
         val normalized = normalizeOrderId(orderId)
-        return "nsewatcher://practice/order/" + Uri.encode(normalized)
+        return "nsewatcher://practice/order/" + encodePathSegment(normalized)
+    }
+
+    private fun encodePathSegment(value: String): String = buildString {
+        value.forEach { ch ->
+            when (ch) {
+                ':' -> append("%3A")
+                else -> append(ch)
+            }
+        }
     }
 
     fun normalizeOrderId(raw: String?): String {
