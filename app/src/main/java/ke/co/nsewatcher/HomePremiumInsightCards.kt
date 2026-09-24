@@ -177,7 +177,6 @@ internal fun PremiumPracticeOverview(
     openPractice: () -> Unit
 ) {
     PremiumResponsivePair(
-        forceHorizontal = true,
         first = {
             PremiumPracticeCard(
                 palette = palette,
