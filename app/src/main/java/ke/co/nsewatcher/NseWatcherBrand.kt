@@ -104,8 +104,9 @@ internal fun NseWatcherBrandLockup(
     compact: Boolean = false
 ) {
     val resolvedDark = dark ?: (MaterialTheme.colorScheme.background.luminance() < 0.5f)
-    val title = MaterialTheme.colorScheme.onBackground
-    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    val palette = premiumHomePalette(resolvedDark)
+    val title = palette.text
+    val muted = palette.muted
 
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         NseWatcherNMark(Modifier.size(if (compact) 36.dp else 46.dp))
