@@ -169,6 +169,117 @@ class PracticeReviewTest {
         assertEquals("news:after", evidence[1].id)
     }
 
+    @Test fun unreviewedFilledDecisionIsClassifiedAsNeedsReviewEvenWhenLaterEvidenceExists() {
+        val later = story("later", "KCB", "2026-09-23T08:00:00Z")
+        val state = PracticeState(
+            enabled = true,
+            orders = listOf(order),
+            quotes = listOf(PracticeQuote("KCB", 51.0, "2026-09-23T08:30:00Z", name = "KCB Group"))
+        )
+
+        val items = PracticeDecisionCenterPresentation.items(
+            state = state,
+            companies = listOf(stock),
+            news = listOf(later),
+            companyEvents = emptyList()
+        )
+
+        assertEquals(1, items.size)
+        assertEquals(PracticeDecisionReviewState.NEEDS_REVIEW, items.single().state)
+        assertEquals(1, items.single().evidenceSinceReview)
+        assertEquals("news:later", items.single().latestEvidence?.id)
+    }
+
+    @Test fun savedReviewWithoutLaterEvidenceIsClassifiedAsReviewed() {
+        val reviewAt = Instant.parse("2026-09-23T09:00:00Z").toEpochMilli()
+        val state = PracticeState(
+            enabled = true,
+            orders = listOf(order),
+            entries = listOf(
+                PracticeEntry(
+                    id = "review:order-1:a",
+                    time = reviewAt,
+                    kind = "REVIEW",
+                    text = "Reviewed the decision.",
+                    symbol = "KCB"
+                )
+            )
+        )
+
+        val items = PracticeDecisionCenterPresentation.items(
+            state = state,
+            companies = listOf(stock),
+            news = listOf(story("before-review", "KCB", "2026-09-23T08:00:00Z")),
+            companyEvents = emptyList()
+        )
+
+        assertEquals(PracticeDecisionReviewState.REVIEWED, items.single().state)
+        assertEquals(reviewAt, items.single().lastReviewAt)
+        assertEquals(0, items.single().evidenceSinceReview)
+    }
+
+    @Test fun evidenceAfterLatestSavedReviewMovesDecisionToNewEvidence() {
+        val reviewAt = Instant.parse("2026-09-23T08:15:00Z").toEpochMilli()
+        val state = PracticeState(
+            enabled = true,
+            orders = listOf(order),
+            entries = listOf(
+                PracticeEntry(
+                    id = "review:order-1:a",
+                    time = reviewAt,
+                    kind = "REVIEW",
+                    text = "Reviewed the earlier evidence.",
+                    symbol = "KCB"
+                )
+            )
+        )
+
+        val items = PracticeDecisionCenterPresentation.items(
+            state = state,
+            companies = listOf(stock),
+            news = listOf(
+                story("before-review", "KCB", "2026-09-23T08:00:00Z"),
+                story("after-review", "KCB", "2026-09-23T08:30:00Z")
+            ),
+            companyEvents = emptyList()
+        )
+
+        assertEquals(PracticeDecisionReviewState.NEW_EVIDENCE, items.single().state)
+        assertEquals(1, items.single().evidenceSinceReview)
+        assertEquals("news:after-review", items.single().latestEvidence?.id)
+    }
+
+    @Test fun decisionCenterSummaryCountsOnlyFilledDecisions() {
+        val reviewedOrder = order.copy(id = "order-2", symbol = "SCOM")
+        val pendingOrder = order.copy(id = "order-3", status = "PENDING", filledAt = 0L, quoteAt = "")
+        val state = PracticeState(
+            enabled = true,
+            orders = listOf(order, reviewedOrder, pendingOrder),
+            entries = listOf(
+                PracticeEntry(
+                    id = "review:order-2:a",
+                    time = Instant.parse("2026-09-23T09:00:00Z").toEpochMilli(),
+                    kind = "REVIEW",
+                    text = "Reviewed SCOM.",
+                    symbol = "SCOM"
+                )
+            )
+        )
+
+        val items = PracticeDecisionCenterPresentation.items(
+            state = state,
+            companies = listOf(stock, stock.copy(symbol = "SCOM", name = "Safaricom")),
+            news = emptyList(),
+            companyEvents = emptyList()
+        )
+        val summary = PracticeDecisionCenterPresentation.summary(items)
+
+        assertEquals(2, summary.total)
+        assertEquals(1, summary.needsReview)
+        assertEquals(0, summary.newEvidence)
+        assertEquals(1, summary.reviewed)
+    }
+
     @Test fun savedDecisionReviewsRemainLinkedToTheirOrder() {
         val state = PracticeState(
             enabled = true,
