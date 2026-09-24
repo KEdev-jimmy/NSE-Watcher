@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import ke.co.nsewatcher.data.MyStocksCache
 import ke.co.nsewatcher.data.MarketData
 import ke.co.nsewatcher.data.MarketObservationStore
+import ke.co.nsewatcher.data.MovementIntelligenceCache
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.catch
@@ -56,6 +57,10 @@ fun MarketDashboard(
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var sheet by rememberSaveable { mutableStateOf<String?>(null) }
+    var movementStock by remember { mutableStateOf<Stock?>(null) }
+    var movementResult by remember { mutableStateOf(MovementIntelligenceCache.Result()) }
+    var movementLoading by remember { mutableStateOf(false) }
+    var movementRevision by remember { mutableIntStateOf(0) }
     var historyRevision by remember { mutableIntStateOf(0) }
     var now by remember { mutableStateOf(Instant.now()) }
     val scope = rememberCoroutineScope()
@@ -107,6 +112,29 @@ fun MarketDashboard(
         finally { busy = false }
     }
     LaunchedEffect(Unit) { refreshData(false) }
+
+    LaunchedEffect(movementStock?.symbol, movementRevision) {
+        val selected = movementStock ?: return@LaunchedEffect
+        movementLoading = true
+        movementResult = MovementIntelligenceCache.Result()
+        try {
+            movementResult = MovementIntelligenceCache.load(selected.symbol)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            movementResult = MovementIntelligenceCache.Result(
+                error = "Movement intelligence is unavailable right now."
+            )
+        } finally {
+            movementLoading = false
+        }
+    }
+
+    fun explainMovement(stock: Stock) {
+        movementStock = stock
+        movementRevision++
+        sheet = "Movement"
+    }
 
     MaterialTheme(colorScheme = CompanyResearchColors) {
         Column(Modifier.fillMaxSize().background(ResearchBackground)) {
@@ -174,7 +202,17 @@ fun MarketDashboard(
                         ResearchPanel {
                             val movers = marketMovers(companies, mover)
                             if (movers.isEmpty()) ResearchCaption("No matching observations are available. Missing daily changes are not counted as zero.")
-                            movers.take(3).forEach { stock -> MarketStockRow(stock, if (mover == "By volume") "${String.format(Locale.US, "%,d", stock.volume)} shares" else CompanyResearchPresentation.percent(stock.change), if (mover == "By volume") null else stock.change, openCompany) }
+                            movers.take(3).forEach { stock ->
+                                MarketStockRow(
+                                    stock,
+                                    if (mover == "By volume") "${String.format(Locale.US, "%,d", stock.volume)} shares" else CompanyResearchPresentation.percent(stock.change),
+                                    if (mover == "By volume") null else stock.change,
+                                    openCompany
+                                )
+                                if (MarketPresentation.validChange(stock)) {
+                                    MarketWhyMovingAction(stock) { explainMovement(it) }
+                                }
+                            }
                             TextButton(onClick = { sheet = "Movers:$mover" }) { Text("View all movers →", color = ResearchGreen) }
                         }
                     }
@@ -221,12 +259,68 @@ fun MarketDashboard(
             ModalBottomSheet(onDismissRequest = { sheet = null }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = ResearchBackground) {
                 LazyColumn(Modifier.fillMaxWidth().fillMaxHeight(0.85f), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     item {
-                        if (title.startsWith("Sector:")) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            MarketSectorIcon(title.substringAfter(':'))
-                            Column(Modifier.weight(1f)) { ResearchTitle(title.substringAfter(':')) }
-                        } else ResearchTitle(title.substringAfter(':'))
+                        when {
+                            title == "Movement" && movementStock != null ->
+                                ResearchTitle("Why is ${movementStock!!.symbol} moving?")
+                            title.startsWith("Sector:") -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                MarketSectorIcon(title.substringAfter(':'))
+                                Column(Modifier.weight(1f)) { ResearchTitle(title.substringAfter(':')) }
+                            }
+                            else -> ResearchTitle(title.substringAfter(':'))
+                        }
                     }
                     when {
+                        title == "Movement" -> {
+                            val selected = movementStock
+                            if (selected == null) {
+                                item { ResearchCaption("Choose a company movement to investigate.") }
+                            } else {
+                                item {
+                                    ResearchPanel {
+                                        ResearchBody("${selected.symbol} · ${selected.name}")
+                                        Text(
+                                            CompanyResearchPresentation.percent(selected.change),
+                                            color = researchChangeColor(selected.change),
+                                            fontSize = 22.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        ResearchCaption("Latest market observation: ${CompanyResearchPresentation.date(selected.observedAt)}")
+                                        ResearchCaption("Quote source: ${selected.source.ifBlank { "Unavailable" }}")
+                                        ResearchCaption(
+                                            "The mover figure above comes from the latest available quote. " +
+                                                "The evidence window below uses dated historical observations, so the percentages can differ."
+                                        )
+                                    }
+                                }
+                                item {
+                                    ResearchMovementContext(
+                                        CompanyAnalysisPresentation.movementContext(selected, companies)
+                                    )
+                                }
+                                item {
+                                    ResearchMovement(
+                                        result = movementResult,
+                                        loading = movementLoading,
+                                        retry = { movementRevision++ }
+                                    )
+                                }
+                                item {
+                                    Button(
+                                        onClick = {
+                                            sheet = null
+                                            openCompany(selected)
+                                        },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text("Open Company Intelligence →")
+                                    }
+                                    ResearchCaption(
+                                        "Company Intelligence combines this movement evidence with financials, company news, " +
+                                            "broader peer context and the optional evidence explanation."
+                                    )
+                                }
+                            }
+                        }
                         title == "Market participation" -> item {
                             ResearchBody("Each company with a finite provider-supplied daily change and a valid price counts once. Rising and falling counts describe participation, not the change in an NSE index.")
                             ResearchCaption("Missing data is excluded, not treated as unchanged. Dates can differ across companies.")
@@ -266,8 +360,18 @@ fun MarketDashboard(
                             }
                             items(rows, key = { it.symbol }) { stock ->
                                 ResearchPanel {
-                                    MarketStockRow(stock, if (title == "Movers:By volume") "${String.format(Locale.US, "%,d", stock.volume)} shares" else if (MarketPresentation.validChange(stock)) CompanyResearchPresentation.percent(stock.change) else "Unavailable", if (title != "Movers:By volume" && MarketPresentation.validChange(stock)) stock.change else null, open = { sheet = null; openCompany(it) })
+                                    MarketStockRow(
+                                        stock,
+                                        if (title == "Movers:By volume") "${String.format(Locale.US, "%,d", stock.volume)} shares"
+                                        else if (MarketPresentation.validChange(stock)) CompanyResearchPresentation.percent(stock.change)
+                                        else "Unavailable",
+                                        if (title != "Movers:By volume" && MarketPresentation.validChange(stock)) stock.change else null,
+                                        open = { sheet = null; openCompany(it) }
+                                    )
                                     ResearchCaption("Source: ${stock.source.ifBlank { "Unavailable" }}")
+                                    if (MarketPresentation.validChange(stock)) {
+                                        MarketWhyMovingAction(stock) { explainMovement(it) }
+                                    }
                                 }
                             }
                         }
@@ -282,6 +386,18 @@ private fun marketMovers(companies: List<Stock>, type: String): List<Stock> = wh
     "By volume" -> companies.filter { it.volumeAvailable && it.volume > 0 }.sortedByDescending { it.volume }
     "Losers" -> companies.filter { MarketPresentation.validChange(it) && it.change < 0 }.sortedBy { it.change }
     else -> companies.filter { MarketPresentation.validChange(it) && it.change > 0 }.sortedByDescending { it.change }
+}
+
+@Composable
+private fun MarketWhyMovingAction(stock: Stock, explain: (Stock) -> Unit) {
+    TextButton(
+        onClick = { explain(stock) },
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+    ) {
+        Icon(Icons.Outlined.Insights, null, tint = ResearchGreen, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(6.dp))
+        Text("Why is ${stock.symbol} moving?", color = ResearchGreen, fontSize = 12.sp)
+    }
 }
 
 @Composable
