@@ -141,6 +141,19 @@ class MarketAttentionEngineTest {
             .detail.contains("does not prove"))
     }
 
+    @Test fun newsPublishedAfterTheObservedMoveDoesNotElevateThatMove() {
+        val rows = listOf(
+            stock("KCB", 1.5, "Banking"),
+            stock("EQTY", 1.4, "Banking"),
+            stock("ABSA", 1.6, "Banking")
+        )
+        val laterNews = news("after-observation", "KCB", "2026-09-24T11:30:00Z")
+
+        val attention = MarketAttentionEngine.rank(rows, listOf(laterNews), now, limit = 10)
+
+        assertFalse(attention.any { it.stock.symbol == "KCB" })
+    }
+
     @Test fun companyAnalysisAndAttentionShareTheSamePeerContext() {
         val target = stock("KCB", 3.0, "Banks")
         val rows = listOf(
