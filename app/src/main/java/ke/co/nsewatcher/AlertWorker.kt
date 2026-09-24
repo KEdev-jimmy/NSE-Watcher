@@ -58,34 +58,39 @@ internal fun automaticWatchlistAlertRules(
 
 private val PRACTICE_EVIDENCE_RETENTION: Duration = Duration.ofDays(30)
 
+internal fun practiceEvidenceOrderActive(
+    state: PracticeState,
+    order: PracticeOrder,
+    now: Instant,
+    retention: Duration = PRACTICE_EVIDENCE_RETENTION
+): Boolean {
+    if (!state.enabled || order.status != "FILLED") return false
+    val fillAt = when {
+        order.filledAt > 0L -> Instant.ofEpochMilli(order.filledAt)
+        order.quoteAt.isNotBlank() -> runCatching { Instant.parse(order.quoteAt) }.getOrNull()
+        else -> null
+    } ?: return false
+
+    val latestReviewAt = state.entries.asSequence()
+        .filter { it.kind == "REVIEW" && it.id.startsWith("review:" + order.id + ":") }
+        .mapNotNull { entry ->
+            entry.time.takeIf { it > 0L }?.let(Instant::ofEpochMilli)
+        }
+        .maxOrNull()
+
+    val latestActivity = listOfNotNull(fillAt, latestReviewAt).maxOrNull() ?: fillAt
+    return !latestActivity.isAfter(now) && !latestActivity.isBefore(now.minus(retention))
+}
+
 internal fun practiceEvidenceMonitoringSymbols(
     state: PracticeState,
     now: Instant,
     retention: Duration = PRACTICE_EVIDENCE_RETENTION
 ): Set<String> {
     if (!state.enabled) return emptySet()
-    val cutoff = now.minus(retention)
     return state.orders.asSequence()
-        .filter { it.status == "FILLED" }
-        .mapNotNull { order ->
-            val fillAt = when {
-                order.filledAt > 0L -> Instant.ofEpochMilli(order.filledAt)
-                order.quoteAt.isNotBlank() -> runCatching { Instant.parse(order.quoteAt) }.getOrNull()
-                else -> null
-            } ?: return@mapNotNull null
-
-            val latestReviewAt = state.entries.asSequence()
-                .filter { it.kind == "REVIEW" && it.id.startsWith("review:" + order.id + ":") }
-                .mapNotNull { entry ->
-                    entry.time.takeIf { it > 0L }?.let(Instant::ofEpochMilli)
-                }
-                .maxOrNull()
-
-            val latestActivity = listOfNotNull(fillAt, latestReviewAt).maxOrNull() ?: fillAt
-            if (latestActivity.isAfter(now) || latestActivity.isBefore(cutoff)) return@mapNotNull null
-
-            WatchlistPresentation.symbol(order.symbol).takeIf(String::isNotBlank)
-        }
+        .filter { practiceEvidenceOrderActive(state, it, now, retention) }
+        .mapNotNull { WatchlistPresentation.symbol(it.symbol).takeIf(String::isNotBlank) }
         .toSet()
 }
 
