@@ -24,13 +24,14 @@ import ke.co.nsewatcher.domain.AlertType
 import ke.co.nsewatcher.domain.PriceAlert
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
+import java.time.Duration
 import java.time.Instant
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 /**
  * Shared 15-minute background monitor for user alerts, pending Practice orders and
- * periodic watched-company data checks.
+ * periodic company-data checks for watched companies plus recent filled Practice decisions.
  *
  * Practice fills deliberately use only the current fetched quote. Stored quotes and
  * chart history are never replayed to infer a fill that may have happened while the
@@ -53,6 +54,50 @@ internal fun automaticWatchlistAlertRules(
         }
     }
 }
+
+
+private val PRACTICE_EVIDENCE_RETENTION: Duration = Duration.ofDays(30)
+
+internal fun practiceEvidenceMonitoringSymbols(
+    state: PracticeState,
+    now: Instant,
+    retention: Duration = PRACTICE_EVIDENCE_RETENTION
+): Set<String> {
+    if (!state.enabled) return emptySet()
+    val cutoff = now.minus(retention)
+    return state.orders.asSequence()
+        .filter { it.status == "FILLED" }
+        .mapNotNull { order ->
+            val fillAt = when {
+                order.filledAt > 0L -> Instant.ofEpochMilli(order.filledAt)
+                order.quoteAt.isNotBlank() -> runCatching { Instant.parse(order.quoteAt) }.getOrNull()
+                else -> null
+            } ?: return@mapNotNull null
+
+            val latestReviewAt = state.entries.asSequence()
+                .filter { it.kind == "REVIEW" && it.id.startsWith("review:" + order.id + ":") }
+                .mapNotNull { entry ->
+                    entry.time.takeIf { it > 0L }?.let(Instant::ofEpochMilli)
+                }
+                .maxOrNull()
+
+            val latestActivity = listOfNotNull(fillAt, latestReviewAt).maxOrNull() ?: fillAt
+            if (latestActivity.isAfter(now) || latestActivity.isBefore(cutoff)) return@mapNotNull null
+
+            WatchlistPresentation.symbol(order.symbol).takeIf(String::isNotBlank)
+        }
+        .toSet()
+}
+
+internal fun companyEvidenceMonitoringSymbols(
+    watchedSymbols: Set<String>,
+    practiceState: PracticeState,
+    now: Instant
+): Set<String> =
+    watchedSymbols.asSequence()
+        .map(WatchlistPresentation::symbol)
+        .filter(String::isNotBlank)
+        .toSet() + practiceEvidenceMonitoringSymbols(practiceState, now)
 
 class AlertWorker(appContext: Context, workerParams: WorkerParameters) : CoroutineWorker(appContext, workerParams) {
     override suspend fun doWork(): Result {
@@ -98,7 +143,12 @@ class AlertWorker(appContext: Context, workerParams: WorkerParameters) : Corouti
             val alerts = activeConfigured + automaticWatchlistAlerts
             val initialPractice = practiceStore.read()
             val practicePending = initialPractice.enabled && initialPractice.orders.any { it.status == "PENDING" }
-            val companyChecks = companyChangeStore.syncAndDue(watchedSymbols, now)
+            val evidenceMonitoringSymbols = companyEvidenceMonitoringSymbols(
+                watchedSymbols = watchedSymbols,
+                practiceState = initialPractice,
+                now = now
+            )
+            val companyChecks = companyChangeStore.syncAndDue(evidenceMonitoringSymbols, now)
             if (alerts.isEmpty() && !practicePending && companyChecks.isEmpty()) return Result.success()
 
             val newsEnabled = alerts.any { AlertEvaluator.isNews(it.type) }
