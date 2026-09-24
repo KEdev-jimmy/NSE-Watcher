@@ -15,12 +15,11 @@ internal object PracticeNotifications {
     private val orderIdPattern = Regex("[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
 
     fun pendingIntent(context: Context, orderId: String): PendingIntent {
-        val normalized = normalizeOrderId(orderId)
         val intent = Intent(context, DesignActivity::class.java).apply {
             action = ACTION_OPEN_PRACTICE
-            data = Uri.parse("nsewatcher://practice/order/${Uri.encode(normalized)}")
+            data = deepLink(orderId)
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            putExtra(EXTRA_ORDER_ID, normalized)
+            putExtra(EXTRA_ORDER_ID, normalizeOrderId(orderId))
         }
         return PendingIntent.getActivity(
             context,
@@ -53,6 +52,16 @@ internal object PracticeNotifications {
     }
 
     internal fun practiceAction(): String = ACTION_OPEN_PRACTICE
+
+    internal fun deepLink(orderId: String): Uri {
+        val normalized = normalizeOrderId(orderId)
+        return Uri.Builder()
+            .scheme("nsewatcher")
+            .authority("practice")
+            .appendPath("order")
+            .appendPath(normalized)
+            .build()
+    }
 
     fun normalizeOrderId(raw: String?): String {
         val value = raw.orEmpty().trim()
