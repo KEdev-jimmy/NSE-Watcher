@@ -15,11 +15,12 @@ internal object PracticeNotifications {
     private val orderIdPattern = Regex("[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
 
     fun pendingIntent(context: Context, orderId: String): PendingIntent {
+        val normalized = normalizeOrderId(orderId)
         val intent = Intent(context, DesignActivity::class.java).apply {
             action = ACTION_OPEN_PRACTICE
-            data = deepLink(orderId)
+            data = deepLink(normalized)
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-            putExtra(EXTRA_ORDER_ID, normalizeOrderId(orderId))
+            putExtra(EXTRA_ORDER_ID, normalized)
         }
         return PendingIntent.getActivity(
             context,
