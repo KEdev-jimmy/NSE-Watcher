@@ -176,26 +176,24 @@ internal fun PremiumPracticeOverview(
     insights: PracticeLearningInsights,
     openPractice: () -> Unit
 ) {
-    PremiumResponsivePair(
-        forceHorizontal = true,
-        first = {
-            PremiumPracticeCard(
-                palette = palette,
-                enabled = enabled,
-                cash = cash,
-                openPractice = openPractice,
-                modifier = Modifier.fillMaxWidth()
-            )
-        },
-        second = {
-            PremiumLearningProgressCard(
-                palette = palette,
-                insights = insights,
-                openPractice = openPractice,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-    )
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        PremiumPracticeCard(
+            palette = palette,
+            enabled = enabled,
+            cash = cash,
+            openPractice = openPractice,
+            modifier = Modifier.fillMaxWidth()
+        )
+        PremiumLearningProgressCard(
+            palette = palette,
+            insights = insights,
+            openPractice = openPractice,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
 }
 
 @Composable
