@@ -182,9 +182,9 @@ fun HomeDashboard(
             companies = practiceCompanies
         )
     }
-    val trackedSymbols = remember(watchedSymbols, changes) {
-        watchedSymbols + changes.asSequence()
-            .filter { it.practiceOrderId != null }
+    val trackedSymbols = remember(watchedSymbols, practiceState) {
+        watchedSymbols + practiceState?.orders.orEmpty().asSequence()
+            .filter { it.status == "FILLED" }
             .map { WatchlistPresentation.symbol(it.symbol) }
             .filter(String::isNotBlank)
             .toSet()
