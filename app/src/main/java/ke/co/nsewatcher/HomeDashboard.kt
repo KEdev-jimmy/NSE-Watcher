@@ -54,6 +54,7 @@ fun HomeDashboard(
     marketIndices: List<MyStocksCache.MarketIndex>,
     initialMarketStatus: MyStocksCache.MarketStatus, startupDataLoaded: Boolean,
     name: String, initialCatalog: List<Stock>, practiceEnabled: Boolean, practiceCash: Double,
+    darkTheme: Boolean,
     openAllNews: () -> Unit, openPractice: () -> Unit, openPracticeReview: (String) -> Unit, openProfile: () -> Unit,
     openAlertSettings: () -> Unit, onQuotesLoaded: (List<Stock>) -> Unit,
     onNewsLoaded: (List<NewsItem>) -> Unit,
@@ -240,7 +241,7 @@ fun HomeDashboard(
             }
         }
     }
-    val preview = watched.take(3)
+    val preview = watched.take(6)
     LaunchedEffect(preview.map { it.symbol }, historyRevision) {
         val forceHistoryRefresh = historyRevision > handledHistoryRevision
         preview.forEach { stock ->
@@ -265,6 +266,34 @@ fun HomeDashboard(
     }
     val relevantNews = remember(newsFeed, watched) { HomePresentation.companyNews(newsFeed, watched) }
     val displayedNews = if (watched.isEmpty()) newsFeed.distinctBy { it.id }.sortedByDescending { CompanyResearchPresentation.timestamp(it.publishedAt) } else relevantNews
+    val marketAttention = remember(currentStocks, newsFeed, now) {
+        MarketAttentionEngine.rank(currentStocks, newsFeed, now, limit = 3)
+    }
+    val practiceDecisionItems = remember(practiceState, practiceCompanies, newsFeed, companyDataEvents) {
+        practiceState?.let {
+            PracticeDecisionCenterPresentation.items(
+                state = it,
+                companies = practiceCompanies,
+                news = newsFeed,
+                companyEvents = companyDataEvents
+            )
+        }.orEmpty()
+    }
+    val practiceInsights = remember(practiceState, practiceCompanies, practiceDecisionItems) {
+        practiceState?.let {
+            PracticeLearningInsightsPresentation.insights(
+                state = it,
+                companies = practiceCompanies,
+                items = practiceDecisionItems
+            )
+        } ?: PracticeLearningInsights(
+            totalDecisions = 0,
+            reasonsRecorded = 0,
+            reviewedAtLeastOnce = 0,
+            needsFirstReview = 0,
+            newEvidenceAfterReview = 0
+        )
+    }
 
     val unreviewedNewsCompanies = remember(unreviewedChanges) {
         unreviewedChanges.filter { it.story != null }.map { WatchlistPresentation.symbol(it.symbol) }.filter { it.isNotBlank() }.distinct().size
@@ -287,6 +316,7 @@ fun HomeDashboard(
         HomeReferenceDashboard(
             name = name,
             avatar = avatar,
+            darkTheme = darkTheme,
             market = market,
             stocks = currentStocks,
             now = now,
@@ -294,6 +324,7 @@ fun HomeDashboard(
             hasAttention = unreviewedChanges.isNotEmpty(),
             watched = watched,
             watchlistPreview = preview,
+            watchlistHistories = histories,
             watchlistLoading = saved == null,
             watchlistError = watchlistError,
             relevantNews = relevantNews,
@@ -303,6 +334,8 @@ fun HomeDashboard(
             briefLoading = saved == null || (practiceEnabled && practiceState == null && !practiceStateError) || (watched.isNotEmpty() && changeState == null),
             briefHasError = changeStateError || watchlistError || alertError || companyChangeError || newsError || practiceStateError,
             intelligence = intelligence,
+            marketAttention = marketAttention,
+            practiceInsights = practiceInsights,
             gainersSelected = gainersSelected,
             onGainersSelected = { gainersSelected = it },
             practiceEnabled = practiceEnabled,
