@@ -58,34 +58,39 @@ internal fun automaticWatchlistAlertRules(
 
 private val PRACTICE_EVIDENCE_RETENTION: Duration = Duration.ofDays(30)
 
+internal fun practiceEvidenceOrderActive(
+    state: PracticeState,
+    order: PracticeOrder,
+    now: Instant,
+    retention: Duration = PRACTICE_EVIDENCE_RETENTION
+): Boolean {
+    if (!state.enabled || order.status != "FILLED") return false
+    val fillAt = when {
+        order.filledAt > 0L -> Instant.ofEpochMilli(order.filledAt)
+        order.quoteAt.isNotBlank() -> runCatching { Instant.parse(order.quoteAt) }.getOrNull()
+        else -> null
+    } ?: return false
+
+    val latestReviewAt = state.entries.asSequence()
+        .filter { it.kind == "REVIEW" && it.id.startsWith("review:" + order.id + ":") }
+        .mapNotNull { entry ->
+            entry.time.takeIf { it > 0L }?.let(Instant::ofEpochMilli)
+        }
+        .maxOrNull()
+
+    val latestActivity = listOfNotNull(fillAt, latestReviewAt).maxOrNull() ?: fillAt
+    return !latestActivity.isAfter(now) && !latestActivity.isBefore(now.minus(retention))
+}
+
 internal fun practiceEvidenceMonitoringSymbols(
     state: PracticeState,
     now: Instant,
     retention: Duration = PRACTICE_EVIDENCE_RETENTION
 ): Set<String> {
     if (!state.enabled) return emptySet()
-    val cutoff = now.minus(retention)
     return state.orders.asSequence()
-        .filter { it.status == "FILLED" }
-        .mapNotNull { order ->
-            val fillAt = when {
-                order.filledAt > 0L -> Instant.ofEpochMilli(order.filledAt)
-                order.quoteAt.isNotBlank() -> runCatching { Instant.parse(order.quoteAt) }.getOrNull()
-                else -> null
-            } ?: return@mapNotNull null
-
-            val latestReviewAt = state.entries.asSequence()
-                .filter { it.kind == "REVIEW" && it.id.startsWith("review:" + order.id + ":") }
-                .mapNotNull { entry ->
-                    entry.time.takeIf { it > 0L }?.let(Instant::ofEpochMilli)
-                }
-                .maxOrNull()
-
-            val latestActivity = listOfNotNull(fillAt, latestReviewAt).maxOrNull() ?: fillAt
-            if (latestActivity.isAfter(now) || latestActivity.isBefore(cutoff)) return@mapNotNull null
-
-            WatchlistPresentation.symbol(order.symbol).takeIf(String::isNotBlank)
-        }
+        .filter { practiceEvidenceOrderActive(state, it, now, retention) }
+        .mapNotNull { WatchlistPresentation.symbol(it.symbol).takeIf(String::isNotBlank) }
         .toSet()
 }
 
@@ -143,15 +148,24 @@ class AlertWorker(appContext: Context, workerParams: WorkerParameters) : Corouti
             val alerts = activeConfigured + automaticWatchlistAlerts
             val initialPractice = practiceStore.read()
             val practicePending = initialPractice.enabled && initialPractice.orders.any { it.status == "PENDING" }
+            val activePracticeEvidenceSymbols = practiceEvidenceMonitoringSymbols(initialPractice, now)
+            val practiceEvidenceNotificationsEnabled =
+                practiceAlertsEnabled && activePracticeEvidenceSymbols.isNotEmpty()
             val evidenceMonitoringSymbols = companyEvidenceMonitoringSymbols(
                 watchedSymbols = watchedSymbols,
                 practiceState = initialPractice,
                 now = now
             )
             val companyChecks = companyChangeStore.syncAndDue(evidenceMonitoringSymbols, now)
-            if (alerts.isEmpty() && !practicePending && companyChecks.isEmpty()) return Result.success()
+            if (alerts.isEmpty() && !practicePending && companyChecks.isEmpty() && !practiceEvidenceNotificationsEnabled) {
+                syncPracticeEvidenceNotificationActivation(
+                    enabled = practiceAlertsEnabled,
+                    now = now
+                )
+                return Result.success()
+            }
 
-            val newsEnabled = alerts.any { AlertEvaluator.isNews(it.type) }
+            val newsEnabled = alerts.any { AlertEvaluator.isNews(it.type) } || practiceEvidenceNotificationsEnabled
             val priceAlertsEnabled = alerts.any { !AlertEvaluator.isNews(it.type) }
             val quotesNeeded = priceAlertsEnabled || practicePending
 
@@ -170,6 +184,42 @@ class AlertWorker(appContext: Context, workerParams: WorkerParameters) : Corouti
                     // scheduled company-data check instead of hammering the endpoint every 15 minutes.
                     companyChangeStore.markChecked(symbol, now)
                 }
+            }
+
+            if (practiceEvidenceNotificationsEnabled) {
+                val baseline = syncPracticeEvidenceNotificationActivation(
+                    enabled = true,
+                    now = now
+                )
+                if (baseline != null) {
+                    val companyEvents = companyChangeStore.events.first()
+                    val notifiedKeys = prefs.getStringSet(PRACTICE_EVIDENCE_NOTIFIED_KEY, emptySet())
+                        .orEmpty()
+                        .toSet()
+                    val candidates = PracticeNotifications.evidenceCandidates(
+                        state = initialPractice,
+                        news = newsResult.items,
+                        companyEvents = companyEvents,
+                        now = now,
+                        baselineAt = baseline,
+                        notifiedKeys = notifiedKeys
+                    )
+                    if (candidates.isNotEmpty() && notificationsAllowed()) {
+                        notifyPracticeEvidence(candidates)
+                        recordPracticeEvidenceNotifications(
+                            candidates = candidates,
+                            activeOrderIds = initialPractice.orders
+                                .filter { practiceEvidenceOrderActive(initialPractice, it, now) }
+                                .map { it.id }
+                                .toSet()
+                        )
+                    }
+                }
+            } else {
+                syncPracticeEvidenceNotificationActivation(
+                    enabled = practiceAlertsEnabled,
+                    now = now
+                )
             }
 
             if (practicePending) {
@@ -242,6 +292,77 @@ class AlertWorker(appContext: Context, workerParams: WorkerParameters) : Corouti
         }
     }
 
+    private fun notifyPracticeEvidence(candidates: List<PracticeEvidenceNotificationCandidate>) {
+        if (candidates.isEmpty() || !notificationsAllowed()) return
+        val manager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val silent = notificationSoundIsSilent()
+        val channelId = ensureChannel(manager, practice = true, silent = silent)
+        candidates.forEach { candidate ->
+            val message = candidate.title.ifBlank { "New company evidence is available for review." }
+            val detail = buildString {
+                append(message)
+                if (candidate.source.isNotBlank()) {
+                    append(" • ")
+                    append(candidate.source)
+                }
+                append(". Review what changed since your practice decision.")
+            }
+            val notification = NotificationCompat.Builder(applicationContext, channelId)
+                .setSmallIcon(R.drawable.ic_nse_watcher)
+                .setContentTitle("New evidence since your " + candidate.symbol + " practice decision")
+                .setContentText(message)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(detail))
+                .setContentIntent(PracticeNotifications.pendingIntent(applicationContext, candidate.orderId))
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setSilent(silent)
+                .setOnlyAlertOnce(true)
+                .setAutoCancel(true)
+                .build()
+            manager.notify(("practice-evidence:" + candidate.orderId).hashCode(), notification)
+        }
+    }
+
+    private fun syncPracticeEvidenceNotificationActivation(
+        enabled: Boolean,
+        now: Instant
+    ): Instant? {
+        val prefs = prefsForNotifications()
+        val wasEnabled = prefs.getBoolean(PRACTICE_EVIDENCE_ACTIVE_KEY, false)
+        if (!enabled) {
+            prefs.edit()
+                .putBoolean(PRACTICE_EVIDENCE_ACTIVE_KEY, false)
+                .putLong(PRACTICE_EVIDENCE_BASELINE_KEY, now.toEpochMilli())
+                .apply()
+            return null
+        }
+        if (!wasEnabled) {
+            prefs.edit()
+                .putBoolean(PRACTICE_EVIDENCE_ACTIVE_KEY, true)
+                .putLong(PRACTICE_EVIDENCE_BASELINE_KEY, now.toEpochMilli())
+                .apply()
+            return null
+        }
+        val baselineMillis = prefs.getLong(PRACTICE_EVIDENCE_BASELINE_KEY, 0L)
+        return baselineMillis.takeIf { it > 0L }?.let(Instant::ofEpochMilli)
+    }
+
+    private fun recordPracticeEvidenceNotifications(
+        candidates: List<PracticeEvidenceNotificationCandidate>,
+        activeOrderIds: Set<String>
+    ) {
+        val prefs = prefsForNotifications()
+        val existing = prefs.getStringSet(PRACTICE_EVIDENCE_NOTIFIED_KEY, emptySet()).orEmpty()
+        val activePrefixes = activeOrderIds.map { PracticeNotifications.normalizeOrderId(it) + "|" }
+        val retained = existing.filter { key -> activePrefixes.any(key::startsWith) }.toMutableSet()
+        candidates.flatMapTo(retained) { it.coveredKeys }
+        prefs.edit()
+            .putStringSet(PRACTICE_EVIDENCE_NOTIFIED_KEY, retained.take(1000).toSet())
+            .apply()
+    }
+
+    private fun prefsForNotifications() =
+        applicationContext.getSharedPreferences("nse_watcher_preferences", Context.MODE_PRIVATE)
+
     private fun notifyPracticeFills(orders: List<PracticeOrder>) {
         if (!notificationsAllowed()) return
         val manager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -300,6 +421,9 @@ class AlertWorker(appContext: Context, workerParams: WorkerParameters) : Corouti
         private const val ALERT_CHANNEL_SILENT = "market_alerts_silent_v2"
         private const val PRACTICE_CHANNEL_DEFAULT = "practice_orders_v2"
         private const val PRACTICE_CHANNEL_SILENT = "practice_orders_silent_v2"
+        private const val PRACTICE_EVIDENCE_ACTIVE_KEY = "practice_evidence_notifications_active_v1"
+        private const val PRACTICE_EVIDENCE_BASELINE_KEY = "practice_evidence_notifications_baseline_v1"
+        private const val PRACTICE_EVIDENCE_NOTIFIED_KEY = "practice_evidence_notifications_notified_v1"
 
         fun schedule(context: Context) {
             val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
