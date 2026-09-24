@@ -242,6 +242,11 @@ fun MarketDashboard(
                                         ResearchBody("• ${reason.title}")
                                         ResearchCaption(reason.detail)
                                     }
+                                    item.latestEvidence?.let { evidence ->
+                                        ResearchCaption(
+                                            "Recent evidence: ${evidence.title} · ${evidence.source.ifBlank { "Source unavailable" }}"
+                                        )
+                                    }
                                     TextButton(
                                         onClick = { explainMovement(item.stock) },
                                         contentPadding = PaddingValues(horizontal = 0.dp, vertical = 4.dp)
