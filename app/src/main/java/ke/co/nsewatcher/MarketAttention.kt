@@ -242,7 +242,7 @@ internal object MarketAttentionEngine {
             stock = stock,
             score = score,
             context = context,
-            reasons = reasons.take(3),
+            reasons = reasons,
             latestEvidence = evidence
         )
     }
