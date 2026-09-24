@@ -174,7 +174,7 @@ fun HomeDashboard(
         val reviewed = changeState?.reviewedIds ?: emptySet()
         if (changeState == null) emptyList() else changes.filter { it.id !in reviewed }
     }
-    val brief = unreviewedChanges.take(3)
+    val brief = HomePresentation.visibleBrief(unreviewedChanges)
     val attentionDigest = remember(unreviewedChanges) {
         HomePresentation.attentionDigest(unreviewedChanges)
     }
@@ -260,7 +260,7 @@ fun HomeDashboard(
             stocks = currentStocks,
             now = now,
             refreshing = refreshing,
-            hasAttention = unreviewedAlertCount > 0 || events.isNotEmpty(),
+            hasAttention = unreviewedChanges.isNotEmpty(),
             watched = watched,
             watchlistPreview = preview,
             watchlistLoading = saved == null,
@@ -268,6 +268,9 @@ fun HomeDashboard(
             relevantNews = relevantNews,
             newsLoading = newsLoading,
             newsError = newsError,
+            briefItems = brief,
+            briefLoading = saved == null || (watched.isNotEmpty() && changeState == null),
+            briefHasError = changeStateError || watchlistError || alertError || companyChangeError || newsError,
             intelligence = intelligence,
             gainersSelected = gainersSelected,
             onGainersSelected = { gainersSelected = it },
@@ -282,8 +285,9 @@ fun HomeDashboard(
             openAllNews = openAllNews,
             openNews = openNews,
             openCompany = openCompany,
+            openBriefItem = ::reviewAndOpen,
             reviewBrief = {
-                if (unreviewedChanges.isEmpty()) openMarket()
+                if (brief.isEmpty()) openWatchlist()
                 else showChanges = true
             }
         )
@@ -299,9 +303,9 @@ fun HomeDashboard(
             ) {
                 item {
                     ResearchTitle("What changed for you")
-                    ResearchCaption("${unreviewedChanges.size} ${if (unreviewedChanges.size == 1) "development" else "developments"} ready to review")
+                    ResearchCaption("${brief.size} ${if (brief.size == 1) "development" else "developments"} shown in your Daily Brief")
                 }
-                items(unreviewedChanges, key = { it.id }) { item ->
+                items(brief, key = { it.id }) { item ->
                     ResearchPanel {
                         Text(item.title, color = ResearchText, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         ResearchCaption(item.detail)
@@ -310,7 +314,7 @@ fun HomeDashboard(
                         }
                     }
                 }
-                if (unreviewedChanges.isEmpty()) item { HomeH3Message("You're caught up.") }
+                if (brief.isEmpty()) item { HomeH3Message("You're caught up.") }
             }
         }
         if (showAlerts) ModalBottomSheet(onDismissRequest = { showAlerts = false }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = ResearchBackground) {
