@@ -57,7 +57,7 @@ fun MarketDashboard(
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var sheet by rememberSaveable { mutableStateOf<String?>(null) }
-    var movementStock by remember { mutableStateOf<Stock?>(null) }
+    var movementSymbol by rememberSaveable { mutableStateOf("") }
     var movementResult by remember { mutableStateOf(MovementIntelligenceCache.Result()) }
     var movementLoading by remember { mutableStateOf(false) }
     var movementRevision by remember { mutableIntStateOf(0) }
@@ -70,6 +70,9 @@ fun MarketDashboard(
     val observationsFlow = remember { observationStore.observations.catch { observationError = true } }
     val observations by observationsFlow.collectAsState(initial = emptyList())
     val companies = remember(catalog, stockFeed) { CompaniesPresentation.companies(catalog, stockFeed) }
+    val movementStock = remember(companies, movementSymbol) {
+        companies.firstOrNull { it.symbol.equals(movementSymbol, ignoreCase = true) }
+    }
     val breadth = remember(companies) { MarketPresentation.breadth(companies) }
     val sectors = remember(companies) { MarketPresentation.sectors(companies) }
     val volumeStocks = companies.filter { it.volumeAvailable && it.volume >= 0 }
@@ -113,7 +116,7 @@ fun MarketDashboard(
     }
     LaunchedEffect(Unit) { refreshData(false) }
 
-    LaunchedEffect(movementStock?.symbol, movementRevision) {
+    LaunchedEffect(movementSymbol, movementRevision) {
         val selected = movementStock ?: return@LaunchedEffect
         movementLoading = true
         movementResult = MovementIntelligenceCache.Result()
@@ -131,7 +134,7 @@ fun MarketDashboard(
     }
 
     fun explainMovement(stock: Stock) {
-        movementStock = stock
+        movementSymbol = stock.symbol
         movementRevision++
         sheet = "Movement"
     }
@@ -209,7 +212,7 @@ fun MarketDashboard(
                                     if (mover == "By volume") null else stock.change,
                                     openCompany
                                 )
-                                if (MarketPresentation.validChange(stock)) {
+                                if (MarketPresentation.movementQuestionAvailable(stock)) {
                                     MarketWhyMovingAction(stock) { explainMovement(it) }
                                 }
                             }
@@ -363,13 +366,13 @@ fun MarketDashboard(
                                     MarketStockRow(
                                         stock,
                                         if (title == "Movers:By volume") "${String.format(Locale.US, "%,d", stock.volume)} shares"
-                                        else if (MarketPresentation.validChange(stock)) CompanyResearchPresentation.percent(stock.change)
+                                        else if (MarketPresentation.movementQuestionAvailable(stock)) CompanyResearchPresentation.percent(stock.change)
                                         else "Unavailable",
-                                        if (title != "Movers:By volume" && MarketPresentation.validChange(stock)) stock.change else null,
+                                        if (title != "Movers:By volume" && MarketPresentation.movementQuestionAvailable(stock)) stock.change else null,
                                         open = { sheet = null; openCompany(it) }
                                     )
                                     ResearchCaption("Source: ${stock.source.ifBlank { "Unavailable" }}")
-                                    if (MarketPresentation.validChange(stock)) {
+                                    if (MarketPresentation.movementQuestionAvailable(stock)) {
                                         MarketWhyMovingAction(stock) { explainMovement(it) }
                                     }
                                 }
