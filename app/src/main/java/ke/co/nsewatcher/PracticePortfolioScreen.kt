@@ -147,7 +147,10 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
             orderLaunchSource = ""
         } else back()
     }
-    BackHandler(page != "MAIN" && sheet == null) { page = "MAIN" }
+    BackHandler(page != "MAIN" && sheet == null) {
+        page = "MAIN"
+        orderLaunchSource = ""
+    }
     MaterialTheme(colorScheme = CompanyResearchColors) {
         Column(Modifier.fillMaxSize().background(ResearchBackground)) {
             Row(Modifier.fillMaxWidth().padding(end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
