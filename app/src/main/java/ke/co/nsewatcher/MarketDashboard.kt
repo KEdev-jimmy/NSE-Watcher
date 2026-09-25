@@ -33,6 +33,7 @@ import ke.co.nsewatcher.data.MarketData
 import ke.co.nsewatcher.data.MarketObservationStore
 import ke.co.nsewatcher.data.MovementIntelligenceCache
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
@@ -99,29 +100,71 @@ fun MarketDashboard(
     }
     suspend fun refreshData(force: Boolean) {
         busy = true
+        var quoteFailed = false
+        var statusFailed = false
+        var catalogFailed = false
         try {
-            val refreshedStatus = MarketData.status()
-            status = refreshedStatus
-            if (refreshedStatus.isKnown || !initialStatus.isKnown) {
-                onMarketStatusLoaded(refreshedStatus)
+            coroutineScope {
+                launch {
+                    try {
+                        val refreshedStatus = MarketData.status()
+                        status = refreshedStatus
+                        if (refreshedStatus.isKnown || !initialStatus.isKnown) {
+                            onMarketStatusLoaded(refreshedStatus)
+                        }
+                        val refreshedIndices = MarketData.indices(
+                            refreshedStatus.isKnown && refreshedStatus.isOpen
+                        )
+                        if (refreshedIndices.isNotEmpty()) {
+                            onIndicesLoaded(refreshedIndices)
+                        }
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        statusFailed = true
+                    }
+                }
+                launch {
+                    if (catalog.isEmpty() || force) {
+                        try {
+                            val data = MarketData.companies()
+                            if (data.isNotEmpty()) onCatalogLoaded(data)
+                            else if (catalog.isEmpty()) catalogFailed = true
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            if (catalog.isEmpty()) catalogFailed = true
+                        }
+                    }
+                }
+                launch {
+                    if (
+                        MarketRefreshController.shouldRefreshQuotes(stockFeed.isNotEmpty()) &&
+                        (stockFeed.isEmpty() || force)
+                    ) {
+                        try {
+                            val data = MarketData.stocks()
+                            if (data.isNotEmpty()) onQuotesLoaded(data) else quoteFailed = true
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            quoteFailed = true
+                        }
+                    }
+                }
             }
-            val refreshedIndices = MarketData.indices(refreshedStatus.isKnown && refreshedStatus.isOpen)
-            if (refreshedIndices.isNotEmpty()) {
-                onIndicesLoaded(refreshedIndices)
-            }
-            if (catalog.isEmpty() || force) {
-                val data = MarketData.companies()
-                if (data.isNotEmpty()) onCatalogLoaded(data)
-            }
-            if (MarketRefreshController.shouldRefreshQuotes(stockFeed.isNotEmpty()) && (stockFeed.isEmpty() || force)) {
-                val data = MarketData.stocks()
-                if (data.isNotEmpty()) { onQuotesLoaded(data); error = null }
-                else error = "Quotes could not be refreshed. Available observations keep their original dates."
+            error = when {
+                quoteFailed -> "Quotes could not be refreshed. Available observations keep their original dates."
+                statusFailed -> "Market status could not be refreshed. Other available market data was updated."
+                catalogFailed -> "The company catalogue could not be refreshed."
+                else -> null
             }
             if (force) historyRevision++
-        } catch (cancelled: CancellationException) { throw cancelled }
-        catch (_: Exception) { error = "Market refresh failed. Please try again." }
-        finally { busy = false }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } finally {
+            busy = false
+        }
     }
     LaunchedEffect(Unit) { refreshData(false) }
 
