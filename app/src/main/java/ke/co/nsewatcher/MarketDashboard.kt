@@ -46,13 +46,15 @@ fun MarketDashboard(
     newsFeed: List<NewsItem>,
     openCompany: (Stock) -> Unit,
     openCompanies: (String) -> Unit,
+    openNews: (NewsItem) -> Unit,
+    openSearch: () -> Unit,
+    openAlerts: () -> Unit,
     onQuotesLoaded: (List<Stock>) -> Unit,
     onCatalogLoaded: (List<Stock>) -> Unit,
     onIndicesLoaded: (List<MyStocksCache.MarketIndex>) -> Unit,
     onMarketStatusLoaded: (MyStocksCache.MarketStatus) -> Unit
 ) {
     var tab by rememberSaveable { mutableStateOf("Overview") }
-    var mover by rememberSaveable { mutableStateOf("Gainers") }
     var status by remember { mutableStateOf(initialStatus) }
     val indices = marketIndices
     var busy by remember { mutableStateOf(false) }
@@ -146,178 +148,26 @@ fun MarketDashboard(
     }
 
     MaterialTheme(colorScheme = CompanyResearchColors) {
-        Column(Modifier.fillMaxSize().background(ResearchBackground)) {
-            Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                NseWatcherBrandLockup(modifier = Modifier.weight(1f), compact = true)
-                IconButton(onClick = { if (!busy) scope.launch { refreshData(true) } }, enabled = !busy) {
-                    if (busy) CircularProgressIndicator(Modifier.size(20.dp), color = ResearchGreen, strokeWidth = 2.dp)
-                    else Icon(Icons.Default.Refresh, "Refresh market", tint = ResearchText)
-                }
-            }
-            Column(Modifier.padding(horizontal = 16.dp)) {
-                Text("Market", color = ResearchText, fontSize = 27.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(3.dp)); ResearchCaption("Direction, participation and performance")
-            }
-            MarketChoiceRow(listOf("Overview", "Sectors", "Performance"), tab) { tab = it }
-            HorizontalDivider(color = ResearchBorder)
-            if (tab == "Performance") {
-                Box(Modifier.weight(1f)) { MarketPerformanceView(companies, historyRevision, now, openCompany) }
-            } else LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                if (error != null) item { ResearchCaption(error.orEmpty()) }
-                if (busy && companies.isEmpty()) item { ResearchLoading("Loading market observations…") }
-                if (tab == "Overview") {
-                    item {
-                        ResearchPanel {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    Text(when { !status.isKnown -> "Market status unavailable"; status.isOpen -> "● Market open"; else -> "Market closed" }, color = if (status.isKnown && status.isOpen) ResearchGreen else ResearchMuted, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                                    ResearchCaption(HomePresentation.freshness(companies, now))
-                                    ResearchCaption(latest?.let { CompanyResearchPresentation.date(it.toString()) } ?: "Observation time unavailable")
-                                }
-                                TextButton(onClick = { sheet = "Data coverage" }) { Text("Data coverage ↗", color = ResearchGreen, fontSize = 11.sp) }
-                            }
-                            ResearchCaption("Source: $sources")
-                        }
-                    }
-                    item {
-                        Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                            listOf("^NASI" to "NASI", "^N20I" to "NSE 20", "^N25I" to "NSE 25").forEach { (symbol, title) ->
-                                val index = indices.firstOrNull { it.symbol == symbol && it.value.isFinite() && it.value > 0 }
-                                Surface(Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).clickable(role = Role.Button) { sheet = "Index observations" }, color = ResearchCard, shape = RoundedCornerShape(10.dp), border = BorderStroke(1.dp, ResearchBorder)) {
-                                    Column(Modifier.padding(9.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                                        Text(title, color = ResearchText, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                        Text(index?.let { String.format(Locale.US, "%,.2f", it.value) } ?: "Unavailable", color = ResearchText, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                                        Text(index?.changePct?.let { CompanyResearchPresentation.percent(it) } ?: "No change data", color = researchChangeColor(index?.changePct), fontSize = 11.sp)
-                                        if (index != null) Text(CompanyResearchPresentation.date(index.asOf), color = ResearchMuted, fontSize = 10.sp)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    item {
-                        ResearchPanel {
-                            Text("MARKET PARTICIPATION", color = ResearchMuted, fontSize = 11.sp, letterSpacing = 0.7.sp)
-                            ResearchTitle(MarketPresentation.summary(breadth))
-                            ResearchCaption("${breadth.rising} rising versus ${breadth.falling} falling in the available daily changes.")
-                            MarketBreadthBar(breadth)
-                            ResearchCaption("${breadth.covered} daily changes · ${breadth.total - breadth.covered} unavailable")
-                            TextButton(onClick = { sheet = "Market participation" }) { Text("What does this mean? ⓘ", color = ResearchGreen, fontSize = 12.sp) }
-                        }
-                    }
-                    item {
-                        ResearchPanel {
-                            ResearchTitle("What deserves attention")
-                            ResearchCaption(
-                                "A deterministic shortlist from the latest comparable observations. " +
-                                    "It highlights unusual movement, peer divergence, reported volume and recent company evidence — not what to buy."
-                            )
-                            if (attention.isEmpty()) {
-                                ResearchCaption("No current movement stands out strongly enough from the available evidence and peer context.")
-                            } else {
-                                attention.forEachIndexed { index, item ->
-                                    if (index > 0) HorizontalDivider(color = ResearchBorder)
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                    ) {
-                                        Box(
-                                            Modifier.size(32.dp).background(ResearchRaised, CircleShape),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(item.stock.symbol.take(1), color = ResearchGreen, fontWeight = FontWeight.Bold)
-                                        }
-                                        Column(Modifier.weight(1f)) {
-                                            ResearchBody("${item.stock.symbol} · ${item.stock.name}")
-                                            ResearchCaption("Observed ${CompanyResearchPresentation.date(item.stock.observedAt)}")
-                                        }
-                                        Text(
-                                            CompanyResearchPresentation.percent(item.stock.change),
-                                            color = researchChangeColor(item.stock.change),
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
-                                    item.reasons.take(2).forEach { reason ->
-                                        ResearchBody("• ${reason.title}")
-                                        ResearchCaption(reason.detail)
-                                    }
-                                    item.latestEvidence?.let { evidence ->
-                                        ResearchCaption(
-                                            "Recent evidence: ${evidence.title} · ${evidence.source.ifBlank { "Source unavailable" }}"
-                                        )
-                                    }
-                                    TextButton(
-                                        onClick = { explainMovement(item.stock) },
-                                        contentPadding = PaddingValues(horizontal = 0.dp, vertical = 4.dp)
-                                    ) {
-                                        Text("Why is ${item.stock.symbol} moving? →", color = ResearchGreen, fontSize = 12.sp)
-                                    }
-                                }
-                            }
-                            ResearchCaption(
-                                "Peer averages use available same-date stock observations and are not official NSE market or sector indices."
-                            )
-                        }
-                    }
-                    item {
-                        ResearchTitle("Today’s movers")
-                        MarketChoiceRow(listOf("Gainers", "Losers", "By volume"), mover) { mover = it }
-                        ResearchPanel {
-                            val movers = marketMovers(companies, mover)
-                            if (movers.isEmpty()) ResearchCaption("No matching observations are available. Missing daily changes are not counted as zero.")
-                            movers.take(3).forEach { stock ->
-                                MarketStockRow(
-                                    stock,
-                                    if (mover == "By volume") "${String.format(Locale.US, "%,d", stock.volume)} shares" else CompanyResearchPresentation.percent(stock.change),
-                                    if (mover == "By volume") null else stock.change,
-                                    openCompany
-                                )
-                                if (MarketPresentation.movementQuestionAvailable(stock)) {
-                                    MarketWhyMovingAction(stock) { explainMovement(it) }
-                                }
-                            }
-                            TextButton(onClick = { sheet = "Movers:$mover" }) { Text("View all movers →", color = ResearchGreen) }
-                        }
-                    }
-                    item {
-                        ResearchPanel {
-                            ResearchBody("Trading activity")
-                            Text(if (volumeStocks.isEmpty()) "Unavailable" else if (volume >= 1_000_000) String.format(Locale.US, "%.2fM shares", volume / 1_000_000) else String.format(Locale.US, "%,.0f shares", volume), color = ResearchText, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                            ResearchCaption("Reported volume across ${volumeStocks.size} companies")
-                            ResearchCaption("Share volume, not shilling turnover. Observations may have different times.")
-                        }
-                    }
-                } else {
-                    item { ResearchCaption("Daily changes · Latest available observations"); Spacer(Modifier.height(8.dp)); ResearchTitle("Where is strength appearing?"); ResearchCaption("Compare participation within each sector.") }
-                    if (sectors.isEmpty()) item { ResearchPanel { ResearchCaption("Sector observations are unavailable. Refresh to try again.") } }
-                    items(sectors, key = { it.name }) { sector ->
-                        Surface(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(role = Role.Button) { sheet = "Sector:${sector.name}" }, color = ResearchCard, shape = RoundedCornerShape(12.dp), border = BorderStroke(1.dp, ResearchBorder)) {
-                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    MarketSectorIcon(sector.name)
-                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                        ResearchBody(sector.name)
-                                        Text(sector.average?.let { CompanyResearchPresentation.percent(it) } ?: "Unavailable", color = researchChangeColor(sector.average), fontWeight = FontWeight.Bold, fontSize = 17.sp)
-                                    }
-                                    Icon(Icons.Default.ChevronRight, null, tint = ResearchMuted, modifier = Modifier.size(20.dp))
-                                }
-                                ResearchCaption("${sector.breadth.covered} of ${sector.breadth.total} with data")
-                                MarketBreadthBar(sector.breadth)
-                            }
-                        }
-                    }
-                    item {
-                        ResearchPanel {
-                            ResearchTitle("How this is calculated")
-                            ResearchBody("Equal-weight average of available daily price changes. This is not an official sector index.")
-                            ResearchCaption("Small samples can be misleading. Check coverage and observation dates before comparing.")
-                            TextButton(onClick = { sheet = "Data coverage" }) { Text("See source observations →", color = ResearchGreen) }
-                        }
-                    }
-                    item { OutlinedButton(onClick = { openCompanies("All") }, modifier = Modifier.fillMaxWidth()) { Text("Browse companies by sector →") } }
-                }
-            }
-        }
+        PremiumMarketExperience(
+            tab = tab,
+            onTab = { tab = it },
+            status = status,
+            companies = companies,
+            newsFeed = newsFeed,
+            breadth = breadth,
+            sectors = sectors,
+            attention = attention,
+            latest = latest,
+            busy = busy,
+            error = error,
+            onRefresh = { if (!busy) scope.launch { refreshData(true) } },
+            openCompany = openCompany,
+            openCompanies = openCompanies,
+            openNews = openNews,
+            openSearch = openSearch,
+            openAlerts = openAlerts,
+            showSheet = { sheet = it }
+        )
         sheet?.let { title ->
             ModalBottomSheet(onDismissRequest = { sheet = null }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = ResearchBackground) {
                 LazyColumn(Modifier.fillMaxWidth().fillMaxHeight(0.85f), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
