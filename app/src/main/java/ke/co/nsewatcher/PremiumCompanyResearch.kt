@@ -409,8 +409,8 @@ private fun PremiumKeyStatisticsCard(
             listOf(
                 "Market value" to intelligence.profile.marketCap.ifBlank { "Unavailable" },
                 "P/E ratio" to intelligence.profile.pe.ifBlank { "Unavailable" },
-                "52-week high" to (yearPrices.maxOrNull()?.let(CompanyResearchPresentation::money) ?: "Unavailable"),
-                "52-week low" to (yearPrices.minOrNull()?.let(CompanyResearchPresentation::money) ?: "Unavailable")
+                "52-week high" to (yearPrices.maxOrNull()?.let { CompanyResearchPresentation.money(it) } ?: "Unavailable"),
+                "52-week low" to (yearPrices.minOrNull()?.let { CompanyResearchPresentation.money(it) } ?: "Unavailable")
             )
         )
         if (yearPrices.isEmpty()) {
@@ -806,7 +806,8 @@ private fun FinancialTrendBars(
             Triple(point, parseFinancialNumber(point.revenue), parseFinancialNumber(point.profit))
         }
     }
-    val maximum = parsed.flatMap { listOfNotNull(it.second, it.third) }.maxOrNull()?.takeIf { it > 0.0 }
+    val maximum = parsed.flatMap { listOfNotNull(it.second, it.third) }
+        .maxOfOrNull { abs(it) }?.takeIf { it > 0.0 }
 
     if (maximum == null) {
         Box(modifier, contentAlignment = Alignment.Center) {
@@ -827,16 +828,8 @@ private fun FinancialTrendBars(
                     verticalAlignment = Alignment.Bottom,
                     horizontalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
-                    Box(
-                        Modifier.width(11.dp)
-                            .fillMaxHeight(((revenue ?: 0.0) / maximum).toFloat().coerceIn(0.03f, 1f))
-                            .background(MaterialTheme.colorScheme.tertiary, RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
-                    )
-                    Box(
-                        Modifier.width(11.dp)
-                            .fillMaxHeight(((profit ?: 0.0) / maximum).toFloat().coerceIn(0.03f, 1f))
-                            .background(ResearchGreen, RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp))
-                    )
+                    FinancialHistoryBar(revenue, maximum, MaterialTheme.colorScheme.tertiary)
+                    FinancialHistoryBar(profit, maximum, ResearchGreen)
                 }
                 Spacer(Modifier.height(5.dp))
                 Text(
@@ -848,6 +841,23 @@ private fun FinancialTrendBars(
             }
         }
     }
+}
+
+@Composable
+private fun RowScope.FinancialHistoryBar(value: Double?, maximum: Double, positiveColor: Color) {
+    if (value == null) {
+        Spacer(Modifier.width(11.dp))
+        return
+    }
+    val fraction = (abs(value) / maximum).toFloat().coerceIn(0.03f, 1f)
+    Box(
+        Modifier.width(11.dp)
+            .fillMaxHeight(fraction)
+            .background(
+                if (value < 0.0) ResearchRed else positiveColor,
+                RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp)
+            )
+    )
 }
 
 @Composable
