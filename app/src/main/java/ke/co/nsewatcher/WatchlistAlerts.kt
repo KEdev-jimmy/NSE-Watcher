@@ -102,7 +102,7 @@ internal fun WatchlistAlertsSheet(
                     ResearchCaption(when (type) {
                         AlertType.PRICE_ABOVE, AlertType.PRICE_BELOW -> "Triggers when successive available quotes cross your price. The first check establishes a baseline."
                         AlertType.HIGH_VOLUME -> "Requires current volume and an available provider average. For example, 50 means 50% above average."
-                        AlertType.NEWS, AlertType.CORPORATE_ACTION -> "Checks company-linked items from the current Nairobi trading day."
+                        AlertType.NEWS, AlertType.CORPORATE_ACTION -> "Checks company-linked items after hours as well, with up to a seven-day catch-up window."
                         else -> "Uses the provider’s reported daily percentage change."
                     })
                     if (editing?.enabled == false) ResearchCaption("This rule will stay paused after editing. Use its switch to resume it.")

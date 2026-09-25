@@ -409,7 +409,11 @@ private fun App(
             )
             Page.LIVE_DATA->MarketDataSettingsScreen(autoRefresh,{autoRefresh=it;put("auto_refresh",it)},::back)
             Page.CHARTS->ChartSettingsScreen(chartDefaultRange,chartShowGrid,{chartDefaultRange=it;put("chart_default_range",it)},{chartShowGrid=it;put("chart_show_grid",it)},::back)
-            Page.ALERTS->AlertPage(::back)
+            Page.ALERTS->PremiumAlertRulesScreen(
+                catalog=companyCatalog,
+                quotes=stocks,
+                back=::back
+            )
             Page.LANGUAGE->LanguageRegionScreen(::back)
             Page.SECURITY->AccountSignInScreen(name,username,::back){go(Page.PROFILE)}
             Page.PRIVACY->PrivacyDataScreen(::back)
