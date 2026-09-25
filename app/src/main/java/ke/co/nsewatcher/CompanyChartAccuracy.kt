@@ -25,38 +25,10 @@ internal object CompanyChartAccuracy {
         oneDayFallback: Double? = null,
         today: LocalDate = LocalDate.now(zone)
     ): Double? {
-        if (range == "1D") return (result.dailyChangePct ?: oneDayFallback)?.takeIf { it.isFinite() }
-        if (result.points.size < 2) return null
-        val dated = result.points.map { point ->
-            if (!point.close.isFinite() || point.close <= 0.0) return null
-            (observationDate(point.date) ?: return null) to point.close
-        }.sortedBy { it.first }
-        if (dated.map { it.first }.distinct().size != dated.size) return null
-        val start = when (range) {
-            "3D" -> today.minusDays(3)
-            "1W" -> today.minusWeeks(1)
-            "1M" -> today.minusMonths(1)
-            "3M" -> today.minusMonths(3)
-            "6M" -> today.minusMonths(6)
-            "1Y" -> today.minusYears(1)
-            "3Y" -> today.minusYears(3)
-            "5Y" -> today.minusYears(5)
-            else -> return null
+        if (range == "1D") {
+            return (result.dailyChangePct ?: oneDayFallback)?.takeIf { it.isFinite() }
         }
-        // Boundary tolerance for weekends and daily/weekly/monthly aggregation.
-        // This does not claim that every intervening trading session is present.
-        val tolerance = when (range) {
-            "3D" -> 1L
-            "1Y" -> 8L
-            "3Y", "5Y" -> 32L
-            else -> 3L
-        }
-        val first = dated.first()
-        val last = dated.last()
-        if (first.first.isBefore(start.minusDays(tolerance)) ||
-            first.first.isAfter(start.plusDays(tolerance)) ||
-            last.first.isBefore(today.minusDays(tolerance)) || last.first.isAfter(today)) return null
-        return ((last.second - first.second) / first.second * 100.0).takeIf { it.isFinite() }
+        return MarketPresentation.historicalCoverage(range, result, today).change
     }
 
     data class ObservedOhlc(val open: Double?, val high: Double?, val low: Double?)
