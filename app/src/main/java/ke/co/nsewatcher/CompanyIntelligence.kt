@@ -156,7 +156,7 @@ fun CompanyIntelligence(
             movement = MovementIntelligenceCache.Result(error = "Movement evidence is temporarily unavailable.")
         } finally { movementLoading = false }
     }
-    LaunchedEffect(s.symbol, analystRequestRevision, refresh) {
+    LaunchedEffect(s.symbol, analystRequestRevision) {
         if (analystRequestRevision == 0) return@LaunchedEffect
         analystLoading = true
         try {
@@ -233,7 +233,11 @@ fun CompanyIntelligence(
         onAiExplain = { analystRequestRevision++ },
         watched = watched, onWatchToggle = onWatchToggle,
         back = back, openNews = openNews, openPractice = openPractice,
-        onRefresh = { refresh++ },
+        onRefresh = {
+            analyst = AnalystCache.Result()
+            analystRequestRevision = 0
+            refresh++
+        },
         refreshing = fundamentalsLoading || newsLoading || loadingRanges.isNotEmpty() || movementLoading || analystLoading,
         selectedRange = selectedRange, onRange = { range ->
             selectedRange = range
