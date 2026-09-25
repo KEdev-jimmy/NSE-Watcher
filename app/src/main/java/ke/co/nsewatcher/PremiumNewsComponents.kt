@@ -47,7 +47,7 @@ internal fun PremiumNewsHeader(
                 onClick = onSearch
             )
             Spacer(Modifier.width(4.dp))
-            PremiumNewsHeaderButton(Icons.Default.NotificationsNone, "Alerts", openAlerts, showDot = true)
+            PremiumNewsHeaderButton(Icons.Default.NotificationsNone, "Alerts", openAlerts)
         }
         Text("News", color = MaterialTheme.colorScheme.onBackground, fontSize = 27.sp, fontWeight = FontWeight.ExtraBold)
         Text("Relevant NSE news and updates.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.5.sp)
