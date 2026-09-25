@@ -57,6 +57,8 @@ internal fun PremiumMarketExperience(
     sectors: List<MarketSector>,
     attention: List<MarketAttentionItem>,
     latest: Instant?,
+    historyRevision: Int,
+    now: Instant,
     busy: Boolean,
     error: String?,
     onRefresh: () -> Unit,
@@ -68,6 +70,23 @@ internal fun PremiumMarketExperience(
     showSheet: (String) -> Unit
 ) {
     val calendarEvents = remember(newsFeed) { buildMarketCalendarEvents(newsFeed) }
+
+    if (tab == "Performance") {
+        MarketPerformanceView(
+            companies = companies,
+            revision = historyRevision,
+            now = now,
+            openCompany = openCompany,
+            openCompanies = openCompanies,
+            onTab = onTab,
+            busy = busy,
+            onRefresh = onRefresh,
+            openSearch = openSearch,
+            openAlerts = openAlerts
+        )
+        return
+    }
+
     val subtitle = when (tab) {
         "Movers" -> "See the shares drawing attention today."
         "Sectors" -> "Track sectors and upcoming market events."
@@ -120,7 +139,7 @@ internal fun PremiumMarketExperience(
 }
 
 @Composable
-private fun PremiumMarketHeader(
+internal fun PremiumMarketHeader(
     subtitle: String,
     busy: Boolean,
     onRefresh: () -> Unit,
@@ -201,14 +220,15 @@ private fun MarketHeaderAction(icon: ImageVector, description: String, action: (
 }
 
 @Composable
-private fun PremiumMarketTabs(selected: String, onSelected: (String) -> Unit) {
+internal fun PremiumMarketTabs(selected: String, onSelected: (String) -> Unit) {
     val options = listOf(
         "Overview" to Icons.Outlined.BarChart,
         "Movers" to Icons.Outlined.TrendingUp,
         "Sectors" to Icons.Outlined.PieChart,
-        "Calendar" to Icons.Outlined.CalendarMonth
+        "Calendar" to Icons.Outlined.CalendarMonth,
+        "Performance" to Icons.Outlined.TrendingUp
     )
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
         options.forEach { pair ->
             val label = pair.first
             val active = selected == label
@@ -220,16 +240,16 @@ private fun PremiumMarketTabs(selected: String, onSelected: (String) -> Unit) {
                 border = BorderStroke(1.dp, if (active) ResearchGreen else ResearchBorder)
             ) {
                 Row(
-                    Modifier.fillMaxSize().padding(horizontal = 7.dp, vertical = 8.dp),
+                    Modifier.fillMaxSize().padding(horizontal = 3.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center
                 ) {
-                    Icon(pair.second, label, tint = if (active) ResearchGreen else ResearchMuted, modifier = Modifier.size(17.dp))
-                    Spacer(Modifier.width(5.dp))
+                    Icon(pair.second, label, tint = if (active) ResearchGreen else ResearchMuted, modifier = Modifier.size(15.dp))
+                    Spacer(Modifier.width(3.dp))
                     Text(
                         label,
                         color = if (active) ResearchGreen else ResearchMuted,
-                        fontSize = 10.sp,
+                        fontSize = if (label == "Performance") 8.5.sp else 9.sp,
                         fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
                         maxLines = 1
                     )
@@ -1020,7 +1040,7 @@ private fun CalendarEventRow(event: MarketCalendarEvent, openNews: (NewsItem) ->
 }
 
 @Composable
-private fun MarketSectionCard(content: @Composable ColumnScope.() -> Unit) {
+internal fun MarketSectionCard(content: @Composable ColumnScope.() -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
@@ -1032,7 +1052,7 @@ private fun MarketSectionCard(content: @Composable ColumnScope.() -> Unit) {
 }
 
 @Composable
-private fun MarketSectionHeader(
+internal fun MarketSectionHeader(
     icon: ImageVector,
     iconTint: Color,
     title: String,
@@ -1073,7 +1093,7 @@ private fun MarketMessageCard(icon: ImageVector, title: String, detail: String, 
 }
 
 @Composable
-private fun MarketIconBubble(icon: ImageVector, tint: Color, size: Dp = 42.dp) {
+internal fun MarketIconBubble(icon: ImageVector, tint: Color, size: Dp = 42.dp) {
     Surface(
         modifier = Modifier.size(size),
         shape = CircleShape,
@@ -1169,7 +1189,7 @@ private fun marketChangeColor(value: Double?): Color = when {
     else -> ResearchRed
 }
 
-private fun premiumSectorSymbol(sector: String): ImageVector {
+internal fun premiumSectorSymbol(sector: String): ImageVector {
     val name = sector.trim().lowercase(Locale.US)
     return when {
         name.contains("bank") -> Icons.Outlined.AccountBalance

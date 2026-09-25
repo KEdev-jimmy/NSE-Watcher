@@ -158,6 +158,8 @@ fun MarketDashboard(
             sectors = sectors,
             attention = attention,
             latest = latest,
+            historyRevision = historyRevision,
+            now = now,
             busy = busy,
             error = error,
             onRefresh = { if (!busy) scope.launch { refreshData(true) } },
