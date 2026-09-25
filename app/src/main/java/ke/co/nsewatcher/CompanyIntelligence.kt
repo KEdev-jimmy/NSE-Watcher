@@ -175,16 +175,49 @@ fun CompanyIntelligence(
 
     val day = ranges["1D"] ?: MyStocksCache.HistoryResult()
     val session = remember(s, day) { CompanyResearchPresentation.session(s, day) }
-    val returns = remember(ranges, session.dailyChange) {
+    val coverageDate = LocalDate.now(CompanyResearchPresentation.zone)
+    val returns = remember(ranges, session.dailyChange, coverageDate) {
         ranges.mapValues { (range, result) ->
-            CompanyChartAccuracy.periodReturn(range, result, if (range == "1D") session.dailyChange else null)
+            CompanyChartAccuracy.periodReturn(
+                range,
+                result,
+                if (range == "1D") session.dailyChange else null,
+                coverageDate
+            )
         } + ("1D" to session.dailyChange)
     }
-    val deterministic = remember(s, intelligence, ranges["1M"], news) {
+
+    val oneMonthResult = ranges["1M"] ?: MyStocksCache.HistoryResult()
+    val oneMonthCoverage = remember(oneMonthResult, coverageDate) {
+        MarketPresentation.historicalCoverage("1M", oneMonthResult, coverageDate)
+    }
+    val oneMonthPrices = remember(oneMonthResult, oneMonthCoverage, coverageDate) {
+        if (oneMonthCoverage.change == null) {
+            emptyList()
+        } else {
+            val start = MarketPresentation.start("1M", coverageDate)
+            WatchlistPresentation.trend(oneMonthResult.points)
+                .filter { point ->
+                    val date = MarketPresentation.date(point.date)
+                    date != null && !date.isBefore(start) && !date.isAfter(coverageDate)
+                }
+                .map { it.close }
+        }
+    }
+
+    val oneYearResult = ranges["1Y"] ?: MyStocksCache.HistoryResult()
+    val oneYearCoverage = remember(oneYearResult, coverageDate) {
+        MarketPresentation.historicalCoverage("1Y", oneYearResult, coverageDate)
+    }
+    val validatedOneYear = remember(oneYearResult, oneYearCoverage) {
+        if (oneYearCoverage.change != null) oneYearResult else MyStocksCache.HistoryResult()
+    }
+
+    val deterministic = remember(s, intelligence, oneMonthPrices, news) {
         CompanyIntelligenceEngine.build(
             stock = s,
             source = intelligence,
-            priceHistory = ranges["1M"]?.prices.orEmpty(),
+            priceHistory = oneMonthPrices,
             news = news
         )
     }
@@ -196,15 +229,20 @@ fun CompanyIntelligence(
         fundamentalsLoading = fundamentalsLoading, news = news, newsLoading = newsLoading,
         newsError = newsError, movement = movement, movementLoading = movementLoading,
         deterministic = deterministic, movementContext = movementContext,
-        analyst = analyst, analystLoading = analystLoading,
-        onAnalysis = { analysisRequested = true }, watched = watched, onWatchToggle = onWatchToggle,
+        analyst = analyst, analystLoading = analystLoading, analystRequested = analystRequested,
+        onAnalysis = { movementRequested = true },
+        onAiExplain = { analystRequested = true },
+        watched = watched, onWatchToggle = onWatchToggle,
         back = back, openNews = openNews, openPractice = openPractice,
         onRefresh = { refresh++ },
         refreshing = fundamentalsLoading || newsLoading || loadingRanges.isNotEmpty() || movementLoading || analystLoading,
-        selectedRange = selectedRange, onRange = { selectedRange = it },
+        selectedRange = selectedRange, onRange = { range ->
+            selectedRange = range
+            requestedRanges = CompanyHistoryLoadingPolicy.request(requestedRanges, range)
+        },
         chart = ranges[selectedRange] ?: MyStocksCache.HistoryResult(),
         chartLoading = selectedRange in loadingRanges,
-        oneYearChart = ranges["1Y"] ?: MyStocksCache.HistoryResult(),
+        oneYearChart = validatedOneYear,
         rangeReturns = returns,
         sessionLoading = "1D" in loadingRanges,
         showChartGrid = showChartGrid
