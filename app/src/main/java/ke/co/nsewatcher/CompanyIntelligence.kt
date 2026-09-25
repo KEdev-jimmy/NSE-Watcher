@@ -152,7 +152,10 @@ fun CompanyIntelligence(
         if (!movementRequested) return@LaunchedEffect
         movementLoading = true
         try {
-            movement = MovementIntelligenceCache.load(s.symbol)
+            movement = MovementIntelligenceCache.load(
+                symbol = s.symbol,
+                forceRefresh = refresh > 0
+            )
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {

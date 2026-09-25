@@ -68,6 +68,7 @@ fun MarketDashboard(
     var movementResult by remember { mutableStateOf(MovementIntelligenceCache.Result()) }
     var movementLoading by remember { mutableStateOf(false) }
     var movementRevision by remember { mutableIntStateOf(0) }
+    var movementForceRefresh by remember { mutableStateOf(false) }
     var historyRevision by remember { mutableIntStateOf(0) }
     var now by remember { mutableStateOf(Instant.now()) }
     val scope = rememberCoroutineScope()
@@ -173,7 +174,10 @@ fun MarketDashboard(
         movementLoading = true
         movementResult = MovementIntelligenceCache.Result()
         try {
-            movementResult = MovementIntelligenceCache.load(selected.symbol)
+            movementResult = MovementIntelligenceCache.load(
+                symbol = selected.symbol,
+                forceRefresh = movementForceRefresh
+            )
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
@@ -182,6 +186,7 @@ fun MarketDashboard(
             )
         } finally {
             movementLoading = false
+            movementForceRefresh = false
         }
     }
 
@@ -189,6 +194,7 @@ fun MarketDashboard(
         movementSymbol = stock.symbol
         movementResult = MovementIntelligenceCache.Result()
         movementLoading = true
+        movementForceRefresh = false
         movementRevision++
         sheet = "Movement"
     }
@@ -264,6 +270,7 @@ fun MarketDashboard(
                                         loading = movementLoading,
                                         retry = {
                                             movementLoading = true
+                                            movementForceRefresh = true
                                             movementRevision++
                                         }
                                     )
