@@ -111,6 +111,25 @@ internal fun CompanyResearchScreen(
                 PremiumCompanyTabs(selected = tab, onSelected = ::selectTab)
             }
 
+            if (intelligence.cacheState == "STALE_FALLBACK") {
+                item {
+                    ResearchPanel {
+                        ResearchTitle("Showing cached company research")
+                        ResearchCaption(
+                            intelligence.cacheMessage.ifBlank {
+                                "Live company research is temporarily unavailable."
+                            }
+                        )
+                        intelligence.cacheAgeMinutes?.let { age ->
+                            ResearchCaption("Cached about ${age} minute${if (age == 1L) "" else "s"} ago.")
+                        }
+                        TextButton(onClick = onRefresh) {
+                            Text("Try live refresh", color = ResearchGreen)
+                        }
+                    }
+                }
+            }
+
             when (tab) {
                 "Overview" -> item {
                     Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {

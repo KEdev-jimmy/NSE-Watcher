@@ -67,7 +67,10 @@ fun CompanyIntelligence(
     LaunchedEffect(s.symbol, refresh) {
         fundamentalsLoading = true
         try {
-            intelligence = CompanyIntelligenceCache.load(s.symbol)
+            intelligence = CompanyIntelligenceCache.load(
+                symbol = s.symbol,
+                forceRefresh = refresh > 0
+            )
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {

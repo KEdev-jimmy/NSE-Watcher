@@ -56,10 +56,25 @@ fun CompanyComparison(stocks: List<Stock>, back: () -> Unit, initialSymbols: Lis
         loading = true
         try {
             coroutineScope {
-                val results = listOf(async { CompanyIntelligenceCache.load(leftStock.symbol) }, async { CompanyIntelligenceCache.load(rightStock.symbol) }).awaitAll()
-                leftResult = results[0]; rightResult = results[1]
+                val forceRefresh = retry > 0
+                val results = listOf(
+                    async {
+                        CompanyIntelligenceCache.load(
+                            symbol = leftStock.symbol,
+                            forceRefresh = forceRefresh
+                        )
+                    },
+                    async {
+                        CompanyIntelligenceCache.load(
+                            symbol = rightStock.symbol,
+                            forceRefresh = forceRefresh
+                        )
+                    }
+                ).awaitAll()
+                leftResult = results[0]
+                rightResult = results[1]
             }
-            loadError = false
+            loadError = leftResult.error != null || rightResult.error != null
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) { loadError = true }
         finally { loading = false }
@@ -84,7 +99,32 @@ fun CompanyComparison(stocks: List<Stock>, back: () -> Unit, initialSymbols: Lis
         item { if (loading) CompareNote("Loading sourced company data…") else CompareTable(leftStock, rightStock, metrics) }
         if (!loading) item { CompareNote("Prices use each company’s latest available NSE observation (" + observationTime(leftStock) + "; " + observationTime(rightStock) + "). The feed is provider-supplied and 15-minute delayed.") }
         if (!loading) {
-            if (loadError) item { CompareNote("Company research could not be refreshed. Available values remain shown.") }
+            if (loadError) {
+                item {
+                    val unavailable = buildList {
+                        if (leftResult.error != null) add(leftStock.symbol)
+                        if (rightResult.error != null) add(rightStock.symbol)
+                    }
+                    CompareNote(
+                        "Company research is currently unavailable for " +
+                            unavailable.joinToString(" and ") +
+                            ". Quote values remain separate; unavailable research fields are not inferred."
+                    )
+                }
+            }
+            if (leftResult.cacheState == "STALE_FALLBACK" || rightResult.cacheState == "STALE_FALLBACK") {
+                item {
+                    val cached = buildList {
+                        if (leftResult.cacheState == "STALE_FALLBACK") add(leftStock.symbol)
+                        if (rightResult.cacheState == "STALE_FALLBACK") add(rightStock.symbol)
+                    }
+                    CompareNote(
+                        "Live company research could not be refreshed for " +
+                            cached.joinToString(" and ") +
+                            ". The comparison is using the most recent cached research for those companies."
+                    )
+                }
+            }
             if (leftStock.sector != rightStock.sector) item { CompareNote("These companies are in different sectors. Their financial ratios may not be directly comparable.") }
             item { CompareNote("This is a side-by-side factual comparison of available provider data. It does not rank the companies or give a BUY/SELL instruction.") }
             item { Text("Source dates", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = CompareText) }
