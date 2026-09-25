@@ -12,8 +12,6 @@ import ke.co.nsewatcher.data.MarketData
 import ke.co.nsewatcher.data.MyStocksCache
 import ke.co.nsewatcher.data.NewsCache
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 internal object CompanyHistoryLoadingPolicy {
@@ -63,7 +61,7 @@ fun CompanyIntelligence(
     var analyst by remember(s.symbol) { mutableStateOf(AnalystCache.Result()) }
     var analystLoading by remember(s.symbol) { mutableStateOf(false) }
     var movementRequested by remember(s.symbol) { mutableStateOf(false) }
-    var analystRequested by remember(s.symbol) { mutableStateOf(false) }
+    var analystRequestRevision by remember(s.symbol) { mutableIntStateOf(0) }
     val lastMarketRefreshMs = MarketRefreshController.state.value.lastSuccessfulRefreshMs
 
     LaunchedEffect(s.symbol, refresh) {
@@ -158,8 +156,8 @@ fun CompanyIntelligence(
             movement = MovementIntelligenceCache.Result(error = "Movement evidence is temporarily unavailable.")
         } finally { movementLoading = false }
     }
-    LaunchedEffect(s.symbol, analystRequested, refresh) {
-        if (!analystRequested) return@LaunchedEffect
+    LaunchedEffect(s.symbol, analystRequestRevision, refresh) {
+        if (analystRequestRevision == 0) return@LaunchedEffect
         analystLoading = true
         try {
             analyst = AnalystCache.ask(
@@ -229,9 +227,10 @@ fun CompanyIntelligence(
         fundamentalsLoading = fundamentalsLoading, news = news, newsLoading = newsLoading,
         newsError = newsError, movement = movement, movementLoading = movementLoading,
         deterministic = deterministic, movementContext = movementContext,
-        analyst = analyst, analystLoading = analystLoading, analystRequested = analystRequested,
+        analyst = analyst, analystLoading = analystLoading,
+        analystRequested = analystRequestRevision > 0,
         onAnalysis = { movementRequested = true },
-        onAiExplain = { analystRequested = true },
+        onAiExplain = { analystRequestRevision++ },
         watched = watched, onWatchToggle = onWatchToggle,
         back = back, openNews = openNews, openPractice = openPractice,
         onRefresh = { refresh++ },
