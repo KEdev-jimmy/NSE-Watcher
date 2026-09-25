@@ -80,6 +80,7 @@ fun CompaniesDirectory(
 
     var query by rememberSaveable { mutableStateOf("") }
     var selectedSector by rememberSaveable(initialSector) { mutableStateOf(initialSector) }
+    var spotlight by rememberSaveable { mutableStateOf("") }
     var sortName by rememberSaveable { mutableStateOf(CompanySort.NAME.name) }
     var sortMenu by remember { mutableStateOf(false) }
     var comparing by rememberSaveable { mutableStateOf(false) }
@@ -91,7 +92,7 @@ fun CompaniesDirectory(
     val snackbar = remember { SnackbarHostState() }
 
     val companies = remember(catalog, quotes) { CompaniesPresentation.companies(catalog, quotes) }
-    val visible = remember(companies, query, selectedSector, sortName) {
+    val baseVisible = remember(companies, query, selectedSector, sortName) {
         CompaniesPresentation.visible(companies, query, selectedSector, CompanySort.valueOf(sortName))
     }
     val sectors = remember(companies) { companies.map { it.sector }.distinct().sorted() }
@@ -134,6 +135,14 @@ fun CompaniesDirectory(
                     ChronoUnit.DAYS.between(today, date) in 0..90
             }
         }.distinct()
+    }
+
+    val visible = remember(baseVisible, spotlight, recentResultSymbols, upcomingDividendSymbols) {
+        when (spotlight) {
+            "Results" -> baseVisible.filter { it.symbol in recentResultSymbols }
+            "Dividends" -> baseVisible.filter { it.symbol in upcomingDividendSymbols }
+            else -> baseVisible
+        }
     }
 
     suspend fun load(force: Boolean) {
@@ -315,10 +324,12 @@ fun CompaniesDirectory(
                         onResults = {
                             query = ""
                             selectedSector = "All"
+                            spotlight = if (spotlight == "Results") "" else "Results"
                         },
                         onDividends = {
                             query = ""
                             selectedSector = "All"
+                            spotlight = if (spotlight == "Dividends") "" else "Dividends"
                         }
                     )
                 }
@@ -327,7 +338,12 @@ fun CompaniesDirectory(
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(
-                                if (selectedSector == "All") "All Companies" else "$selectedSector Companies",
+                                when {
+                                    spotlight == "Results" -> "New Results"
+                                    spotlight == "Dividends" -> "Dividend Soon"
+                                    selectedSector == "All" -> "All Companies"
+                                    else -> "$selectedSector Companies"
+                                },
                                 color = ResearchText,
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.ExtraBold
@@ -337,6 +353,11 @@ fun CompaniesDirectory(
                                 color = ResearchMuted,
                                 fontSize = 10.sp
                             )
+                        }
+                        if (spotlight.isNotBlank()) {
+                            TextButton(onClick = { spotlight = "" }) {
+                                Text("Show all", color = ResearchGreen, fontSize = 9.5.sp)
+                            }
                         }
                         if (!comparing) {
                             OutlinedButton(
