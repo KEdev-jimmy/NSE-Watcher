@@ -67,6 +67,7 @@ internal fun MarketPerformanceView(
     revision: Int,
     now: Instant,
     openCompany: (Stock) -> Unit,
+    openCompanies: (String) -> Unit,
     onTab: (String) -> Unit,
     busy: Boolean,
     onRefresh: () -> Unit,
@@ -224,7 +225,8 @@ internal fun MarketPerformanceView(
             item {
                 SectorPerformanceCard(
                     sectors = sectorPerformance.take(6),
-                    range = range
+                    range = range,
+                    openCompanies = openCompanies
                 )
             }
 
@@ -467,19 +469,19 @@ private fun PerformanceLeadersRow(
                 item {
                     PerformanceLeaderCard(
                         "Strongest Performer", Icons.Outlined.TrendingUp, strongest, ResearchGreen,
-                        histories[strongest?.stock?.symbol], range, end, openCompany, Modifier.width(158.dp)
+                        strongest?.stock?.symbol?.let { histories[it] }, range, end, openCompany, Modifier.width(158.dp)
                     )
                 }
                 item {
                     PerformanceLeaderCard(
                         "Weakest Performer", Icons.Outlined.TrendingDown, weakest, ResearchRed,
-                        histories[weakest?.stock?.symbol], range, end, openCompany, Modifier.width(158.dp)
+                        weakest?.stock?.symbol?.let { histories[it] }, range, end, openCompany, Modifier.width(158.dp)
                     )
                 }
                 item {
                     PerformanceLeaderCard(
                         "Most Consistent", Icons.Outlined.Shield, mostConsistent, MaterialTheme.colorScheme.tertiary,
-                        histories[mostConsistent?.stock?.symbol], range, end, openCompany, Modifier.width(158.dp)
+                        mostConsistent?.stock?.symbol?.let { histories[it] }, range, end, openCompany, Modifier.width(158.dp)
                     )
                 }
             }
@@ -487,15 +489,15 @@ private fun PerformanceLeadersRow(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 PerformanceLeaderCard(
                     "Strongest Performer", Icons.Outlined.TrendingUp, strongest, ResearchGreen,
-                    histories[strongest?.stock?.symbol], range, end, openCompany, Modifier.weight(1f)
+                    strongest?.stock?.symbol?.let { histories[it] }, range, end, openCompany, Modifier.weight(1f)
                 )
                 PerformanceLeaderCard(
                     "Weakest Performer", Icons.Outlined.TrendingDown, weakest, ResearchRed,
-                    histories[weakest?.stock?.symbol], range, end, openCompany, Modifier.weight(1f)
+                    weakest?.stock?.symbol?.let { histories[it] }, range, end, openCompany, Modifier.weight(1f)
                 )
                 PerformanceLeaderCard(
                     "Most Consistent", Icons.Outlined.Shield, mostConsistent, MaterialTheme.colorScheme.tertiary,
-                    histories[mostConsistent?.stock?.symbol], range, end, openCompany, Modifier.weight(1f)
+                    mostConsistent?.stock?.symbol?.let { histories[it] }, range, end, openCompany, Modifier.weight(1f)
                 )
             }
         }
@@ -553,14 +555,17 @@ private fun PerformanceLeaderCard(
 @Composable
 private fun SectorPerformanceCard(
     sectors: List<PerformanceSector>,
-    range: String
+    range: String,
+    openCompanies: (String) -> Unit
 ) {
     MarketSectionCard {
         MarketSectionHeader(
             Icons.Outlined.PieChart,
             MaterialTheme.colorScheme.tertiary,
             "Sector Performance",
-            "How key sectors have performed over the selected period."
+            "How key sectors have performed over the selected period.",
+            if (sectors.isNotEmpty()) "See all sectors" else null,
+            { openCompanies("All") }
         )
         Spacer(Modifier.height(10.dp))
         if (sectors.isEmpty()) {
@@ -570,7 +575,7 @@ private fun SectorPerformanceCard(
                 sectors.chunked(2).forEach { row ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         row.forEach { sector ->
-                            SectorPerformanceCell(sector, Modifier.weight(1f))
+                            SectorPerformanceCell(sector, Modifier.weight(1f)) { openCompanies(sector.name) }
                         }
                         if (row.size == 1) Spacer(Modifier.weight(1f))
                     }
@@ -590,11 +595,13 @@ private fun SectorPerformanceCard(
 @Composable
 private fun SectorPerformanceCell(
     sector: PerformanceSector,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
 ) {
     val accent = performanceChangeColor(sector.change)
     Surface(
-        modifier = modifier.heightIn(min = 72.dp),
+        modifier = modifier.heightIn(min = 72.dp).clip(RoundedCornerShape(12.dp))
+            .clickable(role = Role.Button, onClick = onClick),
         shape = RoundedCornerShape(12.dp),
         color = ResearchRaised,
         border = BorderStroke(1.dp, ResearchBorder)
