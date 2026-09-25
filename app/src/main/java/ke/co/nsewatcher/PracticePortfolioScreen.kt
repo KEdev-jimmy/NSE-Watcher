@@ -200,7 +200,9 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
     MaterialTheme(colorScheme = CompanyResearchColors) {
         Column(Modifier.fillMaxSize().background(ResearchBackground)) {
             Row(Modifier.fillMaxWidth().padding(end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = ::goBack) { Icon(Icons.Outlined.ArrowBack, "Back", tint = ResearchText) }
+                if (page != "MAIN") {
+                    IconButton(onClick = ::goBack) { Icon(Icons.Outlined.ArrowBack, "Back", tint = ResearchText) }
+                }
                 if (page == "MAIN") {
                     NseWatcherBrandLockup(modifier = Modifier.weight(1f), compact = true)
                 } else {
@@ -214,8 +216,12 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
                 if (page == "MAIN") IconButton(onClick = { sheet = "Settings" }) { Icon(Icons.Outlined.Settings, "Practice settings", tint = ResearchText) } else PracticeBadge()
             }
             if (page == "MAIN") {
-                Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) { ResearchTitle("Practice Portfolio"); PracticeBadge() }
-                MarketChoiceRow(listOf("Overview", "Holdings", "Decisions", "Activity"), tab) { tab = it }
+                Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    ResearchTitle("Practice & Learn")
+                    ResearchCaption("Practice with virtual money, review your decisions, and learn from real market evidence.")
+                    PracticeBadge()
+                }
+                MarketChoiceRow(listOf("Overview", "Holdings", "Learn", "Activity"), tab) { tab = it }
             }
             if (error != null) Surface(color = ResearchRaised, modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp)) { Text(error.orEmpty(), color = PracticeAmber, fontSize = 13.sp); if (s == null) TextButton(onClick = { operation({ store.read() }) }) { Text("Retry saved account") } }
@@ -292,7 +298,7 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
                         item {
                             PracticeLearningInsightsCard(
                                 insights = learningInsights,
-                                onOpenCenter = { tab = "Decisions" }
+                                onOpenCenter = { tab = "Learn" }
                             )
                         }
                         val pending = s.orders.count { it.status == "PENDING" }
@@ -306,15 +312,21 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
                     tab == "Holdings" -> item {
                         PracticeHoldings(s, companies, onHolding = { symbol = it.symbol; page = "HOLDING" }, onTrade = { trade(it, "BUY") }, onResearch = openCompany, onBrowse = { sheet = "Choose company" }, onRules = { sheet = "Valuation" })
                     }
-                    tab == "Decisions" -> item {
-                        PracticeDecisionReviewCenter(
-                            items = decisionItems,
-                            onReview = { order ->
-                                editId = order.id
-                                symbol = order.symbol
-                                sheet = "Decision review"
-                            }
-                        )
+                    tab == "Learn" -> item {
+                        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                            PracticeLearningInsightsCard(
+                                insights = learningInsights,
+                                onOpenCenter = {}
+                            )
+                            PracticeDecisionReviewCenter(
+                                items = decisionItems,
+                                onReview = { order ->
+                                    editId = order.id
+                                    symbol = order.symbol
+                                    sheet = "Decision review"
+                                }
+                            )
+                        }
                     }
                     tab == "Activity" -> item {
                         PracticeActivity(s, activityTab, onTab = { activityTab = it }, onCancel = { id -> operation({ store.update { PracticeEngine.cancel(it, id) } }) },
@@ -420,7 +432,7 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
                                             }
                                         }) {
                                             sheet = null
-                                            notice = "Decision review saved. You can revisit it in Decisions."
+                                            notice = "Decision review saved. You can revisit it in Learn."
                                         }
                                     }
                                 )
