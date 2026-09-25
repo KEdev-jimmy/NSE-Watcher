@@ -70,146 +70,115 @@ internal fun CompanyResearchScreen(
     analyst: AnalystCache.Result, analystLoading: Boolean, onAnalysis: () -> Unit,
     watched: Boolean, onWatchToggle: (() -> Unit)?, back: () -> Unit, openNews: (NewsItem) -> Unit,
     openPractice: () -> Unit, onRefresh: () -> Unit, refreshing: Boolean, selectedRange: String, onRange: (String) -> Unit,
-    chart: MyStocksCache.HistoryResult, chartLoading: Boolean, rangeReturns: Map<String, Double?>,
-    sessionLoading: Boolean, showChartGrid: Boolean
+    chart: MyStocksCache.HistoryResult, chartLoading: Boolean, oneYearChart: MyStocksCache.HistoryResult,
+    rangeReturns: Map<String, Double?>, sessionLoading: Boolean, showChartGrid: Boolean
 ) {
     var tab by rememberSaveable(stock.symbol) { mutableStateOf("Overview") }
     var selectedMetric by remember(stock.symbol) { mutableStateOf<ResearchMetric?>(null) }
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+
     fun selectTab(value: String) {
         tab = value
         if (value == "Analysis") onAnalysis()
         scope.launch { listState.animateScrollToItem(0) }
     }
-    LaunchedEffect(tab) { if (tab == "Analysis") onAnalysis() }
+
     MaterialTheme(colorScheme = CompanyResearchColors) {
         LazyColumn(
-            state = listState, modifier = Modifier.fillMaxSize().background(ResearchBackground),
+            state = listState,
+            modifier = Modifier.fillMaxSize().background(ResearchBackground),
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(13.dp)
         ) {
             item {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = back) { Icon(Icons.Default.ArrowBack, "Back", tint = ResearchText) }
-                    Text("Company Intelligence", Modifier.weight(1f), color = ResearchText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    IconButton(onClick = { onWatchToggle?.invoke() }, enabled = onWatchToggle != null) {
-                        Icon(if (watched) Icons.Default.Star else Icons.Default.StarBorder,
-                            if (watched) "Remove from watchlist" else "Add to watchlist", tint = ResearchGreen)
-                    }
-                }
+                PremiumCompanyTopBar(
+                    stock = stock,
+                    watched = watched,
+                    onWatchToggle = onWatchToggle,
+                    back = back
+                )
             }
-            item { ResearchCompanyHeader(stock, intelligence.profile, session, market, sessionLoading) }
             item {
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf("Overview", "Financials", "News", "Analysis", "About").forEach { label ->
-                        FilterChip(
-                            selected = tab == label, onClick = { selectTab(label) },
-                            label = { Text(label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold) },
-                            modifier = Modifier.heightIn(min = 44.dp), shape = RoundedCornerShape(22.dp),
-                            colors = FilterChipDefaults.filterChipColors(
-                                containerColor = ResearchCard, labelColor = ResearchMuted,
-                                selectedContainerColor = ResearchGreen, selectedLabelColor = MaterialTheme.colorScheme.onPrimary
-                            ), border = BorderStroke(1.dp, if (tab == label) ResearchGreen else ResearchBorder)
+                PremiumCompanyIdentity(
+                    stock = stock,
+                    profile = intelligence.profile,
+                    watched = watched
+                )
+            }
+            item {
+                PremiumCompanyTabs(selected = tab, onSelected = ::selectTab)
+            }
+
+            when (tab) {
+                "Overview" -> item {
+                    Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
+                        PremiumCompanyOverview(
+                            stock = stock,
+                            session = session,
+                            market = market,
+                            intelligence = intelligence,
+                            news = news,
+                            selectedRange = selectedRange,
+                            onRange = onRange,
+                            chart = chart,
+                            chartLoading = chartLoading,
+                            oneYearChart = oneYearChart,
+                            rangeReturns = rangeReturns,
+                            showChartGrid = showChartGrid,
+                            onRefresh = onRefresh,
+                            openPractice = openPractice,
+                            openAnalysis = { selectTab("Analysis") }
                         )
                     }
                 }
-            }
-            when (tab) {
-                "Overview" -> {
-                    item {
-                        ResearchPanel {
-                            ResearchTitle("Test your investment idea")
-                            ResearchBody("Move this company into Practice Portfolio with the company already selected.")
-                            ResearchCaption("You can record why you would trade it before confirming. Practice orders use virtual money and are never sent to a broker.")
-                            OutlinedButton(onClick = openPractice, modifier = Modifier.fillMaxWidth()) {
-                                Text("Practice ${stock.symbol} →")
-                            }
-                        }
-                    }
-                    item {
-                        ResearchPanel {
-                            ResearchTitle("Session at a glance")
-                            ResearchCaption(CompanyChartAccuracy.sessionTitle(session.observedAt))
-                            ResearchFactGrid(listOf(
-                                "Previous close" to CompanyResearchPresentation.money(session.previousClose),
-                                "Observed open" to CompanyResearchPresentation.money(session.open),
-                                "Observed high" to CompanyResearchPresentation.money(session.high),
-                                "Observed low" to CompanyResearchPresentation.money(session.low)
-                            ))
-                            HorizontalDivider(color = ResearchBorder)
-                            CompanyResearchChart(chart.points, selectedRange, chartLoading, onRefresh, showGrid = showChartGrid)
-                            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                CompanyResearchPresentation.ranges.forEach { range ->
-                                    FilterChip(
-                                        selected = selectedRange == range, onClick = { onRange(range) },
-                                        label = { Text(range, fontSize = 12.sp, fontWeight = FontWeight.Bold) },
-                                        modifier = Modifier.heightIn(min = 44.dp), shape = RoundedCornerShape(16.dp),
-                                        colors = FilterChipDefaults.filterChipColors(
-                                            containerColor = ResearchRaised, labelColor = ResearchMuted,
-                                            selectedContainerColor = ResearchGreen, selectedLabelColor = MaterialTheme.colorScheme.onPrimary
-                                        ), border = BorderStroke(1.dp, Color.Transparent)
-                                    )
-                                }
-                            }
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                                ResearchReturn(if (selectedRange == "1D") "Session" else selectedRange, rangeReturns[selectedRange], Modifier.weight(1f))
-                                val comparisonRange = if (selectedRange == "1M") "1Y" else "1M"
-                                ResearchReturn(comparisonRange, rangeReturns[comparisonRange], Modifier.weight(1f))
-                            }
-                            ResearchCaption("— means insufficient dated coverage. Historical returns compare available closing observations; dividends are excluded.")
-                        }
-                    }
-                    item {
-                        ResearchPanel {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Icon(Icons.Default.Insights, null, tint = ResearchGreen)
-                                ResearchTitle("What this means")
-                            }
-                            ResearchBody(CompanyResearchPresentation.meaning(session.dailyChange))
-                            ResearchCaption("A price change alone does not explain why. Check company announcements and financial results for context.")
-                            TextButton(onClick = { selectTab("Analysis") }) {
-                                Text("Why is ${stock.symbol} moving?", color = ResearchLinkBlue, fontSize = 13.sp)
-                                Spacer(Modifier.width(6.dp)); Icon(Icons.Default.ArrowForward, null, tint = ResearchLinkBlue, modifier = Modifier.size(17.dp))
-                            }
-                        }
-                    }
-                    item {
-                        OutlinedButton(
-                            onClick = { onWatchToggle?.invoke() }, enabled = onWatchToggle != null,
-                            modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp), shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.dp, ResearchGreen), colors = ButtonDefaults.outlinedButtonColors(contentColor = ResearchGreen)
-                        ) {
-                            Icon(if (watched) Icons.Default.Star else Icons.Default.StarBorder, null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(if (watched) "Saved to watchlist · Remove" else "Add to watchlist", fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                        }
+
+                "Financials" -> item {
+                    Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
+                        PremiumCompanyFinancials(
+                            result = intelligence,
+                            loading = fundamentalsLoading,
+                            onRefresh = onRefresh,
+                            onMetric = { selectedMetric = it }
+                        )
                     }
                 }
-                "Financials" -> {
-                    item { ResearchDataStatus(fundamentalsLoading, intelligence.error, intelligence.partial, onRefresh) }
-                    if (!fundamentalsLoading) {
-                        item { ResearchFinancials(intelligence) { selectedMetric = it } }
-                        item { ResearchFinancialHistory(intelligence) }
-                        item { ResearchDividends(intelligence) }
-                    }
-                }
+
                 "News" -> {
                     when {
                         newsLoading -> item { ResearchLoading("Loading company news…") }
-                        newsError != null -> item { ResearchNotice("Company news unavailable", "We couldn’t load the latest company stories.", onRefresh) }
-                        news.isEmpty() -> item { ResearchNotice("No company news returned", "No company stories are available in the current feed.", onRefresh) }
-                        else -> items(news, key = { "company-news-${it.id}" }) { story -> ResearchNewsCard(story) { openNews(story) } }
+                        newsError != null -> item {
+                            ResearchNotice(
+                                "Company news unavailable",
+                                "We couldn’t load the latest company stories.",
+                                onRefresh
+                            )
+                        }
+                        news.isEmpty() -> item {
+                            ResearchNotice(
+                                "No company news returned",
+                                "No company stories are available in the current feed.",
+                                onRefresh
+                            )
+                        }
+                        else -> items(news, key = { "company-news-${it.id}" }) { story ->
+                            ResearchNewsCard(story) { openNews(story) }
+                        }
                     }
                 }
+
                 "Analysis" -> {
                     item {
                         ResearchPanel {
                             ResearchTitle("Observed market movement")
                             ResearchBody(CompanyResearchPresentation.meaning(session.dailyChange))
                             ResearchCaption("Quote source: ${session.source} • ${CompanyResearchPresentation.date(session.observedAt)}")
-                            rangeReturns["1M"]?.let { ResearchBody("The available one-month price return is ${CompanyResearchPresentation.percent(it)}. This excludes dividends.") }
-                            session.sinceOpen?.let { ResearchCaption("Since observed open: ${CompanyResearchPresentation.percent(it)}. This is different from change versus the previous close.") }
+                            rangeReturns["1M"]?.let {
+                                ResearchBody("The available one-month price return is ${CompanyResearchPresentation.percent(it)}. This excludes dividends.")
+                            }
+                            session.sinceOpen?.let {
+                                ResearchCaption("Since observed open: ${CompanyResearchPresentation.percent(it)}. This is different from change versus the previous close.")
+                            }
                             ResearchCaption("These observations describe available data; they do not establish fair value or predict the next price move.")
                         }
                     }
@@ -221,40 +190,81 @@ internal fun CompanyResearchScreen(
                         ResearchPanel {
                             ResearchTitle("Sources & evidence")
                             ResearchCaption("Review the source, reporting period and update date behind each claim.")
-                            if (fundamentalsLoading) ResearchLoading("Loading company evidence…")
-                            else if (intelligence.evidence.isEmpty()) ResearchCaption("No additional company evidence was returned.")
+                            if (fundamentalsLoading) {
+                                ResearchLoading("Loading company evidence…")
+                            } else if (intelligence.evidence.isEmpty()) {
+                                ResearchCaption("No additional company evidence was returned.")
+                            }
                         }
                     }
                     items(intelligence.evidence) { record -> ResearchEvidence(record) }
                 }
-                "About" -> item { ResearchAbout(stock, intelligence, fundamentalsLoading, onRefresh) }
+
+                "About" -> item {
+                    ResearchAbout(stock, intelligence, fundamentalsLoading, onRefresh)
+                }
             }
+
             item {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    ResearchCaption("Research with evidence. Prices and reports may cover different dates.", Modifier.weight(1f))
+                    ResearchCaption(
+                        "Research with evidence. Prices and reports may cover different dates.",
+                        Modifier.weight(1f)
+                    )
                     IconButton(onClick = onRefresh, enabled = !refreshing) {
-                        if (refreshing) CircularProgressIndicator(Modifier.size(20.dp), color = ResearchGreen, strokeWidth = 2.dp)
-                        else Icon(Icons.Default.Refresh, "Refresh company data", tint = ResearchGreen)
+                        if (refreshing) {
+                            CircularProgressIndicator(
+                                Modifier.size(20.dp),
+                                color = ResearchGreen,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Icon(Icons.Default.Refresh, "Refresh company data", tint = ResearchGreen)
+                        }
                     }
                 }
             }
         }
+
         selectedMetric?.let { metric ->
             AlertDialog(
-                onDismissRequest = { selectedMetric = null }, containerColor = ResearchCard,
+                onDismissRequest = { selectedMetric = null },
+                containerColor = ResearchCard,
                 title = { Text(metric.label, color = ResearchText) },
                 text = {
-                    Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(
+                        Modifier.verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
                         ResearchBody(metric.value)
                         ResearchBody(metric.explanation)
                         ResearchCaption("Period: ${metric.period.ifBlank { "Not supplied" }}")
-                        ResearchCaption("Source: " + intelligence.fieldSources[metric.key].orEmpty().joinToString(" • ").ifBlank { "Not supplied" })
-                        intelligence.conflicts[metric.key].orEmpty().forEach { (source, value) -> ResearchBody("$source: $value") }
-                        if (intelligence.fieldQuality[metric.key] == "CONFLICT") ResearchCaption("Sources differ. Check the reporting period and source before comparing this value.")
+                        ResearchCaption(
+                            "Source: " + intelligence.fieldSources[metric.key].orEmpty()
+                                .joinToString(" • ")
+                                .ifBlank { "Not supplied" }
+                        )
+                        intelligence.conflicts[metric.key].orEmpty().forEach { (source, value) ->
+                            ResearchBody("$source: $value")
+                        }
+                        if (intelligence.fieldQuality[metric.key] == "CONFLICT") {
+                            ResearchCaption("Sources differ. Check the reporting period and source before comparing this value.")
+                        }
                     }
                 },
-                confirmButton = { TextButton(onClick = { selectedMetric = null; selectTab("Analysis") }) { Text("View evidence", color = ResearchGreen) } },
-                dismissButton = { TextButton(onClick = { selectedMetric = null }) { Text("Close", color = ResearchMuted) } }
+                confirmButton = {
+                    TextButton(onClick = {
+                        selectedMetric = null
+                        selectTab("Analysis")
+                    }) {
+                        Text("View evidence", color = ResearchGreen)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { selectedMetric = null }) {
+                        Text("Close", color = ResearchMuted)
+                    }
+                }
             )
         }
     }
@@ -350,9 +360,9 @@ private fun ResearchDataStatus(loading: Boolean, error: String?, partial: Boolea
     }
 }
 
-private data class ResearchMetric(val key: String, val label: String, val value: String, val period: String, val explanation: String)
+internal data class ResearchMetric(val key: String, val label: String, val value: String, val period: String, val explanation: String)
 
-private fun researchMetrics(p: CompanyIntelligenceCache.Profile): List<ResearchMetric> {
+internal fun researchMetrics(p: CompanyIntelligenceCache.Profile): List<ResearchMetric> {
     fun value(raw: String) = raw.trim().takeUnless { it.isBlank() || it == "-" || it.equals("n/a", true) } ?: "Unavailable"
     fun metric(key: String, label: String, raw: String, explanation: String, ratios: Boolean = false) =
         ResearchMetric(key, label, value(raw), if (ratios) p.ratioPeriod else p.financialPeriod, explanation)
