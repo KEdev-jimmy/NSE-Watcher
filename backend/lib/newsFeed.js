@@ -176,10 +176,31 @@ function withinWindow(item) {
   return time >= Date.now() - HISTORY_DAYS * 24 * 60 * 60 * 1000;
 }
 
+const STRICT_EXTERNAL_MARKET_TERMS = [
+  'nse', 'nairobi securities exchange', 'capital markets authority', 'cma kenya',
+  'listed shares', 'listed company', 'share price', 'stock market', 'equities',
+  'securities exchange', 'market turnover', 'nse 20', 'nse 25', 'nasi'
+];
+
+const STRICT_KENYA_MACRO_TERMS = [
+  'central bank of kenya', 'cbk', 'kenya shilling', 'treasury bond', 'treasury bills',
+  'interest rate', 'inflation'
+];
+
 function isRelevantExternalNews(item) {
   const haystack = `${item.title} ${item.summary}`.toLowerCase();
-  if (NSE_COMPANIES.some(([symbol, company]) => haystack.includes(company.toLowerCase()) || new RegExp(`\\b${symbol.replace(/[&.]/g, '\\$&')}\\b`, 'i').test(haystack))) return true;
-  return INTELLIGENCE_MARKET_TERMS.some(term => haystack.includes(term));
+  const tokens = haystack.toUpperCase().split(/[^A-Z0-9&]+/).filter(Boolean);
+  if (NSE_COMPANIES.some(([symbol, company]) =>
+    haystack.includes(company.toLowerCase()) || tokens.includes(symbol.toUpperCase())
+  )) return true;
+  if (STRICT_EXTERNAL_MARKET_TERMS.some(term => haystack.includes(term))) return true;
+  const kenyaMacro = STRICT_KENYA_MACRO_TERMS.some(term => haystack.includes(term));
+  const marketContext = /\b(nse|shares?|stocks?|equities|securities|market|investors?)\b/i.test(haystack);
+  return kenyaMacro && marketContext;
+}
+
+function isFeedRelevant(item) {
+  return Boolean(item) && item.intelligenceRelevance !== 'general';
 }
 
 function normalizeExternalNews(items) {
@@ -258,9 +279,19 @@ async function loadFeed() {
     loadRssSources(),
   ]);
   const externalItems = normalizeExternalNews(sourceResult.items);
-  const items = sortNewest(dedupe([...myStocksResult.items, ...externalItems]));
+  let items = sortNewest(dedupe([...myStocksResult.items, ...externalItems]));
   const providerErrors = [...myStocksResult.errors, ...sourceResult.errors];
-  if (items.length) await enrichMissingCompanyMetadata(items.filter(item => !item.sourceKind || item.sourceKind === 'api'));
+  if (items.length) {
+    await enrichMissingCompanyMetadata(items.filter(item => !item.sourceKind || item.sourceKind === 'api'));
+    items = items.map(item => {
+      const intelligence = intelligenceRelevance(item);
+      return {
+        ...item,
+        intelligenceRelevance: intelligence.level,
+        intelligenceRelevanceReason: intelligence.reason,
+      };
+    }).filter(isFeedRelevant);
+  }
   return { items, providerErrors, partial: providerErrors.length > 0 };
 }
 
@@ -303,4 +334,7 @@ async function handle(req, res) {
 }
 
 module.exports = handle;
-module.exports._newsTest = { canonicalUrl, dedupe, normalizeItem, withinWindow, newsFreshnessMode };
+module.exports._newsTest = {
+  canonicalUrl, dedupe, normalizeItem, withinWindow, newsFreshnessMode,
+  isRelevantExternalNews, isFeedRelevant
+};
