@@ -77,6 +77,7 @@ internal fun PremiumMarketExperience(
             revision = historyRevision,
             now = now,
             openCompany = openCompany,
+            openCompanies = openCompanies,
             onTab = onTab,
             busy = busy,
             onRefresh = onRefresh,
