@@ -384,10 +384,10 @@ private fun MarketPulseCard(
         Spacer(Modifier.height(11.dp))
         Row(verticalAlignment = Alignment.Stretch, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Surface(
-                Modifier.width(105.dp),
-                RoundedCornerShape(14.dp),
-                palette.primary.copy(alpha = .08f),
-                BorderStroke(1.dp, palette.primary.copy(alpha = .55f))
+                modifier = Modifier.width(105.dp),
+                shape = RoundedCornerShape(14.dp),
+                color = palette.primary.copy(alpha = .08f),
+                border = BorderStroke(1.dp, palette.primary.copy(alpha = .55f))
             ) {
                 Column(Modifier.padding(9.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -413,10 +413,10 @@ private fun MarketPulseCard(
                 }
             }
             Surface(
-                Modifier.weight(1f),
-                RoundedCornerShape(14.dp),
-                palette.raised,
-                BorderStroke(1.dp, palette.border)
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(14.dp),
+                color = palette.raised,
+                border = BorderStroke(1.dp, palette.border)
             ) {
                 Row(Modifier.padding(7.dp), verticalAlignment = Alignment.CenterVertically) {
                     PulseValue(breadth.rising, "Advancers", palette.primary, Modifier.weight(1f))
@@ -563,7 +563,7 @@ private fun MarketSectorSnapshot(palette: PremiumHomePalette, sectors: List<Mark
 @Composable
 private fun SectorSmallTile(sector: MarketSector, palette: PremiumHomePalette, modifier: Modifier) {
     val tint = changeTint(sector.average, palette)
-    Surface(modifier.height(72.dp), RoundedCornerShape(12.dp), palette.raised, BorderStroke(1.dp, palette.border)) {
+    Surface(modifier = modifier.height(72.dp), shape = RoundedCornerShape(12.dp), color = palette.raised, border = BorderStroke(1.dp, palette.border)) {
         Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(sectorIcon(sector.name), null, tint = tint, modifier = Modifier.size(16.dp))
@@ -746,7 +746,7 @@ private fun MarketSectorsPage(
                 if (lines.isEmpty()) Text("Not enough sector data is available.", color = palette.muted, fontSize = 10.sp)
                 lines.forEachIndexed { index, line ->
                     Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.Top) {
-                        Surface(Modifier.size(23.dp), CircleShape, palette.primary.copy(alpha = .1f), BorderStroke(1.dp, palette.primary)) {
+                        Surface(modifier = Modifier.size(23.dp), shape = CircleShape, color = palette.primary.copy(alpha = .1f), border = BorderStroke(1.dp, palette.primary)) {
                             Box(contentAlignment = Alignment.Center) {
                                 Text("${index + 1}", color = palette.primary, fontSize = 8.5.sp, fontWeight = FontWeight.Bold)
                             }
@@ -781,10 +781,10 @@ private fun MarketSectorsPage(
 private fun SectorHeatTile(sector: MarketSector, palette: PremiumHomePalette, modifier: Modifier, click: () -> Unit) {
     val tint = changeTint(sector.average, palette)
     Surface(
-        modifier.height(82.dp).clip(RoundedCornerShape(12.dp)).clickable(onClick = click),
-        RoundedCornerShape(12.dp),
-        tint.copy(alpha = .08f),
-        BorderStroke(1.dp, tint.copy(alpha = .38f))
+        modifier = modifier.height(82.dp).clip(RoundedCornerShape(12.dp)).clickable(onClick = click),
+        shape = RoundedCornerShape(12.dp),
+        color = tint.copy(alpha = .08f),
+        border = BorderStroke(1.dp, tint.copy(alpha = .38f))
     ) {
         Column(Modifier.padding(7.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -853,12 +853,12 @@ private fun MarketCalendarPage(palette: PremiumHomePalette, calendar: List<Marke
                         val selected = selectedDate == date
                         val hasEvent = calendar.any { it.date == date }
                         Surface(
-                            Modifier.weight(1f).clip(RoundedCornerShape(11.dp)).clickable {
+                            modifier = Modifier.weight(1f).clip(RoundedCornerShape(11.dp)).clickable {
                                 selectedDateRaw = if (selected) "" else date.toString()
                             },
-                            RoundedCornerShape(11.dp),
-                            if (selected) palette.primary.copy(alpha = .13f) else palette.raised,
-                            BorderStroke(1.dp, if (selected) palette.primary else palette.border)
+                            shape = RoundedCornerShape(11.dp),
+                            color = if (selected) palette.primary.copy(alpha = .13f) else palette.raised,
+                            border = BorderStroke(1.dp, if (selected) palette.primary else palette.border)
                         ) {
                             Column(Modifier.padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(date.dayOfWeek.name.take(3).lowercase().replaceFirstChar { it.titlecase(Locale.US) }, color = palette.muted, fontSize = 7.5.sp)
@@ -873,10 +873,10 @@ private fun MarketCalendarPage(palette: PremiumHomePalette, calendar: List<Marke
                     listOf("All", "Results", "Dividends", "AGM", "Other").forEach { option ->
                         val active = filter == option
                         Surface(
-                            Modifier.clip(RoundedCornerShape(20.dp)).clickable { filter = option; selectedDateRaw = "" },
-                            RoundedCornerShape(20.dp),
-                            if (active) palette.primary.copy(alpha = .12f) else palette.raised,
-                            BorderStroke(1.dp, if (active) palette.primary else palette.border)
+                            modifier = Modifier.clip(RoundedCornerShape(20.dp)).clickable { filter = option; selectedDateRaw = "" },
+                            shape = RoundedCornerShape(20.dp),
+                            color = if (active) palette.primary.copy(alpha = .12f) else palette.raised,
+                            border = BorderStroke(1.dp, if (active) palette.primary else palette.border)
                         ) {
                             Text(option, color = if (active) palette.primary else palette.muted, fontSize = 9.sp, fontWeight = if (active) FontWeight.Bold else FontWeight.Medium, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
                         }
@@ -921,7 +921,7 @@ private fun CalendarRow(event: MarketCalendarItem, palette: PremiumHomePalette) 
         else -> palette.primary
     }
     Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Surface(Modifier.width(49.dp), RoundedCornerShape(10.dp), palette.raised, BorderStroke(1.dp, palette.border)) {
+        Surface(modifier = Modifier.width(49.dp), shape = RoundedCornerShape(10.dp), color = palette.raised, border = BorderStroke(1.dp, palette.border)) {
             Column(Modifier.padding(vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(event.date.dayOfMonth.toString().padStart(2, '0'), color = palette.text, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
                 Text(event.date.month.name.take(3), color = palette.muted, fontSize = 8.sp)
@@ -932,7 +932,7 @@ private fun CalendarRow(event: MarketCalendarItem, palette: PremiumHomePalette) 
             Text(event.company.ifBlank { "Market event" }, color = palette.text, fontSize = 10.8.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(event.label, color = palette.muted, fontSize = 9.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
-        Surface(RoundedCornerShape(20.dp), tint.copy(alpha = .1f), BorderStroke(1.dp, tint.copy(alpha = .65f))) {
+        Surface(shape = RoundedCornerShape(20.dp), color = tint.copy(alpha = .1f), border = BorderStroke(1.dp, tint.copy(alpha = .65f))) {
             Text(event.kind, color = tint, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp))
         }
     }
@@ -950,7 +950,7 @@ private fun MarketLearningCard(palette: PremiumHomePalette, title: String, subti
             }
         }
         Spacer(Modifier.height(7.dp))
-        Surface(RoundedCornerShape(13.dp), palette.primary.copy(alpha = .07f), BorderStroke(1.dp, palette.primary.copy(alpha = .32f))) {
+        Surface(shape = RoundedCornerShape(13.dp), color = palette.primary.copy(alpha = .07f), border = BorderStroke(1.dp, palette.primary.copy(alpha = .32f))) {
             Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.MenuBook, null, tint = palette.primary, modifier = Modifier.size(24.dp))
                 Spacer(Modifier.width(9.dp))
@@ -962,7 +962,7 @@ private fun MarketLearningCard(palette: PremiumHomePalette, title: String, subti
 
 @Composable
 private fun MarketRoundIcon(icon: ImageVector, tint: Color, palette: PremiumHomePalette) {
-    Surface(Modifier.size(39.dp), CircleShape, tint.copy(alpha = .10f), BorderStroke(1.dp, palette.border)) {
+    Surface(modifier = Modifier.size(39.dp), shape = CircleShape, color = tint.copy(alpha = .10f), border = BorderStroke(1.dp, palette.border)) {
         Box(contentAlignment = Alignment.Center) {
             Icon(icon, null, tint = tint, modifier = Modifier.size(20.dp))
         }
