@@ -3,9 +3,11 @@ package ke.co.nsewatcher
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -21,6 +23,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -320,12 +323,64 @@ private fun MarketWhyMovingAction(stock: Stock, explain: (Stock) -> Unit) {
 
 @Composable
 internal fun MarketChoiceRow(options: List<String>, selected: String, select: (String) -> Unit) {
-    Row(Modifier.fillMaxWidth()) { options.forEach { option ->
-        Column(Modifier.weight(1f)) {
-            TextButton(onClick = { select(option) }, modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(horizontal = 2.dp, vertical = 8.dp)) { Text(option, color = if (option == selected) ResearchGreen else ResearchMuted, fontSize = 12.sp, fontWeight = if (option == selected) FontWeight.Bold else FontWeight.Normal) }
-            if (option == selected) Box(Modifier.fillMaxWidth().height(2.dp).background(ResearchGreen))
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val scroll = shouldScrollTabs(
+            widthDp = maxWidth.value,
+            fontScale = LocalDensity.current.fontScale,
+            optionCount = options.size,
+            minimumOptionWidthDp = 72f
+        )
+        if (scroll) {
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                options.forEach { option ->
+                    Column(Modifier.widthIn(min = 78.dp)) {
+                        TextButton(
+                            onClick = { select(option) },
+                            modifier = Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                        ) {
+                            Text(
+                                option,
+                                color = if (option == selected) ResearchGreen else ResearchMuted,
+                                fontSize = 12.sp,
+                                fontWeight = if (option == selected) FontWeight.Bold else FontWeight.Normal,
+                                maxLines = 1
+                            )
+                        }
+                        if (option == selected) {
+                            Box(Modifier.fillMaxWidth().height(2.dp).background(ResearchGreen))
+                        }
+                    }
+                }
+            }
+        } else {
+            Row(Modifier.fillMaxWidth()) {
+                options.forEach { option ->
+                    Column(Modifier.weight(1f)) {
+                        TextButton(
+                            onClick = { select(option) },
+                            modifier = Modifier.fillMaxWidth(),
+                            contentPadding = PaddingValues(horizontal = 2.dp, vertical = 8.dp)
+                        ) {
+                            Text(
+                                option,
+                                color = if (option == selected) ResearchGreen else ResearchMuted,
+                                fontSize = 12.sp,
+                                fontWeight = if (option == selected) FontWeight.Bold else FontWeight.Normal,
+                                maxLines = 1
+                            )
+                        }
+                        if (option == selected) {
+                            Box(Modifier.fillMaxWidth().height(2.dp).background(ResearchGreen))
+                        }
+                    }
+                }
+            }
         }
-    } }
+    }
 }
 
 @Composable
