@@ -2,6 +2,7 @@ package ke.co.nsewatcher
 
 import ke.co.nsewatcher.data.MyStocksCache
 import ke.co.nsewatcher.data.NewsCache
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeoutOrNull
@@ -68,7 +69,13 @@ internal class StartupDataLoader(
         load: suspend () -> T
     ): Bounded<T> {
         val value = withTimeoutOrNull(sourceTimeoutMs) {
-            runCatching { load() }.getOrDefault(fallback)
+            try {
+                load()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                fallback
+            }
         }
         return if (value == null) {
             Bounded(fallback, timedOut = true)
