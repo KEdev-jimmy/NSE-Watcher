@@ -506,8 +506,23 @@ internal fun NotificationCenterScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    if (!permissionGranted && Build.VERSION.SDK_INT >= 33) TextButton(onClick = { permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) }) {
-                        Text("Allow")
+                    if (!permissionGranted) {
+                        val runtimeMissing = Build.VERSION.SDK_INT >= 33 &&
+                            ContextCompat.checkSelfPermission(
+                                context,
+                                Manifest.permission.POST_NOTIFICATIONS
+                            ) != PackageManager.PERMISSION_GRANTED
+                        TextButton(
+                            onClick = {
+                                if (runtimeMissing) {
+                                    permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                } else {
+                                    openAndroidNotificationSettings(context)
+                                }
+                            }
+                        ) {
+                            Text(if (runtimeMissing) "Allow" else "Open settings")
+                        }
                     }
                 }
             }
