@@ -228,33 +228,76 @@ internal fun PremiumMarketTabs(selected: String, onSelected: (String) -> Unit) {
         "Calendar" to Icons.Outlined.CalendarMonth,
         "Performance" to Icons.Outlined.TrendingUp
     )
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-        options.forEach { pair ->
-            val label = pair.first
-            val active = selected == label
-            Surface(
-                modifier = Modifier.weight(1f).heightIn(min = 48.dp).clip(RoundedCornerShape(13.dp))
-                    .clickable(role = Role.Tab) { onSelected(label) },
-                shape = RoundedCornerShape(13.dp),
-                color = if (active) ResearchGreen.copy(alpha = 0.12f) else ResearchCard,
-                border = BorderStroke(1.dp, if (active) ResearchGreen else ResearchBorder)
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val scroll = shouldScrollTabs(
+            widthDp = maxWidth.value,
+            fontScale = LocalDensity.current.fontScale,
+            optionCount = options.size,
+            minimumOptionWidthDp = 70f
+        )
+        if (scroll) {
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(5.dp)
             ) {
-                Row(
-                    Modifier.fillMaxSize().padding(horizontal = 3.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Icon(pair.second, label, tint = if (active) ResearchGreen else ResearchMuted, modifier = Modifier.size(15.dp))
-                    Spacer(Modifier.width(3.dp))
-                    Text(
-                        label,
-                        color = if (active) ResearchGreen else ResearchMuted,
-                        fontSize = if (label == "Performance") 8.5.sp else 9.sp,
-                        fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
-                        maxLines = 1
+                options.forEach { pair ->
+                    PremiumMarketTab(
+                        pair = pair,
+                        active = selected == pair.first,
+                        modifier = Modifier.widthIn(min = 82.dp),
+                        onSelected = onSelected
                     )
                 }
             }
+        } else {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                options.forEach { pair ->
+                    PremiumMarketTab(
+                        pair = pair,
+                        active = selected == pair.first,
+                        modifier = Modifier.weight(1f),
+                        onSelected = onSelected
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PremiumMarketTab(
+    pair: Pair<String, ImageVector>,
+    active: Boolean,
+    modifier: Modifier,
+    onSelected: (String) -> Unit
+) {
+    val label = pair.first
+    Surface(
+        modifier = modifier.heightIn(min = 48.dp).clip(RoundedCornerShape(13.dp))
+            .clickable(role = Role.Tab) { onSelected(label) },
+        shape = RoundedCornerShape(13.dp),
+        color = if (active) ResearchGreen.copy(alpha = 0.12f) else ResearchCard,
+        border = BorderStroke(1.dp, if (active) ResearchGreen else ResearchBorder)
+    ) {
+        Row(
+            Modifier.fillMaxSize().padding(horizontal = 5.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                pair.second,
+                label,
+                tint = if (active) ResearchGreen else ResearchMuted,
+                modifier = Modifier.size(15.dp)
+            )
+            Spacer(Modifier.width(3.dp))
+            Text(
+                label,
+                color = if (active) ResearchGreen else ResearchMuted,
+                fontSize = if (label == "Performance") 8.5.sp else 9.sp,
+                fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+                maxLines = 1
+            )
         }
     }
 }

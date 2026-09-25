@@ -17,6 +17,8 @@ internal interface MarketDataProvider {
     suspend fun indices(marketOpen: Boolean): List<MyStocksCache.MarketIndex>
     suspend fun history(symbol: String, period: String): MyStocksCache.HistoryResult
     suspend fun newsFeed(forceRefresh: Boolean = false): NewsCache.FeedResult
+    suspend fun newsDetail(id: String): NewsItem?
+    suspend fun companyNews(symbol: String): NewsCache.FeedResult
 }
 
 internal object NseWatcherMarketDataProvider : MarketDataProvider {
@@ -38,6 +40,12 @@ internal object NseWatcherMarketDataProvider : MarketDataProvider {
 
     override suspend fun newsFeed(forceRefresh: Boolean): NewsCache.FeedResult =
         NewsCache.loadFeedResult(forceRefresh)
+
+    override suspend fun newsDetail(id: String): NewsItem? =
+        NewsCache.loadDetail(id)
+
+    override suspend fun companyNews(symbol: String): NewsCache.FeedResult =
+        NewsCache.loadCompanyNews(symbol)
 }
 
 internal class MarketDataGateway(
@@ -60,6 +68,12 @@ internal class MarketDataGateway(
 
     suspend fun newsFeed(forceRefresh: Boolean = false): NewsCache.FeedResult =
         provider.newsFeed(forceRefresh)
+
+    suspend fun newsDetail(id: String): NewsItem? =
+        provider.newsDetail(id)
+
+    suspend fun companyNews(symbol: String): NewsCache.FeedResult =
+        provider.companyNews(symbol)
 }
 
 internal object MarketData {
@@ -82,4 +96,10 @@ internal object MarketData {
 
     suspend fun newsFeed(forceRefresh: Boolean = false): NewsCache.FeedResult =
         gateway.newsFeed(forceRefresh)
+
+    suspend fun newsDetail(id: String): NewsItem? =
+        gateway.newsDetail(id)
+
+    suspend fun companyNews(symbol: String): NewsCache.FeedResult =
+        gateway.companyNews(symbol)
 }

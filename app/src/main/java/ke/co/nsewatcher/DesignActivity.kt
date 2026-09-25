@@ -63,8 +63,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import ke.co.nsewatcher.data.WatchlistStore
 
@@ -168,43 +166,36 @@ private fun App(
     var companyCatalog by remember { mutableStateOf(emptyList<Stock>()) }
 
     LaunchedEffect(Unit) {
-        val completed = withTimeoutOrNull(12_000L) {
-            coroutineScope {
-                val stocksDeferred = async {
-                    runCatching { MarketData.stocks() }.getOrDefault(emptyList())
-                }
-                val newsDeferred = async {
-                    runCatching { MarketData.newsFeed().items }.getOrDefault(emptyList())
-                }
-                val companiesDeferred = async {
-                    runCatching { MarketData.companies() }.getOrDefault(emptyList())
-                }
-                val statusDeferred = async {
-                    runCatching { MarketData.status() }.getOrDefault(MyStocksCache.MarketStatus())
-                }
-                val indicesDeferred = async {
-                    val status = statusDeferred.await()
-                    runCatching {
-                        MarketData.indices(status.isKnown && status.isOpen)
-                    }.getOrDefault(emptyList())
-                }
+        val startup = StartupDataLoader(
+            stocks = MarketData::stocks,
+            news = { MarketData.newsFeed() },
+            companies = MarketData::companies,
+            status = MarketData::status
+        ).load()
 
-                val loadedStocks = stocksDeferred.await()
-                if (loadedStocks.isNotEmpty()) {
-                    liveStocks.value = loadedStocks
-                }
-                newsFeed = newsDeferred.await()
-                companyCatalog = companiesDeferred.await()
-                startupMarketStatus = statusDeferred.await()
-                marketIndices = indicesDeferred.await()
-            }
-            true
-        } ?: false
+        if (startup.stocks.isNotEmpty()) {
+            liveStocks.value = startup.stocks
+        }
+        newsFeed = startup.news
+        companyCatalog = startup.companies
+        startupMarketStatus = startup.marketStatus
 
-        // The welcome screen is intentionally the gate. If a provider is slow or unavailable,
-        // the gate has a bounded fallback; Home can then retry any incomplete data request.
-        startupComplete = completed
+        // Launch no longer waits on index retrieval. The four primary startup sources
+        // are independently bounded, so one slow provider cannot hide data that is
+        // already ready from another source.
+        startupComplete = startup.completed
         startupReady = true
+
+        val indices = withTimeoutOrNull(4_000L) {
+            runCatching {
+                MarketData.indices(
+                    startup.marketStatus.isKnown && startup.marketStatus.isOpen
+                )
+            }.getOrDefault(emptyList())
+        }.orEmpty()
+        if (indices.isNotEmpty()) {
+            marketIndices = indices
+        }
     }
 
     var page by remember { mutableStateOf(Page.HOME) }
