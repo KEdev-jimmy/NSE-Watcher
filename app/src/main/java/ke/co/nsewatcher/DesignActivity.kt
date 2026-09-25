@@ -46,6 +46,7 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
 import coil3.compose.AsyncImage
 import androidx.compose.ui.unit.dp
@@ -442,57 +443,75 @@ private fun BottomNav(selected: Int, onSelect: (Int) -> Unit) {
     )
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val palette = premiumHomePalette(dark)
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 5.dp),
-        shape = RoundedCornerShape(28.dp),
-        color = palette.nav,
-        border = BorderStroke(1.dp, palette.border),
-        tonalElevation = 0.dp,
-        shadowElevation = 7.dp
+
+    BoxWithConstraints(
+        Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 5.dp)
     ) {
-        Row(
-            Modifier.fillMaxWidth().height(68.dp).padding(horizontal = 6.dp, vertical = 5.dp),
-            verticalAlignment = Alignment.CenterVertically
+        val compact = shouldCompactBottomNav(
+            widthDp = maxWidth.value,
+            fontScale = LocalDensity.current.fontScale,
+            itemCount = items.size
+        )
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(28.dp),
+            color = palette.nav,
+            border = BorderStroke(1.dp, palette.border),
+            tonalElevation = 0.dp,
+            shadowElevation = 7.dp
         ) {
-            items.forEachIndexed { index, item ->
-                val isSelected = selected == index
-                val selectedModifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .clip(RoundedCornerShape(23.dp))
-                    .background(
-                        if (isSelected) palette.primary.copy(alpha = if (dark) 0.13f else 0.10f)
-                        else Color.Transparent
-                    )
-                    .clickable { onSelect(index) }
-                Column(
-                    selectedModifier,
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        item.second,
-                        contentDescription = item.first,
-                        tint = if (isSelected) palette.primary else palette.muted,
-                        modifier = Modifier.size(if (isSelected) 25.dp else 23.dp)
-                    )
-                    Spacer(Modifier.height(3.dp))
-                    Text(
-                        item.first,
-                        color = if (isSelected) palette.primary else palette.muted,
-                        fontSize = 10.sp,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                    )
-                    if (isSelected) {
-                        Spacer(Modifier.height(3.dp))
-                        Box(
-                            Modifier
-                                .size(4.dp)
-                                .clip(CircleShape)
-                                .background(palette.primary)
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .height(if (compact) 64.dp else 68.dp)
+                    .padding(horizontal = 6.dp, vertical = 5.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                items.forEachIndexed { index, item ->
+                    val isSelected = selected == index
+                    val selectedModifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clip(RoundedCornerShape(23.dp))
+                        .background(
+                            if (isSelected) {
+                                palette.primary.copy(alpha = if (dark) 0.13f else 0.10f)
+                            } else {
+                                Color.Transparent
+                            }
                         )
+                        .clickable { onSelect(index) }
+                    Column(
+                        selectedModifier,
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            item.second,
+                            contentDescription = item.first,
+                            tint = if (isSelected) palette.primary else palette.muted,
+                            modifier = Modifier.size(if (isSelected) 25.dp else 23.dp)
+                        )
+                        if (!compact || isSelected) {
+                            Spacer(Modifier.height(3.dp))
+                            Text(
+                                item.first,
+                                color = if (isSelected) palette.primary else palette.muted,
+                                fontSize = if (compact) 9.sp else 10.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            )
+                        }
+                        if (isSelected && !compact) {
+                            Spacer(Modifier.height(3.dp))
+                            Box(
+                                Modifier
+                                    .size(4.dp)
+                                    .clip(CircleShape)
+                                    .background(palette.primary)
+                            )
+                        }
                     }
                 }
             }
