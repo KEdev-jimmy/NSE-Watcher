@@ -178,6 +178,14 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
             newEvidenceAfterReview = 0
         )
     }
+    val valuationFreshness = remember(s, quoteFeed) {
+        s?.let { PracticePortfolioPresentation.valuationFreshness(it, quoteFeed) }
+            ?: PracticeValuationFreshness(provisional = false)
+    }
+    val attentionSummary = remember(s, learningInsights) {
+        s?.let { PracticePortfolioPresentation.attention(it, learningInsights) }
+            ?: PracticeAttentionSummary(0, 0, 0)
+    }
     val selected = companies.firstOrNull { it.symbol == symbol } ?: s?.quotes?.firstOrNull { it.symbol == symbol }?.let { Stock(it.symbol, it.name.ifBlank { it.symbol }, it.price, 0.0, emptyList(), sector = it.sector, observedAt = it.at, changeAvailable = false) }
         ?: Stock(symbol, symbol, Double.NaN, 0.0, emptyList(), changeAvailable = false, volumeAvailable = false)
     fun trade(stock: Stock, direction: String, id: String = "") {
@@ -260,7 +268,7 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
                 when {
                     page == "DIVIDENDS" -> item { Column(verticalArrangement = Arrangement.spacedBy(14.dp)) { PracticeDividends() } }
                     page == "HOLDING" -> item {
-                        PracticeHoldingDetail(s, selected, onTrade = { trade(selected, it) }, onResearch = { openCompany(selected) }, onNews = { sheet = "Related news" }, onNotes = { sheet = "Holding note" })
+                        PracticeHoldingDetail(s, selected, quoteFeed, onTrade = { trade(selected, it) }, onResearch = { openCompany(selected) }, onNews = { sheet = "Related news" }, onNotes = { sheet = "Holding note" })
                     }
                     !s.enabled -> item {
                         ResearchPanel {
@@ -273,44 +281,130 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
                     tab == "Overview" -> {
                         val positions = PracticeEngine.positions(s)
                         val value = PracticeEngine.value(s)
-                        val provisional = positions.any { it.estimated }
-                        item {
-                            ResearchCaption(when { !market.isKnown -> "Market status unavailable"; market.isOpen -> "Market open • Delayed observations"; else -> "Market closed • Latest available prices" })
-                            val latest = s.quotes.filter { q -> s.holdings.any { it.symbol == q.symbol } }.maxByOrNull { CompanyResearchPresentation.timestamp(it.at) ?: Instant.MIN }
-                            ResearchCaption(latest?.let { "Latest holding quote: ${CompanyResearchPresentation.date(it.at)}" } ?: "Quote dates appear on your holdings.")
+                        val provisional = positions.any { it.estimated } || valuationFreshness.provisional
+                        val marketLabel = when {
+                            !market.isKnown -> "Status unavailable"
+                            market.isOpen -> "Market open"
+                            else -> "Market closed"
                         }
-                        item { ResearchPanel {
-                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) { PracticeIcon(Icons.Outlined.BarChart); Column(Modifier.weight(1f)) {
-                                ResearchCaption(if (provisional) "Estimated portfolio value" else "Portfolio value")
-                                Text(practiceMoney(value), color = ResearchText, fontSize = 29.sp, fontWeight = FontWeight.Bold)
-                                Text("${practiceGain(value - s.contributed)} since start", color = researchChangeColor(value-s.contributed), fontWeight = FontWeight.Bold)
-                            } }
-                            ResearchCaption("After recorded practice costs • Added cash excluded from profit")
-                            if (provisional) ResearchCaption("Some holdings have no dated quote. Their cost is shown as an estimate; this gain is provisional.")
-                        } }
-                        item { Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) { PracticeMetric("Cash balance", practiceMoney(s.cash), Modifier.weight(1f)); PracticeMetric("Shares value", practiceMoney(value - s.cash), Modifier.weight(1f)) } }
-                        item { ResearchCaption("${practiceMoney(PracticeEngine.reserved(s))} reserved for orders • ${practiceMoney(PracticeEngine.available(s))} available") }
-                        item { Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                            Button(onClick = { sheet = "Choose company" }, modifier = Modifier.weight(1f)) { Text("Buy shares") }
-                            OutlinedButton(onClick = { sheet = "Add virtual cash" }, modifier = Modifier.weight(1f)) { Text("Add virtual cash") }
-                        } }
+                        val latest = s.quotes
+                            .filter { q -> s.holdings.any { it.symbol == q.symbol } }
+                            .maxByOrNull { CompanyResearchPresentation.timestamp(it.at) ?: Instant.MIN }
+                        val observationLabel = latest?.let {
+                            "Latest saved holding observation: ${CompanyResearchPresentation.date(it.at)}"
+                        } ?: "No dated holding observation has been saved yet."
+
+                        item {
+                            PracticePortfolioHero(
+                                value = value,
+                                gain = value - s.contributed,
+                                provisional = provisional,
+                                marketLabel = marketLabel,
+                                observationLabel = observationLabel
+                            )
+                        }
+
+                        item {
+                            PracticeAdaptivePair(
+                                first = { modifier ->
+                                    PracticeMetric(
+                                        "Available cash",
+                                        practiceMoney(PracticeEngine.available(s)),
+                                        modifier
+                                    )
+                                },
+                                second = { modifier ->
+                                    PracticeMetric(
+                                        "Shares value",
+                                        practiceMoney(value - s.cash),
+                                        modifier
+                                    )
+                                }
+                            )
+                        }
+
+                        val reserved = PracticeEngine.reserved(s)
+                        if (reserved > 0.0) {
+                            item {
+                                ResearchCaption(
+                                    "${practiceMoney(reserved)} is reserved for pending buy orders. " +
+                                        "Pending sell orders reserve shares instead of cash."
+                                )
+                            }
+                        }
+
+                        item {
+                            PracticeAdaptivePair(
+                                first = { modifier ->
+                                    Button(
+                                        onClick = { sheet = "Choose company" },
+                                        modifier = modifier.heightIn(min = 48.dp)
+                                    ) {
+                                        Icon(Icons.Outlined.AddShoppingCart, null, modifier = Modifier.size(18.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("Buy shares")
+                                    }
+                                },
+                                second = { modifier ->
+                                    OutlinedButton(
+                                        onClick = { sheet = "Add virtual cash" },
+                                        modifier = modifier.heightIn(min = 48.dp)
+                                    ) {
+                                        Icon(Icons.Outlined.AddCard, null, modifier = Modifier.size(18.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("Add virtual cash")
+                                    }
+                                }
+                            )
+                        }
+
+                        item {
+                            PracticeAttentionCard(
+                                summary = attentionSummary,
+                                onOrders = {
+                                    tab = "Activity"
+                                    activityTab = "Orders"
+                                },
+                                onLearn = { tab = "Learn" },
+                                onBrowse = { sheet = "Choose company" }
+                            )
+                        }
+
                         item { PracticeJourney(s) }
+
                         item {
                             PracticeLearningInsightsCard(
                                 insights = learningInsights,
                                 onOpenCenter = { tab = "Learn" }
                             )
                         }
-                        val pending = s.orders.count { it.status == "PENDING" }
-                        if (pending > 0) item { ResearchPanel {
-                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) { PracticeIcon(Icons.Outlined.Schedule, true); Column(Modifier.weight(1f)) { Text("$pending order${if (pending == 1) "" else "s"} waiting", color = PracticeAmber, fontWeight = FontWeight.Bold); ResearchCaption("View the reason for each order") } }
-                            TextButton(onClick = { tab = "Activity"; activityTab = "Orders" }) { Text("View orders →") }
-                        } }
-                        item { ResearchPanel { PracticeIcon(Icons.Outlined.PieChart); ResearchTitle("Understand your exposure"); PracticeAllocation(s, companies); TextButton(onClick = { tab = "Holdings" }) { Text("Explore your holdings →") } } }
-                        item { ResearchPanel { PracticeLink(Icons.Outlined.AccountBalanceWallet, "Dividends and eligibility") { page = "DIVIDENDS" }; PracticeLink(Icons.Outlined.MenuBook, "How practice trading works") { sheet = "Practice rules" } } }
+
+                        item {
+                            ResearchPanel {
+                                PracticeIcon(Icons.Outlined.PieChart)
+                                ResearchTitle("Understand your exposure")
+                                PracticeAllocation(s, companies)
+                                TextButton(onClick = { tab = "Holdings" }) {
+                                    Text("Explore your holdings →")
+                                }
+                            }
+                        }
+
+                        item {
+                            ResearchPanel {
+                                PracticeLink(
+                                    Icons.Outlined.AccountBalanceWallet,
+                                    "Dividends and eligibility"
+                                ) { page = "DIVIDENDS" }
+                                PracticeLink(
+                                    Icons.Outlined.MenuBook,
+                                    "How practice trading works"
+                                ) { sheet = "Practice rules" }
+                            }
+                        }
                     }
                     tab == "Holdings" -> item {
-                        PracticeHoldings(s, companies, onHolding = { symbol = it.symbol; page = "HOLDING" }, onTrade = { trade(it, "BUY") }, onResearch = openCompany, onBrowse = { sheet = "Choose company" }, onRules = { sheet = "Valuation" })
+                        PracticeHoldings(s, companies, quoteFeed, onHolding = { symbol = it.symbol; page = "HOLDING" }, onTrade = { trade(it, "BUY") }, onResearch = openCompany, onBrowse = { sheet = "Choose company" }, onRules = { sheet = "Valuation" })
                     }
                     tab == "Learn" -> item {
                         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
