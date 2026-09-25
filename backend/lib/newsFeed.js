@@ -189,18 +189,13 @@ const STRICT_KENYA_MACRO_TERMS = [
 
 function isRelevantExternalNews(item) {
   const haystack = `${item.title} ${item.summary}`.toLowerCase();
+  const tokens = haystack.toUpperCase().split(/[^A-Z0-9&]+/).filter(Boolean);
   if (NSE_COMPANIES.some(([symbol, company]) =>
-    haystack.includes(company.toLowerCase()) ||
-    new RegExp(`\\b${symbol.replace(/[&.]/g, '\\function isRelevantExternalNews(item) {
-  const haystack = `${item.title} ${item.summary}`.toLowerCase();
-  if (NSE_COMPANIES.some(([symbol, company]) => haystack.includes(company.toLowerCase()) || new RegExp(`\\b${symbol.replace(/[&.]/g, '\\$&')}\\b`, 'i').test(haystack))) return true;
-  return INTELLIGENCE_MARKET_TERMS.some(term => haystack.includes(term));
-}
-')}\\b`, 'i').test(haystack)
+    haystack.includes(company.toLowerCase()) || tokens.includes(symbol.toUpperCase())
   )) return true;
   if (STRICT_EXTERNAL_MARKET_TERMS.some(term => haystack.includes(term))) return true;
   const kenyaMacro = STRICT_KENYA_MACRO_TERMS.some(term => haystack.includes(term));
-  const marketContext = /\\b(nse|shares?|stocks?|equities|securities|market|investors?)\\b/i.test(haystack);
+  const marketContext = /\b(nse|shares?|stocks?|equities|securities|market|investors?)\b/i.test(haystack);
   return kenyaMacro && marketContext;
 }
 
