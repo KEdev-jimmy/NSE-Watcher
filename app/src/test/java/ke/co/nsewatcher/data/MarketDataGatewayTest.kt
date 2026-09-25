@@ -79,6 +79,50 @@ class MarketDataGatewayTest {
                 )
             )
         }
+
+        override suspend fun newsDetail(id: String): NewsItem? {
+            calls += "news-detail:$id"
+            return NewsItem(
+                id = id,
+                title = "Detailed KCB update",
+                summary = "",
+                body = "Full article",
+                source = "Issuer",
+                publishedAt = "2026-09-23T09:00:00Z",
+                category = "Company News",
+                symbol = "KCB",
+                companyName = "KCB Group",
+                imageUrl = "",
+                url = "https://example.com/kcb",
+                dividendAmount = "",
+                exDate = "",
+                paymentDate = ""
+            )
+        }
+
+        override suspend fun companyNews(symbol: String): NewsCache.FeedResult {
+            calls += "company-news:$symbol"
+            return NewsCache.FeedResult(
+                items = listOf(
+                    NewsItem(
+                        id = "company-1",
+                        title = "$symbol company update",
+                        summary = "",
+                        body = "",
+                        source = "Issuer",
+                        publishedAt = "2026-09-23T10:00:00Z",
+                        category = "Company News",
+                        symbol = symbol,
+                        companyName = "Company",
+                        imageUrl = "",
+                        url = "https://example.com/company",
+                        dividendAmount = "",
+                        exDate = "",
+                        paymentDate = ""
+                    )
+                )
+            )
+        }
     }
 
     @Test fun delegatesCurrentMarketShapesWithoutReinterpretingThem() = runBlocking {
@@ -91,6 +135,8 @@ class MarketDataGatewayTest {
         assertEquals("^NASI", gateway.indices(true).single().symbol)
         assertEquals(10.0, gateway.history("KCB", "1m").prices.single(), 0.0001)
         assertEquals("n1", gateway.newsFeed(forceRefresh = true).items.single().id)
+        assertEquals("detail-1", gateway.newsDetail("detail-1")?.id)
+        assertEquals("company-1", gateway.companyNews("KCB").items.single().id)
 
         assertEquals(
             listOf(
@@ -99,7 +145,9 @@ class MarketDataGatewayTest {
                 "status",
                 "indices:true",
                 "history:KCB:1m",
-                "news:true"
+                "news:true",
+                "news-detail:detail-1",
+                "company-news:KCB"
             ),
             provider.calls
         )
