@@ -85,19 +85,6 @@ private val Red: Color
 private const val PREFS = "nse_watcher_preferences"
 
 
-private fun formatPrice(value: Double): String = "KSh " + String.format(Locale.US, "%,.2f", value)
-private fun formatShares(value: Long): String = String.format(Locale.US, "%,d", value)
-private fun marketObservationShort(stock: Stock): String {
-    if (stock.observedAt.isBlank()) return "Latest NSE observation unavailable"
-    val delay = stock.delayMinutes ?: 15
-    val observed = runCatching {
-        java.time.Instant.parse(stock.observedAt)
-            .atZone(java.time.ZoneId.of("Africa/Nairobi"))
-            .format(java.time.format.DateTimeFormatter.ofPattern("dd MMM, HH:mm", Locale.US))
-    }.getOrDefault(stock.observedAt.replace("T", " ").removeSuffix("Z").take(16))
-    return "As of $observed EAT • $delay-min delayed"
-}
-
 data class Stock(val symbol:String,val name:String,val price:Double,val change:Double,val history:List<Double>,val logoUrl:String?=null,val sector:String="Other",val volume:Long=0L,val changeAvailable:Boolean=true,val volumeAvailable:Boolean=true,val source:String="",val observedAt:String="",val freshnessMode:String="UNKNOWN",val dataOrigin:String="unknown",val averageVolume:Long=0L,val averageVolumeAvailable:Boolean=false,val previousClose:Double?=null,val delayMinutes:Int?=null)
 
 data class NewsItem(
@@ -438,16 +425,6 @@ private fun App(
     }}
 }
 
-@Composable private fun Section(t:String,s:String){Column{Text(t,fontWeight=FontWeight.ExtraBold,fontSize=16.sp);Text(s,color=Muted,fontSize=10.sp)}}
-@Composable private fun Logo(symbol:String,size:Int,logoUrl:String?=null){
-    val resolvedUrl = logoUrl?.takeIf{it.isNotBlank()} ?: "https://mystocks.africa/logos/${symbol.lowercase(Locale.US)}-ke.svg"
-    Surface(Modifier.size(size.dp),RoundedCornerShape(8.dp),when(symbol){"SCOM"->Color(0xFF0B8F4D);"KCB"->Color(0xFF1B4D9B);"EQTY"->Color(0xFF137A45);"ABSA"->Color(0xFFC6283D);"COOP"->Color(0xFF1769AA);"EABL"->Color(0xFFB8A23A);else->Color(0xFF285C8C)}){
-        Box(Modifier.fillMaxSize(),Alignment.Center){
-            AsyncImage(model=resolvedUrl,contentDescription=symbol,modifier=Modifier.fillMaxSize().padding(5.dp),contentScale=androidx.compose.ui.layout.ContentScale.Fit)
-            Text(symbol.take(3),color=Color.White.copy(alpha=.85f),fontWeight=FontWeight.ExtraBold,fontSize=8.sp)
-        }
-    }
-}
 @Composable private fun TopBar(name:String,go:(Page)->Unit){
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     Row(
@@ -531,8 +508,6 @@ private fun BottomNav(selected: Int, onSelect: (Int) -> Unit) {
         }
     }
 }
-@Composable private fun Header(title:String,sub:String?=null,back:(()->Unit)?=null){Row(Modifier.fillMaxWidth().padding(horizontal=8.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically){if(back!=null)IconButton(back){Icon(Icons.Default.ArrowBack,"Back")};Column{Text(title,fontSize=20.sp,fontWeight=FontWeight.ExtraBold);if(sub!=null)Text(sub,fontSize=10.sp,color=Muted)}}}
-
 @Composable
 private fun Company(
     s: Stock,
@@ -578,191 +553,6 @@ private fun Company(
     )
 }
 
-@Composable
-private fun CompanyNewsSection(
-    symbol: String,
-    items: List<NewsItem>,
-    loading: Boolean,
-    error: String?
-) {
-    Card(Modifier.fillMaxWidth(), RoundedCornerShape(17.dp), border = BorderStroke(1.dp, Border)) {
-        Column(Modifier.padding(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Company Intelligence", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
-                    Text("News & corporate actions for $symbol", color = Muted, fontSize = 10.sp)
-                }
-                Surface(shape = RoundedCornerShape(20.dp), color = LightGreen) {
-                    Text("90 DAYS", color = Green, fontWeight = FontWeight.Bold, fontSize = 8.sp, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
-                }
-            }
-            Spacer(Modifier.height(8.dp))
-            when {
-                loading -> {
-                    Row(Modifier.fillMaxWidth().padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = Green)
-                        Spacer(Modifier.width(10.dp))
-                        Text("Loading company news…", color = Muted, fontSize = 10.sp)
-                    }
-                }
-                error != null -> {
-                    Text("Company news temporarily unavailable", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(vertical = 10.dp))
-                }
-                items.isEmpty() -> {
-                    Text("No recent company news found", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(vertical = 10.dp))
-                }
-                else -> {
-                    items.take(5).forEachIndexed { index, news ->
-                        Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.Top) {
-                            if (news.symbol.isNotBlank()) {
-                                Logo(news.symbol, 36)
-                            } else {
-                                Surface(Modifier.size(36.dp), RoundedCornerShape(9.dp), LightGreen) {
-                                    Icon(Icons.Default.Article, null, tint = Green, modifier = Modifier.padding(9.dp))
-                                }
-                            }
-                            Spacer(Modifier.width(9.dp))
-                            Column(Modifier.weight(1f)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    NewsChip(news.category, false)
-                                    Spacer(Modifier.width(6.dp))
-                                    Text(newsDate(news.publishedAt), color = Muted, fontSize = 8.sp)
-                                }
-                                Spacer(Modifier.height(4.dp))
-                                Text(news.title, fontWeight = FontWeight.Bold, fontSize = 11.sp, maxLines = 3)
-                                if (news.summary.isNotBlank()) {
-                                    Spacer(Modifier.height(2.dp))
-                                    Text(news.summary, color = Muted, fontSize = 9.sp, maxLines = 2)
-                                }
-                            }
-                        }
-                        if (index < items.take(5).lastIndex) HorizontalDivider(color = Border)
-                    }
-                }
-            }
-            Spacer(Modifier.height(5.dp))
-            Text("Sourced from MyStocks Africa • approximately 15 min delayed. Verify material announcements with the issuer or NSE.", color = Muted, fontSize = 8.sp)
-        }
-    }
-}
-
-@Composable
-private fun CompanyHistoryChart(values: List<Double>, tint: Color) {
-    val valid = values.filter { it.isFinite() && it > 0.0 }
-    if (valid.size < 2) return
-
-    Canvas(
-        Modifier
-            .fillMaxWidth()
-            .height(150.dp)
-            .padding(vertical = 8.dp)
-    ) {
-        val min = valid.minOrNull() ?: return@Canvas
-        val max = valid.maxOrNull() ?: return@Canvas
-        val range = (max - min).takeIf { it > 0.0 } ?: 1.0
-        val path = Path()
-
-        valid.forEachIndexed { index, value ->
-            val x = size.width * index / (valid.lastIndex.coerceAtLeast(1))
-            val y = size.height - (((value - min) / range).toFloat() * size.height)
-            if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
-        }
-
-        drawPath(
-            path = path,
-            color = tint,
-            style = Stroke(width = 4f, cap = StrokeCap.Round)
-        )
-    }
-}
-
-@Composable private fun InfoRow(i:ImageVector,a:String,b:String){Row(Modifier.fillMaxWidth().padding(vertical=7.dp),verticalAlignment=Alignment.CenterVertically){Icon(i,null,tint=Green,modifier=Modifier.size(20.dp));Spacer(Modifier.width(10.dp));Text(a,Modifier.weight(1f),fontSize=11.sp);Text(b,fontSize=11.sp,fontWeight=FontWeight.Bold)}}
-
-@Composable
-private fun News(open:(NewsItem)->Unit){
-    var items by remember { mutableStateOf(emptyList<NewsItem>()) }
-    var loading by remember { mutableStateOf(true) }
-    var category by rememberSaveable { mutableStateOf("All") }
-    LaunchedEffect(Unit){ loading=true; items=MarketData.newsFeed().items; loading=false }
-    val categories=listOf("All","Company News","Dividends","Market","Analysis","Corporate Actions")
-    val filtered=if(category=="All") items else items.filter{it.category.equals(category,true)}
-    val top=filtered.firstOrNull()
-    val trending=filtered.drop(1).take(3)
-    val latest=filtered.drop(4)
-    LazyColumn(contentPadding=PaddingValues(16.dp,8.dp,16.dp,20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
-        item{Header("News","NSE companies, dividends & market intelligence")}
-        item{Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(7.dp)){categories.forEach{c->FilterChip(selected=category==c,onClick={category=c},label={Text(c,fontSize=10.sp)})}}}
-        if(loading){item{Box(Modifier.fillMaxWidth().height(180.dp),contentAlignment=Alignment.Center){CircularProgressIndicator(color=Green)}}}
-        else if(filtered.isEmpty()){
-            item{Card(Modifier.fillMaxWidth(),RoundedCornerShape(18.dp),border=BorderStroke(1.dp,Border)){Column(Modifier.fillMaxWidth().padding(20.dp),horizontalAlignment=Alignment.CenterHorizontally){Icon(Icons.Default.Article,null,tint=Green,modifier=Modifier.size(36.dp));Spacer(Modifier.height(8.dp));Text("News unavailable",fontWeight=FontWeight.ExtraBold,fontSize=16.sp);Text("The live news provider did not return any articles right now. No placeholder news is shown.",color=Muted,fontSize=10.sp,textAlign=TextAlign.Center)}}}
-        } else {
-            top?.let{item{Text("Top News",fontWeight=FontWeight.ExtraBold,fontSize=17.sp)};item{NewsFeatured(it,open)}}
-            if(trending.isNotEmpty()){
-                item{Text("Most Trending News",fontWeight=FontWeight.ExtraBold,fontSize=17.sp)}
-                items(trending){item->NewsListCard(item,open)}
-            }
-            if(latest.isNotEmpty()){
-                item{Text("Latest News",fontWeight=FontWeight.ExtraBold,fontSize=17.sp)}
-                items(latest){item->NewsListCard(item,open)}
-            }
-        }
-        item{Text("News and corporate-action information is sourced through the MyStocks market-intelligence feed. Market data may be delayed; always verify important announcements against the issuer or exchange source.",color=Muted,fontSize=9.sp)}
-    }
-}
-
-private data class NewsDisplayMeta(val symbol:String,val company:String,val logoUrl:String,val label:String,val icon:ImageVector)
-
-private fun newsDisplayMeta(item:NewsItem):NewsDisplayMeta{
-    val raw=item.symbol.trim().uppercase(Locale.US)
-    val normalized=raw.removeSuffix(".KE")
-    val stock=stocks.firstOrNull{it.symbol.equals(normalized,true)}
-    val company=item.companyName.trim().ifBlank{stock?.name.orEmpty()}
-    val symbol=stock?.symbol?:normalized
-    if(company.isNotBlank()||symbol.isNotBlank()){
-        val logo=stock?.logoUrl?.takeIf{it.isNotBlank()} ?: "https://mystocks.africa/logos/${symbol.lowercase(Locale.US)}-ke.svg"
-        return NewsDisplayMeta(symbol,company,logo,symbol.ifBlank{"COMPANY"},Icons.Default.Business)
-    }
-    val c=item.category.lowercase(Locale.US)
-    return when{
-        c.contains("dividend")->NewsDisplayMeta("","","","NSE DIVIDEND",Icons.Default.Payments)
-        c.contains("corporate")||c.contains("action")->NewsDisplayMeta("","","","NSE ACTION",Icons.Default.Event)
-        c.contains("sector")->NewsDisplayMeta("","","","SECTOR",Icons.Default.AccountTree)
-        c.contains("market")->NewsDisplayMeta("","","","MARKET",Icons.Default.TrendingUp)
-        else->NewsDisplayMeta("","","","MARKET INTELLIGENCE",Icons.Default.Article)
-    }
-}
-
-@Composable private fun NewsMetaIcon(item:NewsItem,size:Int,dark:Boolean=false){
-    val meta=newsDisplayMeta(item)
-    if(meta.logoUrl.isNotBlank()&&meta.symbol.isNotBlank()){
-        Surface(Modifier.size(size.dp),RoundedCornerShape(9.dp),if(dark) Color.White.copy(alpha=.13f) else LightGreen){
-            Box(Modifier.fillMaxSize(),Alignment.Center){AsyncImage(model=meta.logoUrl,contentDescription=meta.symbol,modifier=Modifier.fillMaxSize().padding(5.dp),contentScale=androidx.compose.ui.layout.ContentScale.Fit);Text(meta.symbol.take(3),color=if(dark) Color.White.copy(alpha=.75f) else Green,fontWeight=FontWeight.ExtraBold,fontSize=7.sp)}
-        }
-    }else{
-        Surface(Modifier.size(size.dp),RoundedCornerShape(9.dp),if(dark) Color.White.copy(alpha=.13f) else LightGreen){Icon(meta.icon,null,tint=if(dark) Color.White else Green,modifier=Modifier.padding((size/4).dp))}
-    }
-}
-
-@Composable private fun NewsFeatured(item:NewsItem,open:(NewsItem)->Unit){
-    Card(Modifier.fillMaxWidth().clickable{open(item)},RoundedCornerShape(19.dp),colors=CardDefaults.cardColors(containerColor=DarkGreen)){
-        Box(Modifier.fillMaxWidth().height(240.dp)){
-            Box(Modifier.fillMaxSize().background(Color(0x66083C27)))
-            Column(Modifier.fillMaxSize().padding(15.dp),verticalArrangement=Arrangement.Bottom){
-                Row(verticalAlignment=Alignment.CenterVertically){NewsMetaIcon(item,38,true);Spacer(Modifier.width(7.dp));Column(Modifier.weight(1f)){Text(newsDisplayMeta(item).label,color=Color.White,fontWeight=FontWeight.ExtraBold,fontSize=9.sp);if(newsDisplayMeta(item).company.isNotBlank())Text(newsDisplayMeta(item).company,color=Color.White.copy(alpha=.8f),fontSize=8.sp)};NewsChip(item.category,true)}
-                Spacer(Modifier.height(6.dp));Text(item.title,color=Color.White,fontWeight=FontWeight.ExtraBold,fontSize=18.sp,maxLines=3);if(item.summary.isNotBlank()){Spacer(Modifier.height(4.dp));Text(item.summary,color=Color(0xFFD5E9DF),fontSize=10.sp,maxLines=2)}
-                Spacer(Modifier.height(5.dp));Row(verticalAlignment=Alignment.CenterVertically){Text(newsDate(item.publishedAt),color=Color.White.copy(alpha=.75f),fontSize=8.sp);Spacer(Modifier.weight(1f));Text("Read full article →",color=Color.White,fontWeight=FontWeight.Bold,fontSize=10.sp)}
-            }
-        }
-    }
-}
-
-@Composable private fun NewsListCard(item:NewsItem,open:(NewsItem)->Unit){Card(Modifier.fillMaxWidth().clickable{open(item)},RoundedCornerShape(16.dp),border=BorderStroke(1.dp,Border)){Row(Modifier.padding(11.dp),verticalAlignment=Alignment.CenterVertically){NewsMetaIcon(item,42);Spacer(Modifier.width(10.dp));Column(Modifier.weight(1f)){Row(verticalAlignment=Alignment.CenterVertically){Text(if(newsDisplayMeta(item).company.isNotBlank()) newsDisplayMeta(item).company else newsDisplayMeta(item).label,fontSize=9.sp,color=Muted,modifier=Modifier.weight(1f));NewsChip(item.category,false)};Spacer(Modifier.height(3.dp));Text(item.title,fontWeight=FontWeight.Bold,fontSize=12.sp,maxLines=2);if(item.summary.isNotBlank())Text(item.summary,color=Muted,fontSize=9.sp,maxLines=2);Text(newsDate(item.publishedAt),color=Muted,fontSize=8.sp)};Icon(Icons.Default.ChevronRight,null,tint=Muted)}}}
-
-@Composable private fun NewsChip(label:String,dark:Boolean){Surface(shape=RoundedCornerShape(20.dp),color=if(dark) Color.White.copy(alpha=.16f) else LightGreen){Text(label,color=if(dark) Color.White else Green,fontWeight=FontWeight.Bold,fontSize=8.sp,modifier=Modifier.padding(horizontal=8.dp,vertical=4.dp))}}
-
-private fun newsDate(value:String):String=when{value.isBlank()->"Latest";value.length>=10->value.take(10);else->value}
-
-
 private object PaperPortfolioStore {
     private fun prefs(context: Context) = context.getSharedPreferences("nse_watcher_paper_portfolio", Context.MODE_PRIVATE)
     fun isEnabled(context: Context) = prefs(context).getBoolean("enabled", false)
@@ -772,14 +562,3 @@ private object PaperPortfolioStore {
             else runCatching { JSONObject(raw).getDouble("cash") }.getOrDefault(0.0)
     }
 }
-
-@Composable private fun SettingsCard(title:String,icon:ImageVector,content:@Composable ColumnScope.()->Unit){Card(Modifier.fillMaxWidth(),RoundedCornerShape(18.dp),border=BorderStroke(1.dp,Border)){Column(Modifier.padding(14.dp)){Row(verticalAlignment=Alignment.CenterVertically){Surface(Modifier.size(34.dp),CircleShape,LightGreen){Icon(icon,null,tint=Green,modifier=Modifier.padding(8.dp))};Spacer(Modifier.width(9.dp));Text(title,fontWeight=FontWeight.ExtraBold,fontSize=15.sp)};Spacer(Modifier.height(4.dp));content()}}}
-@Composable private fun ToggleRow(icon:ImageVector,title:String,sub:String,checked:Boolean,onChecked:(Boolean)->Unit){Row(Modifier.fillMaxWidth().padding(vertical=7.dp),verticalAlignment=Alignment.CenterVertically){Icon(icon,null,tint=Green,modifier=Modifier.size(21.dp));Spacer(Modifier.width(10.dp));Column(Modifier.weight(1f)){Text(title,fontSize=12.sp,fontWeight=FontWeight.Bold);Text(sub,fontSize=9.sp,color=Muted)};Switch(checked,onChecked)}}
-@Composable private fun RowItem(icon:ImageVector,title:String,sub:String,onClick:()->Unit={}){Row(Modifier.fillMaxWidth().clickable(onClick=onClick).padding(vertical=9.dp),verticalAlignment=Alignment.CenterVertically){Icon(icon,null,tint=Green,modifier=Modifier.size(22.dp));Spacer(Modifier.width(11.dp));Column(Modifier.weight(1f)){Text(title,fontSize=12.sp,fontWeight=FontWeight.Bold);Text(sub,fontSize=9.sp,color=Muted)};Icon(Icons.Default.ChevronRight,null,tint=Muted,modifier=Modifier.size(19.dp))}}
-@Composable private fun Note(text:String){Card(Modifier.fillMaxWidth(),RoundedCornerShape(14.dp),colors=CardDefaults.cardColors(containerColor=LightGreen)){Row(Modifier.padding(12.dp),verticalAlignment=Alignment.CenterVertically){Icon(Icons.Default.Info,null,tint=Green);Spacer(Modifier.width(9.dp));Text(text,fontSize=9.sp,color=Muted)}}}
-
-
-
-
-
-
