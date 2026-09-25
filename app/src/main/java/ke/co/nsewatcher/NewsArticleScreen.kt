@@ -31,7 +31,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import ke.co.nsewatcher.data.MarketData
-import ke.co.nsewatcher.data.NewsCache
 import ke.co.nsewatcher.data.SavedNewsStore
 import ke.co.nsewatcher.data.WatchlistStore
 import kotlinx.coroutines.CancellationException
@@ -96,7 +95,7 @@ private fun ArticleReader(item: NewsItem, catalog: List<Stock>, quotes: List<Sto
     LaunchedEffect(retry) {
         loading = true
         try {
-            val fresh = NewsCache.loadDetail(item.id)
+            val fresh = MarketData.newsDetail(item.id)
             detailError = fresh == null || fresh.id != item.id
             if (fresh != null && fresh.id == item.id) {
                 detail = ArticlePresentation.merge(detail, fresh)
@@ -288,8 +287,8 @@ private fun RelatedArticleSheet(company: Stock, currentId: String, dismiss: () -
     LaunchedEffect(retry) {
         loading = true
         try {
-            val direct = NewsCache.loadCompanyNews(company.symbol)
-            val feed = NewsCache.loadFeedResult(forceRefresh = retry > 0)
+            val direct = MarketData.companyNews(company.symbol)
+            val feed = MarketData.newsFeed(forceRefresh = retry > 0)
             error = direct.error != null && feed.error != null
             if (!error) stories = WatchlistPresentation.linkedNews(direct.items + feed.items, listOf(company)).filter { it.id != currentId }
         } catch (cancelled: CancellationException) { throw cancelled }
