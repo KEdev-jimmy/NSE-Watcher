@@ -405,7 +405,20 @@ private fun App(
                 },
                 onPracticeAlerts={practiceAlerts=it;put("practice_alerts",it)},
                 onSoundMode={notificationSound=it;put("notification_sound",it)},
-                openAlertRules={go(Page.ALERTS)},back=::back
+                openAlertRules={go(Page.ALERTS)},
+                openAlertEvent={event->
+                    val target=AlertDestination.from(event)
+                    val article=target.article()
+                    if(article!=null){
+                        alertNavigationRevision++
+                        selectedNews=article
+                        go(Page.NEWS_DETAIL)
+                    }else{
+                        selected=target.company(CompaniesPresentation.companies(companyCatalog,stocks))
+                        go(Page.COMPANY)
+                    }
+                },
+                back=::back
             )
             Page.LIVE_DATA->MarketDataSettingsScreen(autoRefresh,{autoRefresh=it;put("auto_refresh",it)},::back)
             Page.CHARTS->ChartSettingsScreen(chartDefaultRange,chartShowGrid,{chartDefaultRange=it;put("chart_default_range",it)},{chartShowGrid=it;put("chart_show_grid",it)},::back)
