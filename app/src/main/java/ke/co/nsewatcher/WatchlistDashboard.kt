@@ -61,8 +61,10 @@ import kotlinx.coroutines.sync.withPermit
 @Composable
 fun WatchlistDashboard(
     quoteStocks: List<Stock>, initialCatalog: List<Stock>, initialMarket: MyStocksCache.MarketStatus,
-    onQuotesLoaded: (List<Stock>) -> Unit, openCompany: (Stock) -> Unit,
-    openNews: (NewsItem) -> Unit, openPreferences: () -> Unit, back: () -> Unit
+    sharedNews: List<NewsItem>,
+    onQuotesLoaded: (List<Stock>) -> Unit, onNewsLoaded: (List<NewsItem>) -> Unit,
+    openCompany: (Stock) -> Unit, openNews: (NewsItem) -> Unit,
+    openPreferences: () -> Unit, back: () -> Unit
 ) {
     val context = LocalContext.current
     val store = remember { WatchlistStore(context) }
@@ -337,7 +339,13 @@ fun WatchlistDashboard(
             preferences = { showAlerts = false; openPreferences() },
             phoneSettings = ::phoneSettings, notificationsEnabled = notificationsEnabled
         )
-        if (showNews) WatchlistNewsSheet(companies, dismiss = { showNews = false }, open = { showNews = false; openNews(it) })
+        if (showNews) WatchlistNewsSheet(
+            companies = companies,
+            sharedNews = sharedNews,
+            onNewsLoaded = onNewsLoaded,
+            dismiss = { showNews = false },
+            open = { showNews = false; openNews(it) }
+        )
     }
 }
 
@@ -440,36 +448,118 @@ private fun WatchlistAddSheet(catalog: List<Stock>, saved: List<String>, busy: B
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun WatchlistNewsSheet(companies: List<Stock>, dismiss: () -> Unit, open: (NewsItem) -> Unit) {
-    var feed by remember { mutableStateOf(emptyList<NewsItem>()) }
-    var loading by remember { mutableStateOf(true) }
+private fun WatchlistNewsSheet(
+    companies: List<Stock>,
+    sharedNews: List<NewsItem>,
+    onNewsLoaded: (List<NewsItem>) -> Unit,
+    dismiss: () -> Unit,
+    open: (NewsItem) -> Unit
+) {
+    var feed by remember(sharedNews) { mutableStateOf(sharedNews) }
+    var loading by remember { mutableStateOf(sharedNews.isEmpty()) }
     var error by remember { mutableStateOf(false) }
     var refresh by remember { mutableIntStateOf(0) }
-    LaunchedEffect(refresh) {
-        loading = true
-        try { val result = MarketData.newsFeed(forceRefresh = refresh > 0); error = result.error != null; if (!error) feed = result.items }
-        catch (cancelled: CancellationException) { throw cancelled }
-        catch (_: Exception) { error = true }
-        finally { loading = false }
+
+    LaunchedEffect(sharedNews) {
+        if (sharedNews.isNotEmpty()) {
+            feed = sharedNews
+            error = false
+            loading = false
+        }
     }
-    val stories = remember(feed, companies) { WatchlistPresentation.linkedNews(feed, companies) }
-    ModalBottomSheet(onDismissRequest = dismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = ResearchBackground) {
-        LazyColumn(Modifier.fillMaxWidth().fillMaxHeight(0.85f), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+
+    LaunchedEffect(refresh) {
+        if (refresh == 0 && feed.isNotEmpty()) return@LaunchedEffect
+        loading = true
+        try {
+            val result = MarketData.newsFeed(forceRefresh = refresh > 0)
+            error = result.error != null
+            if (!error) {
+                feed = result.items
+                onNewsLoaded(result.items)
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            error = true
+        } finally {
+            loading = false
+        }
+    }
+
+    val stories = remember(feed, companies) {
+        WatchlistPresentation.linkedNews(feed, companies)
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = dismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = ResearchBackground
+    ) {
+        LazyColumn(
+            Modifier.fillMaxWidth().fillMaxHeight(0.85f),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
             item {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("News from your watchlist", Modifier.weight(1f), color = ResearchText, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                    IconButton(onClick = { refresh++ }, enabled = !loading) { Icon(Icons.Default.Refresh, "Refresh watchlist news", tint = ResearchGreen) }
+                    Text(
+                        "News from your watchlist",
+                        Modifier.weight(1f),
+                        color = ResearchText,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    IconButton(
+                        onClick = { refresh++ },
+                        enabled = !loading
+                    ) {
+                        Icon(
+                            Icons.Default.Refresh,
+                            "Refresh watchlist news",
+                            tint = ResearchGreen
+                        )
+                    }
                 }
             }
             if (loading) item { ResearchLoading("Loading company stories…") }
-            if (error) item { ResearchCaption("News could not be updated. Try refreshing again.") }
-            if (!loading && !error && stories.isEmpty()) item { ResearchCaption("No stories linked to your saved companies were returned by the current feed.") }
+            if (error) {
+                item {
+                    ResearchCaption(
+                        if (feed.isEmpty()) {
+                            "News could not be updated. Try refreshing again."
+                        } else {
+                            "News refresh failed. Showing the current shared app feed."
+                        }
+                    )
+                }
+            }
+            if (!loading && stories.isEmpty()) {
+                item {
+                    ResearchCaption(
+                        "No stories linked to your saved companies were returned by the current shared feed."
+                    )
+                }
+            }
             items(stories, key = { it.id }) { story ->
-                Surface(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable(role = Role.Button) { open(story) }, color = ResearchCard, shape = RoundedCornerShape(14.dp), border = BorderStroke(1.dp, ResearchBorder)) {
-                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Surface(
+                    Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .clickable(role = Role.Button) { open(story) },
+                    color = ResearchCard,
+                    shape = RoundedCornerShape(14.dp),
+                    border = BorderStroke(1.dp, ResearchBorder)
+                ) {
+                    Column(
+                        Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         ResearchCaption(story.companyName.ifBlank { story.symbol })
                         ResearchBody(story.title)
-                        ResearchCaption("${story.source.ifBlank { "Source unavailable" }} · ${CompanyResearchPresentation.date(story.publishedAt)}")
+                        ResearchCaption(
+                            "${story.source.ifBlank { "Source unavailable" }} · " +
+                                CompanyResearchPresentation.date(story.publishedAt)
+                        )
                         Text("Read article →", color = ResearchGreen, fontSize = 13.sp)
                     }
                 }
@@ -477,5 +567,3 @@ private fun WatchlistNewsSheet(companies: List<Stock>, dismiss: () -> Unit, open
         }
     }
 }
-
-
