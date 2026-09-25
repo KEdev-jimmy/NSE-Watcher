@@ -37,6 +37,7 @@ import ke.co.nsewatcher.data.MarketHistoryCache
 import ke.co.nsewatcher.data.NewsCache
 import ke.co.nsewatcher.data.WatchlistStore
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.catch
@@ -127,46 +128,113 @@ fun HomeDashboard(
         finally { newsLoading = false }
     }
     LaunchedEffect(Unit) {
-        refreshNews()
-        if (catalog.isEmpty()) catalog = MarketData.companies()
-        if (!startupDataLoaded && MarketRefreshController.shouldRefreshQuotes(currentStocks.isNotEmpty())) {
-            MarketData.stocks().takeIf { it.isNotEmpty() }?.let(onQuotesLoaded)
-            val recoveredStatus = MarketData.status()
-            market = recoveredStatus
-            if (recoveredStatus.isKnown || !initialMarketStatus.isKnown) {
-                onMarketStatusLoaded(recoveredStatus)
+        coroutineScope {
+            launch { refreshNews() }
+            launch {
+                if (catalog.isEmpty()) {
+                    try {
+                        MarketData.companies().takeIf { it.isNotEmpty() }?.let { catalog = it }
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        // Keep the current catalogue state; the Companies screen can retry.
+                    }
+                }
             }
-            MarketData.indices(recoveredStatus.isKnown && recoveredStatus.isOpen)
-                .takeIf { it.isNotEmpty() }
-                ?.let(onIndicesLoaded)
+            if (!startupDataLoaded && MarketRefreshController.shouldRefreshQuotes(currentStocks.isNotEmpty())) {
+                launch {
+                    try {
+                        MarketData.stocks().takeIf { it.isNotEmpty() }?.let(onQuotesLoaded)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        // Keep any existing observations.
+                    }
+                }
+                launch {
+                    try {
+                        val recoveredStatus = MarketData.status()
+                        market = recoveredStatus
+                        if (recoveredStatus.isKnown || !initialMarketStatus.isKnown) {
+                            onMarketStatusLoaded(recoveredStatus)
+                        }
+                        MarketData.indices(recoveredStatus.isKnown && recoveredStatus.isOpen)
+                            .takeIf { it.isNotEmpty() }
+                            ?.let(onIndicesLoaded)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        // Status/indices can retry independently on the next refresh.
+                    }
+                }
+            }
         }
-        while (true) { delay(MarketRefreshController.REFRESH_INTERVAL_MS); refreshNews(); historyRevision++ }
+        while (true) {
+            delay(MarketRefreshController.REFRESH_INTERVAL_MS)
+            refreshNews()
+            historyRevision++
+        }
     }
     fun refresh() {
         if (refreshing) return
         refreshing = true
         scope.launch {
+            var quoteFailed = false
+            var statusFailed = false
             try {
-                val refreshedStatus = MarketData.status()
-                market = refreshedStatus
-                if (refreshedStatus.isKnown || !initialMarketStatus.isKnown) {
-                    onMarketStatusLoaded(refreshedStatus)
+                coroutineScope {
+                    launch {
+                        try {
+                            val refreshedStatus = MarketData.status()
+                            market = refreshedStatus
+                            if (refreshedStatus.isKnown || !initialMarketStatus.isKnown) {
+                                onMarketStatusLoaded(refreshedStatus)
+                            }
+                            MarketData.indices(refreshedStatus.isKnown && refreshedStatus.isOpen)
+                                .takeIf { it.isNotEmpty() }
+                                ?.let(onIndicesLoaded)
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            statusFailed = true
+                        }
+                    }
+                    launch {
+                        if (MarketRefreshController.shouldRefreshQuotes(currentStocks.isNotEmpty())) {
+                            try {
+                                val quotes = MarketData.stocks()
+                                if (quotes.isNotEmpty()) onQuotesLoaded(quotes) else quoteFailed = true
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (_: Exception) {
+                                quoteFailed = true
+                            }
+                        }
+                    }
+                    launch { refreshNews(force = true) }
+                    launch {
+                        if (catalog.isEmpty()) {
+                            try {
+                                MarketData.companies().takeIf { it.isNotEmpty() }?.let { catalog = it }
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (_: Exception) {
+                                // Keep the current empty state and allow the directory to retry.
+                            }
+                        }
+                    }
                 }
-                MarketData.indices(refreshedStatus.isKnown && refreshedStatus.isOpen)
-                    .takeIf { it.isNotEmpty() }
-                    ?.let(onIndicesLoaded)
-                // All foreground screens share the same provider-aware quote cadence.
-                if (MarketRefreshController.shouldRefreshQuotes(currentStocks.isNotEmpty())) {
-                    val quotes = MarketData.stocks()
-                    if (quotes.isNotEmpty()) { onQuotesLoaded(quotes); refreshError = null }
-                    else refreshError = "Quotes could not be updated. Available observations are still shown."
-                } else refreshError = null
-                refreshNews(force = true)
-                if (catalog.isEmpty()) catalog = MarketData.companies()
+                refreshError = when {
+                    quoteFailed -> "Quotes could not be updated. Available observations are still shown."
+                    statusFailed -> "Market status could not be refreshed. Other available data was updated."
+                    else -> null
+                }
                 historyRevision++
-            } catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { refreshError = "Could not refresh. Please try again." }
-            finally { refreshing = false }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } finally {
+                refreshing = false
+            }
         }
     }
     val watched = remember(saved, catalog, currentStocks) { WatchlistPresentation.companies(saved.orEmpty(), catalog, currentStocks) }
