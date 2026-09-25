@@ -652,6 +652,16 @@ private fun ResearchAnalyst(
 internal fun ResearchMovement(result: MovementIntelligenceCache.Result, loading: Boolean, retry: () -> Unit) {
     ResearchPanel {
         ResearchTitle("Company-specific movement evidence")
+        if (result.cacheState == "STALE_FALLBACK") {
+            ResearchCaption(
+                result.cacheMessage.ifBlank {
+                    "Live movement evidence could not be refreshed. Showing cached evidence."
+                }
+            )
+            result.cacheAgeMinutes?.let { age ->
+                ResearchCaption("Cached about $age minute${if (age == 1L) "" else "s"} ago.")
+            }
+        }
         when {
             loading -> ResearchLoading("Checking dated company evidence…")
             result.error != null -> {
