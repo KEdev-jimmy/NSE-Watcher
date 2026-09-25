@@ -66,11 +66,34 @@ import java.util.UUID
                 if (typeHelp) ResearchCaption("This simulator supports limit orders only. Orders remain pending until filled or cancelled; real order-book liquidity and settlement delays are not simulated.")
             }
             item {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    OutlinedTextField(quantity, { quantity = it.filter(Char::isDigit).take(10) }, label = { Text("Whole shares") }, singleLine = true, modifier = Modifier.weight(1f))
-                    OutlinedTextField(limit, { limit = it }, label = { Text("Limit (KSh)") }, singleLine = true, modifier = Modifier.weight(1f))
+                PracticeAdaptivePair(
+                    first = { modifier ->
+                        OutlinedTextField(
+                            quantity,
+                            { quantity = it.filter(Char::isDigit).take(10) },
+                            label = { Text("Whole shares") },
+                            singleLine = true,
+                            modifier = modifier
+                        )
+                    },
+                    second = { modifier ->
+                        OutlinedTextField(
+                            limit,
+                            { limit = it },
+                            label = { Text("Limit (KSh)") },
+                            singleLine = true,
+                            modifier = modifier
+                        )
+                    }
+                )
+                Row {
+                    TextButton(onClick = { quantity = (shares - 1).coerceAtLeast(1).toString() }) {
+                        Text("− 1 share")
+                    }
+                    TextButton(onClick = { quantity = (shares + 1).coerceAtMost(1_000_000_000L).toString() }) {
+                        Text("+ 1 share")
+                    }
                 }
-                Row { TextButton(onClick = { quantity = (shares - 1).coerceAtLeast(1).toString() }) { Text("− 1 share") }; TextButton(onClick = { quantity = (shares + 1).coerceAtMost(1_000_000_000L).toString() }) { Text("+ 1 share") } }
             }
             item { ResearchPanel {
                 ResearchTitle("Order summary")
@@ -81,7 +104,29 @@ import java.util.UUID
                 if (side == "SELL") ResearchCaption("${shares.coerceAtLeast(0)} shares will be reserved; proceeds depend on the eventual simulated fill.")
             } }
             item { PracticeLine("Unreserved cash", practiceMoney(PracticeEngine.available(s, editId))); if (side == "SELL") PracticeLine("Unreserved shares", ((s.holdings.firstOrNull { it.symbol == stock.symbol }?.shares ?: 0) - PracticeEngine.reservedShares(s, stock.symbol, editId)).toString()) }
-            item { OutlinedTextField(note, { note = it.take(2000) }, label = { Text("Why this trade? (optional)") }, modifier = Modifier.fillMaxWidth(), minLines = 2) }
+            item {
+                ResearchPanel {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(9.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        PracticeIcon(Icons.Outlined.EditNote)
+                        Column(Modifier.weight(1f)) {
+                            ResearchTitle("Write your reason")
+                            ResearchCaption("Optional, but this makes the later Decision Review much more useful.")
+                        }
+                    }
+                    OutlinedTextField(
+                        note,
+                        { note = it.take(2000) },
+                        label = { Text("Why are you testing this idea?") },
+                        placeholder = { Text("What evidence or expectation is behind this decision?") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 3
+                    )
+                    ResearchCaption("Your reason is saved with this simulated order and is never treated as investment advice.")
+                }
+            }
             if (error != null) item { Text(error.orEmpty(), color = PracticeAmber) }
         }
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -122,7 +167,22 @@ import java.util.UUID
                         if (o.status == "PENDING") {
                             PracticeLine(if (o.side == "BUY") "Reserved cash" else "Reserved shares", if (o.side == "BUY") practiceMoney(PracticeEngine.money(o.limit * o.shares) + PracticeEngine.money(o.limit * o.shares * PracticeEngine.FEE)) else o.shares.toString())
                             ResearchCaption(o.reason); ResearchCaption("Your shares have not changed for this order.")
-                            Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) { OutlinedButton(enabled = !working, onClick = { onEdit(o) }) { Text("Edit order") }; OutlinedButton(enabled = !working, onClick = { cancelling = o.id }) { Text("Cancel order", color = ResearchRed) } }
+                            PracticeAdaptivePair(
+                                first = { modifier ->
+                                    OutlinedButton(
+                                        enabled = !working,
+                                        onClick = { onEdit(o) },
+                                        modifier = modifier
+                                    ) { Text("Edit order") }
+                                },
+                                second = { modifier ->
+                                    OutlinedButton(
+                                        enabled = !working,
+                                        onClick = { cancelling = o.id },
+                                        modifier = modifier
+                                    ) { Text("Cancel order", color = ResearchRed) }
+                                }
+                            )
                         } else ResearchCaption(o.reason)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             TextButton(onClick = { onDetails(o.id) }) { Text("View price and costs →") }

@@ -35,8 +35,16 @@ import java.util.Locale
     ResearchCaption("Allocation of shares value; cash excluded.${if (positions.any { it.estimated }) " Includes cost estimates for missing quotes." else ""}")
 }
 
-@Composable internal fun PracticeHoldings(s: PracticeState, companies: List<Stock>, onHolding: (Stock) -> Unit,
-    onTrade: (Stock) -> Unit, onResearch: (Stock) -> Unit, onBrowse: () -> Unit, onRules: () -> Unit) {
+@Composable internal fun PracticeHoldings(
+    s: PracticeState,
+    companies: List<Stock>,
+    currentQuotes: List<Stock>,
+    onHolding: (Stock) -> Unit,
+    onTrade: (Stock) -> Unit,
+    onResearch: (Stock) -> Unit,
+    onBrowse: () -> Unit,
+    onRules: () -> Unit
+) {
     var query by rememberSaveable { mutableStateOf("") }
     var sort by rememberSaveable { mutableStateOf("Value") }
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -48,17 +56,35 @@ import java.util.Locale
         if (rows.isEmpty()) ResearchPanel { ResearchBody(if (s.holdings.isEmpty()) "No positions yet" else "No matching holdings"); TextButton(onClick = onBrowse) { Text("Explore companies →") } }
         rows.forEach { p ->
             val stock = companies.firstOrNull { it.symbol == p.holding.symbol } ?: Stock(p.holding.symbol, p.quote?.name?.ifBlank { p.holding.symbol } ?: p.holding.symbol, p.quote?.price ?: Double.NaN, 0.0, emptyList(), changeAvailable = false)
+            val quoteConfirmed = PracticePortfolioPresentation.quoteConfirmedByCurrentFeed(
+                p.holding.symbol,
+                s,
+                currentQuotes
+            )
+            val provisional = p.estimated || !quoteConfirmed
             ResearchPanel {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                     PracticeCompanyIcon(stock)
                     Column(Modifier.weight(1f)) { ResearchBody(stock.name); ResearchCaption(stock.symbol) }
                     Column(horizontalAlignment = Alignment.End) {
                         Text(practiceMoney(p.value), color = ResearchText, fontWeight = FontWeight.Bold)
-                        Text(if (p.estimated) "Cost estimate" else practiceGain(p.gain), color = if (p.estimated) PracticeAmber else researchChangeColor(p.gain), fontSize = 13.sp)
+                        Text(
+                            if (provisional) "Last-known value" else practiceGain(p.gain),
+                            color = if (provisional) PracticeAmber else researchChangeColor(p.gain),
+                            fontSize = 13.sp
+                        )
                     }
                 }
                 ResearchCaption("Average cost ${practiceMoney(p.holding.cost / p.holding.shares)} • ${p.holding.shares} shares")
-                ResearchCaption(p.quote?.let { "Observed ${CompanyResearchPresentation.date(it.at)}" } ?: "No dated quote. Holding retained at estimated cost.")
+                ResearchCaption(
+                    p.quote?.let {
+                        val prefix = if (quoteConfirmed) "Observed" else "Saved observation"
+                        "$prefix ${CompanyResearchPresentation.date(it.at)}"
+                    } ?: "No dated quote. Holding retained at estimated cost."
+                )
+                if (!p.estimated && !quoteConfirmed) {
+                    ResearchCaption("The current loaded market feed has not confirmed this saved observation yet, so the displayed gain is provisional.")
+                }
                 if (p.holding.legacy) ResearchCaption("Legacy cost basis excludes original buy fees.")
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     TextButton(onClick = { onResearch(stock) }) { Text("Research →") }
@@ -73,9 +99,21 @@ import java.util.Locale
     }
 }
 
-@Composable internal fun PracticeHoldingDetail(s: PracticeState, stock: Stock, onTrade: (String) -> Unit,
-    onResearch: () -> Unit, onNews: () -> Unit, onNotes: () -> Unit) {
+@Composable internal fun PracticeHoldingDetail(
+    s: PracticeState,
+    stock: Stock,
+    currentQuotes: List<Stock>,
+    onTrade: (String) -> Unit,
+    onResearch: () -> Unit,
+    onNews: () -> Unit,
+    onNotes: () -> Unit
+) {
     val position = PracticeEngine.positions(s).firstOrNull { it.holding.symbol == stock.symbol }
+    val quoteConfirmed = PracticePortfolioPresentation.quoteConfirmedByCurrentFeed(
+        stock.symbol,
+        s,
+        currentQuotes
+    )
     var range by rememberSaveable(stock.symbol) { mutableStateOf("1M") }
     var history by remember(stock.symbol) { mutableStateOf(MyStocksCache.HistoryResult()) }
     var loading by remember { mutableStateOf(false) }
@@ -95,13 +133,36 @@ import java.util.Locale
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) { PracticeCompanyIcon(stock); Column { ResearchTitle(stock.name); ResearchCaption("${stock.symbol} • ${stock.sector}") } }
         if (position == null) { ResearchBody("You no longer hold shares in this company."); Button(onClick = { onTrade("BUY") }) { Text("Buy shares") }; return }
         val h = position.holding
+        val provisional = position.estimated || !quoteConfirmed
         ResearchPanel {
-            ResearchCaption(if (position.estimated) "Estimated holding value" else "Holding value")
+            ResearchCaption(
+                when {
+                    position.estimated -> "Estimated holding value"
+                    !quoteConfirmed -> "Last-known holding value"
+                    else -> "Holding value"
+                }
+            )
             Text(practiceMoney(position.value), color = ResearchText, fontSize = 29.sp, fontWeight = FontWeight.Bold)
-            Text(if (position.estimated) "Gain unavailable without a quote" else "${practiceGain(position.gain)} unrealised", color = if (position.estimated) PracticeAmber else researchChangeColor(position.gain))
-            ResearchCaption("Gain on shares you still hold")
+            Text(
+                when {
+                    position.estimated -> "Gain unavailable without a quote"
+                    !quoteConfirmed -> "${practiceGain(position.gain)} provisional"
+                    else -> "${practiceGain(position.gain)} unrealised"
+                },
+                color = if (provisional) PracticeAmber else researchChangeColor(position.gain)
+            )
+            ResearchCaption(
+                if (provisional) {
+                    "A current loaded market observation has not confirmed this valuation yet."
+                } else {
+                    "Gain on shares you still hold"
+                }
+            )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) { PracticeMetric("Shares owned", h.shares.toString(), Modifier.weight(1f)); PracticeMetric("Average cost", practiceMoney(h.cost / h.shares), Modifier.weight(1f)) }
+        PracticeAdaptivePair(
+            first = { modifier -> PracticeMetric("Shares owned", h.shares.toString(), modifier) },
+            second = { modifier -> PracticeMetric("Average cost", practiceMoney(h.cost / h.shares), modifier) }
+        )
         ResearchCaption(if (h.legacy) "Legacy cost basis excludes original buy fees." else "Average cost includes simulated buy costs.")
         ResearchPanel {
             ResearchTitle("Your position"); PracticeLine("Cost basis", practiceMoney(h.cost))
@@ -125,10 +186,14 @@ import java.util.Locale
             PracticeLink(Icons.Outlined.Article, "Related news", onNews)
             PracticeLink(Icons.Outlined.EditNote, "Your trade notes", onNotes)
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Button(onClick = { onTrade("BUY") }, modifier = Modifier.weight(1f)) { Text("Buy more") }
-            OutlinedButton(onClick = { onTrade("SELL") }, modifier = Modifier.weight(1f)) { Text("Sell shares") }
-        }
+        PracticeAdaptivePair(
+            first = { modifier ->
+                Button(onClick = { onTrade("BUY") }, modifier = modifier) { Text("Buy more") }
+            },
+            second = { modifier ->
+                OutlinedButton(onClick = { onTrade("SELL") }, modifier = modifier) { Text("Sell shares") }
+            }
+        )
         ResearchCaption("Selling realises a gain or loss after costs. Practice sale proceeds are available immediately; real settlement delays are not simulated.")
     }
 }

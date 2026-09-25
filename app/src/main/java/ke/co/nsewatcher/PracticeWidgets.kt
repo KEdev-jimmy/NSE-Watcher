@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import coil3.compose.AsyncImage
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -58,6 +59,199 @@ internal fun practiceGain(value: Double) = (if (value > 0) "+" else if (value < 
         Text(title, Modifier.weight(1f), color = ResearchText); Icon(Icons.Outlined.ChevronRight, null, tint = ResearchMuted)
     }
 }
+@Composable
+internal fun PracticeAdaptivePair(
+    first: @Composable (Modifier) -> Unit,
+    second: @Composable (Modifier) -> Unit
+) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val stacked = maxWidth < 350.dp || LocalDensity.current.fontScale > 1.12f
+        if (stacked) {
+            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                first(Modifier.fillMaxWidth())
+                second(Modifier.fillMaxWidth())
+            }
+        } else {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(9.dp)
+            ) {
+                first(Modifier.weight(1f))
+                second(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+internal fun PracticePortfolioHero(
+    value: Double,
+    gain: Double,
+    provisional: Boolean,
+    marketLabel: String,
+    observationLabel: String
+) {
+    ResearchPanel {
+        Row(verticalAlignment = Alignment.Top) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        if (provisional) "Last-known portfolio value" else "Practice portfolio value",
+                        color = ResearchMuted,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(Modifier.width(7.dp))
+                    PracticeBadge()
+                }
+                Text(
+                    practiceMoney(value),
+                    color = ResearchText,
+                    fontSize = 29.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                Text(
+                    practiceGain(gain) + " since start",
+                    color = if (provisional) PracticeAmber else researchChangeColor(gain),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = ResearchRaised,
+                border = BorderStroke(1.dp, ResearchBorder)
+            ) {
+                Text(
+                    marketLabel,
+                    color = if (marketLabel.startsWith("Market open")) ResearchGreen else ResearchMuted,
+                    fontSize = 8.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                )
+            }
+        }
+        ResearchCaption("After recorded practice costs • Added virtual cash is excluded from gain.")
+        if (provisional) {
+            Surface(
+                Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp),
+                color = PracticeAmber.copy(alpha = 0.07f),
+                border = BorderStroke(1.dp, PracticeAmber.copy(alpha = 0.38f))
+            ) {
+                Row(
+                    Modifier.padding(9.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(7.dp)
+                ) {
+                    Icon(
+                        Icons.Outlined.Info,
+                        null,
+                        tint = PracticeAmber,
+                        modifier = Modifier.size(17.dp)
+                    )
+                    Text(
+                        "Some holdings are using saved observations that the current loaded market feed has not yet confirmed. Treat the displayed gain as provisional.",
+                        color = ResearchMuted,
+                        fontSize = 8.8.sp,
+                        lineHeight = 12.5.sp
+                    )
+                }
+            }
+        }
+        ResearchCaption(observationLabel)
+    }
+}
+
+@Composable
+internal fun PracticeAttentionCard(
+    summary: PracticeAttentionSummary,
+    onOrders: () -> Unit,
+    onLearn: () -> Unit,
+    onBrowse: () -> Unit
+) {
+    ResearchPanel {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            PracticeIcon(
+                if (summary.total == 0) Icons.Outlined.CheckCircle else Icons.Outlined.Notifications,
+                amber = summary.total > 0
+            )
+            Spacer(Modifier.width(9.dp))
+            Column(Modifier.weight(1f)) {
+                ResearchTitle(if (summary.total == 0) "You're caught up" else "What needs your attention?")
+                ResearchCaption(
+                    if (summary.total == 0) {
+                        "No pending orders or saved decisions currently need review."
+                    } else {
+                        "Use this queue to continue the decisions you already started."
+                    }
+                )
+            }
+        }
+
+        if (summary.total == 0) {
+            TextButton(onClick = onBrowse, modifier = Modifier.fillMaxWidth()) {
+                Text("Explore another company →", color = ResearchGreen)
+            }
+        } else {
+            if (summary.pendingOrders > 0) {
+                PracticeAttentionRow(
+                    icon = Icons.Outlined.Schedule,
+                    title = "${summary.pendingOrders} pending order${if (summary.pendingOrders == 1) "" else "s"}",
+                    detail = "See why each order is still waiting.",
+                    action = onOrders
+                )
+            }
+            if (summary.needsFirstReview > 0) {
+                PracticeAttentionRow(
+                    icon = Icons.Outlined.RateReview,
+                    title = "${summary.needsFirstReview} decision${if (summary.needsFirstReview == 1) "" else "s"} need a first review",
+                    detail = "Compare what you expected with what happened afterward.",
+                    action = onLearn
+                )
+            }
+            if (summary.newEvidence > 0) {
+                PracticeAttentionRow(
+                    icon = Icons.Outlined.NewReleases,
+                    title = "New evidence for ${summary.newEvidence} reviewed decision${if (summary.newEvidence == 1) "" else "s"}",
+                    detail = "Revisit the evidence without treating timing as causation.",
+                    action = onLearn
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PracticeAttentionRow(
+    icon: ImageVector,
+    title: String,
+    detail: String,
+    action: () -> Unit
+) {
+    Surface(
+        Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+        color = ResearchRaised,
+        border = BorderStroke(1.dp, ResearchBorder)
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(9.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(icon, null, tint = PracticeAmber, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Column(Modifier.weight(1f)) {
+                Text(title, color = ResearchText, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                Text(detail, color = ResearchMuted, fontSize = 8.7.sp, lineHeight = 12.sp)
+            }
+            IconButton(onClick = action, modifier = Modifier.size(34.dp)) {
+                Icon(Icons.Outlined.ChevronRight, "Open", tint = ResearchGreen)
+            }
+        }
+    }
+}
+
 @Composable internal fun PracticeJourney(state: PracticeState) {
     var range by rememberSaveable { mutableStateOf("All") }
     var metric by rememberSaveable { mutableStateOf("Value") }
