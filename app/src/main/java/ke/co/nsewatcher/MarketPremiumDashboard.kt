@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -212,23 +213,23 @@ private fun PremiumMarketTabs(selected: String, onSelected: (String) -> Unit) {
             val label = pair.first
             val active = selected == label
             Surface(
-                modifier = Modifier.weight(1f).heightIn(min = 54.dp).clip(RoundedCornerShape(13.dp))
+                modifier = Modifier.weight(1f).heightIn(min = 48.dp).clip(RoundedCornerShape(13.dp))
                     .clickable(role = Role.Tab) { onSelected(label) },
                 shape = RoundedCornerShape(13.dp),
                 color = if (active) ResearchGreen.copy(alpha = 0.12f) else ResearchCard,
                 border = BorderStroke(1.dp, if (active) ResearchGreen else ResearchBorder)
             ) {
-                Column(
-                    Modifier.fillMaxSize().padding(horizontal = 4.dp, vertical = 8.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                Row(
+                    Modifier.fillMaxSize().padding(horizontal = 7.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
                 ) {
-                    Icon(pair.second, label, tint = if (active) ResearchGreen else ResearchMuted, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.height(3.dp))
+                    Icon(pair.second, label, tint = if (active) ResearchGreen else ResearchMuted, modifier = Modifier.size(17.dp))
+                    Spacer(Modifier.width(5.dp))
                     Text(
                         label,
                         color = if (active) ResearchGreen else ResearchMuted,
-                        fontSize = 9.5.sp,
+                        fontSize = 10.sp,
                         fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
                         maxLines = 1
                     )
@@ -390,24 +391,20 @@ private fun MarketHighlightsRow(companies: List<Stock>, openCompany: (Stock) -> 
     val gainer = remember(companies) { marketMoversForPremium(companies, "Gainers").firstOrNull() }
     val loser = remember(companies) { marketMoversForPremium(companies, "Losers").firstOrNull() }
     val active = remember(companies) { marketMoversForPremium(companies, "By volume").firstOrNull() }
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(end = 2.dp)) {
-        item {
-            MarketHighlightCard(
-                "Top Gainer", Icons.Outlined.TrendingUp, gainer, ResearchGreen,
-                gainer?.let { CompanyResearchPresentation.percent(it.change) } ?: "Unavailable", openCompany
-            )
-        }
-        item {
-            MarketHighlightCard(
-                "Top Loser", Icons.Outlined.TrendingDown, loser, ResearchRed,
-                loser?.let { CompanyResearchPresentation.percent(it.change) } ?: "Unavailable", openCompany
-            )
-        }
-        item {
-            MarketHighlightCard(
-                "Most Active", Icons.Outlined.BarChart, active, MaterialTheme.colorScheme.tertiary,
-                active?.let { formatMarketVolume(it.volume) } ?: "Unavailable", openCompany
-            )
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val compact = maxWidth < 350.dp
+        if (compact) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(end = 2.dp)) {
+                item { MarketHighlightCard("Top Gainer", Icons.Outlined.TrendingUp, gainer, ResearchGreen, gainer?.let { CompanyResearchPresentation.percent(it.change) } ?: "Unavailable", openCompany, Modifier.width(146.dp)) }
+                item { MarketHighlightCard("Top Loser", Icons.Outlined.TrendingDown, loser, ResearchRed, loser?.let { CompanyResearchPresentation.percent(it.change) } ?: "Unavailable", openCompany, Modifier.width(146.dp)) }
+                item { MarketHighlightCard("Most Active", Icons.Outlined.BarChart, active, MaterialTheme.colorScheme.tertiary, active?.let { formatMarketVolume(it.volume) } ?: "Unavailable", openCompany, Modifier.width(146.dp)) }
+            }
+        } else {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                MarketHighlightCard("Top Gainer", Icons.Outlined.TrendingUp, gainer, ResearchGreen, gainer?.let { CompanyResearchPresentation.percent(it.change) } ?: "Unavailable", openCompany, Modifier.weight(1f))
+                MarketHighlightCard("Top Loser", Icons.Outlined.TrendingDown, loser, ResearchRed, loser?.let { CompanyResearchPresentation.percent(it.change) } ?: "Unavailable", openCompany, Modifier.weight(1f))
+                MarketHighlightCard("Most Active", Icons.Outlined.BarChart, active, MaterialTheme.colorScheme.tertiary, active?.let { formatMarketVolume(it.volume) } ?: "Unavailable", openCompany, Modifier.weight(1f))
+            }
         }
     }
 }
@@ -419,39 +416,32 @@ private fun MarketHighlightCard(
     stock: Stock?,
     accent: Color,
     value: String,
-    openCompany: (Stock) -> Unit
+    openCompany: (Stock) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Surface(
-        modifier = Modifier.width(158.dp).heightIn(min = 132.dp)
+        modifier = modifier.heightIn(min = 128.dp)
             .clip(RoundedCornerShape(16.dp))
             .clickable(enabled = stock != null, role = Role.Button) { stock?.let(openCompany) },
         shape = RoundedCornerShape(16.dp),
         color = accent.copy(alpha = 0.08f),
         border = BorderStroke(1.dp, accent.copy(alpha = 0.65f))
     ) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(icon, null, tint = accent, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(7.dp))
-                Text(title, color = ResearchText, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                Icon(Icons.Outlined.ChevronRight, null, tint = accent, modifier = Modifier.size(16.dp))
+                Icon(icon, null, tint = accent, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(5.dp))
+                Text(title, color = ResearchText, fontSize = 9.5.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), maxLines = 1)
+                Icon(Icons.Outlined.ChevronRight, null, tint = accent, modifier = Modifier.size(14.dp))
             }
-            Text(stock?.symbol ?: "—", color = ResearchText, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
+            Text(stock?.symbol ?: "—", color = ResearchText, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold)
             Text(
                 stock?.price?.takeIf { it.isFinite() && it > 0 }?.let { "KSh " + String.format(Locale.US, "%,.2f", it) } ?: "Price unavailable",
                 color = ResearchText,
-                fontSize = 12.sp
+                fontSize = 10.5.sp,
+                maxLines = 1
             )
-            Text(value, color = accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-            if (stock != null) {
-                Text(
-                    CompanyResearchPresentation.date(stock.observedAt),
-                    color = ResearchMuted,
-                    fontSize = 8.5.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
+            Text(value, color = accent, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 2, lineHeight = 13.sp)
         }
     }
 }
@@ -705,7 +695,12 @@ private fun androidx.compose.foundation.lazy.LazyListScope.premiumSectorItems(
                 Text("Sector observations are unavailable.", color = ResearchMuted, fontSize = 12.sp)
             } else {
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
-                    val columns = if (maxWidth >= 520.dp) 4 else 2
+                    val largeText = LocalDensity.current.fontScale > 1.12f
+                    val columns = when {
+                        largeText -> 2
+                        maxWidth >= 360.dp -> 4
+                        else -> 2
+                    }
                     Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                         sectors.take(8).chunked(columns).forEach { row ->
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
@@ -736,24 +731,25 @@ private fun androidx.compose.foundation.lazy.LazyListScope.premiumSectorItems(
 private fun HeatmapSectorCard(sector: MarketSector, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val accent = marketChangeColor(sector.average)
     Surface(
-        modifier = modifier.heightIn(min = 96.dp).clip(RoundedCornerShape(13.dp)).clickable(role = Role.Button, onClick = onClick),
+        modifier = modifier.heightIn(min = 92.dp).clip(RoundedCornerShape(13.dp)).clickable(role = Role.Button, onClick = onClick),
         shape = RoundedCornerShape(13.dp),
         color = accent.copy(alpha = 0.07f),
         border = BorderStroke(1.dp, accent.copy(alpha = 0.45f))
     ) {
-        Column(Modifier.padding(11.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                MarketIconBubble(premiumSectorSymbol(sector.name), accent, 32.dp)
-                Spacer(Modifier.width(8.dp))
-                Text(sector.name, color = ResearchText, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
+        Column(
+            Modifier.padding(horizontal = 8.dp, vertical = 9.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp),
+            horizontalAlignment = Alignment.Start
+        ) {
+            Icon(premiumSectorSymbol(sector.name), null, tint = accent, modifier = Modifier.size(21.dp))
+            Text(sector.name, color = ResearchText, fontSize = 9.5.sp, lineHeight = 12.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(
                 sector.average?.let { CompanyResearchPresentation.percent(it) } ?: "Unavailable",
                 color = accent,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.ExtraBold
+                fontSize = 12.5.sp,
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 1
             )
-            Text(sector.breadth.covered.toString() + " companies with data", color = ResearchMuted, fontSize = 9.sp)
         }
     }
 }
@@ -835,20 +831,31 @@ private fun WhatToWatchNextCard() {
             "Simple prompts to help a new investor investigate further."
         )
         Spacer(Modifier.height(10.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            WatchPrompt(Icons.Outlined.BarChart, "Compare sector breadth with the companies driving it.")
-            WatchPrompt(Icons.Outlined.Description, "Check company results for evidence behind a large move.")
-            WatchPrompt(Icons.Outlined.CalendarMonth, "Check supplied dividend dates and recent corporate announcements.")
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val stack = maxWidth < 350.dp || LocalDensity.current.fontScale > 1.12f
+            if (stack) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    WatchPrompt(Icons.Outlined.BarChart, "Compare sector breadth with the companies driving it.")
+                    WatchPrompt(Icons.Outlined.Description, "Check company results for evidence behind a large move.")
+                    WatchPrompt(Icons.Outlined.CalendarMonth, "Check supplied dividend dates and recent corporate announcements.")
+                }
+            } else {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    WatchPrompt(Icons.Outlined.BarChart, "Compare sector breadth with the companies driving it.", Modifier.weight(1f))
+                    WatchPrompt(Icons.Outlined.Description, "Check company results for evidence behind a large move.", Modifier.weight(1f))
+                    WatchPrompt(Icons.Outlined.CalendarMonth, "Check supplied dividend dates and recent corporate announcements.", Modifier.weight(1f))
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun WatchPrompt(icon: ImageVector, text: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(22.dp))
-        Spacer(Modifier.width(10.dp))
-        Text(text, color = ResearchText, fontSize = 11.5.sp, lineHeight = 16.sp)
+private fun WatchPrompt(icon: ImageVector, text: String, modifier: Modifier = Modifier) {
+    Row(modifier, verticalAlignment = Alignment.Top) {
+        Icon(icon, null, tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(7.dp))
+        Text(text, color = ResearchText, fontSize = 10.5.sp, lineHeight = 14.sp, modifier = Modifier.weight(1f))
     }
 }
 
@@ -872,7 +879,8 @@ private fun PremiumCalendarView(events: List<MarketCalendarEvent>, openNews: (Ne
     val week = remember(anchor) { (-2L..2L).map { anchor.plusDays(it) } }
     val filtered = remember(events, filter, selected) {
         events.filter { event ->
-            (filter == "All" || event.type == filter) && (selected == null || event.date == selected)
+            (filter == "All" || event.type == filter || (filter == "Other" && event.type == "Corporate Action")) &&
+                (selected == null || event.date == selected)
         }
     }
 
@@ -921,7 +929,7 @@ private fun PremiumCalendarView(events: List<MarketCalendarEvent>, openNews: (Ne
             }
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                listOf("All", "Results", "Dividends", "Announcements").forEach { option ->
+                listOf("All", "Results", "Dividends", "AGM", "Other").forEach { option ->
                     FilterChip(
                         selected = filter == option,
                         onClick = { filter = option },
@@ -1218,10 +1226,18 @@ private fun buildMarketCalendarEvents(news: List<NewsItem>): List<MarketCalendar
                     "Results coverage published · " + item.source.ifBlank { "Source unavailable" },
                     item
                 )
+                isMarketAgmItem(item) -> events += MarketCalendarEvent(
+                    item.id + ":agm:" + published,
+                    published,
+                    "AGM",
+                    company,
+                    "AGM-related announcement published · " + item.source.ifBlank { "Source unavailable" },
+                    item
+                )
                 isMarketAnnouncementItem(item) -> events += MarketCalendarEvent(
                     item.id + ":announcement:" + published,
                     published,
-                    "Announcements",
+                    "Corporate Action",
                     company,
                     "Corporate announcement published · " + item.source.ifBlank { "Source unavailable" },
                     item
@@ -1242,10 +1258,14 @@ private fun isMarketResultsItem(item: NewsItem): Boolean =
         Regex("\\b(earnings|financial results|annual results|interim results|half.year results|full.year results|quarterly results)\\b", RegexOption.IGNORE_CASE)
             .containsMatchIn(item.title)
 
+private fun isMarketAgmItem(item: NewsItem): Boolean =
+    Regex("\\b(agm|annual general meeting)\\b", RegexOption.IGNORE_CASE)
+        .containsMatchIn(item.title)
+
 private fun isMarketAnnouncementItem(item: NewsItem): Boolean =
     item.category.equals("Corporate Actions", true) ||
         item.category.equals("Announcements", true) ||
-        Regex("\\b(agm|annual general meeting|corporate action|book closure|rights issue|bonus issue)\\b", RegexOption.IGNORE_CASE)
+        Regex("\\b(corporate action|book closure|rights issue|bonus issue)\\b", RegexOption.IGNORE_CASE)
             .containsMatchIn(item.title)
 
 private fun parseMarketDate(raw: String): LocalDate? {
@@ -1269,11 +1289,13 @@ private fun parseMarketDate(raw: String): LocalDate? {
 private fun calendarAccent(type: String): Color = when (type) {
     "Dividends" -> Color(0xFFF0B531)
     "Results" -> MaterialTheme.colorScheme.tertiary
+    "AGM" -> Color(0xFF9B6BFF)
     else -> ResearchGreen
 }
 
 private fun calendarIcon(type: String): ImageVector = when (type) {
     "Dividends" -> Icons.Outlined.Payments
     "Results" -> Icons.Outlined.Description
+    "AGM" -> Icons.Outlined.AccountBalance
     else -> Icons.Outlined.Campaign
 }
