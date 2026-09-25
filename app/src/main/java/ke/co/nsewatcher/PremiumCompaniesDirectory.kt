@@ -41,6 +41,7 @@ import ke.co.nsewatcher.data.AlertStore
 import ke.co.nsewatcher.data.MarketData
 import ke.co.nsewatcher.data.WatchlistStore
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -147,29 +148,67 @@ fun CompaniesDirectory(
 
     suspend fun load(force: Boolean) {
         busy = true
+        var catalogFailed = false
+        var quoteFailed = false
+        var newsFailed = false
         try {
-            if (catalog.isEmpty() || force) {
-                val result = MarketData.companies()
-                if (result.isNotEmpty()) {
-                    onCatalogLoaded(result)
-                    loadError = null
-                } else {
-                    loadError = "Company catalogue could not be updated. Available companies remain visible."
+            coroutineScope {
+                launch {
+                    if (catalog.isEmpty() || force) {
+                        try {
+                            val result = MarketData.companies()
+                            if (result.isNotEmpty()) onCatalogLoaded(result)
+                            else catalogFailed = true
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            catalogFailed = true
+                        }
+                    }
+                }
+                launch {
+                    if (
+                        MarketRefreshController.shouldRefreshQuotes(quotes.isNotEmpty()) &&
+                        (quotes.isEmpty() || force)
+                    ) {
+                        try {
+                            val result = MarketData.stocks()
+                            if (result.isNotEmpty()) onQuotesLoaded(result)
+                            else quoteFailed = true
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            quoteFailed = true
+                        }
+                    }
+                }
+                launch {
+                    if (newsFeed.isEmpty() || force) {
+                        try {
+                            val feed = MarketData.newsFeed(forceRefresh = force)
+                            if (feed.error == null) onNewsLoaded(feed.items)
+                            else newsFailed = true
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            newsFailed = true
+                        }
+                    }
                 }
             }
-            if (MarketRefreshController.shouldRefreshQuotes(quotes.isNotEmpty()) && (quotes.isEmpty() || force)) {
-                val result = MarketData.stocks()
-                if (result.isNotEmpty()) onQuotesLoaded(result)
-                else loadError = "Quotes could not be updated. Companies remain available for research."
-            }
-            if (newsFeed.isEmpty() || force) {
-                val feed = MarketData.newsFeed(forceRefresh = force)
-                if (feed.error == null) onNewsLoaded(feed.items)
+            loadError = when {
+                catalogFailed && catalog.isEmpty() ->
+                    "Company catalogue could not be updated. Try again when data is available."
+                quoteFailed ->
+                    "Quotes could not be updated. Companies remain available for research."
+                newsFailed ->
+                    "Company news signals could not be refreshed. The current shared feed remains visible."
+                catalogFailed ->
+                    "Company catalogue could not be refreshed. Available companies remain visible."
+                else -> null
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: Exception) {
-            loadError = "Could not refresh this directory. Please try again."
         } finally {
             busy = false
         }
