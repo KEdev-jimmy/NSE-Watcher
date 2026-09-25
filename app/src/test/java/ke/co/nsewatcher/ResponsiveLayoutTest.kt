@@ -64,4 +64,26 @@ class ResponsiveLayoutTest {
             )
         )
     }
+
+
+    @Test
+    fun bottomNavKeepsAllLabelsOnRedmiClassWidthAtNormalScale() {
+        assertFalse(shouldCompactBottomNav(393f, 1f))
+    }
+
+    @Test
+    fun bottomNavCompactsOnNarrowPhone() {
+        assertTrue(shouldCompactBottomNav(320f, 1f))
+    }
+
+    @Test
+    fun bottomNavCompactsForExtremeAccessibilityText() {
+        assertTrue(shouldCompactBottomNav(393f, 1.5f))
+    }
+
+    @Test
+    fun bottomNavStaysExpandedOnTabletAtNormalScale() {
+        assertFalse(shouldCompactBottomNav(800f, 1f))
+    }
+
 }
