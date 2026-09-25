@@ -38,6 +38,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import ke.co.nsewatcher.data.AlertStore
+import ke.co.nsewatcher.domain.AlertEvent
 
 private const val SUPPORT_EMAIL = "jameswaweru399@gmail.com"
 
@@ -438,9 +440,12 @@ internal fun NotificationCenterScreen(
     onPracticeAlerts: (Boolean) -> Unit,
     onSoundMode: (String) -> Unit,
     openAlertRules: () -> Unit,
+    openAlertEvent: (AlertEvent) -> Unit,
     back: () -> Unit
 ) {
     val context = LocalContext.current
+    val alertStore = remember(context) { AlertStore(context) }
+    val alertEvents by alertStore.events.collectAsState(initial = emptyList())
     var permissionGranted by remember {
         mutableStateOf(
             Build.VERSION.SDK_INT < 33 ||
@@ -505,6 +510,71 @@ internal fun NotificationCenterScreen(
             }
         }
         item {
+            HubSectionTitle(
+                "Recent alert activity",
+                "Conditions detected by the background monitor"
+            )
+        }
+        if (alertEvents.isEmpty()) {
+            item {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant
+                ) {
+                    Row(
+                        Modifier.padding(13.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.History,
+                            null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(Modifier.width(9.dp))
+                        Column {
+                            Text(
+                                "No alert activity recorded yet",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            )
+                            Text(
+                                "When one of your enabled rules is detected, its evidence destination will appear here.",
+                                fontSize = 9.5.sp,
+                                lineHeight = 14.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+        } else {
+            items(alertEvents.take(8), key = { "alert-activity-${it.id}" }) { event ->
+                AlertActivityCard(
+                    event = event,
+                    onClick = { openAlertEvent(event) }
+                )
+            }
+            if (alertEvents.size > 8) {
+                item {
+                    Text(
+                        "Showing the 8 most recent detections from ${alertEvents.size} stored events.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 9.sp
+                    )
+                }
+            }
+        }
+        item {
+            Text(
+                "Alert activity records conditions accepted by NSE Watcher's monitor. " +
+                    "It does not prove that Android displayed a notification.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 9.sp,
+                lineHeight = 13.sp
+            )
+        }
+        item {
             HubSettingsSection("Sound") {
                 listOf("Default" to "Use the Android notification sound", "Silent" to "Deliver enabled alerts without sound").forEach { (mode, sub) ->
                     Row(
@@ -537,6 +607,102 @@ internal fun NotificationCenterScreen(
             }
         }
     }
+}
+
+@Composable
+private fun AlertActivityCard(
+    event: AlertEvent,
+    onClick: () -> Unit
+) {
+    val hasArticle = event.articleId.isNotBlank()
+    val icon = if (hasArticle) Icons.Default.Article else Icons.Default.NotificationsActive
+    val accent = if (hasArticle) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary
+    Surface(
+        modifier = Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(13.dp))
+            .clickable(role = Role.Button, onClickLabel = "Open alert evidence", onClick = onClick),
+        shape = RoundedCornerShape(13.dp),
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+    ) {
+        Row(
+            Modifier.padding(11.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Box(
+                Modifier.size(36.dp)
+                    .background(accent.copy(alpha = 0.09f), RoundedCornerShape(9.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(icon, null, tint = accent, modifier = Modifier.size(18.dp))
+            }
+            Spacer(Modifier.width(9.dp))
+            Column(
+                Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        event.symbol,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        event.title.ifBlank { "Alert detected" },
+                        color = MaterialTheme.colorScheme.onBackground,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Text(
+                    event.message,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 9.5.sp,
+                    lineHeight = 14.sp,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    buildString {
+                        append("Detected ")
+                        append(alertActivityTime(event.recordedAt))
+                        if (event.source.isNotBlank()) {
+                            append(" · ")
+                            append(event.source)
+                        }
+                    },
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 8.5.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Icon(
+                Icons.Default.ChevronRight,
+                null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(17.dp)
+            )
+        }
+    }
+}
+
+private fun alertActivityTime(raw: String): String {
+    if (raw.isBlank()) return "time unavailable"
+    return runCatching {
+        java.time.Instant.parse(raw)
+            .atZone(java.time.ZoneId.of("Africa/Nairobi"))
+            .format(
+                java.time.format.DateTimeFormatter.ofPattern(
+                    "dd MMM, HH:mm 'EAT'",
+                    java.util.Locale.US
+                )
+            )
+    }.getOrDefault(CompanyResearchPresentation.date(raw))
 }
 
 @Composable
