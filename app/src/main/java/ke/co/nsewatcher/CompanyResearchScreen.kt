@@ -67,7 +67,8 @@ internal fun CompanyResearchScreen(
     fundamentalsLoading: Boolean, news: List<NewsItem>, newsLoading: Boolean, newsError: String?,
     movement: MovementIntelligenceCache.Result, movementLoading: Boolean,
     deterministic: CompanyIntelligenceEngine.Result, movementContext: CompanyMovementContext,
-    analyst: AnalystCache.Result, analystLoading: Boolean, onAnalysis: () -> Unit,
+    analyst: AnalystCache.Result, analystLoading: Boolean, analystRequested: Boolean,
+    onAnalysis: () -> Unit, onAiExplain: () -> Unit,
     watched: Boolean, onWatchToggle: (() -> Unit)?, back: () -> Unit, openNews: (NewsItem) -> Unit,
     openPractice: () -> Unit, onRefresh: () -> Unit, refreshing: Boolean, selectedRange: String, onRange: (String) -> Unit,
     chart: MyStocksCache.HistoryResult, chartLoading: Boolean, oneYearChart: MyStocksCache.HistoryResult,
@@ -185,7 +186,14 @@ internal fun CompanyResearchScreen(
                     item { ResearchDeterministicAnalysis(deterministic) }
                     item { ResearchMovementContext(movementContext) }
                     item { ResearchMovement(movement, movementLoading, onRefresh) }
-                    item { ResearchAnalyst(analyst, analystLoading) }
+                    item {
+                        ResearchAnalyst(
+                            result = analyst,
+                            loading = analystLoading,
+                            requested = analystRequested,
+                            request = onAiExplain
+                        )
+                    }
                     item {
                         ResearchPanel {
                             ResearchTitle("Sources & evidence")
@@ -518,19 +526,67 @@ internal fun ResearchMovementContext(context: CompanyMovementContext) {
 }
 
 @Composable
-private fun ResearchAnalyst(result: AnalystCache.Result, loading: Boolean) {
+private fun ResearchAnalyst(
+    result: AnalystCache.Result,
+    loading: Boolean,
+    requested: Boolean,
+    request: () -> Unit
+) {
     ResearchPanel {
-        ResearchTitle("AI evidence explanation")
-        ResearchCaption("Optional explanation layer. The deterministic assessment above remains the primary analysis.")
+        ResearchTitle("Explain this simply")
+        ResearchCaption(
+            "Optional AI explanation. NSE Watcher's deterministic evidence above remains the primary analysis."
+        )
         when {
+            !requested -> {
+                ResearchBody(
+                    "Ask AI to summarize the supplied evidence in simpler language only when you want it."
+                )
+                Button(
+                    onClick = request,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(11.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = ResearchGreen,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                ) {
+                    Icon(Icons.Default.AutoAwesome, null, modifier = Modifier.size(17.dp))
+                    Spacer(Modifier.width(7.dp))
+                    Text("Explain this simply ✨", fontWeight = FontWeight.Bold)
+                }
+                ResearchCaption(
+                    "Opening Analysis does not contact the AI service. This request is sent only after you tap the button."
+                )
+            }
             loading -> ResearchLoading("Explaining the supplied evidence…")
-            result.error.isNotBlank() -> ResearchCaption("AI explanation is temporarily unavailable. ${result.error}")
-            result.analysis == null && result.message.isNotBlank() -> ResearchCaption(result.message)
-            result.analysis == null -> ResearchCaption("No AI explanation was requested or returned.")
+            result.error.isNotBlank() -> {
+                ResearchCaption("AI explanation is temporarily unavailable. ${result.error}")
+                TextButton(onClick = request) {
+                    Text("Try AI explanation again", color = ResearchGreen)
+                }
+            }
+            result.analysis == null && result.message.isNotBlank() -> {
+                ResearchCaption(result.message)
+                TextButton(onClick = request) {
+                    Text("Try again", color = ResearchGreen)
+                }
+            }
+            result.analysis == null -> {
+                ResearchCaption("No AI explanation was returned.")
+                TextButton(onClick = request) {
+                    Text("Try again", color = ResearchGreen)
+                }
+            }
             else -> {
                 val verified = CompanyAnalysisPresentation.verifiedAnalyst(result)
                 if (verified == null) {
-                    ResearchCaption("The AI response was withheld because its evidence references could not be verified against the returned evidence packet.")
+                    ResearchCaption(
+                        "The AI response was withheld because its evidence references could not be verified against the returned evidence packet."
+                    )
+                    TextButton(onClick = request) {
+                        Text("Request another explanation", color = ResearchGreen)
+                    }
                 } else {
                     val analysis = verified.analysis
                     if (analysis.headline.isNotBlank()) ResearchBody(analysis.headline)
@@ -542,8 +598,12 @@ private fun ResearchAnalyst(result: AnalystCache.Result, loading: Boolean) {
                         ResearchCaption(signal.detail)
                         signal.evidenceIds.distinct().take(2).forEach { id ->
                             verified.evidenceById[id]?.let { evidence ->
-                                ResearchCaption("Evidence: ${evidence.claim.ifBlank { id }} • ${evidence.source.ifBlank { "Source unavailable" }}")
-                                if (evidence.period.isNotBlank()) ResearchCaption("Period: ${evidence.period}")
+                                ResearchCaption(
+                                    "Evidence: ${evidence.claim.ifBlank { id }} • ${evidence.source.ifBlank { "Source unavailable" }}"
+                                )
+                                if (evidence.period.isNotBlank()) {
+                                    ResearchCaption("Period: ${evidence.period}")
+                                }
                                 ResearchSourceLink("Open evidence source", evidence.url)
                             }
                         }
@@ -557,7 +617,9 @@ private fun ResearchAnalyst(result: AnalystCache.Result, loading: Boolean) {
                         ResearchCaption("Still unknown")
                         analysis.unknowns.take(4).forEach { ResearchCaption("• $it") }
                     }
-                    ResearchCaption("AI may summarize or interpret only the supplied evidence. It does not add verified facts, establish causation, or provide BUY/SELL/HOLD instructions.")
+                    ResearchCaption(
+                        "AI may summarize or interpret only the supplied evidence. It does not add verified facts, establish causation, or provide BUY/SELL/HOLD instructions."
+                    )
                 }
             }
         }
