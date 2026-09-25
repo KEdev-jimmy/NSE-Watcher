@@ -123,31 +123,32 @@ fun CompanyIntelligence(
             newsLoading = false
         }
     }
-    // Each range becomes usable as soon as it arrives; a slow five-year response
-    // no longer blocks the session header or one-day chart. No duplicate 1D fetch.
-    LaunchedEffect(s.symbol, lastMarketRefreshMs, refresh) {
-        loadingRanges = CompanyResearchPresentation.ranges.toSet()
-        coroutineScope {
-            CompanyResearchPresentation.ranges.forEach { range ->
-                launch {
-                    try {
-                        val result = MarketHistoryCache.load(
-                            symbol = s.symbol,
-                            period = range,
-                            forceRefresh = refresh > 0
-                        )
-                        ranges = ranges + (range to result)
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (_: Exception) {
-                        ranges = ranges + (range to MyStocksCache.HistoryResult())
-                    } finally { loadingRanges = loadingRanges - range }
-                }
+    // History is demand-driven. Overview preloads only the ranges it visibly
+    // uses; other chart periods are requested when the user selects them.
+    // MarketHistoryCache still handles freshness, in-flight deduplication and TTL.
+    CompanyResearchPresentation.ranges.forEach { range ->
+        val requested = range in requestedRanges
+        LaunchedEffect(s.symbol, range, requested, lastMarketRefreshMs, refresh) {
+            if (!requested) return@LaunchedEffect
+            loadingRanges = loadingRanges + range
+            try {
+                val result = MarketHistoryCache.load(
+                    symbol = s.symbol,
+                    period = range,
+                    forceRefresh = refresh > 0
+                )
+                ranges = ranges + (range to result)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                ranges = ranges + (range to MyStocksCache.HistoryResult())
+            } finally {
+                loadingRanges = loadingRanges - range
             }
         }
     }
-    LaunchedEffect(s.symbol, analysisRequested, refresh) {
-        if (!analysisRequested) return@LaunchedEffect
+    LaunchedEffect(s.symbol, movementRequested, refresh) {
+        if (!movementRequested) return@LaunchedEffect
         movementLoading = true
         try {
             movement = MovementIntelligenceCache.load(s.symbol)
@@ -157,8 +158,8 @@ fun CompanyIntelligence(
             movement = MovementIntelligenceCache.Result(error = "Movement evidence is temporarily unavailable.")
         } finally { movementLoading = false }
     }
-    LaunchedEffect(s.symbol, analysisRequested, refresh) {
-        if (!analysisRequested) return@LaunchedEffect
+    LaunchedEffect(s.symbol, analystRequested, refresh) {
+        if (!analystRequested) return@LaunchedEffect
         analystLoading = true
         try {
             analyst = AnalystCache.ask(
