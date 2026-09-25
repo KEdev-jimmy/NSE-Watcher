@@ -12,8 +12,19 @@ import ke.co.nsewatcher.data.MarketData
 import ke.co.nsewatcher.data.MyStocksCache
 import ke.co.nsewatcher.data.NewsCache
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
+import java.time.LocalDate
+
+internal object CompanyHistoryLoadingPolicy {
+    private val overviewRanges = setOf("1D", "1M", "3M", "1Y", "3Y")
+
+    fun initial(defaultRange: String): Set<String> =
+        (overviewRanges + defaultRange)
+            .filter { it in CompanyResearchPresentation.ranges }
+            .toSet()
+
+    fun request(current: Set<String>, range: String): Set<String> =
+        if (range in CompanyResearchPresentation.ranges) current + range else current
+}
 
 @Composable
 fun CompanyIntelligence(
@@ -37,7 +48,10 @@ fun CompanyIntelligence(
     var refresh by remember(s.symbol) { mutableIntStateOf(0) }
     var selectedRange by rememberSaveable(s.symbol) { mutableStateOf(configuredDefaultRange) }
     var ranges by remember(s.symbol) { mutableStateOf<Map<String, MyStocksCache.HistoryResult>>(emptyMap()) }
-    var loadingRanges by remember(s.symbol) { mutableStateOf(CompanyResearchPresentation.ranges.toSet()) }
+    var requestedRanges by remember(s.symbol) {
+        mutableStateOf(CompanyHistoryLoadingPolicy.initial(configuredDefaultRange))
+    }
+    var loadingRanges by remember(s.symbol) { mutableStateOf(emptySet<String>()) }
     var intelligence by remember(s.symbol) { mutableStateOf(CompanyIntelligenceCache.Result()) }
     var fundamentalsLoading by remember(s.symbol) { mutableStateOf(true) }
     var newsLoading by remember(s.symbol) { mutableStateOf(sharedNews.isEmpty()) }
@@ -46,7 +60,8 @@ fun CompanyIntelligence(
     var movementLoading by remember(s.symbol) { mutableStateOf(false) }
     var analyst by remember(s.symbol) { mutableStateOf(AnalystCache.Result()) }
     var analystLoading by remember(s.symbol) { mutableStateOf(false) }
-    var analysisRequested by remember(s.symbol) { mutableStateOf(false) }
+    var movementRequested by remember(s.symbol) { mutableStateOf(false) }
+    var analystRequestRevision by remember(s.symbol) { mutableIntStateOf(0) }
     val lastMarketRefreshMs = MarketRefreshController.state.value.lastSuccessfulRefreshMs
 
     LaunchedEffect(s.symbol, refresh) {
@@ -106,31 +121,32 @@ fun CompanyIntelligence(
             newsLoading = false
         }
     }
-    // Each range becomes usable as soon as it arrives; a slow five-year response
-    // no longer blocks the session header or one-day chart. No duplicate 1D fetch.
-    LaunchedEffect(s.symbol, lastMarketRefreshMs, refresh) {
-        loadingRanges = CompanyResearchPresentation.ranges.toSet()
-        coroutineScope {
-            CompanyResearchPresentation.ranges.forEach { range ->
-                launch {
-                    try {
-                        val result = MarketHistoryCache.load(
-                            symbol = s.symbol,
-                            period = range,
-                            forceRefresh = refresh > 0
-                        )
-                        ranges = ranges + (range to result)
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (_: Exception) {
-                        ranges = ranges + (range to MyStocksCache.HistoryResult())
-                    } finally { loadingRanges = loadingRanges - range }
-                }
+    // History is demand-driven. Overview preloads only the ranges it visibly
+    // uses; other chart periods are requested when the user selects them.
+    // MarketHistoryCache still handles freshness, in-flight deduplication and TTL.
+    CompanyResearchPresentation.ranges.forEach { range ->
+        val requested = range in requestedRanges
+        LaunchedEffect(s.symbol, range, requested, lastMarketRefreshMs, refresh) {
+            if (!requested) return@LaunchedEffect
+            loadingRanges = loadingRanges + range
+            try {
+                val result = MarketHistoryCache.load(
+                    symbol = s.symbol,
+                    period = range,
+                    forceRefresh = refresh > 0
+                )
+                ranges = ranges + (range to result)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                ranges = ranges + (range to MyStocksCache.HistoryResult())
+            } finally {
+                loadingRanges = loadingRanges - range
             }
         }
     }
-    LaunchedEffect(s.symbol, analysisRequested, refresh) {
-        if (!analysisRequested) return@LaunchedEffect
+    LaunchedEffect(s.symbol, movementRequested, refresh) {
+        if (!movementRequested) return@LaunchedEffect
         movementLoading = true
         try {
             movement = MovementIntelligenceCache.load(s.symbol)
@@ -140,8 +156,8 @@ fun CompanyIntelligence(
             movement = MovementIntelligenceCache.Result(error = "Movement evidence is temporarily unavailable.")
         } finally { movementLoading = false }
     }
-    LaunchedEffect(s.symbol, analysisRequested, refresh) {
-        if (!analysisRequested) return@LaunchedEffect
+    LaunchedEffect(s.symbol, analystRequestRevision) {
+        if (analystRequestRevision == 0) return@LaunchedEffect
         analystLoading = true
         try {
             analyst = AnalystCache.ask(
@@ -157,16 +173,49 @@ fun CompanyIntelligence(
 
     val day = ranges["1D"] ?: MyStocksCache.HistoryResult()
     val session = remember(s, day) { CompanyResearchPresentation.session(s, day) }
-    val returns = remember(ranges, session.dailyChange) {
+    val coverageDate = LocalDate.now(CompanyResearchPresentation.zone)
+    val returns = remember(ranges, session.dailyChange, coverageDate) {
         ranges.mapValues { (range, result) ->
-            CompanyChartAccuracy.periodReturn(range, result, if (range == "1D") session.dailyChange else null)
+            CompanyChartAccuracy.periodReturn(
+                range,
+                result,
+                if (range == "1D") session.dailyChange else null,
+                coverageDate
+            )
         } + ("1D" to session.dailyChange)
     }
-    val deterministic = remember(s, intelligence, ranges["1M"], news) {
+
+    val oneMonthResult = ranges["1M"] ?: MyStocksCache.HistoryResult()
+    val oneMonthCoverage = remember(oneMonthResult, coverageDate) {
+        MarketPresentation.historicalCoverage("1M", oneMonthResult, coverageDate)
+    }
+    val oneMonthPrices = remember(oneMonthResult, oneMonthCoverage, coverageDate) {
+        if (oneMonthCoverage.change == null) {
+            emptyList()
+        } else {
+            val start = MarketPresentation.start("1M", coverageDate)
+            WatchlistPresentation.trend(oneMonthResult.points)
+                .filter { point ->
+                    val date = MarketPresentation.date(point.date)
+                    date != null && !date.isBefore(start) && !date.isAfter(coverageDate)
+                }
+                .map { it.close }
+        }
+    }
+
+    val oneYearResult = ranges["1Y"] ?: MyStocksCache.HistoryResult()
+    val oneYearCoverage = remember(oneYearResult, coverageDate) {
+        MarketPresentation.historicalCoverage("1Y", oneYearResult, coverageDate)
+    }
+    val validatedOneYear = remember(oneYearResult, oneYearCoverage) {
+        if (oneYearCoverage.change != null) oneYearResult else MyStocksCache.HistoryResult()
+    }
+
+    val deterministic = remember(s, intelligence, oneMonthPrices, news) {
         CompanyIntelligenceEngine.build(
             stock = s,
             source = intelligence,
-            priceHistory = ranges["1M"]?.prices.orEmpty(),
+            priceHistory = oneMonthPrices,
             news = news
         )
     }
@@ -179,14 +228,24 @@ fun CompanyIntelligence(
         newsError = newsError, movement = movement, movementLoading = movementLoading,
         deterministic = deterministic, movementContext = movementContext,
         analyst = analyst, analystLoading = analystLoading,
-        onAnalysis = { analysisRequested = true }, watched = watched, onWatchToggle = onWatchToggle,
+        analystRequested = analystRequestRevision > 0,
+        onAnalysis = { movementRequested = true },
+        onAiExplain = { analystRequestRevision++ },
+        watched = watched, onWatchToggle = onWatchToggle,
         back = back, openNews = openNews, openPractice = openPractice,
-        onRefresh = { refresh++ },
+        onRefresh = {
+            analyst = AnalystCache.Result()
+            analystRequestRevision = 0
+            refresh++
+        },
         refreshing = fundamentalsLoading || newsLoading || loadingRanges.isNotEmpty() || movementLoading || analystLoading,
-        selectedRange = selectedRange, onRange = { selectedRange = it },
+        selectedRange = selectedRange, onRange = { range ->
+            selectedRange = range
+            requestedRanges = CompanyHistoryLoadingPolicy.request(requestedRanges, range)
+        },
         chart = ranges[selectedRange] ?: MyStocksCache.HistoryResult(),
         chartLoading = selectedRange in loadingRanges,
-        oneYearChart = ranges["1Y"] ?: MyStocksCache.HistoryResult(),
+        oneYearChart = validatedOneYear,
         rangeReturns = returns,
         sessionLoading = "1D" in loadingRanges,
         showChartGrid = showChartGrid

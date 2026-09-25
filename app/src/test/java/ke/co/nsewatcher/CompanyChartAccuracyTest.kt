@@ -12,6 +12,26 @@ class CompanyChartAccuracyTest {
     private fun value(range: String, history: HistoryResult) =
         CompanyChartAccuracy.periodReturn(range, history, today = today)
 
+    private fun sampled(
+        start: LocalDate,
+        stepDays: Long = 7,
+        firstPrice: Double = 100.0,
+        lastPrice: Double = 110.0
+    ): HistoryResult {
+        val dates = (
+            generateSequence(start) { it.plusDays(stepDays) }
+                .takeWhile { it < today }
+                .toList() + today
+        ).distinct()
+        val denominator = (dates.size - 1).coerceAtLeast(1)
+        return HistoryResult(
+            points = dates.mapIndexed { index, date ->
+                val progress = index.toDouble() / denominator
+                HistoryPoint(firstPrice + ((lastPrice - firstPrice) * progress), date.toString())
+            }
+        )
+    }
+
     @Test fun singleObservationDoesNotBecomeZeroReturn() {
         assertNull(value("3D", result(HistoryPoint(100.0, "2026-09-22"))))
     }
@@ -23,15 +43,16 @@ class CompanyChartAccuracyTest {
     }
 
     @Test fun completeDatedRangeProducesReturn() {
-        assertEquals(10.0, value("1M", result(
-            HistoryPoint(100.0, "2026-08-22"), HistoryPoint(110.0, "2026-09-22")
-        ))!!, 0.00001)
+        assertEquals(10.0, value("1M", sampled(today.minusMonths(1)))!!, 0.00001)
     }
 
     @Test fun unorderedObservationsUseChronologicalBoundaries() {
-        assertEquals(10.0, value("1M", result(
-            HistoryPoint(110.0, "2026-09-22"), HistoryPoint(100.0, "2026-08-22")
-        ))!!, 0.00001)
+        val ordered = sampled(today.minusMonths(1))
+        assertEquals(
+            10.0,
+            value("1M", ordered.copy(points = ordered.points.reversed()))!!,
+            0.00001
+        )
     }
 
     @Test fun missingInvalidAndDuplicateDatesAreUnavailable() {
@@ -66,16 +87,35 @@ class CompanyChartAccuracyTest {
             "3Y" to today.minusYears(3), "5Y" to today.minusYears(5)
         )
         for ((range, start) in starts) {
-            assertEquals(range, 10.0, value(range, result(
-                HistoryPoint(100.0, start.toString()), HistoryPoint(110.0, today.toString())
-            ))!!, 0.00001)
+            val step = when (range) {
+                "3D" -> 1L
+                "1W" -> 2L
+                "1Y" -> 14L
+                "3Y", "5Y" -> 30L
+                else -> 7L
+            }
+            assertEquals(range, 10.0, value(range, sampled(start, step))!!, 0.00001)
         }
     }
 
-    @Test fun zeroReturnIsValidWithTwoDistinctCoveredObservations() {
-        assertEquals(0.0, value("1M", result(
-            HistoryPoint(100.0, "2026-08-22"), HistoryPoint(100.0, "2026-09-22")
-        ))!!, 0.00001)
+    @Test fun zeroReturnIsValidWithCoveredObservations() {
+        assertEquals(
+            0.0,
+            value("1M", sampled(today.minusMonths(1), firstPrice = 100.0, lastPrice = 100.0))!!,
+            0.00001
+        )
+    }
+
+    @Test fun largeInteriorGapIsRejectedExactlyLikeMarketPerformance() {
+        val sparse = result(
+            HistoryPoint(100.0, today.minusMonths(1).toString()),
+            HistoryPoint(110.0, today.toString())
+        )
+        assertNull(value("1M", sparse))
+        assertEquals(
+            "Large gaps in returned history",
+            MarketPresentation.historicalCoverage("1M", sparse, today).reason
+        )
     }
 
     @Test fun sessionHeadingUsesNairobiDateAndNeverInventsToday() {

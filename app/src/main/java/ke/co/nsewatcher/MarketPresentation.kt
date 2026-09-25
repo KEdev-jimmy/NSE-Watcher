@@ -10,6 +10,12 @@ internal data class MarketBreadth(val rising: Int, val flat: Int, val falling: I
 internal data class MarketSector(val name: String, val breadth: MarketBreadth, val average: Double?)
 internal data class MarketPerformance(val stock: Stock, val change: Double, val first: String, val last: String)
 internal data class MarketEligibility(val performance: MarketPerformance? = null, val reason: String = "")
+internal data class HistoricalPeriodCoverage(
+    val change: Double? = null,
+    val first: String = "",
+    val last: String = "",
+    val reason: String = ""
+)
 
 internal object MarketPresentation {
     val ranges = listOf("1D", "3D", "1W", "1M", "3M", "6M", "YTD", "1Y", "3Y", "5Y")
@@ -39,6 +45,48 @@ internal object MarketPresentation {
     }
     fun historyPeriod(range: String) = if (range == "YTD") "1y" else range.lowercase(java.util.Locale.US)
     fun endpointTolerance(range: String): Long = when (range) { "3D" -> 1; "1Y", "YTD" -> 10; "3Y", "5Y" -> 35; else -> 4 }
+    fun historicalCoverage(range: String, result: HistoryResult, end: LocalDate): HistoricalPeriodCoverage {
+        if (range == "1D") return HistoricalPeriodCoverage(reason = "Use the daily quote for 1D")
+        val start = start(range, end)
+        val tolerance = endpointTolerance(range)
+        val valid = WatchlistPresentation.trend(result.points).filter { date(it.date)!! <= end }
+        val points = if (range == "YTD") {
+            val baseline = valid.lastOrNull {
+                date(it.date)!! <= start && date(it.date)!! >= start.minusDays(tolerance)
+            } ?: return HistoricalPeriodCoverage(reason = "Year-end baseline unavailable")
+            listOf(baseline) + valid.filter { date(it.date)!! > start }
+        } else {
+            valid.filter { date(it.date)!! >= start }
+        }
+        if (points.size < 2) return HistoricalPeriodCoverage(reason = "Fewer than two dated observations")
+        val firstDate = date(points.first().date)!!
+        val lastDate = date(points.last().date)!!
+        if (range != "YTD" && firstDate > start.plusDays(tolerance)) {
+            return HistoricalPeriodCoverage(reason = "History does not reach period start")
+        }
+        if (lastDate < end.minusDays(if (range == "3D") 3 else tolerance)) {
+            return HistoricalPeriodCoverage(reason = "History does not reach period end")
+        }
+        if (firstDate >= lastDate) return HistoricalPeriodCoverage(reason = "No dated price interval")
+        val maxGap = when (range) {
+            "1Y", "YTD" -> 21
+            "3Y", "5Y" -> 75
+            else -> 9
+        }
+        if (points.zipWithNext().any { (a, b) ->
+                ChronoUnit.DAYS.between(date(a.date), date(b.date)) > maxGap
+            }) {
+            return HistoricalPeriodCoverage(reason = "Large gaps in returned history")
+        }
+        val change = (points.last().close / points.first().close - 1.0) * 100
+        if (!change.isFinite()) return HistoricalPeriodCoverage(reason = "Invalid price calculation")
+        return HistoricalPeriodCoverage(
+            change = change,
+            first = points.first().date,
+            last = points.last().date
+        )
+    }
+
     fun eligible(stock: Stock, range: String, result: HistoryResult, end: LocalDate): MarketEligibility {
         if (range == "1D") {
             if (!validChange(stock)) return MarketEligibility(reason = "Daily change unavailable")
@@ -46,25 +94,11 @@ internal object MarketPresentation {
             if (observed > end || observed < end.minusDays(4)) return MarketEligibility(reason = "Quote outside recent session window")
             return MarketEligibility(MarketPerformance(stock, stock.change, stock.observedAt, stock.observedAt))
         }
-        val start = start(range, end)
-        val tolerance = endpointTolerance(range)
-        val valid = WatchlistPresentation.trend(result.points).filter { date(it.date)!! <= end }
-        val points = if (range == "YTD") {
-            val baseline = valid.lastOrNull { date(it.date)!! <= start && date(it.date)!! >= start.minusDays(tolerance) }
-                ?: return MarketEligibility(reason = "Year-end baseline unavailable")
-            listOf(baseline) + valid.filter { date(it.date)!! > start }
-        } else valid.filter { date(it.date)!! >= start }
-        if (points.size < 2) return MarketEligibility(reason = "Fewer than two dated observations")
-        val firstDate = date(points.first().date)!!
-        val lastDate = date(points.last().date)!!
-        if (range != "YTD" && firstDate > start.plusDays(tolerance)) return MarketEligibility(reason = "History does not reach period start")
-        if (lastDate < end.minusDays(if (range == "3D") 3 else tolerance)) return MarketEligibility(reason = "History does not reach period end")
-        if (firstDate >= lastDate) return MarketEligibility(reason = "No dated price interval")
-        val maxGap = when (range) { "1Y", "YTD" -> 21; "3Y", "5Y" -> 75; else -> 9 }
-        if (points.zipWithNext().any { (a, b) -> ChronoUnit.DAYS.between(date(a.date), date(b.date)) > maxGap }) return MarketEligibility(reason = "Large gaps in returned history")
-        val change = (points.last().close / points.first().close - 1.0) * 100
-        if (!change.isFinite()) return MarketEligibility(reason = "Invalid price calculation")
-        return MarketEligibility(MarketPerformance(stock, change, points.first().date, points.last().date))
+        val coverage = historicalCoverage(range, result, end)
+        val change = coverage.change ?: return MarketEligibility(reason = coverage.reason)
+        return MarketEligibility(
+            MarketPerformance(stock, change, coverage.first, coverage.last)
+        )
     }
     fun ranked(values: List<MarketPerformance>, filter: String): List<MarketPerformance> = when (filter) {
         "Losers" -> values.filter { it.change < 0 }.sortedBy { it.change }
