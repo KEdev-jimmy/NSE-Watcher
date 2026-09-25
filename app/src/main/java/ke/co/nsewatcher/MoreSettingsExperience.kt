@@ -37,7 +37,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import ke.co.nsewatcher.data.AlertStore
 import ke.co.nsewatcher.domain.AlertEvent
 
@@ -446,14 +450,35 @@ internal fun NotificationCenterScreen(
     val context = LocalContext.current
     val alertStore = remember(context) { AlertStore(context) }
     val alertEvents by alertStore.events.collectAsState(initial = emptyList())
-    var permissionGranted by remember {
-        mutableStateOf(
-            Build.VERSION.SDK_INT < 33 ||
-                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-        )
+
+    fun notificationsAllowed(): Boolean {
+        val runtimePermission = Build.VERSION.SDK_INT < 33 ||
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        return runtimePermission &&
+            NotificationManagerCompat.from(context).areNotificationsEnabled()
     }
-    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-        permissionGranted = it
+
+    var permissionGranted by remember { mutableStateOf(notificationsAllowed()) }
+    fun refreshPermissionState() {
+        permissionGranted = notificationsAllowed()
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) {
+        refreshPermissionState()
+    }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        refreshPermissionState()
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) refreshPermissionState()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     LazyColumn(
