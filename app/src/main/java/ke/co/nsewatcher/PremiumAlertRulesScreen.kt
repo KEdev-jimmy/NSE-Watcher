@@ -1,7 +1,6 @@
 package ke.co.nsewatcher
 
 import android.Manifest
-import android.app.NotificationManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -28,7 +27,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -36,6 +34,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import ke.co.nsewatcher.data.AlertStore
 import ke.co.nsewatcher.data.WatchlistStore
 import ke.co.nsewatcher.domain.AlertType
@@ -99,8 +100,14 @@ internal fun PremiumAlertRulesScreen(
         refreshNotificationState()
     }
 
-    LaunchedEffect(Unit) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
         refreshNotificationState()
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) refreshNotificationState()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     fun openPhoneNotificationSettings() {
@@ -582,7 +589,7 @@ internal fun PremiumAlertRulesScreen(
                         deleting = null
                         if (editingId == rule.id) closeForm()
                     },
-                    enabled = !saving && rule.type in WatchlistPresentation.supportedTypes
+                    enabled = !saving
                 ) {
                     Text("Delete", color = ResearchRed)
                 }
@@ -811,7 +818,7 @@ private fun AlertRuleCard(
                 Switch(
                     checked = rule.enabled,
                     onCheckedChange = onToggle,
-                    enabled = !saving
+                    enabled = !saving && rule.type in WatchlistPresentation.supportedTypes
                 )
             }
 
