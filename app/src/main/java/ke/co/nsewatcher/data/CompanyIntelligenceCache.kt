@@ -1,12 +1,17 @@
 package ke.co.nsewatcher.data
 
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+import java.util.Locale
 
 /**
  * Company-intelligence bridge. Credentials stay on Vercel; Android only sees
@@ -91,10 +96,24 @@ object CompanyIntelligenceCache {
         val fetchedAt: String = "",
         val partial: Boolean = false,
         val financialHistoryAvailable: Boolean = false,
+        val cacheState: String = "LIVE",
+        val cacheAgeMinutes: Long? = null,
+        val cacheMessage: String = "",
         val error: String? = null
     )
 
-    suspend fun load(symbol: String): Result = withContext(Dispatchers.IO) {
+    private val repository by lazy {
+        CompanyIntelligenceRepository(loader = ::fetch)
+    }
+
+    suspend fun load(
+        symbol: String,
+        forceRefresh: Boolean = false
+    ): Result = repository.load(symbol, forceRefresh)
+
+    suspend fun clear(symbol: String? = null) = repository.clear(symbol)
+
+    private suspend fun fetch(symbol: String): Result = withContext(Dispatchers.IO) {
         val encoded = URLEncoder.encode(symbol.trim(), Charsets.UTF_8.name())
         val root = request(BASE_URL + encoded)
             ?: return@withContext Result(error = "Unable to reach the company intelligence service.")
@@ -312,4 +331,141 @@ object CompanyIntelligenceCache {
             connection.disconnect()
         }
     }.getOrNull()
+}
+
+
+internal class CompanyIntelligenceRepository(
+    private val loader: suspend (String) -> CompanyIntelligenceCache.Result,
+    private val nowMs: () -> Long = System::currentTimeMillis,
+    private val maxAgeMs: Long = 30L * 60L * 1000L,
+    private val maxStaleMs: Long = 6L * 60L * 60L * 1000L,
+    private val maxEntries: Int = 64
+) {
+    private data class Entry(
+        val result: CompanyIntelligenceCache.Result,
+        val loadedAtMs: Long
+    )
+
+    private val mutex = Mutex()
+    private val entries = mutableMapOf<String, Entry>()
+    private val inFlight = mutableMapOf<String, CompletableDeferred<CompanyIntelligenceCache.Result>>()
+
+    suspend fun load(
+        symbol: String,
+        forceRefresh: Boolean = false
+    ): CompanyIntelligenceCache.Result {
+        val key = normalizeSymbol(symbol)
+        if (key.isBlank()) {
+            return CompanyIntelligenceCache.Result(error = "Company symbol is unavailable.")
+        }
+
+        var owner = false
+        var staleEntry: Entry? = null
+        val pending = mutex.withLock {
+            val now = nowMs()
+            val cached = entries[key]
+            staleEntry = cached?.takeIf { now - it.loadedAtMs <= maxStaleMs }
+
+            if (!forceRefresh && cached != null && now - cached.loadedAtMs < maxAgeMs) {
+                return cached.result.withCacheState(
+                    state = "FRESH_CACHE",
+                    ageMs = now - cached.loadedAtMs,
+                    message = ""
+                )
+            }
+
+            inFlight[key] ?: CompletableDeferred<CompanyIntelligenceCache.Result>().also {
+                inFlight[key] = it
+                owner = true
+            }
+        }
+
+        if (owner) {
+            try {
+                val live = loader(key)
+                val delivered = if (usable(live)) {
+                    val clean = live.copy(
+                        cacheState = "LIVE",
+                        cacheAgeMinutes = 0,
+                        cacheMessage = ""
+                    )
+                    mutex.withLock {
+                        entries[key] = Entry(clean, nowMs())
+                        trimLocked()
+                        inFlight.remove(key)
+                    }
+                    clean
+                } else {
+                    val fallback = staleEntry?.toFallback(nowMs())
+                    mutex.withLock { inFlight.remove(key) }
+                    fallback ?: live
+                }
+                pending.complete(delivered)
+            } catch (cancelled: CancellationException) {
+                mutex.withLock { inFlight.remove(key) }
+                pending.completeExceptionally(cancelled)
+                throw cancelled
+            } catch (_: Exception) {
+                val fallback = staleEntry?.toFallback(nowMs())
+                val result = fallback ?: CompanyIntelligenceCache.Result(
+                    error = "Unable to reach the company intelligence service."
+                )
+                mutex.withLock { inFlight.remove(key) }
+                pending.complete(result)
+            }
+        }
+
+        return pending.await()
+    }
+
+    suspend fun clear(symbol: String? = null) {
+        mutex.withLock {
+            if (symbol == null) {
+                entries.clear()
+            } else {
+                entries.remove(normalizeSymbol(symbol))
+            }
+        }
+    }
+
+    private fun Entry.toFallback(now: Long): CompanyIntelligenceCache.Result {
+        val age = (now - loadedAtMs).coerceAtLeast(0L)
+        return result.copy(
+            partial = true,
+            cacheState = "STALE_FALLBACK",
+            cacheAgeMinutes = age / 60_000L,
+            cacheMessage = "Live company research could not be refreshed. Showing the most recent cached company data.",
+            error = null
+        )
+    }
+
+    private fun CompanyIntelligenceCache.Result.withCacheState(
+        state: String,
+        ageMs: Long,
+        message: String
+    ): CompanyIntelligenceCache.Result = copy(
+        cacheState = state,
+        cacheAgeMinutes = ageMs.coerceAtLeast(0L) / 60_000L,
+        cacheMessage = message
+    )
+
+    private fun usable(result: CompanyIntelligenceCache.Result): Boolean =
+        result.error == null && (
+            result.profile != CompanyIntelligenceCache.Profile() ||
+                result.dividends.isNotEmpty() ||
+                result.financialHistory.isNotEmpty() ||
+                result.evidence.isNotEmpty() ||
+                result.fieldSources.isNotEmpty() ||
+                result.fetchedAt.isNotBlank()
+            )
+
+    private fun normalizeSymbol(value: String): String =
+        value.trim().uppercase(Locale.US).removeSuffix(".KE")
+
+    private fun trimLocked() {
+        while (entries.size > maxEntries) {
+            val oldest = entries.minByOrNull { it.value.loadedAtMs }?.key ?: break
+            entries.remove(oldest)
+        }
+    }
 }
