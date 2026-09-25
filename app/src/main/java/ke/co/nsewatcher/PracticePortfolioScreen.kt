@@ -316,7 +316,8 @@ internal fun PracticePortfolioScreen(quoteFeed: List<Stock>, catalog: List<Stock
                         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                             PracticeLearningInsightsCard(
                                 insights = learningInsights,
-                                onOpenCenter = {}
+                                onOpenCenter = {},
+                                showOpenCenter = false
                             )
                             PracticeDecisionReviewCenter(
                                 items = decisionItems,
