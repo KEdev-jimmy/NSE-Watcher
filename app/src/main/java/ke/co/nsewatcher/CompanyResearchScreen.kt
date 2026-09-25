@@ -551,7 +551,7 @@ private fun ResearchAnalyst(
                         contentColor = MaterialTheme.colorScheme.onPrimary
                     )
                 ) {
-                    Icon(Icons.Default.AutoAwesome, null, modifier = Modifier.size(17.dp))
+                    Icon(Icons.Default.Lightbulb, null, modifier = Modifier.size(17.dp))
                     Spacer(Modifier.width(7.dp))
                     Text("Explain this simply ✨", fontWeight = FontWeight.Bold)
                 }
