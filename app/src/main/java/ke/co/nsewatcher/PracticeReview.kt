@@ -334,7 +334,8 @@ internal object PracticeReviewPresentation {
 @Composable
 internal fun PracticeLearningInsightsCard(
     insights: PracticeLearningInsights,
-    onOpenCenter: () -> Unit
+    onOpenCenter: () -> Unit,
+    showOpenCenter: Boolean = true
 ) {
     ResearchPanel {
         Row(
@@ -377,8 +378,10 @@ internal fun PracticeLearningInsightsCard(
             ResearchCaption("These patterns describe your saved Practice history; they do not judge the quality of a decision.")
         }
 
-        TextButton(onClick = onOpenCenter, modifier = Modifier.fillMaxWidth()) {
-            Text(if (insights.totalDecisions == 0) "Open decision center →" else "Review your decisions →")
+        if (showOpenCenter) {
+            TextButton(onClick = onOpenCenter, modifier = Modifier.fillMaxWidth()) {
+                Text(if (insights.totalDecisions == 0) "Open decision center →" else "Review your decisions →")
+            }
         }
     }
 }

@@ -46,6 +46,7 @@ internal fun MoreHubScreen(
     name: String,
     username: String,
     email: String,
+    back: () -> Unit,
     openProfile: () -> Unit,
     openPractice: () -> Unit,
     openWatchlist: () -> Unit,
@@ -79,7 +80,12 @@ internal fun MoreHubScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            NseWatcherBrandLockup(compact = true)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = back) {
+                    Icon(Icons.Default.ArrowBack, "Back")
+                }
+                NseWatcherBrandLockup(modifier = Modifier.weight(1f), compact = true)
+            }
         }
         item {
             Surface(
@@ -248,7 +254,8 @@ internal fun ProfileHubScreen(
     back: () -> Unit,
     openAccount: () -> Unit,
     openWatchlist: () -> Unit,
-    openPractice: () -> Unit
+    openPractice: () -> Unit,
+    openMore: () -> Unit
 ) {
     var editing by rememberSaveable { mutableStateOf(false) }
     var draftName by rememberSaveable(name) { mutableStateOf(name) }
@@ -333,7 +340,8 @@ internal fun ProfileHubScreen(
                     HubRow("Account & sign in", "Google/email sync is not connected yet", Icons.Default.AccountCircle, openAccount),
                     HubRow("Profile photo", "Choose a picture from this device", Icons.Default.PhotoCamera, pickAvatar),
                     HubRow("Watchlist", "Open companies you follow", Icons.Default.Bookmark, openWatchlist),
-                    HubRow("Practice Portfolio", "Open your virtual investing account", Icons.Default.AccountBalanceWallet, openPractice)
+                    HubRow("Practice & Learn", "Open your virtual investing and learning space", Icons.Default.School, openPractice),
+                    HubRow("Tools & settings", "Alerts, comparison, preferences and support", Icons.Default.GridView, openMore)
                 )
             )
         }
