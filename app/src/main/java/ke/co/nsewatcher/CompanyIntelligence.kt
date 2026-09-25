@@ -14,6 +14,19 @@ import ke.co.nsewatcher.data.NewsCache
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import java.time.LocalDate
+
+internal object CompanyHistoryLoadingPolicy {
+    private val overviewRanges = setOf("1D", "1M", "3M", "1Y", "3Y")
+
+    fun initial(defaultRange: String): Set<String> =
+        (overviewRanges + defaultRange)
+            .filter { it in CompanyResearchPresentation.ranges }
+            .toSet()
+
+    fun request(current: Set<String>, range: String): Set<String> =
+        if (range in CompanyResearchPresentation.ranges) current + range else current
+}
 
 @Composable
 fun CompanyIntelligence(
@@ -37,7 +50,10 @@ fun CompanyIntelligence(
     var refresh by remember(s.symbol) { mutableIntStateOf(0) }
     var selectedRange by rememberSaveable(s.symbol) { mutableStateOf(configuredDefaultRange) }
     var ranges by remember(s.symbol) { mutableStateOf<Map<String, MyStocksCache.HistoryResult>>(emptyMap()) }
-    var loadingRanges by remember(s.symbol) { mutableStateOf(CompanyResearchPresentation.ranges.toSet()) }
+    var requestedRanges by remember(s.symbol) {
+        mutableStateOf(CompanyHistoryLoadingPolicy.initial(configuredDefaultRange))
+    }
+    var loadingRanges by remember(s.symbol) { mutableStateOf(emptySet<String>()) }
     var intelligence by remember(s.symbol) { mutableStateOf(CompanyIntelligenceCache.Result()) }
     var fundamentalsLoading by remember(s.symbol) { mutableStateOf(true) }
     var newsLoading by remember(s.symbol) { mutableStateOf(sharedNews.isEmpty()) }
@@ -46,7 +62,8 @@ fun CompanyIntelligence(
     var movementLoading by remember(s.symbol) { mutableStateOf(false) }
     var analyst by remember(s.symbol) { mutableStateOf(AnalystCache.Result()) }
     var analystLoading by remember(s.symbol) { mutableStateOf(false) }
-    var analysisRequested by remember(s.symbol) { mutableStateOf(false) }
+    var movementRequested by remember(s.symbol) { mutableStateOf(false) }
+    var analystRequested by remember(s.symbol) { mutableStateOf(false) }
     val lastMarketRefreshMs = MarketRefreshController.state.value.lastSuccessfulRefreshMs
 
     LaunchedEffect(s.symbol, refresh) {
