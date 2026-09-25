@@ -582,7 +582,7 @@ internal fun PremiumAlertRulesScreen(
                         deleting = null
                         if (editingId == rule.id) closeForm()
                     },
-                    enabled = !saving
+                    enabled = !saving && rule.type in WatchlistPresentation.supportedTypes
                 ) {
                     Text("Delete", color = ResearchRed)
                 }
