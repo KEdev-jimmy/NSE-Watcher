@@ -63,19 +63,17 @@ internal class StartupDataLoader(
         )
     }
 
-    private suspend fun <T> bounded(
+    private suspend fun <T : Any> bounded(
         fallback: T,
         load: suspend () -> T
     ): Bounded<T> {
-        var completed = false
         val value = withTimeoutOrNull(sourceTimeoutMs) {
-            completed = true
             runCatching { load() }.getOrDefault(fallback)
         }
-        return if (value == null && !completed) {
+        return if (value == null) {
             Bounded(fallback, timedOut = true)
         } else {
-            Bounded(value ?: fallback, timedOut = false)
+            Bounded(value, timedOut = false)
         }
     }
 }
