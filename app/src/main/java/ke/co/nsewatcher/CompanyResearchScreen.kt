@@ -620,6 +620,9 @@ private fun ResearchAnalyst(
                     ResearchCaption(
                         "AI may summarize or interpret only the supplied evidence. It does not add verified facts, establish causation, or provide BUY/SELL/HOLD instructions."
                     )
+                    TextButton(onClick = request) {
+                        Text("Explain again", color = ResearchGreen)
+                    }
                 }
             }
         }
