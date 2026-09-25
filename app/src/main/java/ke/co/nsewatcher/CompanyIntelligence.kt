@@ -185,7 +185,10 @@ fun CompanyIntelligence(
         refreshing = fundamentalsLoading || newsLoading || loadingRanges.isNotEmpty() || movementLoading || analystLoading,
         selectedRange = selectedRange, onRange = { selectedRange = it },
         chart = ranges[selectedRange] ?: MyStocksCache.HistoryResult(),
-        chartLoading = selectedRange in loadingRanges, rangeReturns = returns,
-        sessionLoading = "1D" in loadingRanges, showChartGrid = showChartGrid
+        chartLoading = selectedRange in loadingRanges,
+        oneYearChart = ranges["1Y"] ?: MyStocksCache.HistoryResult(),
+        rangeReturns = returns,
+        sessionLoading = "1D" in loadingRanges,
+        showChartGrid = showChartGrid
     )
 }

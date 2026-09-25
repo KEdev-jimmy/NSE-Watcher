@@ -42,7 +42,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CompaniesDirectory(
+private fun LegacyCompaniesDirectory(
     catalog: List<Stock>, quotes: List<Stock>, name: String, initialSector: String = "All",
     openCompany: (Stock) -> Unit, openWatchlist: () -> Unit, openCompare: (List<String>) -> Unit,
     openNews: (NewsItem) -> Unit, openProfile: () -> Unit,
