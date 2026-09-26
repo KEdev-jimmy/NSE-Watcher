@@ -116,6 +116,7 @@ internal fun PremiumNewsDashboard(
     newsFeed: List<NewsItem>,
     catalog: List<Stock>,
     quotes: List<Stock>,
+    offlineSnapshot: Boolean = false,
     onNewsLoaded: (List<NewsItem>) -> Unit,
     openAlerts: () -> Unit,
     open: (NewsItem) -> Unit
@@ -284,6 +285,16 @@ internal fun PremiumNewsDashboard(
             }
 
             item { PremiumNewsTabs(selected = tab, onSelected = ::selectTab) }
+
+            if (offlineSnapshot && relevantFeed.isNotEmpty()) {
+                item {
+                    PremiumNewsMessage(
+                        "Offline snapshot",
+                        "Showing saved NSE-relevant stories while the live News service reconnects. These stories are marked stale.",
+                        "Try live refresh"
+                    ) { refreshNews(true) }
+                }
+            }
 
             if (error != null && relevantFeed.isNotEmpty()) {
                 item {

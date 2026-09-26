@@ -107,4 +107,48 @@ class StartupSnapshotPolicyTest {
         assertEquals("STALE", fallback.news.single().freshnessMode)
         assertEquals(setOf("news"), fallback.restoredSources)
     }
+
+    @Test
+    fun usedSourcesOnlyReportsFallbacksThatReplaceFailedLiveSources() {
+        val startup = StartupDataSnapshot(
+            stocks = emptyList(),
+            news = emptyList(),
+            companies = listOf(company),
+            marketStatus = ke.co.nsewatcher.data.MyStocksCache.MarketStatus(),
+            completed = false,
+            failedSources = setOf("stocks", "news", "status")
+        )
+        val offline = StartupOfflineSnapshot(
+            stocks = listOf(stock.copy(freshnessMode = "STALE", dataOrigin = "offline_snapshot")),
+            news = listOf(story.copy(freshnessMode = "STALE")),
+            companies = listOf(company),
+            restoredSources = setOf("stocks", "news", "companies")
+        )
+
+        assertEquals(
+            setOf("stocks", "news"),
+            StartupSnapshotPolicy.usedSources(startup, offline)
+        )
+    }
+
+    @Test
+    fun successfulEmptyNewsDoesNotReuseOlderOfflineNews() {
+        val startup = StartupDataSnapshot(
+            stocks = listOf(stock),
+            news = emptyList(),
+            companies = listOf(company),
+            marketStatus = ke.co.nsewatcher.data.MyStocksCache.MarketStatus(
+                status = "CLOSED",
+                isKnown = true
+            ),
+            completed = true
+        )
+        val offline = StartupOfflineSnapshot(
+            news = listOf(story.copy(freshnessMode = "STALE")),
+            restoredSources = setOf("news")
+        )
+
+        assertTrue(StartupSnapshotPolicy.usedSources(startup, offline).isEmpty())
+    }
+
 }

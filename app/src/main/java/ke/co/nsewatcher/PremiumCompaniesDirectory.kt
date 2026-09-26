@@ -60,6 +60,8 @@ fun CompaniesDirectory(
     quotes: List<Stock>,
     name: String,
     newsFeed: List<NewsItem>,
+    offlineCatalog: Boolean = false,
+    offlineQuotes: Boolean = false,
     initialSector: String = "All",
     openCompany: (Stock) -> Unit,
     openWatchlist: () -> Unit,
@@ -307,6 +309,24 @@ fun CompaniesDirectory(
                     Text("Companies", color = ResearchText, fontSize = 27.sp, fontWeight = FontWeight.ExtraBold)
                     Spacer(Modifier.height(3.dp))
                     Text("Explore all NSE listed companies.", color = ResearchMuted, fontSize = 12.5.sp)
+                }
+
+                if (offlineCatalog || offlineQuotes) {
+                    item {
+                        ResearchPanel {
+                            ResearchTitle("Offline snapshot")
+                            ResearchCaption(
+                                when {
+                                    offlineCatalog && offlineQuotes ->
+                                        "Showing a saved company catalogue and saved market observations while live data reconnects. Saved prices are stale."
+                                    offlineCatalog ->
+                                        "Showing a saved company catalogue while live company discovery reconnects. Live prices remain separate."
+                                    else ->
+                                        "Showing saved market observations while live quotes reconnect. Saved prices are stale and cannot trigger alerts or Practice fills."
+                                }
+                            )
+                        }
+                    }
                 }
 
                 item {
