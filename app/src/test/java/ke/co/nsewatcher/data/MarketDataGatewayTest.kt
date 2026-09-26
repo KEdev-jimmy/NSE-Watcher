@@ -56,6 +56,23 @@ class MarketDataGatewayTest {
             return MyStocksCache.HistoryResult(prices = listOf(10.0))
         }
 
+        override suspend fun technicalHistory(
+            symbol: String,
+            lookbackDays: Int
+        ): MyStocksCache.HistoryResult {
+            calls += "technical-history:$symbol:$lookbackDays"
+            return MyStocksCache.HistoryResult(
+                prices = listOf(11.0, 12.0),
+                purpose = "technical-analysis",
+                interval = "1d",
+                lookbackDays = lookbackDays,
+                dataQuality = MyStocksCache.HistoryQuality(
+                    candleCount = 2,
+                    indicatorReadiness = MyStocksCache.IndicatorReadiness(rsi14 = false)
+                )
+            )
+        }
+
         override suspend fun newsFeed(forceRefresh: Boolean): NewsCache.FeedResult {
             calls += "news:$forceRefresh"
             return NewsCache.FeedResult(
@@ -134,6 +151,7 @@ class MarketDataGatewayTest {
         assertEquals("OPEN", gateway.status().status)
         assertEquals("^NASI", gateway.indices(true).single().symbol)
         assertEquals(10.0, gateway.history("KCB", "1m").prices.single(), 0.0001)
+        assertEquals("technical-analysis", gateway.technicalHistory("KCB", 400).purpose)
         assertEquals("n1", gateway.newsFeed(forceRefresh = true).items.single().id)
         assertEquals("detail-1", gateway.newsDetail("detail-1")?.id)
         assertEquals("company-1", gateway.companyNews("KCB").items.single().id)
@@ -145,6 +163,7 @@ class MarketDataGatewayTest {
                 "status",
                 "indices:true",
                 "history:KCB:1m",
+                "technical-history:KCB:400",
                 "news:true",
                 "news-detail:detail-1",
                 "company-news:KCB"
