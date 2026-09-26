@@ -22,6 +22,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.layout.ContentScale
+import coil3.compose.AsyncImage
 import ke.co.nsewatcher.data.MyStocksCache
 import java.time.Instant
 import java.time.ZoneId
@@ -49,6 +51,8 @@ internal fun HomePremiumDashboard(
     practiceInsights: PracticeLearningInsights,
     practiceEnabled: Boolean,
     practiceCash: Double,
+    profileName: String,
+    avatarUri: String?,
     onRefresh: () -> Unit,
     openAlerts: () -> Unit,
     openWatchlist: () -> Unit,
@@ -56,7 +60,8 @@ internal fun HomePremiumDashboard(
     openMarket: () -> Unit,
     openCompanies: () -> Unit,
     openCompany: (Stock) -> Unit,
-    openBriefItem: (HomeBriefItem) -> Unit
+    openBriefItem: (HomeBriefItem) -> Unit,
+    openProfile: () -> Unit
 ) {
     val palette = premiumHomePalette(darkTheme)
     val hero = HomePremiumPresentation.hero(intelligence, briefItems)
@@ -78,8 +83,11 @@ internal fun HomePremiumDashboard(
                     dark = darkTheme,
                     palette = palette,
                     hasAttention = hasAttention,
+                    profileName = profileName,
+                    avatarUri = avatarUri,
                     openCompanies = openCompanies,
-                    openAlerts = openAlerts
+                    openAlerts = openAlerts,
+                    openProfile = openProfile
                 )
             }
             if (offlineSnapshotSources.isNotEmpty()) {
@@ -189,8 +197,11 @@ private fun PremiumHomeHeader(
     dark: Boolean,
     palette: PremiumHomePalette,
     hasAttention: Boolean,
+    profileName: String,
+    avatarUri: String?,
     openCompanies: () -> Unit,
-    openAlerts: () -> Unit
+    openAlerts: () -> Unit,
+    openProfile: () -> Unit
 ) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp),
@@ -225,6 +236,33 @@ private fun PremiumHomeHeader(
                         .align(Alignment.TopEnd)
                         .offset(x = (-4).dp, y = 3.dp)
                 )
+            }
+        }
+        Spacer(Modifier.width(7.dp))
+        Surface(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .clickable(role = Role.Button, onClick = openProfile),
+            shape = CircleShape,
+            color = palette.raised,
+            border = BorderStroke(1.dp, palette.border)
+        ) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(
+                    profileName.trim().take(1).uppercase(Locale.US).ifBlank { "I" },
+                    color = palette.text,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 14.sp
+                )
+                if (!avatarUri.isNullOrBlank()) {
+                    AsyncImage(
+                        model = avatarUri,
+                        contentDescription = "Open profile",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
             }
         }
     }
