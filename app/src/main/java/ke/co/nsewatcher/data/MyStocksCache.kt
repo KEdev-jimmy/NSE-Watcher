@@ -15,6 +15,7 @@ object MyStocksCache {
     private const val BACKEND_INDICES_URL = "https://nse-watcher.jameswaweru399.workers.dev/api/market?action=indices"
     private const val BACKEND_CHART_URL = "https://nse-watcher.jameswaweru399.workers.dev/api/market?action=chart"
     private const val BACKEND_TECHNICAL_HISTORY_URL = "https://nse-watcher.jameswaweru399.workers.dev/api/market?action=technical-history"
+    private const val BACKEND_TECHNICAL_HISTORY_FALLBACK_URL = "https://nse-watcher.vercel.app/api/market?action=technical-history"
 
     private val chartSymbols = setOf("SCOM", "KCB", "EQTY", "ABSA", "COOP", "EABL", "KPLC")
 
@@ -259,8 +260,34 @@ object MyStocksCache {
     suspend fun loadTechnicalHistoryDetails(symbol: String, lookbackDays: Int = 400): HistoryResult = withContext(Dispatchers.IO) {
         val qualified = if (symbol.contains('.')) symbol else "$symbol.KE"
         val boundedLookback = lookbackDays.coerceIn(260, 730)
-        loadHistoryFromUrl("$BACKEND_TECHNICAL_HISTORY_URL&symbol=$qualified&lookbackDays=$boundedLookback")
+        loadTechnicalHistoryWithFallback(qualified, boundedLookback) { url ->
+            loadHistoryFromUrl(url)
+        }
     }
+
+    internal suspend fun loadTechnicalHistoryWithFallback(
+        qualifiedSymbol: String,
+        lookbackDays: Int,
+        loader: suspend (String) -> HistoryResult
+    ): HistoryResult {
+        val symbol = qualifiedSymbol.trim()
+        if (symbol.isBlank()) return HistoryResult()
+
+        val boundedLookback = lookbackDays.coerceIn(260, 730)
+        val encodedSymbol = java.net.URLEncoder.encode(symbol, Charsets.UTF_8.name())
+        val primaryUrl = "$BACKEND_TECHNICAL_HISTORY_URL&symbol=$encodedSymbol&lookbackDays=$boundedLookback"
+        val primary = loader(primaryUrl)
+        if (usableTechnicalHistory(primary)) return primary
+
+        val fallbackUrl = "$BACKEND_TECHNICAL_HISTORY_FALLBACK_URL&symbol=$encodedSymbol&lookbackDays=$boundedLookback"
+        val fallback = loader(fallbackUrl)
+        return fallback.takeIf(::usableTechnicalHistory) ?: HistoryResult()
+    }
+
+    internal fun usableTechnicalHistory(result: HistoryResult): Boolean =
+        result.points.isNotEmpty() &&
+            result.interval.equals("1d", ignoreCase = true) &&
+            result.purpose.equals("technical-analysis", ignoreCase = true)
 
     private fun loadHistoryFromUrl(url: String): HistoryResult = runCatching {
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
