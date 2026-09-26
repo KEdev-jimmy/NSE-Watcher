@@ -462,42 +462,10 @@ private fun MarketBreadthStrengthPanel(result: MarketBreadthStrengthResult) {
                 )
             }
 
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Surface(
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(10.dp),
-                    color = accent.copy(alpha = 0.08f),
-                    border = BorderStroke(1.dp, accent.copy(alpha = 0.35f))
-                ) {
-                    Column(Modifier.padding(9.dp)) {
-                        Text(
-                            result.label.displayName,
-                            color = accent,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                        Text(
-                            "Confidence " + result.confidenceScore + "/100",
-                            color = ResearchMuted,
-                            fontSize = 8.5.sp
-                        )
-                    }
-                }
-                MarketBreadthStrengthMetric(
-                    label = "Breadth",
-                    score = result.breadthScore,
-                    modifier = Modifier.weight(0.72f)
-                )
-                MarketBreadthStrengthMetric(
-                    label = "Sectors",
-                    score = result.sectorParticipationScore,
-                    modifier = Modifier.weight(0.72f)
-                )
-            }
+            MarketBreadthStrengthSummary(
+                result = result,
+                accent = accent
+            )
 
             Text(
                 result.reasons.firstOrNull()
@@ -534,6 +502,91 @@ private fun MarketBreadthStrengthPanel(result: MarketBreadthStrengthResult) {
                     fontSize = 8.5.sp
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun MarketBreadthStrengthSummary(
+    result: MarketBreadthStrengthResult,
+    accent: Color
+) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val stack = maxWidth < 350.dp || LocalDensity.current.fontScale > 1.12f
+        if (stack) {
+            Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                MarketBreadthStrengthLabelTile(
+                    result = result,
+                    accent = accent,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(7.dp)
+                ) {
+                    MarketBreadthStrengthMetric(
+                        label = "Breadth",
+                        score = result.breadthScore,
+                        modifier = Modifier.weight(1f)
+                    )
+                    MarketBreadthStrengthMetric(
+                        label = "Sectors",
+                        score = result.sectorParticipationScore,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        } else {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                MarketBreadthStrengthLabelTile(
+                    result = result,
+                    accent = accent,
+                    modifier = Modifier.weight(1f)
+                )
+                MarketBreadthStrengthMetric(
+                    label = "Breadth",
+                    score = result.breadthScore,
+                    modifier = Modifier.weight(0.72f)
+                )
+                MarketBreadthStrengthMetric(
+                    label = "Sectors",
+                    score = result.sectorParticipationScore,
+                    modifier = Modifier.weight(0.72f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MarketBreadthStrengthLabelTile(
+    result: MarketBreadthStrengthResult,
+    accent: Color,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(10.dp),
+        color = accent.copy(alpha = 0.08f),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.35f))
+    ) {
+        Column(Modifier.padding(9.dp)) {
+            Text(
+                result.label.displayName,
+                color = accent,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 2
+            )
+            Text(
+                "Confidence " + result.confidenceScore + "/100",
+                color = ResearchMuted,
+                fontSize = 8.5.sp
+            )
         }
     }
 }
