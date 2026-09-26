@@ -289,13 +289,16 @@ private fun App(
             val marketStateChanged = refreshedStatus.isKnown &&
                 (!previousMarketKnown || refreshedStatus.isOpen != previousMarketOpen)
             val becameOpen = refreshedStatus.isKnown && refreshedStatus.isOpen && !previousMarketOpen
-            startupMarketStatus = refreshedStatus
+
+            if (refreshedStatus.isKnown) {
+                startupMarketStatus = refreshedStatus
+            }
 
             val quoteRefreshDue = MarketRefreshController.shouldRefreshQuotes(stocks.isNotEmpty())
             val openingRefresh = becameOpen && !MarketRefreshController.state.value.refreshInProgress
 
-            if (marketStateChanged || quoteRefreshDue) {
-                MarketData.indices(refreshedStatus.isKnown && refreshedStatus.isOpen)
+            if (refreshedStatus.isKnown && (marketStateChanged || quoteRefreshDue)) {
+                MarketData.indices(refreshedStatus.isOpen)
                     .takeIf { it.isNotEmpty() }
                     ?.let { marketIndices = it }
             }
@@ -311,8 +314,10 @@ private fun App(
                 }
             }
 
-            previousMarketKnown = refreshedStatus.isKnown
-            previousMarketOpen = refreshedStatus.isKnown && refreshedStatus.isOpen
+            if (refreshedStatus.isKnown) {
+                previousMarketKnown = true
+                previousMarketOpen = refreshedStatus.isOpen
+            }
         }
     }
     fun put(k:String,v:Boolean){prefs.edit().putBoolean(k,v).apply()}
