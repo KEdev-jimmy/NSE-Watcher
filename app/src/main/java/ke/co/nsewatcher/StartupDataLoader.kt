@@ -13,7 +13,8 @@ internal data class StartupDataSnapshot(
     val companies: List<Stock> = emptyList(),
     val marketStatus: MyStocksCache.MarketStatus = MyStocksCache.MarketStatus(),
     val completed: Boolean = false,
-    val timedOutSources: Set<String> = emptySet()
+    val timedOutSources: Set<String> = emptySet(),
+    val failedSources: Set<String> = emptySet()
 )
 
 internal class StartupDataLoader(
@@ -53,14 +54,21 @@ internal class StartupDataLoader(
             if (loadedCompanies.timedOut) add("companies")
             if (loadedStatus.timedOut) add("status")
         }
+        val failed = buildSet {
+            if (!loadedStocks.timedOut && loadedStocks.value.isEmpty()) add("stocks")
+            if (!loadedNews.timedOut && loadedNews.value.error != null) add("news")
+            if (!loadedCompanies.timedOut && loadedCompanies.value.isEmpty()) add("companies")
+            if (!loadedStatus.timedOut && !loadedStatus.value.isKnown) add("status")
+        }
 
         StartupDataSnapshot(
             stocks = loadedStocks.value,
             news = loadedNews.value.items,
             companies = loadedCompanies.value,
             marketStatus = loadedStatus.value,
-            completed = timedOut.isEmpty(),
-            timedOutSources = timedOut
+            completed = timedOut.isEmpty() && failed.isEmpty(),
+            timedOutSources = timedOut,
+            failedSources = failed
         )
     }
 
