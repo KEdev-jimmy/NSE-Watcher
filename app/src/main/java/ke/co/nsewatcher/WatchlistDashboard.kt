@@ -134,7 +134,11 @@ fun WatchlistDashboard(
                         else -> refreshError = "Quotes could not be updated. Each company shows its available observation time."
                     }
                     catalogRequest.await().takeIf { it.isNotEmpty() }?.let { catalog = it }
-                    market = marketRequest.await()
+                    val refreshedMarket = marketRequest.await()
+                    market = MarketPresentation.displayStatus(market, refreshedMarket)
+                    if (!refreshedMarket.isKnown && market.isKnown && refreshError == null) {
+                        refreshError = "Market status could not be refreshed. Saved rules and quote timestamps remain visible."
+                    }
                 }
                 refreshTick++
             } catch (cancelled: CancellationException) { throw cancelled }
