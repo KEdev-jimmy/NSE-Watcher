@@ -408,6 +408,8 @@ fun HomeDashboard(
             practiceInsights = practiceInsights,
             practiceEnabled = practiceEnabled,
             practiceCash = practiceCash,
+            profileName = name,
+            avatarUri = avatar,
             onRefresh = ::refresh,
             openAlerts = { showAlerts = true },
             openWatchlist = openWatchlist,
@@ -415,7 +417,8 @@ fun HomeDashboard(
             openMarket = openMarket,
             openCompanies = openCompanies,
             openCompany = openCompany,
-            openBriefItem = ::reviewAndOpen
+            openBriefItem = ::reviewAndOpen,
+            openProfile = openProfile
         )
         if (showChanges) ModalBottomSheet(
             onDismissRequest = { showChanges = false },
