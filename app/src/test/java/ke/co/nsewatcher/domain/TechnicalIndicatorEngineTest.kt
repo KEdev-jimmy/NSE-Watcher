@@ -111,6 +111,8 @@ class TechnicalIndicatorEngineTest {
 
         assertEquals(210, result.observationCount)
         assertEquals(210.0, result.latestClose ?: Double.NaN, 0.0000001)
+        assertEquals(209.0, result.previousClose ?: Double.NaN, 0.0000001)
+        assertEquals((1.0 / 209.0) * 100.0, result.latestChangePct ?: Double.NaN, 0.0000001)
         assertEquals(200.5, result.movingAverages.sma20 ?: Double.NaN, 0.0000001)
         assertEquals(185.5, result.movingAverages.sma50 ?: Double.NaN, 0.0000001)
         assertEquals(160.5, result.movingAverages.sma100 ?: Double.NaN, 0.0000001)

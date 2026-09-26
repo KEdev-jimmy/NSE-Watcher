@@ -39,6 +39,8 @@ data class VolumeConfirmationSnapshot(
 data class TechnicalIndicatorSnapshot(
     val observationCount: Int,
     val latestClose: Double?,
+    val previousClose: Double?,
+    val latestChangePct: Double?,
     val movingAverages: MovingAverageSnapshot,
     val rsi14: Double?,
     val macd: MacdSnapshot?,
@@ -90,9 +92,21 @@ object TechnicalIndicatorEngine {
             ema50 = ema(closes, 50)
         )
 
+        val latestClose = closes.lastOrNull()
+        val previousClose = closes.getOrNull(closes.lastIndex - 1)
+        val latestChangePct = if (
+            latestClose != null &&
+            previousClose != null &&
+            previousClose > 0.0
+        ) {
+            ((latestClose - previousClose) / previousClose) * 100.0
+        } else null
+
         return TechnicalIndicatorSnapshot(
             observationCount = valid.size,
-            latestClose = closes.lastOrNull(),
+            latestClose = latestClose,
+            previousClose = previousClose,
+            latestChangePct = latestChangePct,
             movingAverages = movingAverages,
             rsi14 = rsi(closes, RSI_PERIOD),
             macd = macd(closes, MACD_FAST, MACD_SLOW, MACD_SIGNAL),
