@@ -95,15 +95,17 @@ data class NewsItem(
 private val liveStocks = mutableStateOf(emptyList<Stock>())
 private val stocks: List<Stock> get() = liveStocks.value
 
-private enum class Page { HOME, MARKET, NEWS, COMPANIES, PAPER, MORE, COMPANY, WATCHLIST, COMPARE, NEWS_DETAIL, PROFILE, SETTINGS, ACCOUNT, THEME, NOTIFICATIONS, LIVE_DATA, CHARTS, ALERTS, LANGUAGE, SECURITY, PRIVACY, DISPLAY, HELP, ABOUT }
+private enum class Page { HOME, MARKET, NEWS, COMPANIES, PAPER, MORE, COMPANY, WATCHLIST, COMPARE, NEWS_DETAIL, PROFILE, SETTINGS, ACCOUNT, AUTH_CREATE, AUTH_SIGNIN, THEME, NOTIFICATIONS, LIVE_DATA, CHARTS, ALERTS, LANGUAGE, SECURITY, PRIVACY, DISPLAY, HELP, ABOUT }
 
 class DesignActivity : ComponentActivity() {
     private var alertDestination by mutableStateOf<AlertDestination?>(null)
     private var practiceDestination by mutableStateOf<PracticeNotificationDestination?>(null)
+    private var avatarRevision by mutableIntStateOf(0)
     private val picker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         uri ?: return@registerForActivityResult
         try { contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
         getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString("avatar_uri", uri.toString()).apply()
+        avatarRevision++
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -117,6 +119,7 @@ class DesignActivity : ComponentActivity() {
                 consumeAlert = { alertDestination = null; intent.action = null },
                 practiceDestination = practiceDestination,
                 consumePractice = { practiceDestination = null; intent.action = null; intent.data = null },
+                avatarRevision = avatarRevision,
                 pickAvatar = { picker.launch(arrayOf("image/*")) }
             )
         }
@@ -135,6 +138,7 @@ private fun App(
     consumeAlert: () -> Unit,
     practiceDestination: PracticeNotificationDestination?,
     consumePractice: () -> Unit,
+    avatarRevision: Int,
     pickAvatar: () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -222,7 +226,17 @@ private fun App(
         }
     }
 
-    var page by remember { mutableStateOf(Page.HOME) }
+    var defaultView by rememberSaveable { mutableStateOf(prefs.getString("default_view", "Home") ?: "Home") }
+    val initialPage = remember {
+        when (prefs.getString("default_view", "Home") ?: "Home") {
+            "Market" -> Page.MARKET
+            "News" -> Page.NEWS
+            "Companies" -> Page.COMPANIES
+            "Practice" -> Page.PAPER
+            else -> Page.HOME
+        }
+    }
+    var page by remember { mutableStateOf(initialPage) }
     var history by remember { mutableStateOf(emptyList<Page>()) }
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var selected by remember { mutableStateOf(Stock("", "", 0.0, 0.0, emptyList())) }
@@ -240,6 +254,7 @@ private fun App(
     var username by rememberSaveable { mutableStateOf(prefs.getString("username", ProfileDefaults.username) ?: ProfileDefaults.username) }
     var email by rememberSaveable { mutableStateOf(prefs.getString("email", ProfileDefaults.email) ?: ProfileDefaults.email) }
     var description by rememberSaveable { mutableStateOf(prefs.getString("description", ProfileDefaults.description) ?: ProfileDefaults.description) }
+    val avatarUri = remember(avatarRevision) { prefs.getString("avatar_uri", null) }
     var marketAlerts by rememberSaveable { mutableStateOf(prefs.getBoolean("market_alerts", true)) }
     var priceAlerts by rememberSaveable { mutableStateOf(prefs.getBoolean("price_alerts", true)) }
     var watchlistNewsAlerts by rememberSaveable { mutableStateOf(prefs.getBoolean("watchlist_news_alerts", false)) }
@@ -390,14 +405,64 @@ private fun App(
             Page.WATCHLIST->WatchlistDashboard(quoteStocks=stocks, initialCatalog=companyCatalog, initialMarket=startupMarketStatus, sharedNews=newsFeed, onQuotesLoaded={liveStocks.value=it;offlineStartupSources=offlineStartupSources-"stocks"}, onNewsLoaded={newsFeed=it;offlineStartupSources=offlineStartupSources-"news"}, openCompany={selected=it;go(Page.COMPANY)}, openNews={selectedNews=it;go(Page.NEWS_DETAIL)}, openPreferences={go(Page.NOTIFICATIONS)}, back=::back)
             Page.COMPARE->CompanyComparison(CompaniesPresentation.companies(companyCatalog, stocks),::back,comparisonSymbols)
             Page.NEWS_DETAIL->key(alertNavigationRevision) { selectedNews?.let { NewsArticleScreen(it,companyCatalog,stocks,::back){company->selected=company;go(Page.COMPANY)} } }
-            Page.PROFILE->ProfileHubScreen(name,username,email,description,{name=it;put("profile_name",it)},{username=it;put("username",it)},{email=it;put("email",it)},{description=it;put("description",it)},pickAvatar,::back,{go(Page.ACCOUNT)},{go(Page.WATCHLIST)},{launchPractice()},{go(Page.SETTINGS)})
-            Page.MORE->MoreHubScreen(name=name,username=username,email=email,back=::back,openProfile={go(Page.PROFILE)},openPractice={launchPractice()},openWatchlist={go(Page.WATCHLIST)},openAlerts={go(Page.ALERTS)},openCompare={comparisonSymbols=emptyList();go(Page.COMPARE)},openSettings={go(Page.SETTINGS)},openNotifications={go(Page.NOTIFICATIONS)},openMarketData={go(Page.LIVE_DATA)},openAppearance={go(Page.DISPLAY)},openHelp={go(Page.HELP)},openAbout={go(Page.ABOUT)})
-            Page.SETTINGS->SettingsOverviewScreen(
-                back=::back,openProfile={go(Page.PROFILE)},openAccount={go(Page.ACCOUNT)},openNotifications={go(Page.NOTIFICATIONS)},
-                openMarketData={go(Page.LIVE_DATA)},openAppearance={go(Page.DISPLAY)},openCharts={go(Page.CHARTS)},
-                openLanguage={go(Page.LANGUAGE)},openPrivacy={go(Page.PRIVACY)},openHelp={go(Page.HELP)},openAbout={go(Page.ABOUT)}
+            Page.PROFILE->DesignedProfileScreen(
+                name=name,
+                username=username,
+                email=email,
+                avatarUri=avatarUri,
+                onName={name=it;put("profile_name",it)},
+                onUsername={username=it;put("username",it)},
+                onEmail={email=it;put("email",it)},
+                pickAvatar=pickAvatar,
+                back=::back,
+                openAccount={go(Page.ACCOUNT)},
+                openPractice={launchPractice()},
+                openAlerts={go(Page.ALERTS)},
+                openWatchlist={go(Page.WATCHLIST)},
+                openSettings={go(Page.SETTINGS)},
+                openHelp={go(Page.HELP)}
             )
-            Page.ACCOUNT->AccountSignInScreen(name,username,::back){go(Page.PROFILE)}
+            Page.MORE->MoreHubScreen(name=name,username=username,email=email,back=::back,openProfile={go(Page.PROFILE)},openPractice={launchPractice()},openWatchlist={go(Page.WATCHLIST)},openAlerts={go(Page.ALERTS)},openCompare={comparisonSymbols=emptyList();go(Page.COMPARE)},openSettings={go(Page.SETTINGS)},openNotifications={go(Page.NOTIFICATIONS)},openMarketData={go(Page.LIVE_DATA)},openAppearance={go(Page.DISPLAY)},openHelp={go(Page.HELP)},openAbout={go(Page.ABOUT)})
+            Page.SETTINGS->DesignedSettingsScreen(
+                back=::back,
+                openProfile={go(Page.PROFILE)},
+                openAccount={go(Page.ACCOUNT)},
+                priceAlerts=priceAlerts,
+                marketAlerts=marketAlerts,
+                newsAndCompanyAlerts=watchlistNewsAlerts && watchlistCorporateAlerts,
+                onPriceAlerts={priceAlerts=it;put("price_alerts",it)},
+                onMarketAlerts={marketAlerts=it;put("market_alerts",it)},
+                onNewsAndCompanyAlerts={enabled->
+                    watchlistNewsAlerts=enabled
+                    watchlistCorporateAlerts=enabled
+                    prefs.edit()
+                        .putBoolean("watchlist_news_alerts",enabled)
+                        .putBoolean("watchlist_corporate_alerts",enabled)
+                        .apply()
+                    if(enabled){
+                        val now=System.currentTimeMillis()
+                        prefs.edit()
+                            .putLong("watchlist_news_enabled_at",now)
+                            .putLong("watchlist_corporate_enabled_at",now)
+                            .apply()
+                    }
+                },
+                darkTheme=dark,
+                defaultView=defaultView,
+                onDefaultView={defaultView=it;put("default_view",it)},
+                openAppearance={go(Page.DISPLAY)},
+                openMarketData={go(Page.LIVE_DATA)},
+                openPrivacy={go(Page.PRIVACY)},
+                openAbout={go(Page.ABOUT)}
+            )
+            Page.ACCOUNT->AuthLandingScreen(
+                back=::back,
+                openCreateAccount={go(Page.AUTH_CREATE)},
+                openSignIn={go(Page.AUTH_SIGNIN)},
+                continueAsGuest=::back
+            )
+            Page.AUTH_CREATE->CreateAccountScreen(name,::back){go(Page.AUTH_SIGNIN)}
+            Page.AUTH_SIGNIN->SignInScreen(::back){go(Page.AUTH_CREATE)}
             Page.THEME->DisplayAppearanceScreen(dark,fontSizeSetting,{dark=it;put("dark_mode",it)},{fontSizeSetting=it;put("font_size",it)},::back)
             Page.NOTIFICATIONS->NotificationCenterScreen(
                 marketAlerts=marketAlerts,priceAlerts=priceAlerts,newsAlerts=watchlistNewsAlerts,corporateAlerts=watchlistCorporateAlerts,
@@ -439,7 +504,7 @@ private fun App(
                 back=::back
             )
             Page.LANGUAGE->LanguageRegionScreen(::back)
-            Page.SECURITY->AccountSignInScreen(name,username,::back){go(Page.PROFILE)}
+            Page.SECURITY->AuthLandingScreen(::back,{go(Page.AUTH_CREATE)},{go(Page.AUTH_SIGNIN)},::back)
             Page.PRIVACY->PrivacyDataScreen(::back)
             Page.DISPLAY->DisplayAppearanceScreen(dark,fontSizeSetting,{dark=it;put("dark_mode",it)},{fontSizeSetting=it;put("font_size",it)},::back)
             Page.HELP->HelpSupportExperienceScreen(::back)
