@@ -36,6 +36,7 @@ import ke.co.nsewatcher.data.CompanyIntelligenceCache
 import ke.co.nsewatcher.data.CompanyIntelligenceEngine
 import ke.co.nsewatcher.data.MovementIntelligenceCache
 import ke.co.nsewatcher.data.MyStocksCache
+import ke.co.nsewatcher.domain.TechnicalStrengthResult
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -68,6 +69,8 @@ internal fun CompanyResearchScreen(
     movement: MovementIntelligenceCache.Result, movementLoading: Boolean,
     deterministic: CompanyIntelligenceEngine.Result, movementContext: CompanyMovementContext,
     analyst: AnalystCache.Result, analystLoading: Boolean, analystRequested: Boolean,
+    technicalHistory: MyStocksCache.HistoryResult, technicalStrength: TechnicalStrengthResult?,
+    technicalLoading: Boolean, technicalError: String?,
     onAnalysis: () -> Unit, onAiExplain: () -> Unit,
     watched: Boolean, onWatchToggle: (() -> Unit)?, back: () -> Unit, openNews: (NewsItem) -> Unit,
     openPractice: () -> Unit, onRefresh: () -> Unit, refreshing: Boolean, selectedRange: String, onRange: (String) -> Unit,
@@ -139,6 +142,10 @@ internal fun CompanyResearchScreen(
                             market = market,
                             intelligence = intelligence,
                             news = news,
+                            technicalHistory = technicalHistory,
+                            technicalStrength = technicalStrength,
+                            technicalLoading = technicalLoading,
+                            technicalError = technicalError,
                             selectedRange = selectedRange,
                             onRange = onRange,
                             chart = chart,
