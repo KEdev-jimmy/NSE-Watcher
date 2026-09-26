@@ -158,13 +158,13 @@ fun HomeDashboard(
                 launch {
                     try {
                         val recoveredStatus = MarketData.status()
-                        market = recoveredStatus
-                        if (recoveredStatus.isKnown || !initialMarketStatus.isKnown) {
+                        market = MarketPresentation.displayStatus(market, recoveredStatus)
+                        if (recoveredStatus.isKnown) {
                             onMarketStatusLoaded(recoveredStatus)
+                            MarketData.indices(recoveredStatus.isOpen)
+                                .takeIf { it.isNotEmpty() }
+                                ?.let(onIndicesLoaded)
                         }
-                        MarketData.indices(recoveredStatus.isKnown && recoveredStatus.isOpen)
-                            .takeIf { it.isNotEmpty() }
-                            ?.let(onIndicesLoaded)
                     } catch (cancelled: CancellationException) {
                         throw cancelled
                     } catch (_: Exception) {
@@ -190,13 +190,15 @@ fun HomeDashboard(
                     launch {
                         try {
                             val refreshedStatus = MarketData.status()
-                            market = refreshedStatus
-                            if (refreshedStatus.isKnown || !initialMarketStatus.isKnown) {
+                            market = MarketPresentation.displayStatus(market, refreshedStatus)
+                            if (refreshedStatus.isKnown) {
                                 onMarketStatusLoaded(refreshedStatus)
+                                MarketData.indices(refreshedStatus.isOpen)
+                                    .takeIf { it.isNotEmpty() }
+                                    ?.let(onIndicesLoaded)
+                            } else {
+                                statusFailed = true
                             }
-                            MarketData.indices(refreshedStatus.isKnown && refreshedStatus.isOpen)
-                                .takeIf { it.isNotEmpty() }
-                                ?.let(onIndicesLoaded)
                         } catch (cancelled: CancellationException) {
                             throw cancelled
                         } catch (_: Exception) {
