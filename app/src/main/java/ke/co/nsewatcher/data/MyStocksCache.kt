@@ -14,6 +14,7 @@ object MyStocksCache {
     private const val BACKEND_STATUS_URL = "https://nse-watcher.jameswaweru399.workers.dev/api/market?action=status"
     private const val BACKEND_INDICES_URL = "https://nse-watcher.jameswaweru399.workers.dev/api/market?action=indices"
     private const val BACKEND_CHART_URL = "https://nse-watcher.jameswaweru399.workers.dev/api/market?action=chart"
+    private const val BACKEND_TECHNICAL_HISTORY_URL = "https://nse-watcher.jameswaweru399.workers.dev/api/market?action=technical-history"
 
     private val chartSymbols = setOf("SCOM", "KCB", "EQTY", "ABSA", "COOP", "EABL", "KPLC")
 
@@ -22,7 +23,38 @@ object MyStocksCache {
         val date: String = "",
         val open: Double? = null,
         val high: Double? = null,
-        val low: Double? = null
+        val low: Double? = null,
+        val volume: Double? = null,
+        val volumeAvailable: Boolean = false
+    )
+
+    data class IndicatorReadiness(
+        val sma20: Boolean = false,
+        val sma50: Boolean = false,
+        val sma100: Boolean = false,
+        val sma200: Boolean = false,
+        val rsi14: Boolean = false,
+        val macd: Boolean = false,
+        val stochastic14: Boolean = false,
+        val volume20: Boolean = false
+    )
+
+    data class HistoryQuality(
+        val qualityStatus: String = "",
+        val qualityIssues: List<String> = emptyList(),
+        val recommendedChartType: String = "",
+        val sandbox: Boolean = false,
+        val coverageStartsAt: String = "",
+        val coverageEndsAt: String = "",
+        val candleCount: Int = 0,
+        val completeOhlcCount: Int = 0,
+        val volumeAvailableCount: Int = 0,
+        val closeOnlyCount: Int = 0,
+        val ohlcCoveragePct: Double = 0.0,
+        val volumeCoveragePct: Double = 0.0,
+        val firstObservationAt: String = "",
+        val lastObservationAt: String = "",
+        val indicatorReadiness: IndicatorReadiness = IndicatorReadiness()
     )
 
     data class HistoryResult(
@@ -39,7 +71,14 @@ object MyStocksCache {
         val previousSessionCloseAt: String = "",
         val dailyChangePct: Double? = null,
         val sessionOpenAt: String = "",
-        val sessionCloseAt: String = ""
+        val sessionCloseAt: String = "",
+        val source: String = "",
+        val delayMinutes: Int? = null,
+        val purpose: String = "",
+        val from: String = "",
+        val to: String = "",
+        val lookbackDays: Int? = null,
+        val dataQuality: HistoryQuality = HistoryQuality()
     )
 
     data class MarketIndex(
@@ -217,6 +256,12 @@ object MyStocksCache {
         loadHistoryFromUrl("$BACKEND_CHART_URL&symbol=$qualified&period=$period")
     }
 
+    suspend fun loadTechnicalHistoryDetails(symbol: String, lookbackDays: Int = 400): HistoryResult = withContext(Dispatchers.IO) {
+        val qualified = if (symbol.contains('.')) symbol else "$symbol.KE"
+        val boundedLookback = lookbackDays.coerceIn(260, 730)
+        loadHistoryFromUrl("$BACKEND_TECHNICAL_HISTORY_URL&symbol=$qualified&lookbackDays=$boundedLookback")
+    }
+
     private fun loadHistoryFromUrl(url: String): HistoryResult = runCatching {
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"; connectTimeout = 10_000; readTimeout = 10_000
@@ -225,47 +270,106 @@ object MyStocksCache {
         try {
             if (connection.responseCode !in 200..299) return@runCatching HistoryResult()
             val root = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
-            val data = root.optJSONObject("data") ?: return@runCatching HistoryResult()
-            val candles = data.optJSONArray("candles") ?: return@runCatching HistoryResult()
-            val points = buildList {
-                for (i in 0 until candles.length()) {
-                    val candle = candles.optJSONObject(i) ?: continue
-                    val close = candle.optDouble("close", Double.NaN)
-                    if (close.isFinite() && close > 0.0) {
-                        val date = candle.optString("date", "").ifBlank { candle.optString("timestamp", "") }
-                        add(HistoryPoint(
-                            close, date,
-                            candle.optDouble("open", Double.NaN).takeIf { it.isFinite() && it > 0.0 },
-                            candle.optDouble("high", Double.NaN).takeIf { it.isFinite() && it > 0.0 },
-                            candle.optDouble("low", Double.NaN).takeIf { it.isFinite() && it > 0.0 }
-                        ))
-                    }
-                }
-            }
-            val prices = points.map { it.close }
-            val first = candles.optJSONObject(0)
-            val last = candles.optJSONObject(candles.length() - 1)
-            val firstDate = first?.optString("date", "")?.ifBlank { first.optString("timestamp", "") } ?: ""
-            val lastDate = last?.optString("date", "")?.ifBlank { last.optString("timestamp", "") } ?: ""
-            val session = root.optJSONObject("session")
-            HistoryResult(
-                prices = prices,
-                points = points,
-                firstDate = firstDate,
-                lastDate = lastDate,
-                interval = root.optString("interval", data.optString("interval", "")),
-                observedAt = root.optString("latestObservationAt", "").ifBlank { root.optString("asOf", "") }.ifBlank { data.optString("asOf", "") },
-                sessionOpen = session?.optDouble("open", Double.NaN)?.takeIf { it.isFinite() },
-                sessionClose = session?.optDouble("close", Double.NaN)?.takeIf { it.isFinite() },
-                sessionChangePct = session?.optDouble("changePct", Double.NaN)?.takeIf { it.isFinite() },
-                previousSessionClose = session?.optDouble("previousClose", Double.NaN)?.takeIf { it.isFinite() && it > 0.0 },
-                previousSessionCloseAt = session?.optString("previousCloseAt", "") ?: "",
-                dailyChangePct = session?.optDouble("dailyChangePct", Double.NaN)?.takeIf { it.isFinite() },
-                sessionOpenAt = session?.optString("openAt", "") ?: "",
-                sessionCloseAt = session?.optString("closeAt", "") ?: ""
-            )
+            parseHistoryResponse(root)
         } finally { connection.disconnect() }
     }.getOrDefault(HistoryResult())
+
+    internal fun parseHistoryResponse(root: JSONObject): HistoryResult {
+        val data = root.optJSONObject("data")
+        val candles = root.optJSONArray("candles")
+            ?: data?.optJSONArray("candles")
+            ?: return HistoryResult()
+
+        val points = buildList {
+            for (i in 0 until candles.length()) {
+                val candle = candles.optJSONObject(i) ?: continue
+                val close = candle.optDouble("close", Double.NaN)
+                if (!close.isFinite() || close <= 0.0) continue
+
+                val date = candle.optString("date", "").ifBlank { candle.optString("timestamp", "") }
+                val rawVolume = candle.optDouble("volume", Double.NaN)
+                val explicitVolumeAvailable = if (candle.has("volumeAvailable") && !candle.isNull("volumeAvailable")) {
+                    candle.optBoolean("volumeAvailable")
+                } else null
+                val volumeAvailable = explicitVolumeAvailable != false && rawVolume.isFinite() && rawVolume >= 0.0
+
+                add(
+                    HistoryPoint(
+                        close = close,
+                        date = date,
+                        open = candle.optDouble("open", Double.NaN).takeIf { it.isFinite() && it > 0.0 },
+                        high = candle.optDouble("high", Double.NaN).takeIf { it.isFinite() && it > 0.0 },
+                        low = candle.optDouble("low", Double.NaN).takeIf { it.isFinite() && it > 0.0 },
+                        volume = rawVolume.takeIf { volumeAvailable },
+                        volumeAvailable = volumeAvailable
+                    )
+                )
+            }
+        }
+
+        val session = root.optJSONObject("session")
+        val quality = root.optJSONObject("dataQuality")
+        val readiness = quality?.optJSONObject("indicatorReadiness")
+        val qualityIssues = buildList {
+            val issues = quality?.optJSONArray("qualityIssues")
+            if (issues != null) {
+                for (i in 0 until issues.length()) {
+                    issues.optString(i, "").takeIf { it.isNotBlank() }?.let(::add)
+                }
+            }
+        }
+
+        return HistoryResult(
+            prices = points.map { it.close },
+            points = points,
+            firstDate = points.firstOrNull()?.date.orEmpty(),
+            lastDate = points.lastOrNull()?.date.orEmpty(),
+            interval = root.optString("interval", data?.optString("interval", "").orEmpty()),
+            observedAt = root.optString("latestObservationAt", "")
+                .ifBlank { root.optString("asOf", "") }
+                .ifBlank { data?.optString("asOf", "").orEmpty() },
+            sessionOpen = session?.optDouble("open", Double.NaN)?.takeIf { it.isFinite() },
+            sessionClose = session?.optDouble("close", Double.NaN)?.takeIf { it.isFinite() },
+            sessionChangePct = session?.optDouble("changePct", Double.NaN)?.takeIf { it.isFinite() },
+            previousSessionClose = session?.optDouble("previousClose", Double.NaN)?.takeIf { it.isFinite() && it > 0.0 },
+            previousSessionCloseAt = session?.optString("previousCloseAt", "") ?: "",
+            dailyChangePct = session?.optDouble("dailyChangePct", Double.NaN)?.takeIf { it.isFinite() },
+            sessionOpenAt = session?.optString("openAt", "") ?: "",
+            sessionCloseAt = session?.optString("closeAt", "") ?: "",
+            source = root.optString("source", ""),
+            delayMinutes = root.optInt("delayMinutes", -1).takeIf { it >= 0 },
+            purpose = root.optString("purpose", ""),
+            from = root.optString("from", ""),
+            to = root.optString("to", ""),
+            lookbackDays = root.optInt("lookbackDays", -1).takeIf { it > 0 },
+            dataQuality = HistoryQuality(
+                qualityStatus = quality?.optString("qualityStatus", "") ?: "",
+                qualityIssues = qualityIssues,
+                recommendedChartType = quality?.optString("recommendedChartType", "") ?: "",
+                sandbox = quality?.optBoolean("sandbox", false) ?: false,
+                coverageStartsAt = quality?.optString("coverageStartsAt", "") ?: "",
+                coverageEndsAt = quality?.optString("coverageEndsAt", "") ?: "",
+                candleCount = quality?.optInt("candleCount", points.size) ?: points.size,
+                completeOhlcCount = quality?.optInt("completeOhlcCount", 0) ?: 0,
+                volumeAvailableCount = quality?.optInt("volumeAvailableCount", 0) ?: 0,
+                closeOnlyCount = quality?.optInt("closeOnlyCount", 0) ?: 0,
+                ohlcCoveragePct = quality?.optDouble("ohlcCoveragePct", 0.0) ?: 0.0,
+                volumeCoveragePct = quality?.optDouble("volumeCoveragePct", 0.0) ?: 0.0,
+                firstObservationAt = quality?.optString("firstObservationAt", "") ?: "",
+                lastObservationAt = quality?.optString("lastObservationAt", "") ?: "",
+                indicatorReadiness = IndicatorReadiness(
+                    sma20 = readiness?.optBoolean("sma20", false) ?: false,
+                    sma50 = readiness?.optBoolean("sma50", false) ?: false,
+                    sma100 = readiness?.optBoolean("sma100", false) ?: false,
+                    sma200 = readiness?.optBoolean("sma200", false) ?: false,
+                    rsi14 = readiness?.optBoolean("rsi14", false) ?: false,
+                    macd = readiness?.optBoolean("macd", false) ?: false,
+                    stochastic14 = readiness?.optBoolean("stochastic14", false) ?: false,
+                    volume20 = readiness?.optBoolean("volume20", false) ?: false
+                )
+            )
+        )
+    }
 
     private fun indexFreshnessMode(asOf: String, marketOpen: Boolean): String {
         if (asOf.isBlank()) return "UNKNOWN"
