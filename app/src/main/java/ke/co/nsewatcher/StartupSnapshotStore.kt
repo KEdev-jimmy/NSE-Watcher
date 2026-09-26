@@ -31,6 +31,18 @@ internal object StartupSnapshotPolicy {
     internal const val NEWS_MAX_AGE_MS = 7L * 24L * 60L * 60L * 1000L
     internal const val COMPANIES_MAX_AGE_MS = 30L * 24L * 60L * 60L * 1000L
 
+    fun usedSources(
+        startup: StartupDataSnapshot,
+        offline: StartupOfflineSnapshot
+    ): Set<String> {
+        val unavailable = startup.failedSources + startup.timedOutSources
+        return buildSet {
+            if ("stocks" in unavailable && offline.stocks.isNotEmpty()) add("stocks")
+            if ("news" in unavailable && offline.news.isNotEmpty()) add("news")
+            if ("companies" in unavailable && offline.companies.isNotEmpty()) add("companies")
+        }
+    }
+
     fun fallback(
         persisted: PersistedStartupSnapshot,
         nowMs: Long
