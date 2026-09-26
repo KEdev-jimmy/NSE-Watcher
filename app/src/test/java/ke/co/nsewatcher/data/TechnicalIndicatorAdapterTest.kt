@@ -13,8 +13,8 @@ class TechnicalIndicatorAdapterTest {
                     close = index.toDouble(),
                     high = index + 1.0,
                     low = index - 1.0,
-                    volume = if (index > 20) 1_000.0 + index else null,
-                    volumeAvailable = index > 20
+                    volume = if (index > 20 && index != 30) 1_000.0 + index else null,
+                    volumeAvailable = index > 20 && index != 30
                 )
             },
             purpose = "technical-analysis",
