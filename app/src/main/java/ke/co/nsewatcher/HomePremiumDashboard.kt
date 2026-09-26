@@ -36,6 +36,7 @@ internal fun HomePremiumDashboard(
     stocks: List<Stock>,
     now: Instant,
     refreshing: Boolean,
+    offlineSnapshotSources: Set<String>,
     hasAttention: Boolean,
     watchlistPreview: List<Stock>,
     watchlistHistories: Map<String, List<MyStocksCache.HistoryPoint>>,
@@ -81,7 +82,7 @@ internal fun HomePremiumDashboard(
                     openAlerts = openAlerts
                 )
             }
-            if (stocks.any { it.dataOrigin == "offline_snapshot" }) {
+            if (offlineSnapshotSources.isNotEmpty()) {
                 item {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
@@ -90,8 +91,21 @@ internal fun HomePremiumDashboard(
                         border = BorderStroke(1.dp, palette.amber.copy(alpha = 0.42f))
                     ) {
                         Text(
-                            "Offline snapshot • Showing saved market observations while live data reconnects. " +
-                                "Saved prices are marked stale and cannot trigger alerts or Practice fills.",
+                            buildString {
+                                append("Offline snapshot • Showing saved ")
+                                append(
+                                    offlineSnapshotSources.sorted().joinToString(", ") { source ->
+                                        when (source) {
+                                            "stocks" -> "market observations"
+                                            "news" -> "NSE news"
+                                            "companies" -> "company catalogue"
+                                            else -> source
+                                        }
+                                    }
+                                )
+                                append(" while live data reconnects. ")
+                                append("Saved prices/news are stale and cannot authorize alerts or Practice fills.")
+                            },
                             color = palette.muted,
                             fontSize = 9.5.sp,
                             lineHeight = 13.5.sp,
