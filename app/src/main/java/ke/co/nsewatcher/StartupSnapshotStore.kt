@@ -227,7 +227,8 @@ internal class StartupSnapshotStore(context: Context) {
                         price = item.optFinite("price"),
                         change = item.optFinite("change"),
                         history = emptyList(),
-                        logoUrl = item.optString("logoUrl").takeIf { it.isNotBlank() },
+                        logoUrl = item.optString("logoUrl")
+                            .takeIf { it.isNotBlank() && !it.equals("null", true) },
                         sector = item.optString("sector", "Other").ifBlank { "Other" },
                         volume = item.optLong("volume", 0L),
                         changeAvailable = item.optBoolean("changeAvailable", false),
