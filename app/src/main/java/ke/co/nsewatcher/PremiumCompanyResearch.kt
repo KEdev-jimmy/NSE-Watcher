@@ -631,7 +631,7 @@ private fun PremiumTechnicalStrengthGauge(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            BoxWithConstraints(
+            Box(
                 modifier = Modifier.fillMaxWidth().heightIn(min = 150.dp, max = 178.dp)
             ) {
                 val density = LocalDensity.current
