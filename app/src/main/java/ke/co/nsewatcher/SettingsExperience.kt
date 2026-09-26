@@ -176,32 +176,135 @@ internal fun AccountSignInScreen(
     back: () -> Unit,
     openProfile: () -> Unit
 ) {
+    var mode by rememberSaveable { mutableStateOf("Sign in") }
+    var fullName by rememberSaveable(name) { mutableStateOf(name.takeUnless { it == ProfileDefaults.displayName }.orEmpty()) }
+    var email by rememberSaveable { mutableStateOf("") }
+    var password by rememberSaveable { mutableStateOf("") }
+    var keepSignedIn by rememberSaveable { mutableStateOf(true) }
     var authMessage by remember { mutableStateOf(false) }
+    val creating = mode == "Create account"
+
     LazyColumn(
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        item { SettingsHeader("Account & Sign in", back) }
+        item { SettingsHeader(if (creating) "Create account" else "Sign in", back) }
         item {
-            Column(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Surface(Modifier.size(82.dp), CircleShape, MaterialTheme.colorScheme.surfaceVariant) {
-                    Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(19.dp))
+            Column(
+                Modifier.fillMaxWidth().padding(top = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Surface(
+                    modifier = Modifier.size(70.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Default.ShowChart,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(34.dp)
+                        )
+                    }
                 }
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(12.dp))
                 Text(
-                    if (username.isBlank()) "Get the most from NSE Watcher" else name,
+                    if (creating) "Create your NSE Watcher account" else "Welcome back",
                     fontWeight = FontWeight.ExtraBold,
-                    fontSize = 19.sp
+                    fontSize = 22.sp
                 )
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(5.dp))
                 Text(
-                    if (username.isBlank()) "Sign in later to sync your watchlist, Practice Portfolio and settings across devices."
-                    else "Your current profile is local to this device.",
+                    if (creating)
+                        "Set up an account for future cross-device sync of your profile, watchlist, alerts and Practice data."
+                    else
+                        "Sign in when cloud accounts are enabled. Market browsing and Practice remain available without an account.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 12.sp,
-                    lineHeight = 18.sp,
-                    modifier = Modifier.padding(horizontal = 18.dp)
+                    fontSize = 11.5.sp,
+                    lineHeight = 17.sp,
+                    modifier = Modifier.padding(horizontal = 12.dp)
                 )
+            }
+        }
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (!creating) {
+                    Button(onClick = { mode = "Sign in" }, modifier = Modifier.weight(1f)) { Text("Sign in") }
+                    OutlinedButton(onClick = { mode = "Create account" }, modifier = Modifier.weight(1f)) { Text("Create account") }
+                } else {
+                    OutlinedButton(onClick = { mode = "Sign in" }, modifier = Modifier.weight(1f)) { Text("Sign in") }
+                    Button(onClick = { mode = "Create account" }, modifier = Modifier.weight(1f)) { Text("Create account") }
+                }
+            }
+        }
+        if (creating) {
+            item {
+                OutlinedTextField(
+                    value = fullName,
+                    onValueChange = { fullName = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("Full name") },
+                    leadingIcon = { Icon(Icons.Default.Person, null) }
+                )
+            }
+        }
+        item {
+            OutlinedTextField(
+                value = email,
+                onValueChange = { email = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text("Email address") },
+                leadingIcon = { Icon(Icons.Default.Email, null) }
+            )
+        }
+        item {
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text("Password") },
+                leadingIcon = { Icon(Icons.Default.Lock, null) }
+            )
+        }
+        if (creating) {
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    SettingsFact(Icons.Default.CheckCircle, "Use at least 8 characters.")
+                    SettingsFact(Icons.Default.CheckCircle, "Include a number and a letter.")
+                    SettingsFact(Icons.Default.CheckCircle, "Cloud sync will only start after real authentication is connected.")
+                }
+            }
+        } else {
+            item {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = keepSignedIn, onCheckedChange = { keepSignedIn = it })
+                    Text("Keep me signed in", fontSize = 11.sp, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { authMessage = true }) { Text("Forgot password?", fontSize = 11.sp) }
+                }
+            }
+        }
+        item {
+            Button(
+                onClick = { authMessage = true },
+                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(if (creating) "Create account" else "Sign in")
+            }
+        }
+        item {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                HorizontalDivider(Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
+                Text(
+                    "  or continue with  ",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 10.sp
+                )
+                HorizontalDivider(Modifier.weight(1f), color = MaterialTheme.colorScheme.outlineVariant)
             }
         }
         item {
@@ -215,36 +318,25 @@ internal fun AccountSignInScreen(
                         Text("G", fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
                     }
                 }
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(10.dp))
                 Text("Continue with Google")
             }
         }
         item {
-            OutlinedButton(
-                onClick = { authMessage = true },
-                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(Icons.Default.Email, null)
-                Spacer(Modifier.width(12.dp))
-                Text("Continue with Email")
-            }
-        }
-        item {
             Surface(
-                color = MaterialTheme.colorScheme.primaryContainer,
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
                 shape = RoundedCornerShape(14.dp)
             ) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SettingsFact(Icons.Default.CheckCircle, "Your market browsing works without an account.")
-                    SettingsFact(Icons.Default.CheckCircle, "Your current profile, watchlist and Practice data stay local.")
-                    SettingsFact(Icons.Default.CheckCircle, "Google sign-in will not require a separate NSE Watcher password.")
+                    SettingsFact(Icons.Default.CheckCircle, "An account is optional for browsing NSE market data.")
+                    SettingsFact(Icons.Default.CheckCircle, "Your current profile, watchlist and Practice Portfolio remain on this device.")
+                    SettingsFact(Icons.Default.CheckCircle, "No sign-in is claimed until a real account backend and OAuth are connected.")
                 }
             }
         }
         item {
             TextButton(onClick = openProfile, modifier = Modifier.fillMaxWidth()) {
-                Text("Edit local profile")
+                Text(if (username.isBlank()) "Continue with local profile" else "Back to local profile")
             }
         }
     }
@@ -255,7 +347,9 @@ internal fun AccountSignInScreen(
             icon = { Icon(Icons.Default.CloudOff, null, tint = MaterialTheme.colorScheme.primary) },
             title = { Text("Cloud accounts are not enabled yet") },
             text = {
-                Text("The account screen is ready, but Google/email authentication and cloud sync still require a real account backend and OAuth configuration. This build keeps your data on this device rather than pretending you are signed in.")
+                Text(
+                    "This screen is the finished account UI, but registration, password recovery, Google sign-in and cross-device sync still need a real authentication backend. NSE Watcher will keep using local data instead of pretending an account was created."
+                )
             },
             confirmButton = { TextButton(onClick = { authMessage = false }) { Text("Got it") } }
         )
