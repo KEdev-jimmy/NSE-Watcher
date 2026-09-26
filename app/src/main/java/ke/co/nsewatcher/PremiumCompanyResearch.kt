@@ -618,6 +618,7 @@ private fun PremiumTechnicalStrengthGauge(
         ResearchGreen.copy(alpha = 0.62f),
         ResearchGreen
     )
+    val needleHubColor = ResearchCard
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -678,7 +679,7 @@ private fun PremiumTechnicalStrengthGauge(
                             cap = StrokeCap.Round
                         )
                         drawCircle(
-                            color = ResearchCard,
+                            color = needleHubColor,
                             radius = arcStrokePx * 0.56f,
                             center = center
                         )
