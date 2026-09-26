@@ -431,7 +431,7 @@ class AlertWorker(appContext: Context, workerParams: WorkerParameters) : Corouti
                 .setConstraints(constraints)
                 .build()
             WorkManager.getInstance(context)
-                .enqueueUniquePeriodicWork(WORK_NAME, ExistingPeriodicWorkPolicy.KEEP, request)
+                .enqueueUniquePeriodicWork(WORK_NAME, ExistingPeriodicWorkPolicy.UPDATE, request)
         }
     }
 }
