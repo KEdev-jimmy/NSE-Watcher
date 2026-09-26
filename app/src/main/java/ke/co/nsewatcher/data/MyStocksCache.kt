@@ -189,9 +189,11 @@ object MyStocksCache {
     suspend fun loadStocks(): List<Stock> = withContext(Dispatchers.IO) {
         MarketRefreshController.markStarted()
         try {
-            val marketStatus = loadMarketStatus()
-            val marketOpen = marketStatus.isOpen.takeIf { marketStatus.isKnown }
-            val base = loadFromUrl(BACKEND_STOCKS_URL, "backend", marketOpen)
+            // Quote retrieval must stay independent from the market-status endpoint.
+            // Callers that need to decide whether trading actions are allowed already
+            // fetch status explicitly. Same-day quote freshness is therefore labelled
+            // CURRENT_DAY here unless a provider marks the observation stale.
+            val base = loadFromUrl(BACKEND_STOCKS_URL, "backend", marketOpen = null)
             // The market-data invariant is deliberately strict:
             // every displayed security price must come from the provider's latest
             // available delayed observation. Never replace it with a static catalogue
@@ -355,7 +357,11 @@ object MyStocksCache {
         } finally { connection.disconnect() }
     }.getOrDefault(emptyList())
 
-    private fun stockFreshnessMode(observedAt: String, marketOpen: Boolean?, providerStale: Boolean = false): String {
+    internal fun stockFreshnessMode(
+        observedAt: String,
+        marketOpen: Boolean?,
+        providerStale: Boolean = false
+    ): String {
         if (providerStale) return "STALE"
         if (observedAt.isBlank()) return "UNKNOWN"
         val now = java.time.Instant.now().atZone(java.time.ZoneId.of("Africa/Nairobi"))
@@ -366,6 +372,7 @@ object MyStocksCache {
                 observedDate.isBefore(now.toLocalDate()) -> "STALE"
                 observedDate == now.toLocalDate() && marketOpen == true -> "CURRENT_SESSION"
                 observedDate == now.toLocalDate() && marketOpen == false -> "END_OF_DAY"
+                observedDate == now.toLocalDate() -> "CURRENT_DAY"
                 else -> "UNKNOWN"
             }
         }
@@ -374,6 +381,7 @@ object MyStocksCache {
             date.isBefore(now.toLocalDate()) -> "STALE"
             date == now.toLocalDate() && marketOpen == true -> "CURRENT_SESSION"
             date == now.toLocalDate() && marketOpen == false -> "END_OF_DAY"
+            date == now.toLocalDate() -> "CURRENT_DAY"
             else -> "UNKNOWN"
         }
     }
