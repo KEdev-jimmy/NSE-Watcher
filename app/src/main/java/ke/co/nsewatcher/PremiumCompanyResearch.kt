@@ -36,6 +36,9 @@ import java.util.Locale
 import kotlin.math.abs
 import ke.co.nsewatcher.data.CompanyIntelligenceCache
 import ke.co.nsewatcher.data.MyStocksCache
+import ke.co.nsewatcher.domain.TechnicalStrengthComponent
+import ke.co.nsewatcher.domain.TechnicalStrengthLabel
+import ke.co.nsewatcher.domain.TechnicalStrengthResult
 
 @Composable
 internal fun PremiumCompanyTopBar(
@@ -204,6 +207,10 @@ internal fun PremiumCompanyOverview(
     market: MyStocksCache.MarketStatus,
     intelligence: CompanyIntelligenceCache.Result,
     news: List<NewsItem>,
+    technicalHistory: MyStocksCache.HistoryResult,
+    technicalStrength: TechnicalStrengthResult?,
+    technicalLoading: Boolean,
+    technicalError: String?,
     selectedRange: String,
     onRange: (String) -> Unit,
     chart: MyStocksCache.HistoryResult,
@@ -228,6 +235,14 @@ internal fun PremiumCompanyOverview(
     )
 
     PremiumTodayGlanceCard(session)
+
+    PremiumTechnicalStrengthCard(
+        result = technicalStrength,
+        history = technicalHistory,
+        loading = technicalLoading,
+        error = technicalError,
+        onRefresh = onRefresh
+    )
 
     PremiumKeyStatisticsCard(
         intelligence = intelligence,
@@ -388,6 +403,337 @@ private fun PremiumTodayGlanceCard(session: CompanyResearchPresentation.Session)
                 "Day low" to CompanyResearchPresentation.money(session.low)
             ),
             changeIndex = 2
+        )
+    }
+}
+
+@Composable
+private fun PremiumTechnicalStrengthCard(
+    result: TechnicalStrengthResult?,
+    history: MyStocksCache.HistoryResult,
+    loading: Boolean,
+    error: String?,
+    onRefresh: () -> Unit
+) {
+    var expanded by remember(result?.score, result?.confidenceScore, history.observedAt) {
+        mutableStateOf(false)
+    }
+    val label = result?.label
+    val accent = when (label) {
+        TechnicalStrengthLabel.STRONG_BULLISH,
+        TechnicalStrengthLabel.BULLISH -> ResearchGreen
+        TechnicalStrengthLabel.STRONG_BEARISH,
+        TechnicalStrengthLabel.BEARISH -> ResearchRed
+        TechnicalStrengthLabel.NEUTRAL -> MaterialTheme.colorScheme.tertiary
+        else -> ResearchMuted
+    }
+
+    PremiumSectionCard(
+        icon = Icons.Default.QueryStats,
+        accent = accent,
+        title = "Technical strength",
+        subtitle = "Trend, momentum and trading participation from verified daily observations"
+    ) {
+        when {
+            loading && result == null -> {
+                ResearchLoading("Calculating technical strength…")
+            }
+
+            result == null -> {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = ResearchRaised,
+                    border = BorderStroke(1.dp, ResearchBorder.copy(alpha = 0.75f))
+                ) {
+                    Column(
+                        Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            "Technical strength unavailable",
+                            color = ResearchText,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            error ?: "Verified daily history was not returned, so NSE Watcher will not estimate a score.",
+                            color = ResearchMuted,
+                            fontSize = 9.5.sp,
+                            lineHeight = 14.sp
+                        )
+                    }
+                }
+                TextButton(onClick = onRefresh) {
+                    Text("Try again", color = ResearchGreen, fontSize = 10.sp)
+                }
+            }
+
+            else -> {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Surface(
+                        modifier = Modifier.size(76.dp),
+                        shape = RoundedCornerShape(18.dp),
+                        color = accent.copy(alpha = 0.09f),
+                        border = BorderStroke(1.dp, accent.copy(alpha = 0.45f))
+                    ) {
+                        Column(
+                            Modifier.fillMaxSize(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                result.score?.toString() ?: "—",
+                                color = accent,
+                                fontSize = 25.sp,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                            Text(
+                                if (result.score == null) "score" else "/ 100",
+                                color = ResearchMuted,
+                                fontSize = 8.5.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+
+                    Column(
+                        Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Text(
+                            result.label.displayName,
+                            color = accent,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                        Text(
+                            result.summary,
+                            color = ResearchText,
+                            fontSize = 10.sp,
+                            lineHeight = 15.sp
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = ResearchRaised,
+                            border = BorderStroke(1.dp, ResearchBorder.copy(alpha = 0.75f))
+                        ) {
+                            Text(
+                                "Data confidence: ${result.confidenceLabel.displayName} · ${result.confidenceScore}/100",
+                                color = ResearchMuted,
+                                fontSize = 8.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+
+                PremiumTechnicalComponentGrid(
+                    trend = result.trend,
+                    momentum = result.momentum,
+                    participation = result.participation
+                )
+
+                val observedAt = history.observedAt.ifBlank {
+                    history.dataQuality.lastObservationAt
+                }
+                val source = history.source.ifBlank { "MyStocks Africa" }
+                val delay = history.delayMinutes?.takeIf { it >= 0 }
+                    ?.let { " · ${it}-min delayed" }
+                    .orEmpty()
+                Text(
+                    "Daily observations · $source$delay" +
+                        if (observedAt.isNotBlank()) "\nAs of ${CompanyResearchPresentation.date(observedAt)}" else "",
+                    color = ResearchMuted,
+                    fontSize = 8.5.sp,
+                    lineHeight = 12.sp
+                )
+
+                TextButton(
+                    onClick = { expanded = !expanded },
+                    contentPadding = PaddingValues(horizontal = 0.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        if (expanded) "Hide why ↑" else "Why this rating? ↓",
+                        color = ResearchGreen,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                if (expanded) {
+                    HorizontalDivider(color = ResearchBorder.copy(alpha = 0.75f))
+                    Text(
+                        "Why",
+                        color = ResearchText,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    result.reasons.forEach { reason ->
+                        PremiumTechnicalBullet(reason)
+                    }
+
+                    val ohlcCoverage = history.dataQuality.ohlcCoveragePct
+                    val volumeCoverage = history.dataQuality.volumeCoveragePct
+                    if (
+                        history.dataQuality.candleCount > 0 ||
+                        ohlcCoverage > 0.0 ||
+                        volumeCoverage > 0.0
+                    ) {
+                        Text(
+                            "Data coverage",
+                            color = ResearchText,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "OHLC ${String.format(Locale.US, "%.1f", ohlcCoverage)}% · " +
+                                "Volume ${String.format(Locale.US, "%.1f", volumeCoverage)}% · " +
+                                "${history.dataQuality.candleCount} daily observations",
+                            color = ResearchMuted,
+                            fontSize = 9.sp,
+                            lineHeight = 13.sp
+                        )
+                    }
+
+                    if (result.cautions.isNotEmpty()) {
+                        Text(
+                            "Keep in mind",
+                            color = ResearchText,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        result.cautions.forEach { caution ->
+                            PremiumTechnicalBullet(caution, caution = true)
+                        }
+                    }
+                }
+
+                Text(
+                    "Technical conditions only — not a buy/sell instruction.",
+                    color = ResearchMuted,
+                    fontSize = 8.5.sp,
+                    lineHeight = 12.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PremiumTechnicalComponentGrid(
+    trend: TechnicalStrengthComponent,
+    momentum: TechnicalStrengthComponent,
+    participation: TechnicalStrengthComponent
+) {
+    val items = listOf(
+        "Trend" to trend,
+        "Momentum" to momentum,
+        "Participation" to participation
+    )
+
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val stack = maxWidth < 360.dp || LocalDensity.current.fontScale > 1.10f
+        if (stack) {
+            Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                items.forEach { (label, component) ->
+                    PremiumTechnicalComponentTile(
+                        label = label,
+                        component = component,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        } else {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(7.dp)
+            ) {
+                items.forEach { (label, component) ->
+                    PremiumTechnicalComponentTile(
+                        label = label,
+                        component = component,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PremiumTechnicalComponentTile(
+    label: String,
+    component: TechnicalStrengthComponent,
+    modifier: Modifier
+) {
+    val score = component.score
+    val accent = when {
+        score == null -> ResearchMuted
+        score >= 60 -> ResearchGreen
+        score < 40 -> ResearchRed
+        else -> MaterialTheme.colorScheme.tertiary
+    }
+    val state = when {
+        score == null -> "Unavailable"
+        score >= 80 -> "Strong"
+        score >= 60 -> "Positive"
+        score >= 40 -> "Mixed"
+        score >= 20 -> "Negative"
+        else -> "Weak"
+    }
+
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(10.dp),
+        color = ResearchRaised,
+        border = BorderStroke(1.dp, ResearchBorder.copy(alpha = 0.75f))
+    ) {
+        Column(
+            Modifier.padding(horizontal = 9.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(label, color = ResearchMuted, fontSize = 8.5.sp, maxLines = 1)
+            Text(
+                score?.let { "$it/100" } ?: "—",
+                color = accent,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.ExtraBold
+            )
+            Text(
+                state,
+                color = ResearchMuted,
+                fontSize = 8.sp,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+@Composable
+private fun PremiumTechnicalBullet(text: String, caution: Boolean = false) {
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Icon(
+            if (caution) Icons.Default.Info else Icons.Default.CheckCircle,
+            null,
+            tint = if (caution) MaterialTheme.colorScheme.tertiary else ResearchGreen,
+            modifier = Modifier.size(14.dp).padding(top = 1.dp)
+        )
+        Text(
+            text,
+            modifier = Modifier.weight(1f),
+            color = ResearchMuted,
+            fontSize = 9.sp,
+            lineHeight = 13.sp
         )
     }
 }
