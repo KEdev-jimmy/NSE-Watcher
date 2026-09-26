@@ -330,6 +330,9 @@ private fun MarketPulseCard(
     latest: Instant?,
     showSheet: (String) -> Unit
 ) {
+    val breadthStrength = remember(breadth, sectors) {
+        MarketBreadthStrengthEngine.calculate(breadth, sectors)
+    }
     MarketSectionCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             MarketIconBubble(Icons.Outlined.MonitorHeart, ResearchGreen)
@@ -407,6 +410,240 @@ private fun MarketPulseCard(
                 Text(marketPulseNarrative(breadth, sectors), color = ResearchText, fontSize = 12.sp, lineHeight = 17.sp)
             }
         }
+        Spacer(Modifier.height(12.dp))
+        MarketBreadthStrengthPanel(breadthStrength)
+    }
+}
+
+@Composable
+private fun MarketBreadthStrengthPanel(result: MarketBreadthStrengthResult) {
+    var expanded by rememberSaveable(result.score, result.confidenceScore) { mutableStateOf(false) }
+    val accent = when (result.label) {
+        MarketBreadthStrengthLabel.BROAD_STRENGTH,
+        MarketBreadthStrengthLabel.POSITIVE -> ResearchGreen
+        MarketBreadthStrengthLabel.WEAK,
+        MarketBreadthStrengthLabel.BROAD_WEAKNESS -> ResearchRed
+        MarketBreadthStrengthLabel.MIXED -> MaterialTheme.colorScheme.tertiary
+        MarketBreadthStrengthLabel.INSUFFICIENT_DATA -> ResearchMuted
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        color = ResearchCard,
+        border = BorderStroke(1.dp, ResearchBorder)
+    ) {
+        Column(
+            Modifier.padding(13.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                MarketIconBubble(Icons.Outlined.MonitorHeart, accent, 34.dp)
+                Spacer(Modifier.width(9.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        "Market breadth strength",
+                        color = ResearchText,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "How widely today’s move is shared across available NSE shares",
+                        color = ResearchMuted,
+                        fontSize = 9.sp,
+                        lineHeight = 12.sp
+                    )
+                }
+                Text(
+                    result.score?.let { it.toString() + "/100" } ?: "—",
+                    color = accent,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            }
+
+            MarketBreadthStrengthSummary(
+                result = result,
+                accent = accent
+            )
+
+            Text(
+                result.reasons.firstOrNull()
+                    ?: "Comparable market breadth is not available yet.",
+                color = ResearchText,
+                fontSize = 10.sp,
+                lineHeight = 14.sp
+            )
+
+            TextButton(
+                onClick = { expanded = !expanded },
+                contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp)
+            ) {
+                Text(
+                    if (expanded) "Hide explanation ↑" else "Why this score? ↓",
+                    color = ResearchGreen,
+                    fontSize = 9.5.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            if (expanded) {
+                HorizontalDivider(color = ResearchBorder.copy(alpha = 0.75f))
+                result.reasons.drop(1).forEach { reason ->
+                    MarketBreadthStrengthBullet(reason, caution = false)
+                }
+                result.cautions.forEach { caution ->
+                    MarketBreadthStrengthBullet(caution, caution = true)
+                }
+                Text(
+                    "Coverage: " + result.coveredCompanies + "/" + result.totalCompanies +
+                        " companies · " + String.format(Locale.US, "%.0f", result.coveragePct) + "%",
+                    color = ResearchMuted,
+                    fontSize = 8.5.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MarketBreadthStrengthSummary(
+    result: MarketBreadthStrengthResult,
+    accent: Color
+) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val stack = maxWidth < 350.dp || LocalDensity.current.fontScale > 1.12f
+        if (stack) {
+            Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                MarketBreadthStrengthLabelTile(
+                    result = result,
+                    accent = accent,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(7.dp)
+                ) {
+                    MarketBreadthStrengthMetric(
+                        label = "Breadth",
+                        score = result.breadthScore,
+                        modifier = Modifier.weight(1f)
+                    )
+                    MarketBreadthStrengthMetric(
+                        label = "Sectors",
+                        score = result.sectorParticipationScore,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        } else {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                MarketBreadthStrengthLabelTile(
+                    result = result,
+                    accent = accent,
+                    modifier = Modifier.weight(1f)
+                )
+                MarketBreadthStrengthMetric(
+                    label = "Breadth",
+                    score = result.breadthScore,
+                    modifier = Modifier.weight(0.72f)
+                )
+                MarketBreadthStrengthMetric(
+                    label = "Sectors",
+                    score = result.sectorParticipationScore,
+                    modifier = Modifier.weight(0.72f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MarketBreadthStrengthLabelTile(
+    result: MarketBreadthStrengthResult,
+    accent: Color,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(10.dp),
+        color = accent.copy(alpha = 0.08f),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.35f))
+    ) {
+        Column(Modifier.padding(9.dp)) {
+            Text(
+                result.label.displayName,
+                color = accent,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 2
+            )
+            Text(
+                "Confidence " + result.confidenceScore + "/100",
+                color = ResearchMuted,
+                fontSize = 8.5.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun MarketBreadthStrengthMetric(
+    label: String,
+    score: Int?,
+    modifier: Modifier = Modifier
+) {
+    val tint = when {
+        score == null -> ResearchMuted
+        score >= 60 -> ResearchGreen
+        score < 40 -> ResearchRed
+        else -> MaterialTheme.colorScheme.tertiary
+    }
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(10.dp),
+        color = ResearchRaised,
+        border = BorderStroke(1.dp, ResearchBorder)
+    ) {
+        Column(
+            Modifier.padding(horizontal = 8.dp, vertical = 9.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(label, color = ResearchMuted, fontSize = 8.sp)
+            Text(
+                score?.toString() ?: "—",
+                color = tint,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.ExtraBold
+            )
+        }
+    }
+}
+
+@Composable
+private fun MarketBreadthStrengthBullet(text: String, caution: Boolean) {
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Icon(
+            if (caution) Icons.Outlined.Info else Icons.Outlined.CheckCircle,
+            null,
+            tint = if (caution) MaterialTheme.colorScheme.tertiary else ResearchGreen,
+            modifier = Modifier.size(14.dp)
+        )
+        Text(
+            text,
+            modifier = Modifier.weight(1f),
+            color = ResearchMuted,
+            fontSize = 9.sp,
+            lineHeight = 13.sp
+        )
     }
 }
 
