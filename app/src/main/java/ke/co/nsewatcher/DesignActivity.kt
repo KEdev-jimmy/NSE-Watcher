@@ -390,10 +390,10 @@ private fun App(
             Page.WATCHLIST->WatchlistDashboard(quoteStocks=stocks, initialCatalog=companyCatalog, initialMarket=startupMarketStatus, sharedNews=newsFeed, onQuotesLoaded={liveStocks.value=it;offlineStartupSources=offlineStartupSources-"stocks"}, onNewsLoaded={newsFeed=it;offlineStartupSources=offlineStartupSources-"news"}, openCompany={selected=it;go(Page.COMPANY)}, openNews={selectedNews=it;go(Page.NEWS_DETAIL)}, openPreferences={go(Page.NOTIFICATIONS)}, back=::back)
             Page.COMPARE->CompanyComparison(CompaniesPresentation.companies(companyCatalog, stocks),::back,comparisonSymbols)
             Page.NEWS_DETAIL->key(alertNavigationRevision) { selectedNews?.let { NewsArticleScreen(it,companyCatalog,stocks,::back){company->selected=company;go(Page.COMPANY)} } }
-            Page.PROFILE->ProfileHubScreen(name,username,email,description,{name=it;put("profile_name",it)},{username=it;put("username",it)},{email=it;put("email",it)},{description=it;put("description",it)},pickAvatar,::back,{go(Page.ACCOUNT)},{go(Page.WATCHLIST)},{launchPractice()},{go(Page.MORE)})
+            Page.PROFILE->ProfileHubScreen(name,username,email,description,{name=it;put("profile_name",it)},{username=it;put("username",it)},{email=it;put("email",it)},{description=it;put("description",it)},pickAvatar,::back,{go(Page.ACCOUNT)},{go(Page.WATCHLIST)},{launchPractice()},{go(Page.SETTINGS)})
             Page.MORE->MoreHubScreen(name=name,username=username,email=email,back=::back,openProfile={go(Page.PROFILE)},openPractice={launchPractice()},openWatchlist={go(Page.WATCHLIST)},openAlerts={go(Page.ALERTS)},openCompare={comparisonSymbols=emptyList();go(Page.COMPARE)},openSettings={go(Page.SETTINGS)},openNotifications={go(Page.NOTIFICATIONS)},openMarketData={go(Page.LIVE_DATA)},openAppearance={go(Page.DISPLAY)},openHelp={go(Page.HELP)},openAbout={go(Page.ABOUT)})
             Page.SETTINGS->SettingsOverviewScreen(
-                back=::back,openAccount={go(Page.ACCOUNT)},openNotifications={go(Page.NOTIFICATIONS)},
+                back=::back,openProfile={go(Page.PROFILE)},openAccount={go(Page.ACCOUNT)},openNotifications={go(Page.NOTIFICATIONS)},
                 openMarketData={go(Page.LIVE_DATA)},openAppearance={go(Page.DISPLAY)},openCharts={go(Page.CHARTS)},
                 openLanguage={go(Page.LANGUAGE)},openPrivacy={go(Page.PRIVACY)},openHelp={go(Page.HELP)},openAbout={go(Page.ABOUT)}
             )
