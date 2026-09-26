@@ -129,7 +129,11 @@ fun HomeDashboard(
     }
     LaunchedEffect(Unit) {
         coroutineScope {
-            launch { refreshNews() }
+            if (newsFeed.isEmpty()) {
+                launch { refreshNews() }
+            } else {
+                newsLoading = false
+            }
             launch {
                 if (catalog.isEmpty()) {
                     try {
