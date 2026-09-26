@@ -8,6 +8,8 @@ import ke.co.nsewatcher.data.CompanyIntelligenceCache
 import ke.co.nsewatcher.data.CompanyIntelligenceEngine
 import ke.co.nsewatcher.data.MovementIntelligenceCache
 import ke.co.nsewatcher.data.MarketHistoryCache
+import ke.co.nsewatcher.data.TechnicalHistoryCache
+import ke.co.nsewatcher.data.TechnicalStrengths
 import ke.co.nsewatcher.data.MarketData
 import ke.co.nsewatcher.data.MyStocksCache
 import ke.co.nsewatcher.data.NewsCache
@@ -15,6 +17,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import ke.co.nsewatcher.domain.TechnicalStrengthResult
 
 internal object CompanyHistoryLoadingPolicy {
     private val overviewRanges = setOf("1D", "1M", "3M", "1Y", "3Y")
@@ -64,6 +67,10 @@ fun CompanyIntelligence(
     var analystLoading by remember(s.symbol) { mutableStateOf(false) }
     var movementRequested by remember(s.symbol) { mutableStateOf(false) }
     var analystRequestRevision by remember(s.symbol) { mutableIntStateOf(0) }
+    var technicalHistory by remember(s.symbol) { mutableStateOf(MyStocksCache.HistoryResult()) }
+    var technicalStrength by remember(s.symbol) { mutableStateOf<TechnicalStrengthResult?>(null) }
+    var technicalLoading by remember(s.symbol) { mutableStateOf(true) }
+    var technicalError by remember(s.symbol) { mutableStateOf<String?>(null) }
     val lastMarketRefreshMs = MarketRefreshController.state.value.lastSuccessfulRefreshMs
 
     LaunchedEffect(s.symbol, refresh) {
@@ -192,6 +199,32 @@ fun CompanyIntelligence(
             analyst = AnalystCache.Result(error = "AI explanation is temporarily unavailable.")
         } finally { analystLoading = false }
     }
+    LaunchedEffect(s.symbol, lastMarketRefreshMs, refresh) {
+        technicalLoading = true
+        technicalError = null
+        try {
+            val history = TechnicalHistoryCache.load(
+                symbol = s.symbol,
+                lookbackDays = 400,
+                forceRefresh = refresh > 0
+            )
+            technicalHistory = history
+            if (history.points.isEmpty()) {
+                technicalStrength = null
+                technicalError = "Verified daily technical history is temporarily unavailable."
+            } else {
+                technicalStrength = TechnicalStrengths.calculate(history)
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            technicalHistory = MyStocksCache.HistoryResult()
+            technicalStrength = null
+            technicalError = "Technical strength could not be calculated right now."
+        } finally {
+            technicalLoading = false
+        }
+    }
 
     val day = ranges["1D"] ?: MyStocksCache.HistoryResult()
     val session = remember(s, day) { CompanyResearchPresentation.session(s, day) }
@@ -251,6 +284,10 @@ fun CompanyIntelligence(
         deterministic = deterministic, movementContext = movementContext,
         analyst = analyst, analystLoading = analystLoading,
         analystRequested = analystRequestRevision > 0,
+        technicalHistory = technicalHistory,
+        technicalStrength = technicalStrength,
+        technicalLoading = technicalLoading,
+        technicalError = technicalError,
         onAnalysis = { movementRequested = true },
         onAiExplain = { analystRequestRevision++ },
         watched = watched, onWatchToggle = onWatchToggle,
@@ -260,7 +297,7 @@ fun CompanyIntelligence(
             analystRequestRevision = 0
             refresh++
         },
-        refreshing = fundamentalsLoading || newsLoading || loadingRanges.isNotEmpty() || movementLoading || analystLoading,
+        refreshing = fundamentalsLoading || newsLoading || loadingRanges.isNotEmpty() || movementLoading || analystLoading || technicalLoading,
         selectedRange = selectedRange, onRange = { range ->
             selectedRange = range
             requestedRanges = CompanyHistoryLoadingPolicy.request(requestedRanges, range)
