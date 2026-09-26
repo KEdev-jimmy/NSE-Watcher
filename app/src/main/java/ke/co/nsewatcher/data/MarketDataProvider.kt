@@ -16,6 +16,7 @@ internal interface MarketDataProvider {
     suspend fun status(): MyStocksCache.MarketStatus
     suspend fun indices(marketOpen: Boolean): List<MyStocksCache.MarketIndex>
     suspend fun history(symbol: String, period: String): MyStocksCache.HistoryResult
+    suspend fun technicalHistory(symbol: String, lookbackDays: Int = 400): MyStocksCache.HistoryResult
     suspend fun newsFeed(forceRefresh: Boolean = false): NewsCache.FeedResult
     suspend fun newsDetail(id: String): NewsItem?
     suspend fun companyNews(symbol: String): NewsCache.FeedResult
@@ -37,6 +38,12 @@ internal object NseWatcherMarketDataProvider : MarketDataProvider {
         period: String
     ): MyStocksCache.HistoryResult =
         MyStocksCache.loadHistoryDetails(symbol, period)
+
+    override suspend fun technicalHistory(
+        symbol: String,
+        lookbackDays: Int
+    ): MyStocksCache.HistoryResult =
+        MyStocksCache.loadTechnicalHistoryDetails(symbol, lookbackDays)
 
     override suspend fun newsFeed(forceRefresh: Boolean): NewsCache.FeedResult =
         NewsCache.loadFeedResult(forceRefresh)
@@ -66,6 +73,12 @@ internal class MarketDataGateway(
     ): MyStocksCache.HistoryResult =
         provider.history(symbol, period)
 
+    suspend fun technicalHistory(
+        symbol: String,
+        lookbackDays: Int = 400
+    ): MyStocksCache.HistoryResult =
+        provider.technicalHistory(symbol, lookbackDays)
+
     suspend fun newsFeed(forceRefresh: Boolean = false): NewsCache.FeedResult =
         provider.newsFeed(forceRefresh)
 
@@ -93,6 +106,12 @@ internal object MarketData {
         period: String
     ): MyStocksCache.HistoryResult =
         gateway.history(symbol, period)
+
+    suspend fun technicalHistory(
+        symbol: String,
+        lookbackDays: Int = 400
+    ): MyStocksCache.HistoryResult =
+        gateway.technicalHistory(symbol, lookbackDays)
 
     suspend fun newsFeed(forceRefresh: Boolean = false): NewsCache.FeedResult =
         gateway.newsFeed(forceRefresh)
