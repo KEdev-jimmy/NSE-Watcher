@@ -1,7 +1,6 @@
 package ke.co.nsewatcher.domain
 
 import kotlin.math.max
-import kotlin.math.min
 
 data class TechnicalCandle(
     val close: Double,
@@ -196,11 +195,9 @@ object TechnicalIndicatorEngine {
                 continue
             }
 
-            val highest = highs.filterNotNull().maxOrNull() ?: run {
-                kSeries += null
-                continue
-            }
-            val lowest = lows.filterNotNull().minOrNull() ?: run {
+            val highest = highs.filterNotNull().maxOrNull()
+            val lowest = lows.filterNotNull().minOrNull()
+            if (highest == null || lowest == null) {
                 kSeries += null
                 continue
             }
