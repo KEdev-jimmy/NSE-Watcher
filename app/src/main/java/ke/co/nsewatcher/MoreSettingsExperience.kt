@@ -260,7 +260,7 @@ internal fun ProfileHubScreen(
     openAccount: () -> Unit,
     openWatchlist: () -> Unit,
     openPractice: () -> Unit,
-    openMore: () -> Unit
+    openSettings: () -> Unit
 ) {
     var editing by rememberSaveable { mutableStateOf(false) }
     var draftName by rememberSaveable(name) { mutableStateOf(name) }
@@ -339,14 +339,22 @@ internal fun ProfileHubScreen(
 
         item {
             HubListCard(
-                title = "Account",
-                subtitle = "Your identity and local data",
+                title = "Your activity",
+                subtitle = "The parts of NSE Watcher that belong to you",
                 rows = listOf(
-                    HubRow("Account & sign in", "Google/email sync is not connected yet", Icons.Default.AccountCircle, openAccount),
-                    HubRow("Profile photo", "Choose a picture from this device", Icons.Default.PhotoCamera, pickAvatar),
-                    HubRow("Watchlist", "Open companies you follow", Icons.Default.Bookmark, openWatchlist),
-                    HubRow("Practice & Learn", "Open your virtual investing and learning space", Icons.Default.School, openPractice),
-                    HubRow("Tools & settings", "Alerts, comparison, preferences and support", Icons.Default.GridView, openMore)
+                    HubRow("Practice Portfolio", "Review your virtual investing and learning activity", Icons.Default.School, openPractice),
+                    HubRow("Watchlist", "Open the companies you follow", Icons.Default.Bookmark, openWatchlist)
+                )
+            )
+        }
+        item {
+            HubListCard(
+                title = "Account & app",
+                subtitle = "Identity, preferences and support",
+                rows = listOf(
+                    HubRow("Account & sign in", "Sign in or create an account when cloud accounts are enabled", Icons.Default.AccountCircle, openAccount),
+                    HubRow("Settings", "Notifications, market data, appearance, privacy and more", Icons.Default.Settings, openSettings),
+                    HubRow("Profile photo", "Choose a picture from this device", Icons.Default.PhotoCamera, pickAvatar)
                 )
             )
         }
@@ -363,6 +371,7 @@ internal fun ProfileHubScreen(
 @Composable
 internal fun SettingsOverviewScreen(
     back: () -> Unit,
+    openProfile: () -> Unit,
     openAccount: () -> Unit,
     openNotifications: () -> Unit,
     openMarketData: () -> Unit,
@@ -375,40 +384,49 @@ internal fun SettingsOverviewScreen(
 ) {
     val context = LocalContext.current
     var emailError by remember { mutableStateOf(false) }
+
     LazyColumn(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item { HubHeader("Settings", back) }
-        item { HubSectionTitle("Quick access", "Common settings, one tap away") }
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                    HubToolCard("Account & sign in", "Identity and future sync", Icons.Default.AccountCircle, openAccount, Modifier.weight(1f))
-                    HubToolCard("Notifications", "Alerts and sounds", Icons.Default.Notifications, openNotifications, Modifier.weight(1f), accent = HubToolAccent.ALERT)
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                    HubToolCard("Market & Data", "Sources and refresh", Icons.Default.Storage, openMarketData, Modifier.weight(1f), accent = HubToolAccent.COMPARE)
-                    HubToolCard("Appearance", "Theme and text", Icons.Default.Palette, openAppearance, Modifier.weight(1f))
-                }
-            }
-        }
         item {
             HubListCard(
-                title = "Preferences",
-                subtitle = "Control how NSE Watcher behaves",
+                title = "Account",
+                subtitle = "Profile and future cross-device access",
                 rows = listOf(
-                    HubRow("Charts", "Default timeframe and chart grid", Icons.Default.Timeline, openCharts),
-                    HubRow("Language & Region", "English, Kenya and KSh", Icons.Default.Language, openLanguage),
-                    HubRow("Privacy & Data", "Local storage and cloud status", Icons.Default.PrivacyTip, openPrivacy)
+                    HubRow("Profile information", "Name, username, email and profile photo", Icons.Default.Person, openProfile),
+                    HubRow("Account & sign in", "Sign in or create an account", Icons.Default.AccountCircle, openAccount)
                 )
             )
         }
         item {
             HubListCard(
-                title = "Support & Information",
-                subtitle = "Get help and learn about the product",
+                title = "Notifications",
+                subtitle = "Choose what deserves your attention",
                 rows = listOf(
+                    HubRow("Alerts & notifications", "Price, market, company, news and Practice alerts", Icons.Default.Notifications, openNotifications)
+                )
+            )
+        }
+        item {
+            HubListCard(
+                title = "App preferences",
+                subtitle = "Control how NSE Watcher looks and behaves",
+                rows = listOf(
+                    HubRow("Display & Appearance", "Theme, font size and layout", Icons.Default.Palette, openAppearance),
+                    HubRow("Market & Data", "Data sources, refresh and coverage", Icons.Default.Storage, openMarketData),
+                    HubRow("Charts", "Default timeframe and chart grid", Icons.Default.Timeline, openCharts),
+                    HubRow("Language & Region", "English, Kenya, KSh and Africa/Nairobi", Icons.Default.Language, openLanguage)
+                )
+            )
+        }
+        item {
+            HubListCard(
+                title = "Privacy & support",
+                subtitle = "Data controls, help and product information",
+                rows = listOf(
+                    HubRow("Privacy & Data", "Local storage, permissions and cloud status", Icons.Default.PrivacyTip, openPrivacy),
                     HubRow("Help & Support", "FAQs, contact and problem reports", Icons.Default.HelpOutline, openHelp),
                     HubRow("Send feedback", "Email the NSE Watcher team", Icons.Default.Email) {
                         emailError = !launchSupportEmail(context, "NSE Watcher Feedback", "Hi James,\n\nMy feedback:\n\n")
@@ -418,6 +436,7 @@ internal fun SettingsOverviewScreen(
             )
         }
     }
+
     if (emailError) {
         AlertDialog(
             onDismissRequest = { emailError = false },
