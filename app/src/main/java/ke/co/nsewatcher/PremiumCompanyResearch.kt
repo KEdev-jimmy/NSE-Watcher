@@ -1,6 +1,8 @@
 package ke.co.nsewatcher
 
 import android.content.Intent
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -20,7 +22,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -34,6 +39,8 @@ import coil3.compose.AsyncImage
 import java.time.LocalDate
 import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.sin
 import ke.co.nsewatcher.data.CompanyIntelligenceCache
 import ke.co.nsewatcher.data.MyStocksCache
 import ke.co.nsewatcher.domain.TechnicalStrengthComponent
@@ -470,68 +477,19 @@ private fun PremiumTechnicalStrengthCard(
             }
 
             else -> {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Surface(
-                        modifier = Modifier.size(76.dp),
-                        shape = RoundedCornerShape(18.dp),
-                        color = accent.copy(alpha = 0.09f),
-                        border = BorderStroke(1.dp, accent.copy(alpha = 0.45f))
-                    ) {
-                        Column(
-                            Modifier.fillMaxSize(),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Text(
-                                result.score?.toString() ?: "—",
-                                color = accent,
-                                fontSize = 25.sp,
-                                fontWeight = FontWeight.ExtraBold
-                            )
-                            Text(
-                                if (result.score == null) "score" else "/ 100",
-                                color = ResearchMuted,
-                                fontSize = 8.5.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
+                PremiumTechnicalStrengthGauge(
+                    score = result.score,
+                    label = result.label.displayName,
+                    confidenceLabel = result.confidenceLabel.displayName,
+                    confidenceScore = result.confidenceScore
+                )
 
-                    Column(
-                        Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(5.dp)
-                    ) {
-                        Text(
-                            result.label.displayName,
-                            color = accent,
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.ExtraBold
-                        )
-                        Text(
-                            result.summary,
-                            color = ResearchText,
-                            fontSize = 10.sp,
-                            lineHeight = 15.sp
-                        )
-                        Surface(
-                            shape = RoundedCornerShape(50),
-                            color = ResearchRaised,
-                            border = BorderStroke(1.dp, ResearchBorder.copy(alpha = 0.75f))
-                        ) {
-                            Text(
-                                "Data confidence: ${result.confidenceLabel.displayName} · ${result.confidenceScore}/100",
-                                color = ResearchMuted,
-                                fontSize = 8.5.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
-                        }
-                    }
-                }
+                Text(
+                    result.summary,
+                    color = ResearchText,
+                    fontSize = 10.sp,
+                    lineHeight = 15.sp
+                )
 
                 PremiumTechnicalComponentGrid(
                     trend = result.trend,
@@ -619,6 +577,168 @@ private fun PremiumTechnicalStrengthCard(
                     color = ResearchMuted,
                     fontSize = 8.5.sp,
                     lineHeight = 12.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PremiumTechnicalStrengthGauge(
+    score: Int?,
+    label: String,
+    confidenceLabel: String,
+    confidenceScore: Int
+) {
+    val animatedScore = remember { Animatable(50f) }
+    LaunchedEffect(score) {
+        val target = score?.coerceIn(0, 100)?.toFloat() ?: 50f
+        if (score != null) {
+            animatedScore.snapTo(50f)
+            animatedScore.animateTo(
+                targetValue = target,
+                animationSpec = tween(durationMillis = 650)
+            )
+        } else {
+            animatedScore.snapTo(50f)
+        }
+    }
+
+    val safeScore = score?.coerceIn(0, 100)
+    val labelColor = when {
+        safeScore == null -> ResearchMuted
+        safeScore >= 60 -> ResearchGreen
+        safeScore < 40 -> ResearchRed
+        else -> MaterialTheme.colorScheme.tertiary
+    }
+    val zoneColors = listOf(
+        ResearchRed,
+        ResearchRed.copy(alpha = 0.58f),
+        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.78f),
+        ResearchGreen.copy(alpha = 0.62f),
+        ResearchGreen
+    )
+    val needleHubColor = ResearchCard
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = ResearchRaised,
+        border = BorderStroke(1.dp, ResearchBorder.copy(alpha = 0.78f))
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 13.dp, vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Box(
+                modifier = Modifier.fillMaxWidth().heightIn(min = 150.dp, max = 178.dp)
+            ) {
+                val density = LocalDensity.current
+                val arcStrokePx = with(density) { 13.dp.toPx() }
+                val needleStrokePx = with(density) { 2.5.dp.toPx() }
+
+                Canvas(
+                    modifier = Modifier.fillMaxWidth().height(126.dp).align(Alignment.TopCenter)
+                ) {
+                    val center = Offset(size.width / 2f, size.height - 7f)
+                    val radius = minOf(
+                        (size.width / 2f) - arcStrokePx,
+                        size.height - arcStrokePx - 9f
+                    ).coerceAtLeast(1f)
+                    val arcSize = Size(radius * 2f, radius * 2f)
+                    val arcTopLeft = Offset(center.x - radius, center.y - radius)
+
+                    val zoneSweep = 36f
+                    zoneColors.forEachIndexed { index, zoneColor ->
+                        drawArc(
+                            color = zoneColor,
+                            startAngle = 180f + (index * zoneSweep),
+                            sweepAngle = zoneSweep - 2.4f,
+                            useCenter = false,
+                            topLeft = arcTopLeft,
+                            size = arcSize,
+                            style = Stroke(width = arcStrokePx, cap = StrokeCap.Round)
+                        )
+                    }
+
+                    if (safeScore != null) {
+                        val angle = 180f + ((animatedScore.value / 100f) * 180f)
+                        val radians = Math.toRadians(angle.toDouble())
+                        val needleLength = radius - (arcStrokePx * 0.9f)
+                        val end = Offset(
+                            x = center.x + (cos(radians) * needleLength).toFloat(),
+                            y = center.y + (sin(radians) * needleLength).toFloat()
+                        )
+
+                        drawLine(
+                            color = labelColor,
+                            start = center,
+                            end = end,
+                            strokeWidth = needleStrokePx,
+                            cap = StrokeCap.Round
+                        )
+                        drawCircle(
+                            color = needleHubColor,
+                            radius = arcStrokePx * 0.56f,
+                            center = center
+                        )
+                        drawCircle(
+                            color = labelColor,
+                            radius = arcStrokePx * 0.34f,
+                            center = center
+                        )
+                    }
+                }
+
+                Column(
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(1.dp)
+                ) {
+                    Text(
+                        safeScore?.toString() ?: "—",
+                        color = labelColor,
+                        fontSize = 29.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    Text(
+                        if (safeScore == null) "Score unavailable" else label,
+                        color = labelColor,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "Data confidence: $confidenceLabel · $confidenceScore/100",
+                        color = ResearchMuted,
+                        fontSize = 8.5.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Strong\nBearish",
+                    color = ResearchRed,
+                    fontSize = 7.5.sp,
+                    lineHeight = 9.sp
+                )
+                Text(
+                    "Neutral",
+                    color = MaterialTheme.colorScheme.tertiary,
+                    fontSize = 7.5.sp
+                )
+                Text(
+                    "Strong\nBullish",
+                    color = ResearchGreen,
+                    fontSize = 7.5.sp,
+                    lineHeight = 9.sp,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End
                 )
             }
         }
