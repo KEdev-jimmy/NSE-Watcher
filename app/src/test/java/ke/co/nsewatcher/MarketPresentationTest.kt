@@ -80,4 +80,36 @@ class MarketPresentationTest {
         assertEquals(merged, mergeMarketObservations(merged, observation("unknown")))
         assertEquals(merged, mergeMarketObservations(merged, observation("2026-09-22T09:00:00Z")))
     }
+    @Test
+    fun unknownRefreshDoesNotErasePreviouslyKnownDisplayStatus() {
+        val known = ke.co.nsewatcher.data.MyStocksCache.MarketStatus(
+            isOpen = true,
+            status = "OPEN",
+            isKnown = true
+        )
+        val unknown = ke.co.nsewatcher.data.MyStocksCache.MarketStatus()
+
+        assertEquals(known, MarketPresentation.displayStatus(known, unknown))
+    }
+
+    @Test
+    fun newlyKnownRefreshReplacesPriorDisplayStatus() {
+        val closed = ke.co.nsewatcher.data.MyStocksCache.MarketStatus(
+            isOpen = false,
+            status = "CLOSED",
+            isKnown = true
+        )
+        val open = ke.co.nsewatcher.data.MyStocksCache.MarketStatus(
+            isOpen = true,
+            status = "OPEN",
+            isKnown = true
+        )
+
+        assertEquals(open, MarketPresentation.displayStatus(closed, open))
+        assertEquals(open, MarketPresentation.displayStatus(
+            ke.co.nsewatcher.data.MyStocksCache.MarketStatus(),
+            open
+        ))
+    }
+
 }

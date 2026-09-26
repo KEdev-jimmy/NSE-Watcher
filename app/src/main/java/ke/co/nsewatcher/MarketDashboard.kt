@@ -109,15 +109,15 @@ fun MarketDashboard(
                 launch {
                     try {
                         val refreshedStatus = MarketData.status()
-                        status = refreshedStatus
-                        if (refreshedStatus.isKnown || !initialStatus.isKnown) {
+                        status = MarketPresentation.displayStatus(status, refreshedStatus)
+                        if (refreshedStatus.isKnown) {
                             onMarketStatusLoaded(refreshedStatus)
-                        }
-                        val refreshedIndices = MarketData.indices(
-                            refreshedStatus.isKnown && refreshedStatus.isOpen
-                        )
-                        if (refreshedIndices.isNotEmpty()) {
-                            onIndicesLoaded(refreshedIndices)
+                            val refreshedIndices = MarketData.indices(refreshedStatus.isOpen)
+                            if (refreshedIndices.isNotEmpty()) {
+                                onIndicesLoaded(refreshedIndices)
+                            }
+                        } else {
+                            statusFailed = true
                         }
                     } catch (cancelled: CancellationException) {
                         throw cancelled

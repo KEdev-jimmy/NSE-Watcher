@@ -1,6 +1,7 @@
 package ke.co.nsewatcher
 
 import ke.co.nsewatcher.data.MyStocksCache.HistoryResult
+import ke.co.nsewatcher.data.MyStocksCache.MarketStatus
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
@@ -20,6 +21,9 @@ internal data class HistoricalPeriodCoverage(
 internal object MarketPresentation {
     val ranges = listOf("1D", "3D", "1W", "1M", "3M", "6M", "YTD", "1Y", "3Y", "5Y")
     fun validChange(stock: Stock) = stock.price.isFinite() && stock.price > 0 && stock.changeAvailable && stock.change.isFinite()
+    fun displayStatus(current: MarketStatus, incoming: MarketStatus): MarketStatus =
+        if (incoming.isKnown || !current.isKnown) incoming else current
+
     fun movementQuestionAvailable(stock: Stock) = validChange(stock)
     fun breadth(stocks: List<Stock>): MarketBreadth {
         val valid = stocks.filter(::validChange)

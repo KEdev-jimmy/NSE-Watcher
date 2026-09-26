@@ -12,6 +12,8 @@ import ke.co.nsewatcher.data.MarketData
 import ke.co.nsewatcher.data.MyStocksCache
 import ke.co.nsewatcher.data.NewsCache
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 internal object CompanyHistoryLoadingPolicy {
@@ -108,18 +110,32 @@ fun CompanyIntelligence(
         if (refresh == 0) return@LaunchedEffect
         newsLoading = true
         try {
-            val result = MarketData.newsFeed(forceRefresh = true)
-            newsError = result.error
-            if (result.error == null) onNewsLoaded(result.items)
-
-            val refreshedStatus = MarketData.status()
-            if (refreshedStatus.isKnown || !marketStatus.isKnown) {
-                onMarketStatusLoaded(refreshedStatus)
+            coroutineScope {
+                launch {
+                    try {
+                        val result = MarketData.newsFeed(forceRefresh = true)
+                        newsError = result.error
+                        if (result.error == null) onNewsLoaded(result.items)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        newsError = "Company news could not be refreshed."
+                    }
+                }
+                launch {
+                    try {
+                        val refreshedStatus = MarketData.status()
+                        if (refreshedStatus.isKnown) {
+                            onMarketStatusLoaded(refreshedStatus)
+                        }
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        // Keep the last known shared market status. Company research
+                        // and news refresh independently from this status check.
+                    }
+                }
             }
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (_: Exception) {
-            newsError = "Shared market data could not be refreshed."
         } finally {
             newsLoading = false
         }
