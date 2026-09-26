@@ -489,7 +489,7 @@ internal fun MarketDataSettingsScreen(
             SettingsSection("Refresh") {
                 SettingsSwitchRow(
                     "Auto refresh",
-                    "Keep eligible market observations current while NSE Watcher is open.",
+                    "Keep primary market screens current while NSE Watcher is open. Practice orders and Alerts perform their own eligibility checks.",
                     autoRefresh,
                     onAutoRefresh
                 )
