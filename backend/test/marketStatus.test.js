@@ -1,7 +1,14 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 
-const { normalizeMarketStatus, latestTradingSession, chronologicallyOrderedCandles } = require('../api/market');
+const {
+  normalizeMarketStatus,
+  latestTradingSession,
+  chronologicallyOrderedCandles,
+  technicalHistoryConfig,
+  normalizeTechnicalCandles,
+  technicalDataQuality,
+} = require('../api/market');
 
 test('missing provider status is UNKNOWN, never CLOSED', () => {
   assert.deepEqual(
@@ -125,4 +132,101 @@ test('historical candle order is preserved when a timestamp is missing', () => {
   ];
 
   assert.deepEqual(chronologicallyOrderedCandles(candles), candles);
+});
+
+
+test('technical history uses a bounded daily lookback suitable for long moving averages', () => {
+  const config = technicalHistoryConfig(new Date('2026-09-26T12:00:00.000Z'), 400);
+
+  assert.equal(config.interval, '1d');
+  assert.equal(config.to, '2026-09-26');
+  assert.equal(config.from, '2025-08-22');
+  assert.equal(config.lookbackDays, 400);
+
+  assert.equal(technicalHistoryConfig(new Date('2026-09-26T12:00:00.000Z'), 10).lookbackDays, 260);
+  assert.equal(technicalHistoryConfig(new Date('2026-09-26T12:00:00.000Z'), 5000).lookbackDays, 730);
+});
+
+test('technical candles preserve verified OHLCV and never invent missing fields', () => {
+  const candles = normalizeTechnicalCandles([
+    {
+      date: '2026-09-25',
+      close: 26.4,
+      open: null,
+      high: null,
+      low: null,
+      volume: 1200000,
+      volumeAvailable: false,
+    },
+    {
+      date: '2026-09-24',
+      open: 25.0,
+      high: 26.0,
+      low: 24.8,
+      close: 25.6,
+      volume: 900000,
+      volumeAvailable: true,
+    },
+  ]);
+
+  assert.deepEqual(candles.map((candle) => candle.date), ['2026-09-24', '2026-09-25']);
+  assert.equal(candles[0].open, 25);
+  assert.equal(candles[0].volume, 900000);
+  assert.equal(candles[0].volumeAvailable, true);
+
+  assert.equal(candles[1].open, null);
+  assert.equal(candles[1].high, null);
+  assert.equal(candles[1].low, null);
+  assert.equal(candles[1].volume, null);
+  assert.equal(candles[1].volumeAvailable, false);
+});
+
+test('technical data quality reports coverage and indicator readiness from actual candles', () => {
+  const candles = Array.from({ length: 205 }, (_, index) => ({
+    date: `2026-01-${String((index % 28) + 1).padStart(2, '0')}`,
+    timestamp: new Date(Date.UTC(2026, 0, 1 + index)).toISOString(),
+    open: 10 + index,
+    high: 11 + index,
+    low: 9 + index,
+    close: 10.5 + index,
+    volume: index >= 185 ? 100000 + index : null,
+    volumeAvailable: index >= 185,
+  }));
+
+  const quality = technicalDataQuality(candles, {
+    qualityStatus: 'PARTIAL',
+    qualityIssues: ['OLDER_VOLUME_MISSING'],
+    recommendedChartType: 'candlestick',
+    sandbox: false,
+  });
+
+  assert.equal(quality.candleCount, 205);
+  assert.equal(quality.completeOhlcCount, 205);
+  assert.equal(quality.volumeAvailableCount, 20);
+  assert.equal(quality.ohlcCoveragePct, 100);
+  assert.equal(quality.volumeCoveragePct, 9.76);
+  assert.equal(quality.indicatorReadiness.sma200, true);
+  assert.equal(quality.indicatorReadiness.macd, true);
+  assert.equal(quality.indicatorReadiness.stochastic14, true);
+  assert.equal(quality.indicatorReadiness.volume20, true);
+  assert.deepEqual(quality.qualityIssues, ['OLDER_VOLUME_MISSING']);
+});
+
+test('stochastic and volume readiness stay false when required trailing observations are incomplete', () => {
+  const candles = Array.from({ length: 40 }, (_, index) => ({
+    date: `row-${index}`,
+    close: 100 + index,
+    open: index < 30 ? 99 + index : null,
+    high: index < 30 ? 101 + index : null,
+    low: index < 30 ? 98 + index : null,
+    volume: index < 15 ? 1000 + index : null,
+    volumeAvailable: index < 15,
+  }));
+
+  const quality = technicalDataQuality(candles);
+
+  assert.equal(quality.indicatorReadiness.rsi14, true);
+  assert.equal(quality.indicatorReadiness.macd, true);
+  assert.equal(quality.indicatorReadiness.stochastic14, false);
+  assert.equal(quality.indicatorReadiness.volume20, false);
 });
