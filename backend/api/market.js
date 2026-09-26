@@ -87,6 +87,123 @@ function periodConfig(period) {
   return { interval, from: start.toISOString().slice(0, 10), to: end.toISOString().slice(0, 10) };
 }
 
+function technicalHistoryConfig(now = new Date(), lookbackDays = 400) {
+  const parsed = Number(lookbackDays);
+  const boundedDays = Number.isFinite(parsed)
+    ? Math.min(730, Math.max(260, Math.trunc(parsed)))
+    : 400;
+  const to = new Date(now);
+  const from = new Date(now);
+  from.setUTCDate(from.getUTCDate() - boundedDays);
+  return {
+    interval: '1d',
+    from: from.toISOString().slice(0, 10),
+    to: to.toISOString().slice(0, 10),
+    lookbackDays: boundedDays,
+  };
+}
+
+function positiveNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : null;
+}
+
+function normalizeTechnicalCandles(rawCandles) {
+  return chronologicallyOrderedCandles(Array.isArray(rawCandles) ? rawCandles : [])
+    .map((candle) => {
+      const close = positiveNumber(candle?.close);
+      if (close === null) return null;
+
+      const rawVolume = Number(candle?.volume);
+      const explicitlyUnavailable = candle?.volumeAvailable === false;
+      const volumeAvailable = !explicitlyUnavailable && Number.isFinite(rawVolume) && rawVolume >= 0;
+      const rawDate = String(candle?.date || candle?.timestamp || '').trim();
+      const timestamp = candleTimestamp(candle);
+
+      return {
+        date: rawDate,
+        timestamp: timestamp ? timestamp.toISOString() : null,
+        open: positiveNumber(candle?.open),
+        high: positiveNumber(candle?.high),
+        low: positiveNumber(candle?.low),
+        close,
+        volume: volumeAvailable ? rawVolume : null,
+        volumeAvailable,
+      };
+    })
+    .filter(Boolean);
+}
+
+function percentage(part, total) {
+  if (!total) return 0;
+  return Math.round((part / total) * 10000) / 100;
+}
+
+function technicalDataQuality(candles, meta = null) {
+  const rows = Array.isArray(candles) ? candles : [];
+  const completeOhlcCount = rows.filter((candle) =>
+    positiveNumber(candle?.open) !== null &&
+    positiveNumber(candle?.high) !== null &&
+    positiveNumber(candle?.low) !== null &&
+    positiveNumber(candle?.close) !== null
+  ).length;
+  const volumeAvailableCount = rows.filter((candle) =>
+    candle?.volumeAvailable === true &&
+    Number.isFinite(Number(candle?.volume)) &&
+    Number(candle.volume) >= 0
+  ).length;
+  const closeOnlyCount = rows.filter((candle) =>
+    positiveNumber(candle?.close) !== null &&
+    positiveNumber(candle?.open) === null &&
+    positiveNumber(candle?.high) === null &&
+    positiveNumber(candle?.low) === null
+  ).length;
+
+  const trailingHasOhlc = (count) => {
+    const tail = rows.slice(-count);
+    return tail.length >= count && tail.every((candle) =>
+      positiveNumber(candle?.high) !== null &&
+      positiveNumber(candle?.low) !== null &&
+      positiveNumber(candle?.close) !== null
+    );
+  };
+  const trailingHasVolume = (count) => {
+    const tail = rows.slice(-count);
+    return tail.length >= count && tail.every((candle) =>
+      candle?.volumeAvailable === true &&
+      Number.isFinite(Number(candle?.volume)) &&
+      Number(candle.volume) >= 0
+    );
+  };
+
+  return {
+    qualityStatus: meta?.qualityStatus || null,
+    qualityIssues: Array.isArray(meta?.qualityIssues) ? meta.qualityIssues : [],
+    recommendedChartType: meta?.recommendedChartType || null,
+    sandbox: meta?.sandbox === true,
+    coverageStartsAt: meta?.coverageStartsAt || null,
+    coverageEndsAt: meta?.coverageEndsAt || null,
+    candleCount: rows.length,
+    completeOhlcCount,
+    volumeAvailableCount,
+    closeOnlyCount,
+    ohlcCoveragePct: percentage(completeOhlcCount, rows.length),
+    volumeCoveragePct: percentage(volumeAvailableCount, rows.length),
+    firstObservationAt: rows[0]?.timestamp || rows[0]?.date || null,
+    lastObservationAt: rows[rows.length - 1]?.timestamp || rows[rows.length - 1]?.date || null,
+    indicatorReadiness: {
+      sma20: rows.length >= 20,
+      sma50: rows.length >= 50,
+      sma100: rows.length >= 100,
+      sma200: rows.length >= 200,
+      rsi14: rows.length >= 15,
+      macd: rows.length >= 35,
+      stochastic14: trailingHasOhlc(14),
+      volume20: trailingHasVolume(20),
+    },
+  };
+}
+
 function candleArray(raw) {
   if (Array.isArray(raw?.candles)) return raw.candles;
   if (Array.isArray(raw?.data?.candles)) return raw.data.candles;
@@ -273,6 +390,35 @@ module.exports = async (req, res) => {
       const losers = await mystocks('/market/movers?exchange=NSE&direction=losers&limit=10');
       return json(res, 200, { source: 'MyStocks Africa', delayMinutes: MARKET_DATA_DELAY_MINUTES, refreshIntervalSeconds: MARKET_DATA_REFRESH_SECONDS, fetchedAt: new Date().toISOString(), gainers, losers });
     }
+    if (action === 'technical-history') {
+      const symbol = String(req.query.symbol || '').trim();
+      if (!symbol) return json(res, 400, { error: 'symbol is required' });
+
+      const cfg = technicalHistoryConfig(new Date(), req.query.lookbackDays);
+      const data = await mystocks(
+        `/stocks/${encodeURIComponent(symbol)}/candles?interval=${cfg.interval}&from=${cfg.from}&to=${cfg.to}`
+      );
+      const candles = normalizeTechnicalCandles(candleArray(data));
+      const meta = providerMeta(data);
+      const latest = candles[candles.length - 1];
+      const latestObservationAt = meta?.asOf || latest?.timestamp || latest?.date || providerAsOf(data) || null;
+
+      return json(res, 200, {
+        source: 'MyStocks Africa',
+        delayMinutes: MARKET_DATA_DELAY_MINUTES,
+        refreshIntervalSeconds: MARKET_DATA_REFRESH_SECONDS,
+        fetchedAt: new Date().toISOString(),
+        symbol,
+        purpose: 'technical-analysis',
+        interval: cfg.interval,
+        from: cfg.from,
+        to: cfg.to,
+        lookbackDays: cfg.lookbackDays,
+        latestObservationAt,
+        dataQuality: technicalDataQuality(candles, meta),
+        candles,
+      });
+    }
     if (action === 'chart') {
       const symbol = String(req.query.symbol || '').trim();
       if (!symbol) return json(res, 400, { error: 'symbol is required' });
@@ -367,3 +513,6 @@ module.exports = async (req, res) => {
 module.exports.normalizeMarketStatus = normalizeMarketStatus;
 module.exports.latestTradingSession = latestTradingSession;
 module.exports.chronologicallyOrderedCandles = chronologicallyOrderedCandles;
+module.exports.technicalHistoryConfig = technicalHistoryConfig;
+module.exports.normalizeTechnicalCandles = normalizeTechnicalCandles;
+module.exports.technicalDataQuality = technicalDataQuality;
