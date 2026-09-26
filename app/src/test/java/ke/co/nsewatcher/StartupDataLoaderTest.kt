@@ -89,4 +89,47 @@ class StartupDataLoaderTest {
         assertEquals("KCB", result.companies.single().symbol)
         assertEquals("OPEN", result.marketStatus.status)
     }
+    @Test
+    fun fastProviderFailuresStillMarkStartupIncomplete() = runTest {
+        val loader = StartupDataLoader(
+            stocks = { emptyList() },
+            news = { NewsCache.FeedResult(emptyList(), error = "offline") },
+            companies = { emptyList() },
+            status = { MyStocksCache.MarketStatus() },
+            sourceTimeoutMs = 1_000L
+        )
+
+        val result = loader.load()
+
+        assertFalse(result.completed)
+        assertTrue(result.timedOutSources.isEmpty())
+        assertEquals(
+            setOf("stocks", "news", "companies", "status"),
+            result.failedSources
+        )
+    }
+
+    @Test
+    fun emptyButSuccessfulNewsFeedDoesNotFailStartupByItself() = runTest {
+        val loader = StartupDataLoader(
+            stocks = { listOf(quote) },
+            news = { NewsCache.FeedResult(emptyList()) },
+            companies = { listOf(quote.copy(price = Double.NaN)) },
+            status = {
+                MyStocksCache.MarketStatus(
+                    isOpen = false,
+                    status = "CLOSED",
+                    isKnown = true
+                )
+            },
+            sourceTimeoutMs = 1_000L
+        )
+
+        val result = loader.load()
+
+        assertTrue(result.completed)
+        assertTrue(result.failedSources.isEmpty())
+        assertTrue(result.news.isEmpty())
+    }
+
 }
