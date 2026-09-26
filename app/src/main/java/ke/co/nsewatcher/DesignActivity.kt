@@ -167,6 +167,9 @@ private fun App(
     var companyCatalog by remember { mutableStateOf(emptyList<Stock>()) }
 
     LaunchedEffect(Unit) {
+        val snapshotStore = StartupSnapshotStore(context)
+        val offline = snapshotStore.loadFallback()
+
         val startup = StartupDataLoader(
             stocks = MarketData::stocks,
             news = { MarketData.newsFeed() },
@@ -174,28 +177,46 @@ private fun App(
             status = MarketData::status
         ).load()
 
-        if (startup.stocks.isNotEmpty()) {
-            liveStocks.value = startup.stocks
-        }
-        newsFeed = startup.news
-        companyCatalog = startup.companies
-        startupMarketStatus = startup.marketStatus
+        val unavailable = startup.failedSources + startup.timedOutSources
 
-        // Launch no longer waits on index retrieval. The four primary startup sources
-        // are independently bounded, so one slow provider cannot hide data that is
-        // already ready from another source.
+        liveStocks.value = when {
+            startup.stocks.isNotEmpty() -> startup.stocks
+            offline.stocks.isNotEmpty() -> offline.stocks
+            else -> liveStocks.value
+        }
+
+        if ("news" !in unavailable) {
+            newsFeed = startup.news
+        } else if (offline.news.isNotEmpty()) {
+            newsFeed = offline.news
+        }
+
+        companyCatalog = when {
+            startup.companies.isNotEmpty() -> startup.companies
+            offline.companies.isNotEmpty() -> offline.companies
+            else -> companyCatalog
+        }
+
+        // Persisted status is deliberately never restored. UNKNOWN is safer than
+        // authorizing alerts or Practice fills from an old OPEN/CLOSED state.
+        if (startup.marketStatus.isKnown) {
+            startupMarketStatus = startup.marketStatus
+        }
+
+        snapshotStore.saveSuccessfulSources(startup)
+
         startupComplete = startup.completed
         startupReady = true
 
-        val indices = withTimeoutOrNull(4_000L) {
-            runCatching {
-                MarketData.indices(
-                    startup.marketStatus.isKnown && startup.marketStatus.isOpen
-                )
-            }.getOrDefault(emptyList())
-        }.orEmpty()
-        if (indices.isNotEmpty()) {
-            marketIndices = indices
+        if (startup.marketStatus.isKnown) {
+            val indices = withTimeoutOrNull(4_000L) {
+                runCatching {
+                    MarketData.indices(startup.marketStatus.isOpen)
+                }.getOrDefault(emptyList())
+            }.orEmpty()
+            if (indices.isNotEmpty()) {
+                marketIndices = indices
+            }
         }
     }
 

@@ -81,6 +81,25 @@ internal fun HomePremiumDashboard(
                     openAlerts = openAlerts
                 )
             }
+            if (stocks.any { it.dataOrigin == "offline_snapshot" }) {
+                item {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        color = palette.amber.copy(alpha = 0.08f),
+                        border = BorderStroke(1.dp, palette.amber.copy(alpha = 0.42f))
+                    ) {
+                        Text(
+                            "Offline snapshot • Showing saved market observations while live data reconnects. " +
+                                "Saved prices are marked stale and cannot trigger alerts or Practice fills.",
+                            color = palette.muted,
+                            fontSize = 9.5.sp,
+                            lineHeight = 13.5.sp,
+                            modifier = Modifier.padding(horizontal = 11.dp, vertical = 9.dp)
+                        )
+                    }
+                }
+            }
             item {
                 PremiumHeroCard(
                     palette = palette,

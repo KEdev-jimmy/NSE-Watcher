@@ -72,6 +72,7 @@ internal object PracticeEngine {
         if (!known) return "Waiting for verified market status"
         if (!open) return "Waiting for market to open"
         if (q == null || !q.price.isFinite() || q.price <= 0) return "Waiting for a valid company quote"
+        if (q.freshnessMode.equals("STALE", true)) return "Waiting for a fresh company quote"
         val at = runCatching { Instant.parse(q.observedAt) }.getOrNull() ?: return "Waiting for a timed quote"
         if (at.toEpochMilli() < o.created) return "Waiting for a quote observed after your order"
         if (at.toEpochMilli() > now || now - at.toEpochMilli() > 30 * 60_000L) return "Waiting for a recent eligible quote"
@@ -111,6 +112,7 @@ internal object PracticeEngine {
     fun observe(s: PracticeState, stocks: List<Stock>, now: Long): PracticeState {
         val map = s.quotes.associateBy { it.symbol }.toMutableMap()
         stocks.forEach { stock ->
+            if (stock.freshnessMode.equals("STALE", true)) return@forEach
             val at = CompanyResearchPresentation.timestamp(stock.observedAt)
             val prior = map[stock.symbol]?.let { CompanyResearchPresentation.timestamp(it.at) }
             if (stock.price.isFinite() && stock.price > 0 && at != null && at.toEpochMilli() <= now && (prior == null || at >= prior))

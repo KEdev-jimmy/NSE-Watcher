@@ -51,6 +51,25 @@ class PracticeEngineTest {
         val staleNow = now + 31 * 60000
         assertNotNull(PracticeEngine.waiting(order(), quote(), true, true, staleNow))
     }
+    @Test fun explicitlyStaleQuoteNeverFillsOrReplacesSavedPracticeObservation() {
+        val s = PracticeEngine.submit(account(), order())
+        val stale = quote().copy(freshnessMode = "STALE")
+
+        assertEquals(
+            "Waiting for a fresh company quote",
+            PracticeEngine.waiting(order(), stale, true, true, now)
+        )
+        assertEquals(
+            "PENDING",
+            PracticeEngine.evaluate(s, listOf(stale), true, true, now).orders.single().status
+        )
+
+        val existing = account().copy(
+            quotes = listOf(PracticeQuote("KCB", 94.0, "2026-09-22T07:05:00Z", "KCB Group"))
+        )
+        assertEquals(existing, PracticeEngine.observe(existing, listOf(stale), now))
+    }
+
     @Test fun buyAndSellLimitsAreDirectional() {
         assertNotNull(PracticeEngine.waiting(order(), quote(101.0), true, true, now))
         assertNotNull(PracticeEngine.waiting(order(side = "SELL"), quote(99.0), true, true, now))
