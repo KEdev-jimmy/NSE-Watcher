@@ -492,7 +492,7 @@ internal fun DesignedSettingsScreen(
 
         item {
             SettingsDesignSection("About") {
-                SettingsDesignRow(Icons.Default.InfoOutline, "App Version", version, onClick = openAbout)
+                SettingsDesignRow(Icons.Default.Info, "App Version", version, onClick = openAbout)
                 SettingsDesignDivider()
                 SettingsDesignRow(
                     Icons.Default.Article,
