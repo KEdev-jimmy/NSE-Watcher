@@ -8,6 +8,7 @@ on:
     branches: [ "main" ]
 
 permissions:
+  actions: write
   contents: read
 
 env:
@@ -17,6 +18,66 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - name: Cleanup completed workflow runs older than 3 days
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cutoff_epoch="$(date -u -d '3 days ago' +%s)"
+          repo="$GITHUB_REPOSITORY"
+          tmp="$(mktemp)"
+          gh api --paginate "repos/$repo/actions/runs?per_page=100" \
+            --jq '.workflow_runs[] | [.id, .created_at, .status] | @tsv' > "$tmp"
+          deleted=0
+          while IFS=
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: ""
+
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Install Gradle
+        run: |
+          curl -fsSL https://services.gradle.org/distributions/gradle-8.14.4-bin.zip -o gradle.zip
+          unzip -q gradle.zip
+          echo "$GITHUB_WORKSPACE/gradle-8.14.4/bin" >> "$GITHUB_PATH"
+
+      - name: Run backend quality tests
+        run: node --test backend/test/companyIntelligence.test.js backend/test/marketStatus.test.js backend/test/company.test.js backend/test/movementIntelligence.test.js backend/test/newsRelevance.test.js backend/test/newsFeed.test.js backend/test/analyst.test.js
+
+      - name: Build with Gradle
+        run: gradle --no-daemon build
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: NSE-Watcher-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+\t' read -r run_id created_at status; do
+            created_epoch="$(date -u -d "$created_at" +%s)"
+            if [[ "$status" == "completed" && "$created_epoch" -lt "$cutoff_epoch" ]]; then
+              echo "Deleting run $run_id created $created_at"
+              gh api --method DELETE "repos/$repo/actions/runs/$run_id"
+              deleted=$((deleted + 1))
+            fi
+          done < "$tmp"
+          echo "Deleted $deleted old completed workflow runs."
+
       - uses: actions/checkout@v4
 
       - name: Set up Java
