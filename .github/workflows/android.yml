@@ -44,7 +44,7 @@ jobs:
 
           if [[ "$count" -gt 0 ]]; then
             export GH_TOKEN repo
-            xargs -r -n1 -P16 bash -c '
+            xargs -r -n1 -P8 bash -c '
               id="$1"
               gh api --method DELETE "repos/$repo/actions/runs/$id" >/dev/null 2>&1 || true
             ' _ < "$old_ids"
