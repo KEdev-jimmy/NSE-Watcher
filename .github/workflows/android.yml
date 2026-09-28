@@ -25,21 +25,32 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cutoff_epoch="$(date -u -d '3 days ago' +%s)"
+          cutoff_iso="$(date -u -d '3 days ago' +%Y-%m-%dT%H:%M:%SZ)"
           repo="$GITHUB_REPOSITORY"
-          tmp="$(mktemp)"
+          all_runs="$(mktemp)"
+          old_ids="$(mktemp)"
+
           gh api --paginate "repos/$repo/actions/runs?per_page=100" \
-            --jq '.workflow_runs[] | [.id, .created_at, .status] | @tsv' > "$tmp"
-          deleted=0
+            --jq '.workflow_runs[] | [.id, .created_at, .status] | @tsv' > "$all_runs"
+
           while IFS=$'\t' read -r run_id created_at status; do
-            created_epoch="$(date -u -d "$created_at" +%s)"
-            if [[ "$status" == "completed" && "$created_epoch" -lt "$cutoff_epoch" ]]; then
-              echo "Deleting run $run_id created $created_at"
-              gh api --method DELETE "repos/$repo/actions/runs/$run_id"
-              deleted=$((deleted + 1))
+            if [[ "$status" == "completed" && "$created_at" < "$cutoff_iso" ]]; then
+              echo "$run_id" >> "$old_ids"
             fi
-          done < "$tmp"
-          echo "Deleted $deleted old completed workflow runs."
+          done < "$all_runs"
+
+          count="$(wc -l < "$old_ids" | tr -d ' ')"
+          echo "Deleting $count completed workflow runs older than $cutoff_iso"
+
+          if [[ "$count" -gt 0 ]]; then
+            export GH_TOKEN repo
+            xargs -r -n1 -P16 bash -c '
+              id="$1"
+              gh api --method DELETE "repos/$repo/actions/runs/$id" >/dev/null 2>&1 || true
+            ' _ < "$old_ids"
+          fi
+
+          echo "Cleanup complete."
 
       - uses: actions/checkout@v4
 
