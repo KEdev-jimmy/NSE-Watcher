@@ -8,7 +8,6 @@ on:
     branches: [ "main" ]
 
 permissions:
-  actions: write
   contents: read
 
 env:
@@ -18,40 +17,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Cleanup completed workflow runs older than 3 days
-        if: github.event_name == 'push'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          cutoff_iso="$(date -u -d '3 days ago' +%Y-%m-%dT%H:%M:%SZ)"
-          repo="$GITHUB_REPOSITORY"
-          all_runs="$(mktemp)"
-          old_ids="$(mktemp)"
-
-          gh api --paginate "repos/$repo/actions/runs?per_page=100" \
-            --jq '.workflow_runs[] | [.id, .created_at, .status] | @tsv' > "$all_runs"
-
-          while IFS=$'\t' read -r run_id created_at status; do
-            if [[ "$status" == "completed" && "$created_at" < "$cutoff_iso" ]]; then
-              echo "$run_id" >> "$old_ids"
-            fi
-          done < "$all_runs"
-
-          count="$(wc -l < "$old_ids" | tr -d ' ')"
-          echo "Deleting $count completed workflow runs older than $cutoff_iso"
-
-          if [[ "$count" -gt 0 ]]; then
-            export GH_TOKEN repo
-            xargs -r -n1 -P8 bash -c '
-              id="$1"
-              gh api --method DELETE "repos/$repo/actions/runs/$id" >/dev/null 2>&1 || true
-            ' _ < "$old_ids"
-          fi
-
-          echo "Cleanup complete."
-
       - uses: actions/checkout@v4
 
       - name: Set up Java
