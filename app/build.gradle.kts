@@ -5,12 +5,65 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+val releaseVersionCode = providers.gradleProperty("NSEWATCHER_VERSION_CODE")
+    .orElse(providers.environmentVariable("NSEWATCHER_VERSION_CODE"))
+    .orElse("1")
+    .get()
+    .toIntOrNull()
+    ?.takeIf { it in 1..2_100_000_000 }
+    ?: error("NSEWATCHER_VERSION_CODE must be a positive supported Android integer.")
+
+val releaseVersionName = providers.gradleProperty("NSEWATCHER_VERSION_NAME")
+    .orElse(providers.environmentVariable("NSEWATCHER_VERSION_NAME"))
+    .orElse("0.1.0")
+    .get()
+
+val releaseKeystore = providers.environmentVariable("NSEWATCHER_RELEASE_KEYSTORE")
+    .orNull?.takeIf { it.isNotBlank() }
+val releaseStorePassword = providers.environmentVariable("NSEWATCHER_RELEASE_STORE_PASSWORD")
+    .orNull?.takeIf { it.isNotBlank() }
+val releaseKeyAlias = providers.environmentVariable("NSEWATCHER_RELEASE_KEY_ALIAS")
+    .orNull?.takeIf { it.isNotBlank() }
+val releaseKeyPassword = providers.environmentVariable("NSEWATCHER_RELEASE_KEY_PASSWORD")
+    .orNull?.takeIf { it.isNotBlank() }
+val signingInputs = listOf(releaseKeystore, releaseStorePassword, releaseKeyAlias, releaseKeyPassword)
+val releaseSigningConfigured = signingInputs.all { it != null }
+check(signingInputs.all { it == null } || releaseSigningConfigured) {
+    "Release signing is incomplete. Restore all permanent signing inputs; do not substitute a new key."
+}
+
 android { namespace = "ke.co.nsewatcher"; compileSdk = 35
-    defaultConfig { applicationId = "ke.co.nsewatcher"; minSdk = 26; targetSdk = 35; versionCode = 1; versionName = "0.1.0"; testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner" }
+    defaultConfig {
+        applicationId = "ke.co.nsewatcher"
+        minSdk = 26
+        targetSdk = 35
+        versionCode = releaseVersionCode
+        versionName = releaseVersionName
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
     buildFeatures { compose = true; buildConfig = true }
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
 
-    buildTypes { release { isMinifyEnabled = false; proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro") } }
+    signingConfigs {
+        if (releaseSigningConfigured) {
+            create("permanentRelease") {
+                storeFile = file(requireNotNull(releaseKeystore))
+                storeType = "PKCS12"
+                storePassword = requireNotNull(releaseStorePassword)
+                keyAlias = requireNotNull(releaseKeyAlias)
+                keyPassword = requireNotNull(releaseKeyPassword)
+            }
+        }
+    }
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (releaseSigningConfigured) {
+                signingConfig = signingConfigs.getByName("permanentRelease")
+            }
+        }
+    }
     lint {
         disable += "ProduceStateDoesNotAssignValue"
     }
