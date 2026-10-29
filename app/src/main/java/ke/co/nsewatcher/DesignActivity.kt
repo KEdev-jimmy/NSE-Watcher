@@ -542,7 +542,7 @@ private fun BottomNav(selected: Int, onSelect: (Int) -> Unit) {
     val palette = premiumHomePalette(dark)
 
     BoxWithConstraints(
-        Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 5.dp)
+        Modifier.fillMaxWidth()
     ) {
         val compact = shouldCompactBottomNav(
             widthDp = maxWidth.value,
@@ -551,17 +551,17 @@ private fun BottomNav(selected: Int, onSelect: (Int) -> Unit) {
         )
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(28.dp),
+            shape = RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp),
             color = palette.nav,
             border = BorderStroke(1.dp, palette.border),
             tonalElevation = 0.dp,
-            shadowElevation = 7.dp
+            shadowElevation = 0.dp
         ) {
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .height(if (compact) 64.dp else 68.dp)
-                    .padding(horizontal = 6.dp, vertical = 5.dp),
+                    .height(if (compact) 70.dp else 74.dp)
+                    .padding(horizontal = 5.dp, vertical = 7.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 items.forEachIndexed { index, item ->
@@ -569,14 +569,6 @@ private fun BottomNav(selected: Int, onSelect: (Int) -> Unit) {
                     val selectedModifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .clip(RoundedCornerShape(23.dp))
-                        .background(
-                            if (isSelected) {
-                                palette.primary.copy(alpha = if (dark) 0.13f else 0.10f)
-                            } else {
-                                Color.Transparent
-                            }
-                        )
                         .clickable { onSelect(index) }
                     Column(
                         selectedModifier,
@@ -589,25 +581,24 @@ private fun BottomNav(selected: Int, onSelect: (Int) -> Unit) {
                             tint = if (isSelected) palette.primary else palette.muted,
                             modifier = Modifier.size(if (isSelected) 25.dp else 23.dp)
                         )
-                        if (!compact || isSelected) {
-                            Spacer(Modifier.height(3.dp))
-                            Text(
-                                item.first,
-                                color = if (isSelected) palette.primary else palette.muted,
-                                fontSize = if (compact) 9.sp else 10.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                maxLines = 1,
-                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                            )
-                        }
-                        if (isSelected && !compact) {
-                            Spacer(Modifier.height(3.dp))
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            item.first,
+                            color = if (isSelected) palette.primary else palette.muted,
+                            fontSize = if (compact) 9.sp else 10.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        if (isSelected) {
                             Box(
-                                Modifier
-                                    .size(4.dp)
+                                Modifier.width(24.dp).height(3.dp)
                                     .clip(CircleShape)
                                     .background(palette.primary)
                             )
+                        } else {
+                            Spacer(Modifier.height(3.dp))
                         }
                     }
                 }

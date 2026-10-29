@@ -74,6 +74,7 @@ internal fun HomePremiumDashboard(
     val portfolio = HomeBriefingPresentation.portfolio(practiceState, stocks)
     val activity = HomeBriefingPresentation.tradingActivity(stocks, now)
     val verifiedNews = HomeBriefingPresentation.latestNews(newsFeed, now)
+    val minute = HomeBriefingPresentation.minute(stocks, watchlistPreview, now)
 
     Column(
         Modifier
@@ -82,8 +83,8 @@ internal fun HomePremiumDashboard(
     ) {
         androidx.compose.foundation.lazy.LazyColumn(
             modifier = Modifier.weight(1f),
-            contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             item {
                 PremiumHomeHeader(
@@ -148,10 +149,11 @@ internal fun HomePremiumDashboard(
                 )
             }
             item {
-                HomePortfolioStatPair(
+                HomeMarketMinuteCard(
                     palette = palette,
-                    summary = portfolio,
-                    onOpen = openPractice
+                    summary = minute,
+                    openMarket = openMarket,
+                    openWatchlist = openWatchlist
                 )
             }
             item {
@@ -183,14 +185,6 @@ internal fun HomePremiumDashboard(
                 }
             }
             item {
-                HomeTradingActivityCard(
-                    palette = palette,
-                    activity = activity,
-                    openMarket = openMarket,
-                    openCompany = openCompany
-                )
-            }
-            item {
                 HomeCompactWatchlist(
                     palette = palette,
                     stocks = watchlistPreview,
@@ -209,6 +203,14 @@ internal fun HomePremiumDashboard(
                     error = newsError,
                     openAllNews = openAllNews,
                     openNews = openNews
+                )
+            }
+            item {
+                HomeTradingActivityCard(
+                    palette = palette,
+                    activity = activity,
+                    openMarket = openMarket,
+                    openCompany = openCompany
                 )
             }
             if (briefHasError || watchlistError) {

@@ -27,10 +27,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 
-private val BrandTeal = Color(0xFF18F0C1)
-private val BrandGreen = Color(0xFF00B983)
-private val BrandBlue = Color(0xFF1677FF)
-private val BrandDeep = Color(0xFF083E65)
+private val BrandTeal = Color(0xFF16D9AD)
+private val BrandGreen = Color(0xFF008965)
+private val BrandDeep = Color(0xFF086C77)
+private val BrandAmber = Color(0xFFF7B500)
 
 @Composable
 internal fun NseWatcherNMark(
@@ -45,54 +45,52 @@ internal fun NseWatcherNMark(
     ) {
         val w = size.width
         val h = size.height
-        val radius = w * 0.10f
+        val radius = w * 0.075f
 
         drawRoundRect(
             brush = Brush.verticalGradient(
                 0f to BrandTeal,
                 0.52f to BrandGreen,
-                1f to BrandBlue
+                1f to BrandDeep
             ),
-            topLeft = Offset(w * 0.07f, h * 0.18f),
-            size = Size(w * 0.22f, h * 0.66f),
+            topLeft = Offset(w * 0.07f, h * 0.22f),
+            size = Size(w * 0.22f, h * 0.62f),
             cornerRadius = androidx.compose.ui.geometry.CornerRadius(radius, radius)
         )
 
         drawRoundRect(
             brush = Brush.verticalGradient(
-                0f to Color(0xFF19F6C8),
+                0f to Color(0xFF1AE4BD),
                 0.60f to BrandTeal,
                 1f to BrandDeep
             ),
-            topLeft = Offset(w * 0.71f, h * 0.07f),
-            size = Size(w * 0.22f, h * 0.77f),
+            topLeft = Offset(w * 0.71f, h * 0.22f),
+            size = Size(w * 0.22f, h * 0.62f),
             cornerRadius = androidx.compose.ui.geometry.CornerRadius(radius, radius)
         )
 
         val diagonal = Path().apply {
-            moveTo(w * 0.23f, h * 0.20f)
-            lineTo(w * 0.42f, h * 0.20f)
+            moveTo(w * 0.23f, h * 0.22f)
+            lineTo(w * 0.42f, h * 0.22f)
             lineTo(w * 0.78f, h * 0.72f)
             lineTo(w * 0.78f, h * 0.84f)
             lineTo(w * 0.58f, h * 0.84f)
-            lineTo(w * 0.22f, h * 0.33f)
+            lineTo(w * 0.22f, h * 0.36f)
             close()
         }
         drawPath(
             path = diagonal,
             brush = Brush.linearGradient(
-                colors = listOf(BrandBlue, BrandTeal, BrandGreen),
-                start = Offset(w * 0.18f, h * 0.78f),
-                end = Offset(w * 0.86f, h * 0.16f)
+                colors = listOf(BrandTeal, BrandGreen, BrandDeep),
+                start = Offset(w * 0.18f, h * 0.20f),
+                end = Offset(w * 0.88f, h * 0.88f)
             )
         )
-
-        drawLine(
-            color = Color.White.copy(alpha = 0.22f),
-            start = Offset(w * 0.17f, h * 0.20f),
-            end = Offset(w * 0.17f, h * 0.66f),
-            strokeWidth = (w * 0.025f).coerceAtLeast(1f),
-            cap = StrokeCap.Round
+        drawRoundRect(
+            color = BrandAmber,
+            topLeft = Offset(w * 0.72f, h * 0.015f),
+            size = Size(w * 0.18f, h * 0.16f),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * 0.035f)
         )
     }
 }
@@ -106,26 +104,16 @@ internal fun NseWatcherBrandLockup(
     val resolvedDark = dark ?: (MaterialTheme.colorScheme.background.luminance() < 0.5f)
     val palette = premiumHomePalette(resolvedDark)
     val title = palette.text
-    val muted = palette.muted
-
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        NseWatcherNMark(Modifier.size(if (compact) 36.dp else 46.dp))
-        Spacer(Modifier.width(if (compact) 9.dp else 11.dp))
-        Column {
-            Text(
-                "NSE Watcher",
-                color = title,
-                fontSize = if (compact) 18.sp else 23.sp,
-                fontWeight = FontWeight.ExtraBold
-            )
-            Spacer(Modifier.height(1.dp))
-            Text(
-                "LEARN  INVEST  GROW",
-                color = muted,
-                fontSize = if (compact) 7.5.sp else 8.5.sp,
-                letterSpacing = 1.4.sp,
-                fontWeight = FontWeight.Medium
-            )
-        }
+        NseWatcherNMark(Modifier.size(if (compact) 33.dp else 42.dp))
+        Spacer(Modifier.width(if (compact) 8.dp else 11.dp))
+        Text(
+            "NSE WATCHER",
+            color = title,
+            fontSize = if (compact) 17.sp else 19.sp,
+            letterSpacing = 0.2.sp,
+            fontWeight = FontWeight.ExtraBold,
+            maxLines = 1
+        )
     }
 }

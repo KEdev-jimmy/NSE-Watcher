@@ -25,8 +25,38 @@ internal data class HomeTradingActivity(
     val vsAverage: Double?
 )
 
+internal data class HomeMinuteSummary(
+    val advancing: Int,
+    val declining: Int,
+    val watched: Int,
+    val verified: Int
+)
+
 /** Presentation rules shared by the Home cards; no illustrative market numbers. */
 internal object HomeBriefingPresentation {
+    /** Market breadth from observed, non-stale quotes only, not an NSE-wide claim. */
+    fun minute(stocks: List<Stock>, watched: List<Stock>, now: Instant): HomeMinuteSummary {
+        val verified = stocks.asSequence()
+            .filter { it.price.isFinite() && it.price > 0.0 }
+            .filter { it.changeAvailable && it.change.isFinite() }
+            .filterNot { it.freshnessMode.equals("STALE", ignoreCase = true) }
+            .filter { stock ->
+                val observed = CompanyResearchPresentation.timestamp(stock.observedAt)
+                    ?: return@filter false
+                !observed.isAfter(now.plusSeconds(60)) &&
+                    Duration.between(observed, now) <= Duration.ofDays(7)
+            }
+            .distinctBy { it.symbol.trim().uppercase() }
+            .toList()
+        val watchSymbols = watched.map { it.symbol.trim().uppercase() }.toSet()
+        return HomeMinuteSummary(
+            advancing = verified.count { it.change > 0.0 },
+            declining = verified.count { it.change < 0.0 },
+            watched = verified.count { it.symbol.trim().uppercase() in watchSymbols },
+            verified = verified.size
+        )
+    }
+
     fun portfolio(state: PracticeState?, currentQuotes: List<Stock>): HomePortfolioSummary? {
         if (state?.enabled != true) return null
         val positions = PracticeEngine.positions(state)
@@ -92,7 +122,7 @@ internal object HomeBriefingPresentation {
 
     fun marketStatus(known: Boolean, open: Boolean): String = when {
         !known -> "Status unavailable"
-        open -> "Market open"
+        open -> "Market opened"
         else -> "Market closed"
     }
 }

@@ -74,7 +74,7 @@ internal fun PremiumCardSurface(
         Column(
             Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
+                .padding(16.dp),
             content = content
         )
     }
