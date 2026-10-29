@@ -91,8 +91,42 @@ class HomeBriefingPresentationTest {
     }
 
     @Test fun marketStatusIsShortAndHonestWhenUnknown() {
-        assertEquals("Market open", HomeBriefingPresentation.marketStatus(true, true))
+        assertEquals("Market opened", HomeBriefingPresentation.marketStatus(true, true))
         assertEquals("Market closed", HomeBriefingPresentation.marketStatus(true, false))
         assertEquals("Status unavailable", HomeBriefingPresentation.marketStatus(false, false))
+    }
+
+    @Test fun minuteExcludesStaleFutureMissingAndUnconfirmedQuotes() {
+        val rising = stock("KCB", 100).copy(change = 2.0)
+        val falling = stock("SCOM", 200).copy(change = -1.5)
+        val stale = stock("EQTY", 50).copy(freshnessMode = "STALE")
+        val future = stock("ABSA", 80).copy(observedAt = "2026-10-30T10:00:00Z")
+        val untimed = stock("COOP", 90).copy(observedAt = "")
+        val unconfirmed = stock("NBK", 50).copy(changeAvailable = false)
+        val invalidPrice = stock("BAT", 50).copy(price = 0.0)
+        val now = Instant.parse("2026-10-29T13:00:00Z")
+
+        val result = HomeBriefingPresentation.minute(
+            stocks = listOf(rising, falling, stale, future, untimed, unconfirmed, invalidPrice),
+            watched = listOf(rising, stale, falling),
+            now = now
+        )
+
+        assertEquals(1, result.advancing)
+        assertEquals(1, result.declining)
+        assertEquals(2, result.watched)
+        assertEquals(2, result.verified)
+    }
+
+    @Test fun minuteHasNoInventedCountsWhenFeedIsUnavailable() {
+        val result = HomeBriefingPresentation.minute(
+            stocks = listOf(stock("KCB", 100).copy(observedAt = "")),
+            watched = emptyList(),
+            now = Instant.parse("2026-10-29T13:00:00Z")
+        )
+        assertEquals(0, result.verified)
+        assertEquals(0, result.advancing)
+        assertEquals(0, result.declining)
+        assertEquals(0, result.watched)
     }
 }

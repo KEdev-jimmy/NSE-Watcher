@@ -29,31 +29,31 @@ internal data class PremiumHomePalette(
 )
 
 private val NseWatcherLightPalette = PremiumHomePalette(
-    background = Color(0xFFFAF9F2),
+    background = Color(0xFFF7FAF6),
     surface = Color(0xFFFFFFFF),
-    raised = Color(0xFFF2F7F1),
-    border = Color(0xFFE1E8DF),
-    text = Color(0xFF0B2B31),
-    muted = Color(0xFF6D7D77),
-    primary = Color(0xFF008D5D),
-    secondary = Color(0xFF117A9B),
-    danger = Color(0xFFE23F50),
-    amber = Color(0xFFF0B531),
-    nav = Color(0xFFFFFEFA)
+    raised = Color(0xFFEDF6F1),
+    border = Color(0xFFE2EDE7),
+    text = Color(0xFF102F3B),
+    muted = Color(0xFF667F88),
+    primary = Color(0xFF008965),
+    secondary = Color(0xFF078F97),
+    danger = Color(0xFFD84053),
+    amber = Color(0xFFF7B500),
+    nav = Color(0xFFFFFFFF)
 )
 
 private val NseWatcherDarkPalette = PremiumHomePalette(
-    background = Color(0xFF031326),
-    surface = Color(0xFF071D35),
-    raised = Color(0xFF0B2743),
-    border = Color(0xFF173E61),
-    text = Color(0xFFF7FAFF),
-    muted = Color(0xFFA7B8CB),
-    primary = Color(0xFF20F0C1),
-    secondary = Color(0xFF27B6FF),
-    danger = Color(0xFFFF526B),
-    amber = Color(0xFFF6C65B),
-    nav = Color(0xFF061A31)
+    background = Color(0xFF061C2B),
+    surface = Color(0xFF0A2738),
+    raised = Color(0xFF103347),
+    border = Color(0xFF24495A),
+    text = Color(0xFFF4FBFA),
+    muted = Color(0xFFAFC4CC),
+    primary = Color(0xFF16D9AD),
+    secondary = Color(0xFF29A8E5),
+    danger = Color(0xFFFF6079),
+    amber = Color(0xFFF5BD61),
+    nav = Color(0xFF071D2B)
 )
 
 internal fun premiumHomePalette(dark: Boolean): PremiumHomePalette =
