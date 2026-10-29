@@ -51,6 +51,11 @@ internal fun HomePremiumDashboard(
     practiceInsights: PracticeLearningInsights,
     practiceEnabled: Boolean,
     practiceCash: Double,
+    practiceState: PracticeState?,
+    practiceStateError: Boolean,
+    newsFeed: List<NewsItem>,
+    newsLoading: Boolean,
+    newsError: Boolean,
     profileName: String,
     avatarUri: String?,
     onRefresh: () -> Unit,
@@ -61,12 +66,14 @@ internal fun HomePremiumDashboard(
     openCompanies: () -> Unit,
     openCompany: (Stock) -> Unit,
     openBriefItem: (HomeBriefItem) -> Unit,
+    openNews: (NewsItem) -> Unit,
+    openAllNews: () -> Unit,
     openProfile: () -> Unit
 ) {
     val palette = premiumHomePalette(darkTheme)
-    val hero = HomePremiumPresentation.hero(intelligence, briefItems)
-    val spotlight = HomePremiumPresentation.indexSpotlight(intelligence.marketIndices)
-    val sentiment = HomePremiumPresentation.sentiment(intelligence.breadth, stocks.size)
+    val portfolio = HomeBriefingPresentation.portfolio(practiceState, stocks)
+    val activity = HomeBriefingPresentation.tradingActivity(stocks, now)
+    val verifiedNews = HomeBriefingPresentation.latestNews(newsFeed, now)
 
     Column(
         Modifier
@@ -88,6 +95,14 @@ internal fun HomePremiumDashboard(
                     openCompanies = openCompanies,
                     openAlerts = openAlerts,
                     openProfile = openProfile
+                )
+            }
+            item {
+                HomeBriefingGreeting(
+                    palette = palette,
+                    name = profileName,
+                    now = now,
+                    market = market
                 )
             }
             if (offlineSnapshotSources.isNotEmpty()) {
@@ -123,33 +138,60 @@ internal fun HomePremiumDashboard(
                 }
             }
             item {
-                PremiumHeroCard(
+                HomePracticePortfolioHero(
                     palette = palette,
                     dark = darkTheme,
-                    market = market,
-                    stocks = stocks,
-                    now = now,
-                    hero = hero,
-                    spotlight = spotlight,
-                    topMover = (intelligence.gainers + intelligence.losers)
-                        .maxByOrNull { abs(it.change) },
-                    refreshing = refreshing,
-                    onRefresh = onRefresh,
-                    onHeroAction = {
-                        val item = hero.briefItem
-                        if (item != null) openBriefItem(item) else openMarket()
-                    }
+                    loading = practiceEnabled && practiceState == null && !practiceStateError,
+                    error = practiceStateError,
+                    summary = portfolio,
+                    onOpen = openPractice
                 )
             }
             item {
-                PremiumMarketOverview(
+                HomePortfolioStatPair(
                     palette = palette,
-                    breadth = intelligence.breadth,
-                    sentiment = sentiment
+                    summary = portfolio,
+                    onOpen = openPractice
                 )
             }
             item {
-                PremiumWatchlistStrip(
+                HomeUnusualMove(
+                    palette = palette,
+                    attention = marketAttention.firstOrNull(),
+                    openMarket = openMarket,
+                    openCompany = openCompany
+                )
+            }
+            briefItems.firstOrNull()?.let { followUp ->
+                item {
+                    PremiumCardSurface(
+                        palette,
+                        Modifier.fillMaxWidth(),
+                        onClick = { openBriefItem(followUp) }
+                    ) {
+                        Text("New for you", color = palette.primary, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            followUp.title,
+                            color = palette.text,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text("Review the evidence  ›", color = palette.muted, fontSize = 10.sp)
+                    }
+                }
+            }
+            item {
+                HomeTradingActivityCard(
+                    palette = palette,
+                    activity = activity,
+                    openMarket = openMarket,
+                    openCompany = openCompany
+                )
+            }
+            item {
+                HomeCompactWatchlist(
                     palette = palette,
                     stocks = watchlistPreview,
                     histories = watchlistHistories,
@@ -160,21 +202,13 @@ internal fun HomePremiumDashboard(
                 )
             }
             item {
-                PremiumWhyMovingCard(
+                HomeLatestMarketNews(
                     palette = palette,
-                    dark = darkTheme,
-                    attention = marketAttention.firstOrNull(),
-                    openMarket = openMarket,
-                    openCompany = openCompany
-                )
-            }
-            item {
-                PremiumPracticeOverview(
-                    palette = palette,
-                    enabled = practiceEnabled,
-                    cash = practiceCash,
-                    insights = practiceInsights,
-                    openPractice = openPractice
+                    news = verifiedNews,
+                    loading = newsLoading,
+                    error = newsError,
+                    openAllNews = openAllNews,
+                    openNews = openNews
                 )
             }
             if (briefHasError || watchlistError) {

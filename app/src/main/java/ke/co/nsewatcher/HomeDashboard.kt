@@ -408,6 +408,11 @@ fun HomeDashboard(
             practiceInsights = practiceInsights,
             practiceEnabled = practiceEnabled,
             practiceCash = practiceCash,
+            practiceState = practiceState,
+            practiceStateError = practiceStateError,
+            newsFeed = newsFeed,
+            newsLoading = newsLoading,
+            newsError = newsError,
             profileName = name,
             avatarUri = avatar,
             onRefresh = ::refresh,
@@ -418,6 +423,8 @@ fun HomeDashboard(
             openCompanies = openCompanies,
             openCompany = openCompany,
             openBriefItem = ::reviewAndOpen,
+            openNews = openNews,
+            openAllNews = openAllNews,
             openProfile = openProfile
         )
         if (showChanges) ModalBottomSheet(
