@@ -1,5 +1,16 @@
 # NSE Watcher — Project Handoff & Development Context
 
+## Permanent APK update continuity — 29 October 2026
+
+- Android CI preserves backend/Android validation and internal debug artifacts. Successful pushes to `main` then build a signed APK from the same tested commit and publish exactly `NSE-Watcher-Full.apk` and `NSE-Watcher-Update.apk` at `ci-apk`. They contain identical APK bytes. PR and manual validation runs cannot publish rolling downloads.
+- Preserve application ID `ke.co.nsewatcher`, one permanent NSE-Watcher-specific signing identity, and increasing version codes. Never reuse PesaTrack's key or generate a new key per chat/build. Missing signing credentials must stop publication, with no debug fallback.
+- The four `NSEWATCHER_RELEASE_*` repository secrets provide the signing inputs. Repository variable `NSEWATCHER_RELEASE_CERT_SHA256` pins the public certificate. Rolling versionCode is `200000 + GITHUB_RUN_NUMBER`; versionName is `0.1.<GITHUB_RUN_NUMBER>`. Existing signed asset checks reject incompatible identities, downgrades and different bytes under an equal code. Byte-identical existing assets can be preserved during repair of a partially completed publication.
+- Keep protected key/recovery copies outside Git; the owner authorized C: recovery storage, with an independent offline copy still recommended. Inspect existing credentials before any rotation. Do not print signing values or change unrelated provider/backend secrets.
+- See [docs/RELEASE_PROCESS.md](docs/RELEASE_PROCESS.md) for key recovery, exact triggers, safe retries and acceptance checks. Configuration/tests alone do not prove successful signed publication. Record the actual successful run and downloaded APK verification before claiming release completion.
+- Existing phone update compatibility and data retention require separate manual acceptance. Do not uninstall, clear data or reset a device for signing setup. Any incompatible debug-install migration needs verified private backup/restore and explicit approval.
+
+---
+
 > **Purpose of this file:** persistent development handoff/context for future coding chats.  
 > This is **not** the main README. It records the decisions, architecture, phases, audits, implementation history, constraints, and next steps that must be preserved when continuing work on NSE Watcher.
 
